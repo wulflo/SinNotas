@@ -1,0 +1,32 @@
+# Dependencias
+node_modules/
+.pnpm-store/
+
+# Compilación
+dist/
+dist-tauri/
+src-tauri/target/
+# Proyecto Android/iOS generado por `tauri android init` / `tauri ios init`.
+src-tauri/gen/
+
+# Certificados y material de firma (NUNCA subir al repositorio)
+*.jks
+*.keystore
+*.base64.txt
+*.b64
+*.p12
+*.pfx
+keystore-secrets.txt
+
+# Artefactos de compilación y descargas de CI
+*.apk
+*.aab
+*.idsig
+artifacts/
+permissions.txt
+manifest-dump.xml
+zipalign.txt
+
+# IDEs
+.cursor/
+.vscode/

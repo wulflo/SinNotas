@@ -1,0 +1,41 @@
+[package]
+name = "sin-notas"
+version = "0.1.1"
+description = "A blazing-fast, file-first markdown outliner inspired by Logseq"
+authors = ["Wulflo"]
+license = ""
+repository = ""
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0.0", features = [] }
+
+[lib]
+# El sufijo `_lib` evita conflictos con el nombre del binario en Windows.
+# Tauri Android/iOS compilan este crate como biblioteca (`cargo build --lib`).
+name = "sin_notas_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[dependencies]
+tauri = { version = "2.0.0", features = ["protocol-asset"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-android-fs = "2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+walkdir = "2.5"
+regex = "1.10"
+uuid = { version = "1.10", features = ["v4"] }
+quick-xml = "0.41"
+async-trait = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
