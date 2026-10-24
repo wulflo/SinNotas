@@ -498,7 +498,6 @@ const flashcardKeyEasy = document.getElementById("flashcard-key-easy") as HTMLIn
 const flashcardStatToday = document.getElementById("flashcard-stat-today") as HTMLElement;
 const flashcardStatTotal = document.getElementById("flashcard-stat-total") as HTMLElement;
 const flashcardStatFocus = document.getElementById("flashcard-stat-focus") as HTMLElement;
-const flashcardTreeType = document.getElementById("flashcard-tree-type") as HTMLSelectElement;
 const flashcardGrowthTree = document.querySelector<SVGSVGElement>("#flashcard-growth-tree")!;
 const flashcardTreeProgress = document.getElementById("flashcard-tree-progress") as HTMLSpanElement;
 const flashcardPointsBadge = document.getElementById("flashcard-points-badge") as HTMLSpanElement;
@@ -554,17 +553,6 @@ const snapshotActiveNotesList = document.getElementById("snapshot-active-notes-l
 const btnOpenSnapshotHistory = document.getElementById("btn-open-snapshot-history") as HTMLButtonElement;
 const systemFontSelect = document.getElementById("system-font-select") as HTMLSelectElement;
 initializeLocalization(languageSelect);
-  languageSelect.addEventListener("change", () => {
-    const val = languageSelect.value;
-    if (val === "zh") {
-      showToast("Idioma chino próximamente");
-      const pref = localStorage.getItem("sinnotas-language");
-      if (pref === "es") languageSelect.value = "es";
-      else if (pref === "en") languageSelect.value = "en";
-      else languageSelect.value = "auto";
-      localStorage.setItem("sinnotas-language", languageSelect.value);
-    }
-  });
 
 // Gamepad Elements
 const gamepadEnabledCheckbox = document.getElementById("gamepad-enabled-checkbox") as HTMLInputElement;
@@ -8051,13 +8039,6 @@ const flashcardExplorerVirtual = new VirtualList<Flashcard>({
   emptyText: "No se encontraron tarjetas en las notas del vault.",
 });
 
-const flashcardTreeTypes = new Set([
-  "oak", "pine", "maple", "birch", "cherry", "willow", "cedar", "spruce", "fir", "poplar",
-  "elm", "ash", "beech", "walnut", "olive", "eucalyptus", "magnolia", "palm", "redwood", "baobab",
-]);
-const storedTreeType = localStorage.getItem("sinnotas-flashcard-tree");
-if (storedTreeType && flashcardTreeTypes.has(storedTreeType)) flashcardTreeType.value = storedTreeType;
-
 const intAgain = document.getElementById("int-again") as HTMLElement;
 const intHard = document.getElementById("int-hard") as HTMLElement;
 const intGood = document.getElementById("int-good") as HTMLElement;
@@ -8580,11 +8561,6 @@ pomodoroReset.addEventListener("click", () => {
   pomodoroCompletedFocusSessions = 0;
   pomodoroRemainingSeconds = pomodoroFocusMinutes * 60;
   renderPomodoro();
-});
-flashcardTreeType.addEventListener("change", () => {
-  if (!flashcardTreeTypes.has(flashcardTreeType.value)) return;
-  localStorage.setItem("sinnotas-flashcard-tree", flashcardTreeType.value);
-  updateFlashcardProgressTree();
 });
 
 function setFlashcardFocusMode(enabled: boolean): void {

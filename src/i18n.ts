@@ -1,4 +1,4 @@
-export type InterfaceLanguage = "es" | "en" | "zh";
+export type InterfaceLanguage = "es" | "en";
 export type LanguagePreference = "auto" | InterfaceLanguage;
 
 const englishBySpanish: Record<string, string> = {
@@ -648,7 +648,7 @@ function localizeElement(element: Element): void {
   );
 }
 
-function applyLanguage(nextLanguage: InterfaceLanguage): void { if (nextLanguage === "zh") return;
+function applyLanguage(nextLanguage: InterfaceLanguage): void {
   language = nextLanguage;
   document.documentElement.lang = language;
   localizeElement(document.body);
@@ -672,7 +672,7 @@ export function initializeLocalization(selector: HTMLSelectElement): void {
   const stored = localStorage.getItem("sinnotas-language");
   preference = stored === "es" || stored === "en" || stored === "auto" ? stored : "auto";
   const lang = navigator.language.toLowerCase();
-  const systemLanguage: InterfaceLanguage = lang.startsWith("es") ? "es" : lang.startsWith("zh") ? "zh" : "en";
+  const systemLanguage: InterfaceLanguage = lang.startsWith("es") ? "es" : "en";
   applyLanguage(preference === "auto" ? systemLanguage : preference);
   selector.value = preference;
 
@@ -694,18 +694,13 @@ export function initializeLocalization(selector: HTMLSelectElement): void {
   enOption.textContent = "English";
   selector.appendChild(enOption);
 
-  const zhOption = document.createElement("option");
-  zhOption.value = "zh";
-  zhOption.textContent = "中文";
-  selector.appendChild(zhOption);
-
   selector.value = preference;
   selector.addEventListener("change", () => {
     const selected = selector.value;
-    preference = selected === "es" || selected === "en" || selected === "zh" || selected === "auto" ? selected : "auto";
+    preference = selected === "es" || selected === "en" || selected === "auto" ? selected : "auto";
     localStorage.setItem("sinnotas-language", preference);
     const l = navigator.language.toLowerCase();
-    const sys: InterfaceLanguage = l.startsWith("es") ? "es" : l.startsWith("zh") ? "zh" : "en";
+    const sys: InterfaceLanguage = l.startsWith("es") ? "es" : "en";
     applyLanguage(preference === "auto" ? sys : preference);
   });
 

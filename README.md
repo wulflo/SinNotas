@@ -1,55 +1,55 @@
 # SinNotas
 
-Sin Notas es una aplicación local e independiente para tomar notas y organizar ideas como un outliner jerárquico. Las páginas se almacenan como archivos Markdown dentro del vault activo.
+SinNotas is a local, self-contained note-taking app for organizing ideas as a hierarchical outliner. Pages are stored as Markdown files inside the active vault.
 
-<img width="1600" height="852" alt="captura" src="https://github.com/user-attachments/assets/266714c0-f454-42d1-9519-7a80c930f48d" />
+<img width="1600" height="852" alt="screenshot" src="https://github.com/user-attachments/assets/266714c0-f454-42d1-9519-7a80c930f48d" />
 
-<img width="1241" height="753" alt="captura" src="https://github.com/user-attachments/assets/2ecd2084-3e8e-4ef4-8165-abe40b2c9dcd" />
+<img width="1241" height="753" alt="screenshot" src="https://github.com/user-attachments/assets/2ecd2084-3e8e-4ef4-8165-abe40b2c9dcd" />
 
-## Tecnologías
+## Technologies
 
-- **Aplicación de escritorio:** Tauri v2.
-- **Backend y acceso a archivos:** Rust.
-- **Interfaz:** TypeScript, HTML y CSS nativos.
-- **Desarrollo y empaquetado del frontend:** Vite.
+- **Desktop application:** Tauri v2.
+- **Backend and file access:** Rust.
+- **Interface:** native TypeScript, HTML and CSS.
+- **Frontend development and bundling:** Vite.
 
-El frontend actual no utiliza React ni Tailwind CSS.
+The current frontend uses neither React nor Tailwind CSS.
 
-## Funcionalidades
+## Features
 
-- **Editor jerárquico:** crea y organiza bullets, anida bloques, arrástralos para reordenarlos y selecciona varios para copiarlos, cortarlos, pegarlos con su jerarquía o eliminarlos.
-- **Comandos `/`:** inserta tablas Markdown, encabezados H1–H6, imágenes, tareas y tarjetas Cloze; también aplica colores de texto y fondo.
-- **Markdown:** muestra formato inline para negrita, cursiva, subrayado, resaltado y wikilinks. Los wikilinks permiten abrir páginas y consultar referencias entrantes.
-- **Etiquetas inline:** las etiquetas `#tag` se resaltan con un pill con el color de acento del tema.
-- **Tablas:** guarda tablas en Markdown nativo; el texto Cloze `==...==` funciona también dentro de las celdas. Incluye edición gráfica completa con menú contextual para añadir/eliminar filas y columnas, y reordenamiento mediante arrastre de filas y columnas.
-- **Flashcards:** tarjetas básicas, Cloze y oclusiones de imagen con programación FSRS-4.5; incluye modo focus, temporizador Pomodoro, estadísticas de repaso y un árbol que crece con la práctica. Las tarjetas nuevas pasan por una fase de aprendizaje (pasos fijos cortos: 1 min, 10 min, 1 día) antes de graduarse a repaso FSRS, evitando saltos iniciales de intervalo amplios que actúan como falso positivo. Desde los ajustes de Flashcards se puede filtrar el repaso por nota (cada nota actúa como un mazo con sus tarjetas) para no repasar todas a la vez.
-- **Oclusión de imagen:** dibuja rectángulos, elipses y polígonos, mueve, cambia el tamaño y gira áreas, añade pistas y conserva sus transformaciones en los metadatos Markdown del bloque.
-- **Imágenes:** admite PNG, JPG/JPEG, WebP, SVG, GIF y BMP. Las imágenes insertadas se guardan en `assets/` del vault.
-- **Tareas Kanban:** clasifica tareas como pendientes, en curso o completadas; permite moverlas entre columnas y ocultar las completadas.
-- **Mapa conceptual / Grafo:** vista de grafo con física mejorada (modelo tipo D3/Obsidian), navegación y visualización de relaciones entre páginas. La interacción permanece activa indefinidamente —selección con clicks alternos, click en fondo para cerrar, arrastre de nodos, pan (botón central/derecho), zoom con rueda y doble click para restablecer— y los colores personalizados de nodo se propagan a los vecinos por influencia. Ver [docs/graph-view.md](docs/graph-view.md).
-- **Historial de versiones (snapshots):** guarda y restaura snapshots de páginas; desde los ajustes se pueden borrar todos los snapshots de una vez.
-- **Vaults externos:** abre carpetas Markdown mediante el selector de directorios y navega por sus páginas y subcarpetas.
-- **Diarios y páginas:** crea diarios por fecha, explora todas las páginas y consulta el historial de versiones.
-- **Exportación:** exporta la página actual como texto plano `.txt`.
-- **Sincronización:** usa tu servicio de sincronización favorito para sincronizar tus notas entre dispositivos.
-- **Interfaz adaptable:** incluye temas claro y oscuro, cinco colores de acento, tipografías configurables (separadas entre tipografía del sistema y mosaico de fuentes), control de intensidad de glow (con 3 posiciones/rango ampliado), e interfaz en español e inglés.
-- **Enlace al repositorio:** botón en la configuración para visitar directamente el repositorio de GitHub del proyecto.
+- **Hierarchical editor:** create and organize bullets, nest blocks, drag them to reorder, and select multiple ones to copy, cut, paste with their hierarchy, or delete them.
+- **Slash commands:** insert Markdown tables, H1–H6 headings, images, tasks and Cloze cards; also apply text and background colors.
+- **Markdown:** renders inline formatting for bold, italics, underline, highlight and wikilinks. Wikilinks let you open pages and look up backlinks.
+- **Inline tags:** `#tag` labels are highlighted with a pill in the theme's accent color.
+- **Tables:** tables are stored as native Markdown; Cloze text `==...==` also works inside table cells. Includes full graphical editing with a context menu to add/remove rows and columns, plus drag-and-drop reordering of rows and columns.
+- **Flashcards:** basic, Cloze and image occlusion cards with FSRS-4.5 scheduling; includes focus mode, a Pomodoro timer, review statistics and a progress visualization that grows with your practice. New cards go through a learning phase (short fixed steps: 1 min, 10 min, 1 day) before graduating to FSRS review, avoiding wide initial interval jumps that act as false positives. From the Flashcards settings, reviews can be filtered by note (each note acts as a deck with its own cards) so you don't review everything at once.
+- **Image occlusion:** draw rectangles, ellipses and polygons, move, resize and rotate areas, add hints, and keep those transformations in the block's Markdown metadata.
+- **Images:** supports PNG, JPG/JPEG, WebP, SVG, GIF and BMP. Inserted images are saved to the vault's `assets/` folder.
+- **Kanban tasks:** sort tasks as pending, in progress or completed; move them between columns and hide the completed ones.
+- **Concept map / Graph:** graph view with enhanced physics (D3/Obsidian-like model), navigation and visualization of relationships between pages. Interaction stays alive indefinitely —selection with alternating clicks, click on the background to clear, node dragging, panning (middle/right button), wheel zoom and double-click to reset— and custom node colors propagate to neighbors by influence. See [docs/graph-view.md](docs/graph-view.md).
+- **Version history (snapshots):** save and restore page snapshots; settings let you delete all snapshots at once.
+- **External vaults:** open Markdown folders through the directory picker and navigate their pages and subfolders.
+- **Journals and pages:** create daily journals by date, browse all pages and check version history.
+- **Export:** export the current page as plain `.txt` text.
+- **Sync:** use your favorite sync service to keep notes up to date across devices.
+- **Adaptable UI:** light and dark themes, five accent colors, configurable fonts (system font separate from the font mosaic), glow-intensity control (with 3 positions/extended range), and a Spanish/English interface.
+- **Repository link:** a button in the settings to visit the project's GitHub repository directly.
 
-## Atajos del editor
+## Editor shortcuts
 
-- **Enter:** divide el bloque en el cursor o crea un bullet siguiente.
-- **Tab:** indenta el bloque.
-- **Shift + Tab:** desindenta el bloque.
+- **Enter:** splits the block at the caret or creates the next bullet.
+- **Tab:** indents the block.
+- **Shift + Tab:** outdents the block.
 
-## Requisitos
+## Requirements
 
-En CachyOS, Arch Linux, Manjaro, EndeavourOS
+On CachyOS, Arch Linux, Manjaro, EndeavourOS
 
 ```bash
 sudo pacman -S nodejs npm rust
 ```
 
-Debian, Ubuntu, Linux Mint, Zorin, Pop!_OS y derivadas
+Debian, Ubuntu, Linux Mint, Zorin, Pop!_OS and derivatives
 
 ```bash
 sudo apt update
@@ -57,9 +57,9 @@ sudo apt install libwebkit2gtk-4.1-dev build-essential curl wget file \
   libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 ```
 
-> Los repositorios de Debian y Ubuntu suelen traer versiones antiguas de Node y Rust. Instálalos con [nvm](https://github.com/nvm-sh/nvm) o [NodeSource](https://github.com/nodesource/distributions) (Node) y con `rustup` (Rust, ver más abajo).
+> Debian and Ubuntu repositories often ship outdated Node and Rust versions. Install them with [nvm](https://github.com/nvm-sh/nvm) or [NodeSource](https://github.com/nodesource/distributions) (Node) and with `rustup` (Rust, see below).
 
-Fedora, Nobara, RHEL y derivadas
+Fedora, Nobara, RHEL and derivatives
 
 ```bash
 sudo dnf install webkit2gtk4.1-devel openssl-devel curl wget file \
@@ -67,7 +67,7 @@ sudo dnf install webkit2gtk4.1-devel openssl-devel curl wget file \
 sudo dnf group install "c-development"
 ```
 
-openSUSE (Tumbleweed y Leap)
+openSUSE (Tumbleweed and Leap)
 
 ```bash
 sudo zypper up
@@ -76,106 +76,106 @@ sudo zypper in webkit2gtk3-devel libopenssl-devel curl wget file \
 sudo zypper in -t pattern devel_basis
 ```
 
-## Desarrollo web
+## Web development
 
 ```bash
 npm install
 npm run dev
 ```
 
-Vite mostrará la dirección local en la terminal.
+Vite will show the local address in the terminal.
 
-## Pruebas
+## Tests
 
 ```bash
-npm test              # suite unitaria (vitest)
-npx tsc --noEmit      # tipos
-npm run build         # build de producción frontend
+npm test              # unit test suite (vitest)
+npx tsc --noEmit      # type checking
+npm run build         # production frontend build
 ```
 
-Prueba en vivo de la vista de grafo (interacción real en navegador):
+Live test bench for the graph view (real interaction in a browser):
 
 ```bash
 npm run dev
-# abrir http://localhost:1420/graph-harness.html
+# open http://localhost:1420/graph-harness.html
 ```
 
-El resultado aparece en la propia página (`HARNESS PASS` esperado, 17 comprobaciones de gestos: selección, fondo, arrastre, pan, zoom, colores, estabilidad tras el settle). Después de modificar el grafo es obligatorio pasar tanto la suite como el harness; las directrices y el checklist están en [docs/graph-view.md](docs/graph-view.md).
+The result appears on the page itself (`HARNESS PASS` expected, 17 gesture checks: selection, background, drag, pan, zoom, colors, stability after settle). After modifying the graph, both the test suite and the harness are mandatory; guidelines and the checklist live in [docs/graph-view.md](docs/graph-view.md).
 
-## Documentación técnica
+## Technical documentation
 
-| Documento | Contenido |
+| Document | Contents |
 | --- | --- |
-| [docs/graph-view.md](docs/graph-view.md) | Arquitectura de la vista de grafo, bucles de render/física, directrices anti-regresión (evitar freezes) y banco de pruebas en vivo |
-| [docs/security-audit.md](docs/security-audit.md) | Auditoría de seguridad por fases (backend Rust, frontend, CI/APK, SAF, grafo), hallazgos corregidos y decisiones |
-| [docs/RELEASING.md](docs/RELEASING.md) | Publicación de la APK firmada: secretos, keystore y carga inicial |
-| [docs/ci-release-diagnosis.md](docs/ci-release-diagnosis.md) | Bitácora histórica del diagnóstico de la CI de release |
-| [docs/phase4-saf-plan.md](docs/phase4-saf-plan.md) | Plan de bóvedas externas en Android (Storage Access Framework) |
+| [docs/graph-view.md](docs/graph-view.md) | Graph view architecture, render/physics loops, anti-regression guidelines (avoid freezes) and the live test bench |
+| [docs/security-audit.md](docs/security-audit.md) | Security audit by phase (Rust backend, frontend, CI/APK, SAF, graph), fixed findings and decisions |
+| [docs/RELEASING.md](docs/RELEASING.md) | Publishing the signed APK: secrets, keystore and first upload |
+| [docs/ci-release-diagnosis.md](docs/ci-release-diagnosis.md) | Historical log of the release CI diagnosis |
+| [docs/phase4-saf-plan.md](docs/phase4-saf-plan.md) | Plan for external vaults on Android (Storage Access Framework) |
 
-## Aplicación Tauri
+## Tauri application
 
-Desde la raíz del proyecto:
+From the project root:
 
 ```bash
 npm run tauri dev
 ```
 
-## Compilar AppImage (Linux)
+## Build the AppImage (Linux)
 
 ```bash
 npm run tauri -- build --bundles appimage
 ```
 
-## Compilar en Windows
+## Build on Windows
 
-Requisitos previos:
-- [Node.js](https://nodejs.org/) (recomendado con nvm-windows)
-- [Rust](https://www.rust-lang.org/tools/install) con `rustup` (añade el target para MSVC)
-- [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (Visual Studio Build Tools con "Desarrollo para escritorio con C++")
-- [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) (suele venir en Windows 10/11 modernos)
+Prerequisites:
+- [Node.js](https://nodejs.org/) (recommended with nvm-windows)
+- [Rust](https://www.rust-lang.org/tools/install) with `rustup` (adds the MSVC target)
+- [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (Visual Studio Build Tools with "Desktop development with C++")
+- [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) (usually present on modern Windows 10/11)
 
-Desde PowerShell o CMD en la raíz del proyecto:
+From PowerShell or CMD in the project root:
 
 ```bash
 npm install
 npm run tauri build
 ```
 
-Esto generará el instalador `.msi` y/o `.exe` (NSIS) en `src-tauri/target/release/bundle/`. Si solo deseas compilar sin generar instaladores, puedes usar `npm run tauri build -- --no-bundle`.
+This generates the `.msi` and/or `.exe` (NSIS) installer under `src-tauri/target/release/bundle/`. If you only want to compile without producing installers, use `npm run tauri build -- --no-bundle`.
 
-Para desarrollo en Windows:
+For Windows development:
 ```bash
 npm install
 npm run tauri dev
 ```
 
-Las operaciones de archivos de escritorio se validan en el backend y se limitan al vault activo. El selector de carpetas utiliza el permiso Tauri `dialog:allow-open`; no se concede acceso global al sistema de archivos.
+Desktop file operations are validated in the backend and limited to the active vault. The folder picker uses the Tauri permission `dialog:allow-open`; no global filesystem access is granted.
 
-## Aplicación Android (solo repaso)
+## Android application (review only)
 
-La APK de Android 13 o superior (`minSdkVersion` 33) monta únicamente la experiencia de repaso: pregunta, respuesta, oclusiones de imagen, edición del bloque activo y calificación FSRS. No inicializa el editor, los diarios, Kanban, el mapa conceptual ni la vista de grafo.
+The APK for Android 13 or newer (`minSdkVersion` 33) mounts only the review experience: question, answer, image occlusions, editing the active block and FSRS rating. It does not initialize the editor, journals, Kanban, concept map or graph view.
 
 ```bash
-# Compilación local (requiere Android SDK/NDK y los targets de Rust)
+# Local build (requires the Android SDK/NDK and the Rust targets)
 npm ci
 npm run tauri android init -- --ci
 VITE_APP_MODE=flashcards npm run tauri android build -- --apk --debug
 ```
 
-El flujo `.github/workflows/ci.yml` compila el APK (debug en pushes/PRs y release firmado en tags `v*`) y publica el resultado como artefacto descargable. Los secretos de firma se aíslan en el paso `sign_apk`. Para cargar los secretos, probar sin crear un release y verificar la firma, consulta [docs/RELEASING.md](docs/RELEASING.md).
+The `.github/workflows/ci.yml` workflow builds the APK (debug on pushes/PRs and signed release on `v*` tags) and publishes it as a downloadable artifact. Signing secrets are isolated in the `sign_apk` step. To load the secrets, test without creating a release and verify the signature, see [docs/RELEASING.md](docs/RELEASING.md).
 
-Modos de arranque:
+Launch modes:
 
-- `VITE_APP_MODE=flashcards`: fuerza la vista de repaso en cualquier build.
-- `VITE_APP_MODE=desktop`: fuerza la aplicación completa.
-- Sin variable: Tauri detecta `TAURI_ENV_PLATFORM=android|ios` (o un user agent móvil) y abre la vista de repaso; en escritorio abre la aplicación completa.
+- `VITE_APP_MODE=flashcards`: forces the review view in any build.
+- `VITE_APP_MODE=desktop`: forces the full application.
+- No variable: Tauri detects `TAURI_ENV_PLATFORM=android|ios` (or a mobile user agent) and opens the review view; on desktop it opens the full application.
 
-En la compilación de repaso, Vite elimina la rama de escritorio del bundle. La primera ejecución de la APK siembra notas de ejemplo en el vault interno de la aplicación para poder probar FSRS, Cloze y oclusiones sin depender del escritorio.
+In the review build, Vite strips the desktop branch from the bundle. On first run, the APK seeds sample notes into the app's internal vault so FSRS, Cloze and occlusions can be tried without depending on the desktop app.
 
-### Rutas y Scoped Storage
+### Paths and Scoped Storage
 
-El backend solo acepta rutas reales dentro de la raíz del vault activo. `resolve_vault_path` rechaza `..`, rutas absolutas fuera de la raíz, bytes NUL, enlaces simbólicos que escapan del vault y URIs de Android (`content://`, `file://`, `http://`, etc.). La APK trabaja sobre su vault interno; las URIs de Scoped Storage no se interpretan como nombres de archivo ni permiten leer fuera de la carpeta autorizada.
+The backend only accepts real paths inside the active vault root. `resolve_vault_path` rejects `..`, absolute paths outside the root, NUL bytes, symlinks escaping the vault and Android URIs (`content://`, `file://`, `http://`, etc.). The APK works over its internal vault; Scoped Storage URIs are not interpreted as file names and cannot read outside the authorized folder.
 
-### Seguridad del HTML de repaso
+### Review HTML safety
 
-El Markdown de las tarjetas se escapa y se sanea con DOMPurify antes de cualquier `innerHTML`, tanto en escritorio como en la APK. Las regiones de oclusión se validan y se dibujan con `createElementNS`/`setAttribute`, sin interpolar HTML del usuario. El backend además valida el contenido activo de los SVG antes de guardarlos.
+Card Markdown is escaped and sanitized with DOMPurify before any `innerHTML`, on both desktop and the APK. Occlusion regions are validated and drawn with `createElementNS`/`setAttribute`, without interpolating user HTML. The backend additionally validates active SVG content before saving it.

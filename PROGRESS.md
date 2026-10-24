@@ -60,3 +60,9 @@ Ninguno.
 - Windows/macOS: todas las pruebas manuales; el prefijo `\\?\` en rutas Windows reales.
 - Compilación del comando de F4 en Android/iOS (cfg stub sin verificación en ejercicio real).
 - open_path del plugin opener en móvil: existencia no confirmada (por eso el stub).
+
+## Limpieza posterior a las fases
+
+- Eliminado el selector de tipos de árbol (remanente: label/select con 20 especies, const flashcardTreeType, set flashcardTreeTypes, carga y listener en desktop.ts, regla CSS .focus-tree-panel select). El átomo de progreso se mantiene funcional; solo se quitó el título "Átomo de progreso" (el SVG quedó con aria-label "Progreso de repasos").
+- Eliminado el soporte al chino: tipo InterfaceLanguage sin "zh", opción del select de idioma, detección y stub "Idioma chino próximamente" en desktop.ts, y botón zh en src/mobile/review-app.ts. Una preferencia "sinnotas-language: zh" ya guardada ahora cae a "auto".
+- README.md traducido íntegramente al inglés (mismo contenido y estructura).

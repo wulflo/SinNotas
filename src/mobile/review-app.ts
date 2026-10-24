@@ -339,7 +339,6 @@ class MobileReviewApp {
             <button class="mobile-lang-option" type="button" data-action="set-lang" data-lang="auto">Automático (Sistema)</button>
             <button class="mobile-lang-option" type="button" data-action="set-lang" data-lang="es">Español</button>
             <button class="mobile-lang-option" type="button" data-action="set-lang" data-lang="en">English</button>
-            <button class="mobile-lang-option" type="button" data-action="set-lang" data-lang="zh">中文</button>
           </div>
           <h3 class="mobile-appearance-title">Mantenimiento</h3>
           <button class="mobile-primary" type="button" data-action="reload-app" style="margin-top: 8px;">Recargar aplicación</button>
