@@ -4,6 +4,8 @@ Sin Notas es una aplicación local e independiente para tomar notas y organizar 
 
 <img width="1600" height="852" alt="captura" src="https://github.com/user-attachments/assets/266714c0-f454-42d1-9519-7a80c930f48d" />
 
+<img width="1241" height="753" alt="captura" src="https://github.com/user-attachments/assets/2ecd2084-3e8e-4ef4-8165-abe40b2c9dcd" />
+
 ## Tecnologías
 
 - **Aplicación de escritorio:** Tauri v2.
