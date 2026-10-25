@@ -172,6 +172,42 @@ respuesta completa.
   esta máquina no tiene Android SDK instalado y no hay emulador/dispositivo
   disponible. Esa comprobación queda a cargo del job Android de CI.
 
+## Ajustes posteriores: cloze de escritorio y tablas
+
+- El repaso de escritorio aplica la misma presentación cloze que la APK. Al
+  revelar, `.card-question` se oculta (`.cloze-hidden`) y `.card-answer` pierde
+  el separador y el padding superior (`.cloze-only`), de modo que solo se ve el
+  texto completo con el hueco resuelto, sin el hueco vacío encima. Se mantiene
+  una tarjeta por bloque aunque haya varios resaltados.
+- Las tablas Markdown renderizadas (`.markdown-table`) y las editables
+  (`.markdown-block-table`) derivan fondo, cabecera y bordes del accent activo
+  con `color-mix`, con intensidades distintas para tema oscuro y claro. La vista
+  Android replica el ajuste con `--mobile-accent`. El texto conserva contraste
+  AA en todas las paletas.
+
+## Texto de tarjeta unificado y centrado
+
+- Pregunta y respuesta comparten una sola medida configurable,
+  `--ls-flashcard-text-em` (2.4em por defecto, 36 px con la interfaz en 15 px).
+  Se eliminó el control separado de respuesta; la clave histórica
+  `sinnotas-font-size-flashcard-question` se conserva para respetar la
+  preferencia ya guardada.
+- `.card-question` y `.card-answer` (escritorio) y `.mobile-question` y
+  `.mobile-answer` (repaso) usan el mismo `font-size`, `line-height: 1.55` y
+  `text-align: center`.
+- Las tablas y listas se centran como bloque (`margin-inline: auto` y
+  `width: fit-content`), pero sus celdas y viñetas conservan la alineación
+  interna a la izquierda. Los bloques `pre` y `blockquote` también quedan a la
+  izquierda para no perder legibilidad.
+- En la vista de repaso horizontal, el grid de dos columnas aplicaba
+  `align-items: center`; al revelar un cloze se cambiaba a `flex` sin reponer
+  el estiramiento y el bloque de respuesta quedaba centrado a un ancho menor
+  que la pregunta. El override de cloze ahora fija `align-items: stretch`, por
+  lo que pregunta y respuesta ocupan el mismo ancho.
+- Verificación en navegador (escritorio y repaso horizontal): pregunta y
+  respuesta calculan 36 px y `text-align: center`; las tablas de ambos estados
+  quedan centradas como bloque y las listas mantienen el texto a la izquierda.
+
 ## Reorganización de documentación
 
 - `PROGRESS.md` se movió a `docs/2026-10-25-registro-progreso.md`.

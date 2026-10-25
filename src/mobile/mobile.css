@@ -20,6 +20,10 @@
   --mobile-danger: #f87171;
   --mobile-radius: 20px;
   --mobile-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+  /* Tablas: tinte derivado del acento para ganar visibilidad en ambos temas. */
+  --mobile-table-bg: color-mix(in srgb, var(--mobile-accent) 12%, var(--mobile-bg-soft));
+  --mobile-table-header-bg: color-mix(in srgb, var(--mobile-accent) 25%, var(--mobile-bg-elevated));
+  --mobile-table-border: color-mix(in srgb, var(--mobile-accent) 55%, var(--mobile-bg-elevated));
   --mobile-font: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
   --mobile-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
   --mobile-font-scale: 1.1538461538;
@@ -91,6 +95,10 @@
   --mobile-accent: #0f766e;
   --mobile-accent-strong: #115e59;
   --mobile-shadow: 0 22px 60px rgba(15, 23, 42, 0.16);
+  /* En claro el tinte es más suave para no competir con el texto. */
+  --mobile-table-bg: color-mix(in srgb, var(--mobile-accent) 7%, var(--mobile-bg-elevated));
+  --mobile-table-header-bg: color-mix(in srgb, var(--mobile-accent) 15%, var(--mobile-bg-elevated));
+  --mobile-table-border: color-mix(in srgb, var(--mobile-accent) 55%, var(--mobile-bg-elevated));
 }
 
 /* Paleta de acento con contraste suficiente sobre fondo claro. */
@@ -418,9 +426,11 @@ body.mobile-review-body {
 
 .mobile-question,
 .mobile-answer {
-  font-size: clamp(calc(18px * var(--mobile-font-scale, 1)), 4.6vw, calc(26px * var(--mobile-font-scale, 1)));
+  /* Pregunta y respuesta comparten tamaño: 2.4em de la interfaz por defecto. */
+  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 2.4));
   line-height: 1.55;
-  overflow-wrap: anywhere;
+  text-align: center;
+  overflow-wrap: break-word;
 }
 
 .mobile-answer {
@@ -501,6 +511,35 @@ body.mobile-review-body {
   padding: 0.2em 0 0.2em 1em;
   border-left: 3px solid var(--mobile-accent);
   color: var(--mobile-muted);
+}
+
+.mobile-question .markdown-table,
+.mobile-answer .markdown-table {
+  width: max-content;
+  max-width: 100%;
+  margin: 0.6em 0;
+  border-collapse: collapse;
+  background: var(--mobile-table-bg);
+  font-size: 0.82em;
+  line-height: 1.45;
+}
+
+.mobile-question .markdown-table th,
+.mobile-question .markdown-table td,
+.mobile-answer .markdown-table th,
+.mobile-answer .markdown-table td {
+  min-width: 4.5em;
+  padding: 0.28em 0.5em;
+  border: 1px solid var(--mobile-table-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.mobile-question .markdown-table th,
+.mobile-answer .markdown-table th {
+  background: var(--mobile-table-header-bg);
+  color: var(--mobile-title);
+  font-weight: 650;
 }
 
 .mobile-question mark,
@@ -1251,15 +1290,30 @@ body.mobile-review-body {
   font-size: calc(11px * var(--mobile-font-scale, 1));
 }
 
-.mobile-question {
-  /* El texto de la tarjeta se mide en em de la interfaz (2.4em por defecto). */
-  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-question-em, 2.4));
-  overflow-wrap: break-word;
+/* El texto se centra, pero tablas y listas se centran como bloque para no
+ * perder la alineación interna de sus celdas o viñetas. */
+.mobile-question .markdown-table,
+.mobile-answer .markdown-table {
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.mobile-answer {
-  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-answer-em, 2));
-  overflow-wrap: break-word;
+.mobile-question ul,
+.mobile-question ol,
+.mobile-answer ul,
+.mobile-answer ol {
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+
+.mobile-question pre,
+.mobile-question blockquote,
+.mobile-answer pre,
+.mobile-answer blockquote {
+  text-align: left;
 }
 
 .mobile-question h1,
@@ -1575,10 +1629,14 @@ body.mobile-review-body {
     gap: 24px;
   }
 
-  /* Cloze revelado: una sola columna porque la pregunta se oculta. */
+  /* Cloze revelado: una sola columna porque la pregunta se oculta. Se repone
+   * `align-items: stretch` porque el grid de arriba lo cambia a `center` y,
+   * al pasar a flex, centraría el bloque de respuesta en lugar de dejar que
+   * ocupe todo el ancho como la pregunta. */
   .mobile-card.is-cloze.is-revealed .mobile-card-body {
     display: flex;
     flex-direction: column;
+    align-items: stretch;
   }
 
   .mobile-card.is-revealed .mobile-answer {
@@ -1690,4 +1748,69 @@ body.mobile-full-editor .workspace {
     max-width: 320px;
     min-width: 0;
   }
+}
+
+/* ==================== ACTUALIZACIONES ==================== */
+.mobile-update-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--mobile-border);
+  border-radius: 14px;
+  background: var(--mobile-bg-soft);
+}
+
+.mobile-update-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: calc(13px * var(--mobile-font-scale, 1));
+  color: var(--mobile-muted);
+}
+
+.mobile-update-row strong {
+  color: var(--mobile-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.mobile-update-progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--mobile-accent);
+}
+
+.mobile-update-progress-label {
+  font-size: calc(11px * var(--mobile-font-scale, 1));
+  color: var(--mobile-muted);
+}
+
+.mobile-update-status {
+  margin: 0;
+}
+
+.mobile-update-status[data-status="error"] {
+  color: var(--mobile-danger);
+}
+
+.mobile-update-status[data-status="ready"] {
+  color: var(--mobile-accent);
+}
+
+.mobile-update-notes summary {
+  cursor: pointer;
+  font-size: calc(12px * var(--mobile-font-scale, 1));
+  color: var(--mobile-muted);
+}
+
+.mobile-update-notes pre {
+  margin: 6px 0 0;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--mobile-mono);
+  font-size: calc(11px * var(--mobile-font-scale, 1));
+  color: var(--mobile-text);
 }

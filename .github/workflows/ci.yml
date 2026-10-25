@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches: [main, master, develop]
-    tags: ["v*"]
   pull_request:
     branches: [main, master, develop]
   workflow_dispatch:
@@ -24,7 +23,6 @@ concurrency:
 # - dtolnay/rust-toolchain stable (2026-10)
 # - swatinem/rust-cache v2.8.0
 # - actions/upload-artifact v4.6.0
-# - softprops/action-gh-release v2.5.x
 
 jobs:
   lint-and-test:
@@ -163,13 +161,14 @@ jobs:
 
       # Con vaults SAF externos y diarios, un backup automático en la nube de
       # Android restauraría índices desincronizados: se fuerza allowBackup=false.
-      - name: Patch manifest (allowBackup=false, sin INTERNET)
+      # INTERNET se conserva porque el actualizador descarga latest.json y la APK;
+      # instalación y almacenamiento siguen prohibidos (el usuario instala a mano).
+      - name: Patch manifest (allowBackup=false, INTERNET required)
         run: |
           MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
           test -f "$MANIFEST"
           # La plantilla de Tauri NO trae allowBackup y <application> va solo
           # en su línea (atributos en las siguientes): se inserta ahí.
-          # Sin el permiso INTERNET: la app es 100% local.
           if grep -q 'android:allowBackup' "$MANIFEST"; then
             sed -i 's/android:allowBackup="[a-z]*"/android:allowBackup="false"/' "$MANIFEST"
           else
@@ -178,9 +177,15 @@ jobs:
           if ! grep -q 'android:allowBackup' "$MANIFEST"; then
             sed -i 's/<application /<application android:allowBackup="false" /' "$MANIFEST"
           fi
-          sed -i '/<uses-permission android:name="android.permission.INTERNET" \/>/d' "$MANIFEST"
           grep -q 'android:allowBackup="false"' "$MANIFEST"
-          ! grep -q 'permission.INTERNET' "$MANIFEST"
+          grep -q 'android.permission.INTERNET' "$MANIFEST" || {
+            echo "ERROR: la plantilla de Tauri no declara INTERNET; la actualización de Android no funcionaría." >&2
+            exit 1
+          }
+          if grep -qE 'MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|REQUEST_INSTALL_PACKAGES' "$MANIFEST"; then
+            echo "ERROR: el manifiesto declara permisos de instalación o almacenamiento no permitidos." >&2
+            exit 1
+          fi
           echo "Manifest verificado:"
           grep -E 'allowBackup|uses-permission' "$MANIFEST"
 
@@ -198,11 +203,9 @@ jobs:
   build-android-release:
     name: Build Android Release APK (signed)
     needs: lint-and-test
-    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master'
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/master'
     runs-on: ubuntu-22.04
     timeout-minutes: 90
-    permissions:
-      contents: write
     env:
       VITE_APP_MODE: flashcards
     steps:
@@ -224,29 +227,6 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-
-      # Solo para tags: la versión publicada debe coincidir con el proyecto.
-      - name: Validate tag version
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          TAURI_VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
-          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
-          CARGO_VERSION="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' src-tauri/Cargo.toml | head -n 1)"
-          failed=0
-          for pair in "tauri.conf.json:$TAURI_VERSION" "package.json:$PACKAGE_VERSION" "Cargo.toml:$CARGO_VERSION"; do
-            file="${pair%%:*}"
-            version="${pair#*:}"
-            if [ "$version" != "$TAG_VERSION" ]; then
-              echo "ERROR: $file declara '$version' pero el tag es 'v$TAG_VERSION'" >&2
-              failed=1
-            fi
-          done
-          if [ "$failed" -ne 0 ]; then
-            echo "Actualizá las versiones del proyecto antes de publicar el tag." >&2
-            exit 1
-          fi
-          echo "Versión v$TAG_VERSION coincide con tauri.conf.json, package.json y Cargo.toml."
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
@@ -311,13 +291,14 @@ jobs:
 
       # Con vaults SAF externos y diarios, un backup automático en la nube de
       # Android restauraría índices desincronizados: se fuerza allowBackup=false.
-      - name: Patch manifest (allowBackup=false, sin INTERNET)
+      # INTERNET se conserva porque el actualizador descarga latest.json y la APK;
+      # instalación y almacenamiento siguen prohibidos (el usuario instala a mano).
+      - name: Patch manifest (allowBackup=false, INTERNET required)
         run: |
           MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
           test -f "$MANIFEST"
           # La plantilla de Tauri NO trae allowBackup y <application> va solo
           # en su línea (atributos en las siguientes): se inserta ahí.
-          # Sin el permiso INTERNET: la app es 100% local.
           if grep -q 'android:allowBackup' "$MANIFEST"; then
             sed -i 's/android:allowBackup="[a-z]*"/android:allowBackup="false"/' "$MANIFEST"
           else
@@ -326,9 +307,15 @@ jobs:
           if ! grep -q 'android:allowBackup' "$MANIFEST"; then
             sed -i 's/<application /<application android:allowBackup="false" /' "$MANIFEST"
           fi
-          sed -i '/<uses-permission android:name="android.permission.INTERNET" \/>/d' "$MANIFEST"
           grep -q 'android:allowBackup="false"' "$MANIFEST"
-          ! grep -q 'permission.INTERNET' "$MANIFEST"
+          grep -q 'android.permission.INTERNET' "$MANIFEST" || {
+            echo "ERROR: la plantilla de Tauri no declara INTERNET; la actualización de Android no funcionaría." >&2
+            exit 1
+          }
+          if grep -qE 'MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|REQUEST_INSTALL_PACKAGES' "$MANIFEST"; then
+            echo "ERROR: el manifiesto declara permisos de instalación o almacenamiento no permitidos." >&2
+            exit 1
+          fi
           echo "Manifest verificado:"
           grep -E 'allowBackup|uses-permission' "$MANIFEST"
 
@@ -446,10 +433,14 @@ jobs:
           echo "=== Permissions ==="
           cat permissions.txt
 
-          if grep -qE "(INTERNET|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE)" permissions.txt; then
-            echo "ERROR: Dangerous permission found in APK"
+          if grep -qE "(MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|REQUEST_INSTALL_PACKAGES)" permissions.txt; then
+            echo "ERROR: Dangerous permission found in APK" >&2
             exit 1
           fi
+          grep -q "android.permission.INTERNET" permissions.txt || {
+            echo "ERROR: falta el permiso INTERNET en la APK" >&2
+            exit 1
+          }
 
           "${AAPT2:?AAPT2 no está definido}" dump xmltree "$SIGNED_APK" --file AndroidManifest.xml > manifest-dump.xml
           echo "=== Manifest ==="
@@ -542,12 +533,3 @@ jobs:
           path: ${{ steps.sign_apk.outputs.signed_apk }}
           if-no-files-found: error
           retention-days: 90
-
-      - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
-        with:
-          files: ${{ steps.sign_apk.outputs.signed_apk }}
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -44,13 +44,14 @@ interfaz sin inflar los controles:
 
 | Medida | Por defecto | Con UI 15 px |
 | --- | --- | --- |
-| Pregunta de tarjeta | 2.4em | 36 px |
-| Respuesta de tarjeta | 2em | 30 px |
+| Texto de tarjeta (pregunta y respuesta) | 2.4em | 36 px |
 
-- `applyFontSizes` publica `--ls-flashcard-question-em` y
-  `--ls-flashcard-answer-em` como números sin unidad; el CSS hace
-  `calc(var(--ls-font-size-ui) * var(--ls-flashcard-question-em))`.
-- Los deslizadores van de 1.5em a 3em (paso 0.1) y muestran la unidad `em`.
+- `applyFontSizes` publica `--ls-flashcard-text-em` como número sin unidad; el
+  CSS hace `calc(var(--ls-font-size-ui) * var(--ls-flashcard-text-em))`.
+- Pregunta y respuesta comparten tamaño y alineación centrada en escritorio y
+  repaso. Las tablas y listas se centran como bloque, pero su contenido interno
+  sigue a la izquierda.
+- El deslizador va de 1.5em a 3em (paso 0.1) y muestra la unidad `em`.
 - La interfaz sigue siendo configurable entre 11 y 40 px (escala ~0.85–3×).
 
 ### Migración de valores guardados
@@ -60,6 +61,9 @@ interfaz sin inflar los controles:
   se conserva.
 - Los tamaños de tarjeta guardados en píxeles se convierten a `em` con
   `(px × 2) / 15`, que reproduce el tamaño efectivo anterior con escala 2.
+- La clave `sinnotas-font-size-flashcard-question` se conserva como tamaño
+  único del texto de tarjeta. La antigua clave de respuesta deja de leerse para
+  que pregunta y respuesta no puedan volver a tamaños distintos.
 
 ### Ajustes sin solapamientos
 
@@ -112,12 +116,14 @@ medio.
 ## Verificación
 
 - `npx tsc --noEmit`: OK.
-- `npm test`: 189 pruebas en 21 archivos, todas en verde.
+- `npm test`: 204 pruebas en 22 archivos, todas en verde.
 - `npm run build`: OK (escritorio y `VITE_APP_MODE=flashcards`).
-- Navegador (1000×700): interfaz a 15 px; pregunta 36 px y respuesta 30 px.
-  Con UI 30/40 px no hay filas solapadas, texto recortado ni contenido que
-  invada la columna de herramientas; las palabras largas de la tarjeta se
-  parten con `overflow-wrap: break-word`.
+- Navegador (escritorio y repaso horizontal): interfaz a 15 px; pregunta y
+  respuesta calculan 36 px, `line-height: 1.55` y `text-align: center`. Las
+  tablas quedan centradas como bloque con las celdas a la izquierda, también
+  al revelar un cloze. Con UI 30/40 px no hay filas solapadas, texto recortado
+  ni contenido que invada la columna de herramientas; las palabras largas de
+  la tarjeta se parten con `overflow-wrap: break-word`.
 - El selector «Tipografía del sistema» mide 37 px de alto a UI 15 y 64 px a
   UI 40 (antes quedaba estirado a 220 px).
 - Cambio de vista y de pestaña de Ajustes: ~33 ms por cambio.

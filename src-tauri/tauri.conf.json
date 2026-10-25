@@ -58,5 +58,16 @@
         "sidebarImage": "icons/nsis-sidebar.bmp"
       }
     }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/wulflo/SinNotas/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk2QTAwQTYwQ0U1MzFGNUEKUldSYUgxUE9ZQXFnbGlCTFdyNktyOFRoUWFUZ1JhZXlTVldSWmtDNUU1Y3grR1RJSDdjRnR4ZGgK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

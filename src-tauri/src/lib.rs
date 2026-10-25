@@ -4526,11 +4526,14 @@ fn list_system_fonts() -> Vec<String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
         .plugin(init_android_fs())
         .plugin(tauri_plugin_dialog::init())
         .plugin(init_opener())
         .plugin(init_clipboard())
+        .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_fs::init())
         .manage(ActiveVault::default())
         .manage(SnapshotGate::default())
         .manage(VaultCacheState::default())
@@ -4538,7 +4541,23 @@ pub fn run() {
             let approved = load_approved_vault_roots(app.handle());
             app.manage(ApprovedVaultRoots(Mutex::new(approved)));
             Ok(())
-        })
+        });
+
+    // El actualizador nativo no existe en Android/iOS: allí el frontend
+    // descarga el APK con el plugin HTTP y lo guarda con el de filesystem.
+    #[cfg(desktop)]
+    {
+        builder = builder
+            .plugin(tauri_plugin_updater::Builder::new().build())
+            .plugin(tauri_plugin_process::init());
+    }
+
+    #[cfg(target_os = "android")]
+    {
+        builder = builder.plugin(tauri_plugin_http::init());
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![
             load_vault,
             pick_vault_root,

@@ -15,8 +15,7 @@ export type FontSizeKey =
   | "h4"
   | "h5"
   | "h6"
-  | "flashcardQuestion"
-  | "flashcardAnswer";
+  | "flashcardText";
 
 export type FontSizeUnit = "px" | "em";
 
@@ -132,24 +131,13 @@ export const FONT_SIZE_DEFINITIONS: readonly FontSizeDefinition[] = [
     step: 1,
   },
   {
-    key: "flashcardQuestion",
+    key: "flashcardText",
+    // Se conserva la clave histórica para respetar el tamaño ya elegido.
     storageKey: "sinnotas-font-size-flashcard-question",
-    cssVariable: "--ls-flashcard-question-em",
-    label: "Pregunta de tarjeta",
+    cssVariable: "--ls-flashcard-text-em",
+    label: "Texto de tarjeta",
     // 2.4 em de la interfaz (36 px con la interfaz en 15 px).
     defaultValue: 2.4,
-    min: 1.5,
-    max: 3,
-    step: 0.1,
-    unit: "em",
-  },
-  {
-    key: "flashcardAnswer",
-    storageKey: "sinnotas-font-size-flashcard-answer",
-    cssVariable: "--ls-flashcard-answer-em",
-    label: "Respuesta de tarjeta",
-    // 2 em de la interfaz (30 px con la interfaz en 15 px).
-    defaultValue: 2,
     min: 1.5,
     max: 3,
     step: 0.1,
@@ -338,7 +326,7 @@ export function applyFontSizes(
  * permite bajar a ~0.85× (11 px) o subir hasta 3× sin desbordar los controles.
  *
  * Las tarjetas de repaso no usan esta escala para su texto: su tamaño se
- * expresa en `em` de `--ls-font-size-ui` (por defecto 2.4em / 2em).
+ * expresa en `em` de `--ls-font-size-ui` (por defecto 2.4em).
  */
 export function mobileFontScale(uiSize: number): number {
   const ratio = clampFontSize("ui", uiSize) / 13;

@@ -6,6 +6,10 @@
   --ls-bg-hover: #1f2128;
   --ls-border-color: #262830;
   --ls-border-subtle: #202228;
+  /* Tablas: tinte derivado del acento para separarlas del fondo de la nota. */
+  --ls-table-bg: color-mix(in srgb, var(--ls-accent) 14%, var(--ls-bg-secondary));
+  --ls-table-header-bg: color-mix(in srgb, var(--ls-accent) 28%, var(--ls-bg-secondary));
+  --ls-table-border: color-mix(in srgb, var(--ls-accent) 55%, var(--ls-border-color));
   
   --ls-text-primary: #c7cbd3;
   --ls-text-title: #f4f6fa;
@@ -54,9 +58,8 @@
   --ls-font-size-h4: 18px;
   --ls-font-size-h5: 16px;
   --ls-font-size-h6: 14px;
-  /* Multiplicadores de la interfaz para el texto de las tarjetas. */
-  --ls-flashcard-question-em: 2.4;
-  --ls-flashcard-answer-em: 2;
+  /* Multiplicador de la interfaz para el texto de las tarjetas. */
+  --ls-flashcard-text-em: 2.4;
   --ls-accent-bold: color-mix(in srgb, var(--ls-accent) 72%, var(--ls-text-title));
   --ls-accent-highlight: color-mix(in srgb, var(--ls-accent) 26%, transparent);
   --ls-accent-highlight-text: color-mix(in srgb, var(--ls-accent) 68%, var(--ls-text-title));
@@ -75,6 +78,10 @@
   --ls-bg-hover: #e1e4e8;
   --ls-border-color: #d1d5db;
   --ls-border-subtle: #e5e7eb;
+  /* En claro el tinte es más suave para no competir con el texto. */
+  --ls-table-bg: color-mix(in srgb, var(--ls-accent) 7%, var(--ls-bg-primary));
+  --ls-table-header-bg: color-mix(in srgb, var(--ls-accent) 18%, var(--ls-bg-primary));
+  --ls-table-border: color-mix(in srgb, var(--ls-accent) 60%, var(--ls-border-color));
   
   --ls-text-primary: #374151;
   --ls-text-title: #111827;
@@ -2447,6 +2454,7 @@ body.no-active-page #btn-delete-page {
   max-width: 100%;
   border-collapse: collapse;
   margin: 4px 0;
+  background: var(--ls-table-bg);
   color: var(--ls-text-primary);
   font-size: inherit;
 }
@@ -2459,13 +2467,13 @@ body.no-active-page #btn-delete-page {
 .markdown-table td {
   min-width: 72px;
   padding: 5px 9px;
-  border: 1px solid var(--ls-border-color);
+  border: 1px solid var(--ls-table-border);
   text-align: left;
   vertical-align: top;
 }
 
 .markdown-table th {
-  background: var(--ls-bg-secondary);
+  background: var(--ls-table-header-bg);
   color: var(--ls-text-title);
   font-weight: 650;
 }
@@ -2534,7 +2542,7 @@ body.no-active-page #btn-delete-page {
 .markdown-block-table td {
   min-width: 88px;
   padding: 5px 9px;
-  border: 1px solid var(--ls-border-color);
+  border: 1px solid var(--ls-table-border);
   text-align: left;
   vertical-align: top;
 }
@@ -2598,7 +2606,7 @@ body.no-active-page #btn-delete-page {
 }
 
 .markdown-block-table th {
-  background: var(--ls-bg-secondary);
+  background: var(--ls-table-header-bg);
   color: var(--ls-text-title);
   font-weight: 650;
 }
@@ -5651,15 +5659,43 @@ body.no-active-page #btn-delete-page {
 
 .card-question {
   /* 2.4 em de la interfaz por defecto: grande para leer, sin tocar la escala global. */
-  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-question-em, 2.4));
+  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 2.4));
   font-weight: 600;
-  line-height: 1.5;
+  line-height: 1.55;
   color: var(--ls-text-title);
   margin-bottom: 24px;
+  text-align: center;
   white-space: pre-wrap;
   /* Con fuentes grandes una palabra larga puede superar el ancho de la caja y
    * dibujarse sobre la columna de herramientas. Solo se parte si no cabe. */
   overflow-wrap: break-word;
+}
+
+/* La tarjeta centra el texto, pero los bloques estructurados conservan una
+ * lectura natural: la tabla o la lista se centran como bloque y su contenido
+ * sigue alineado a la izquierda. */
+.card-question .markdown-table,
+.card-answer .markdown-table {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.card-question ul,
+.card-question ol,
+.card-answer ul,
+.card-answer ol {
+  width: fit-content;
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+
+.card-question pre,
+.card-question blockquote,
+.card-answer pre,
+.card-answer blockquote {
+  text-align: left;
 }
 
 .cloze-gap {
@@ -5701,10 +5737,11 @@ body.no-active-page #btn-delete-page {
   margin-top: 24px;
   padding-top: 24px;
   border-top: 4px solid var(--ls-accent);
-  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-answer-em, 2));
-  line-height: 1.6;
+  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 2.4));
+  line-height: 1.55;
   color: var(--ls-text-primary);
   display: none;
+  text-align: center;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   animation: context-menu-fade 0.2s ease-out;
@@ -5712,6 +5749,17 @@ body.no-active-page #btn-delete-page {
 
 .card-answer.visible {
   display: block;
+}
+
+/* Cloze revelado: solo la respuesta completa, sin el hueco vacío encima. */
+.card-question.cloze-hidden {
+  display: none;
+}
+
+.card-answer.cloze-only {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .card-actions-area {
@@ -6971,4 +7019,58 @@ body.mobile-full-editor .main-container {
     padding-left: 14px;
     padding-right: 14px;
   }
+}
+
+/* ==================== ACTUALIZACIONES ==================== */
+.update-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.update-box .advanced-actions {
+  margin-top: 8px;
+}
+
+.update-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: calc(12px * var(--ls-font-scale, 1));
+  color: var(--ls-text-muted);
+}
+
+.update-progress progress {
+  flex: 1 1 auto;
+  height: 8px;
+  accent-color: var(--ls-accent);
+}
+
+.update-status {
+  margin: 0;
+}
+
+.update-status[data-status="error"] {
+  color: #e5484d;
+}
+
+.update-status[data-status="ready"] {
+  color: var(--ls-accent);
+}
+
+.update-notes summary {
+  cursor: pointer;
+  font-size: calc(12px * var(--ls-font-scale, 1));
+  color: var(--ls-text-muted);
+}
+
+.update-notes pre {
+  margin: 6px 0 0;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: calc(12px * var(--ls-font-scale, 1));
+  color: var(--ls-text-primary);
 }

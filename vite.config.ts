@@ -31,6 +31,15 @@ export default defineConfig({
   define: {
     __APP_MODE__: JSON.stringify(appMode),
   },
+  // El optimizador de dependencias usa por defecto el target legacy de Vite
+  // (Safari 14). Los plugins `http` y `fs` incluyen destructuring que esbuild
+  // no puede rebajar a ese target y el servidor de desarrollo falla al
+  // prebundlearlos. Igualamos el target al de producción (WebView moderno).
+  optimizeDeps: {
+    esbuildOptions: {
+      target: "es2021",
+    },
+  },
   build: {
     // Android 13+ usa WebView Chromium 108+; ES2021 es seguro y reduce el
     // tamaño del bundle frente a transformaciones legacy.

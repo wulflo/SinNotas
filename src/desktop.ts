@@ -103,6 +103,15 @@ import {
 import { renderMathToHtml } from "./editor/math";
 import { currentLanguage, initializeLocalization, onLanguageChange, translate } from "./i18n";
 import {
+  checkForUpdates,
+  getCurrentVersion,
+  getUpdatePlatform,
+  installAvailableUpdate,
+  subscribeUpdateState,
+  type UpdateState,
+} from "./services/updater";
+import { formatBytes } from "./services/update-utils";
+import {
   FONT_SIZE_DEFINITIONS,
   applyFontSizes,
   fontSizeDefinition,
@@ -559,6 +568,18 @@ const btnClearCache = document.getElementById("btn-clear-cache") as HTMLButtonEl
 const btnClearFlashcardStats = document.getElementById("btn-clear-flashcard-stats") as HTMLButtonElement;
 const btnDeleteAllSnapshots = document.getElementById("btn-delete-all-snapshots") as HTMLButtonElement;
 const btnReloadApp = document.getElementById("btn-reload-app") as HTMLButtonElement;
+const updateSettingsSection = document.getElementById("update-settings-section") as HTMLElement | null;
+const updateCurrentVersion = document.getElementById("update-current-version") as HTMLElement | null;
+const updateAvailableRow = document.getElementById("update-available-row") as HTMLElement | null;
+const updateNewVersion = document.getElementById("update-new-version") as HTMLElement | null;
+const btnCheckUpdates = document.getElementById("btn-check-updates") as HTMLButtonElement | null;
+const btnInstallUpdate = document.getElementById("btn-install-update") as HTMLButtonElement | null;
+const updateProgressWrap = document.getElementById("update-progress-wrap") as HTMLElement | null;
+const updateProgress = document.getElementById("update-progress") as HTMLProgressElement | null;
+const updateProgressLabel = document.getElementById("update-progress-label") as HTMLElement | null;
+const updateStatus = document.getElementById("update-status") as HTMLElement | null;
+const updateNotesWrap = document.getElementById("update-notes-wrap") as HTMLDetailsElement | null;
+const updateNotes = document.getElementById("update-notes") as HTMLElement | null;
 const languageSelect = document.getElementById("interface-language") as HTMLSelectElement;
 const flashcardReviewOrderSelect = document.getElementById("flashcard-review-order") as HTMLSelectElement;
 const flashcardRecalcActionSelect = document.getElementById("flashcard-recalc-action") as HTMLSelectElement;
@@ -2247,6 +2268,70 @@ btnReloadApp.addEventListener("click", async () => {
 
   window.location.reload();
 });
+
+/* ==================== ACTUALIZACIONES ==================== */
+let updateSettingsReady = false;
+
+function renderUpdateState(state: UpdateState): void {
+  if (!updateCurrentVersion || !updateAvailableRow || !updateNewVersion || !btnCheckUpdates ||
+      !btnInstallUpdate || !updateProgressWrap || !updateProgress || !updateProgressLabel ||
+      !updateStatus || !updateNotesWrap || !updateNotes) {
+    return;
+  }
+
+  updateCurrentVersion.textContent = state.currentVersion || "—";
+  updateAvailableRow.hidden = !state.newVersion;
+  updateNewVersion.textContent = state.newVersion ?? "—";
+
+  const busy = state.status === "checking" || state.status === "downloading";
+  btnCheckUpdates.disabled = busy;
+  btnCheckUpdates.textContent = state.status === "checking" ? "Buscando…" : "Buscar actualizaciones";
+  btnInstallUpdate.hidden = state.status !== "available";
+  btnInstallUpdate.disabled = busy;
+  btnInstallUpdate.textContent =
+    getUpdatePlatform() === "android" ? "Descargar APK" : "Descargar e instalar";
+
+  updateStatus.textContent = state.message ?? "";
+  updateStatus.dataset.status = state.status;
+
+  const showProgress =
+    state.status === "downloading" || (state.status === "ready" && state.progress !== null);
+  updateProgressWrap.hidden = !showProgress;
+  if (showProgress) {
+    if (state.progress === null) updateProgress.removeAttribute("value");
+    else updateProgress.value = state.progress;
+    const percent = state.progress === null ? "" : ` · ${Math.round(state.progress * 100)} %`;
+    updateProgressLabel.textContent =
+      state.totalBytes > 0
+        ? `${formatBytes(state.receivedBytes)} / ${formatBytes(state.totalBytes)}${percent}`
+        : `${formatBytes(state.receivedBytes)}${percent}`;
+  }
+
+  updateNotesWrap.hidden = !state.notes;
+  updateNotes.textContent = state.notes;
+}
+
+function initUpdateSettings(): void {
+  if (updateSettingsReady || !updateSettingsSection) return;
+  updateSettingsReady = true;
+
+  if (getUpdatePlatform() === "unsupported") {
+    updateSettingsSection.hidden = true;
+    return;
+  }
+
+  void getCurrentVersion().then((version) => {
+    if (updateCurrentVersion && version) updateCurrentVersion.textContent = version;
+  });
+
+  subscribeUpdateState(renderUpdateState);
+  btnCheckUpdates?.addEventListener("click", () => {
+    void checkForUpdates();
+  });
+  btnInstallUpdate?.addEventListener("click", () => {
+    void installAvailableUpdate();
+  });
+}
 
 btnThemeSwitch.addEventListener("click", () => {
   const isLight = document.documentElement.getAttribute("data-theme") === "light";
@@ -8588,6 +8673,17 @@ const cardFsrsBadge = document.getElementById("card-fsrs-badge") as HTMLSpanElem
 const cardQuestionEl = document.getElementById("card-question") as HTMLDivElement;
 const cardAnswerEl = document.getElementById("card-answer") as HTMLDivElement;
 const btnShowAnswer = document.getElementById("btn-show-answer") as HTMLButtonElement;
+
+/**
+ * En cloze la respuesta contiene el texto completo con los huecos resueltos.
+ * Al revelarla se oculta la pregunta para no mostrar a la vez el hueco vacío y
+ * el hueco resuelto. El resto de tipos conserva pregunta y respuesta visibles.
+ */
+function syncClozeRevealLayout(card: Flashcard | null, revealed: boolean): void {
+  const clozeOnly = card?.cardType === "cloze" && revealed;
+  cardQuestionEl.classList.toggle("cloze-hidden", clozeOnly);
+  cardAnswerEl.classList.toggle("cloze-only", clozeOnly);
+}
 const fsrsActions = document.getElementById("fsrs-actions") as HTMLDivElement;
 const flashcardReviewTab = document.getElementById("tab-flashcard-review") as HTMLButtonElement;
 const flashcardExplorerTab = document.getElementById("tab-flashcard-explorer") as HTMLButtonElement;
@@ -9231,6 +9327,7 @@ function updateFlashcardLoadingState(progress: FlashcardLoadProgress): void {
   cardAnswerEl.replaceChildren();
   cardAnswerEl.style.display = "none";
   cardAnswerEl.classList.remove("visible");
+  syncClozeRevealLayout(null, false);
   btnShowAnswer.style.display = "none";
   fsrsActions.classList.remove("visible");
 }
@@ -9260,6 +9357,7 @@ function renderFlashcardSessionResult(): void {
             ? "No hay tarjetas pendientes en las notas seleccionadas. Vuelve cuando llegue su fecha de vencimiento o amplía la selección de notas."
             : "No hay tarjetas pendientes de repaso. Vuelve cuando llegue su fecha de vencimiento.";
     cardAnswerEl.style.display = "none";
+    syncClozeRevealLayout(null, false);
     btnShowAnswer.style.display = "none";
     fsrsActions.classList.remove("visible");
     return;
@@ -9570,6 +9668,8 @@ function updateFlashcardUI() {
   const total = flashcardsManager.getCardsCount();
   const current = flashcardsManager.getCurrentIndex();
   const card = flashcardsManager.getCurrentCard();
+  // updateFlashcardUI siempre deja la respuesta oculta hasta pulsar "Mostrar".
+  syncClozeRevealLayout(card, false);
 
   if (!card) {
     cardProgressEl.innerText = `${total} de ${total}`;
@@ -9661,6 +9761,7 @@ function handleRevealAnswer() {
       }
     }
   }
+  syncClozeRevealLayout(card, true);
   cardAnswerEl.classList.add("visible");
   btnShowAnswer.style.display = "none";
   fsrsActions.classList.add("visible");
@@ -11617,6 +11718,7 @@ function scheduleAfterFirstPaint(task: () => void, delay = 0): void {
 
 async function initializeDesktopApp(): Promise<void> {
   initThemeAndTypography();
+  initUpdateSettings();
   loadFlashcardProgressStats();
   scheduleFlashcardDailyReset();
   installFlashcardDailyResetWatchers();

@@ -699,6 +699,34 @@
               </section>
 
               <section class="settings-tab-panel" role="tabpanel" data-settings-panel="advanced" hidden>
+                <div id="update-settings-section">
+                  <div class="settings-section-title">Actualizaciones</div>
+                  <p class="settings-help">Sin Notas solo consulta GitHub cuando pulsás el botón. En escritorio, el paquete se verifica con la firma del actualizador antes de instalarse.</p>
+                  <div class="sync-box update-box">
+                    <div class="settings-row">
+                      <span>Versión instalada</span>
+                      <strong id="update-current-version">—</strong>
+                    </div>
+                    <div class="settings-row" id="update-available-row" hidden>
+                      <span>Nueva versión</span>
+                      <strong id="update-new-version">—</strong>
+                    </div>
+                    <div class="advanced-actions">
+                      <button class="font-option-btn" id="btn-check-updates" type="button">Buscar actualizaciones</button>
+                      <button class="font-option-btn btn-primary" id="btn-install-update" type="button" hidden>Descargar e instalar</button>
+                    </div>
+                    <div class="update-progress" id="update-progress-wrap" hidden>
+                      <progress id="update-progress" max="1" value="0"></progress>
+                      <span id="update-progress-label"></span>
+                    </div>
+                    <p class="settings-help update-status" id="update-status" role="status" aria-live="polite"></p>
+                    <details class="update-notes" id="update-notes-wrap" hidden>
+                      <summary>Notas de la versión</summary>
+                      <pre id="update-notes"></pre>
+                    </details>
+                  </div>
+                </div>
+
                 <div class="settings-section-title">Mantenimiento</div>
                 <p class="settings-help">Estas acciones no eliminan tus notas. La limpieza de adjuntos solo borra imágenes de <code>assets</code> que no estén referenciadas en ninguna nota.</p>
                 <div class="advanced-actions">

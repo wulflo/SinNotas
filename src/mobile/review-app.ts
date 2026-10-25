@@ -29,6 +29,15 @@ import {
   readFontSizes,
   writeFontSize,
 } from "../typography";
+import {
+  checkForUpdates,
+  getCurrentVersion,
+  getUpdatePlatform,
+  installAvailableUpdate,
+  subscribeUpdateState,
+  type UpdateState,
+} from "../services/updater";
+import { formatBytes } from "../services/update-utils";
 import "./mobile.css";
 
 interface VaultSnapshot {
@@ -232,6 +241,8 @@ class MobileReviewApp {
   private toastTimer: number | null = null;
   private busy = false;
   private imageRequest = 0;
+  private updateUiReady = false;
+  private lastUpdateStatus: UpdateState["status"] = "idle";
 
   private readonly root: HTMLDivElement;
   private readonly refs: {
@@ -281,6 +292,17 @@ class MobileReviewApp {
     occlusionGrip: HTMLElement;
     occlusionCoords: HTMLElement;
     saveOcclusion: HTMLButtonElement;
+    updateSection: HTMLElement;
+    updateCurrentVersion: HTMLElement;
+    updateAvailable: HTMLElement;
+    updateNewVersion: HTMLElement;
+    updateCheckButton: HTMLButtonElement;
+    updateInstallButton: HTMLButtonElement;
+    updateProgress: HTMLProgressElement;
+    updateProgressLabel: HTMLElement;
+    updateStatus: HTMLElement;
+    updateNotesWrap: HTMLDetailsElement;
+    updateNotes: HTMLElement;
     toast: HTMLElement;
   };
 
@@ -415,6 +437,30 @@ class MobileReviewApp {
             <button class="mobile-lang-option" type="button" data-action="set-lang" data-lang="zh">中文</button>
           </div>
           <p class="mobile-editor-hint">El idioma se guarda en este dispositivo.</p>
+
+          <h3 class="mobile-appearance-title">Actualizaciones</h3>
+          <div class="mobile-update-card" data-update-section>
+            <div class="mobile-update-row">
+              <span>Versión instalada</span>
+              <strong data-update-current-version>—</strong>
+            </div>
+            <div class="mobile-update-row" data-update-available hidden>
+              <span>Nueva versión</span>
+              <strong data-update-new-version>—</strong>
+            </div>
+            <div class="mobile-settings-actions">
+              <button class="mobile-secondary" type="button" data-action="check-updates">Buscar actualizaciones</button>
+              <button class="mobile-primary" type="button" data-action="install-update" data-update-install hidden>Descargar APK</button>
+            </div>
+            <progress class="mobile-update-progress" data-update-progress max="1" value="0" hidden></progress>
+            <span class="mobile-update-progress-label" data-update-progress-label hidden></span>
+            <p class="mobile-editor-hint mobile-update-status" data-update-status role="status" aria-live="polite"></p>
+            <details class="mobile-update-notes" data-update-notes hidden>
+              <summary>Notas de la versión</summary>
+              <pre data-update-notes-content></pre>
+            </details>
+          </div>
+          <p class="mobile-editor-hint">Sin Notas solo consulta GitHub cuando pulsás el botón. El APK se guarda en la carpeta de descargas privada de la app; abrilo desde un gestor de archivos para instalarlo.</p>
 
           <h3 class="mobile-appearance-title">Bóveda y mantenimiento</h3>
           <div class="mobile-settings-actions">
@@ -552,6 +598,17 @@ class MobileReviewApp {
       occlusionGrip: requireElement(this.root, "[data-occlusion-grip]"),
       occlusionCoords: requireElement(this.root, "[data-occlusion-coords]"),
       saveOcclusion: requireElement(this.root, "[data-save-occlusion]"),
+      updateSection: requireElement(this.root, "[data-update-section]"),
+      updateCurrentVersion: requireElement(this.root, "[data-update-current-version]"),
+      updateAvailable: requireElement(this.root, "[data-update-available]"),
+      updateNewVersion: requireElement(this.root, "[data-update-new-version]"),
+      updateCheckButton: requireElement(this.root, "[data-action='check-updates']"),
+      updateInstallButton: requireElement(this.root, "[data-update-install]"),
+      updateProgress: requireElement(this.root, "[data-update-progress]"),
+      updateProgressLabel: requireElement(this.root, "[data-update-progress-label]"),
+      updateStatus: requireElement(this.root, "[data-update-status]"),
+      updateNotesWrap: requireElement(this.root, "[data-update-notes]"),
+      updateNotes: requireElement(this.root, "[data-update-notes-content]"),
       toast: requireElement(this.root, "[data-toast]"),
     };
   }
@@ -575,6 +632,7 @@ class MobileReviewApp {
     this.applyStoredFontSizes();
     this.updateLanguageButtons();
     this.bindEvents();
+    this.initUpdateSettings();
     void this.loadAndApply(this.vault.getActiveRootPath(), undefined, true).finally(() => {
       window.clearTimeout(splashTimeout);
     });
@@ -640,6 +698,10 @@ class MobileReviewApp {
         this.closeDrawer();
         window.location.reload();
         return;
+      } else if (action === "check-updates") {
+        void checkForUpdates();
+      } else if (action === "install-update") {
+        void installAvailableUpdate();
       } else if (action === "set-lang") {
         const lang = target.dataset.lang;
         if (lang === "auto" || lang === "es" || lang === "en" || lang === "zh") {
@@ -2086,6 +2148,70 @@ class MobileReviewApp {
     this.refs.refreshButton.disabled = busy;
     this.refs.notesButton.disabled = busy;
     this.updateHistoryButtons();
+  }
+
+  private initUpdateSettings(): void {
+    if (this.updateUiReady) return;
+    this.updateUiReady = true;
+
+    if (getUpdatePlatform() === "unsupported") {
+      this.refs.updateSection.hidden = true;
+      return;
+    }
+
+    void getCurrentVersion().then((version) => {
+      if (version) this.refs.updateCurrentVersion.textContent = version;
+    });
+
+    subscribeUpdateState((state) => this.renderUpdateState(state));
+    this.refs.updateCheckButton.addEventListener("click", () => {
+      void checkForUpdates();
+    });
+    this.refs.updateInstallButton.addEventListener("click", () => {
+      void installAvailableUpdate();
+    });
+  }
+
+  private renderUpdateState(state: UpdateState): void {
+    this.refs.updateCurrentVersion.textContent = state.currentVersion || "—";
+    this.refs.updateAvailable.hidden = !state.newVersion;
+    this.refs.updateNewVersion.textContent = state.newVersion ?? "—";
+
+    const busy = state.status === "checking" || state.status === "downloading";
+    this.refs.updateCheckButton.disabled = busy;
+    this.refs.updateCheckButton.textContent =
+      state.status === "checking" ? "Buscando…" : "Buscar actualizaciones";
+    this.refs.updateInstallButton.hidden = state.status !== "available";
+    this.refs.updateInstallButton.disabled = busy;
+
+    this.refs.updateStatus.textContent = state.message ?? "";
+    this.refs.updateStatus.dataset.status = state.status;
+
+    const showProgress =
+      state.status === "downloading" ||
+      (state.status === "ready" && state.progress !== null);
+    this.refs.updateProgress.hidden = !showProgress;
+    this.refs.updateProgressLabel.hidden = !showProgress;
+    if (showProgress) {
+      if (state.progress === null) this.refs.updateProgress.removeAttribute("value");
+      else this.refs.updateProgress.value = state.progress;
+      const percent = state.progress === null ? "" : ` · ${Math.round(state.progress * 100)} %`;
+      this.refs.updateProgressLabel.textContent =
+        state.totalBytes > 0
+          ? `${formatBytes(state.receivedBytes)} / ${formatBytes(state.totalBytes)}${percent}`
+          : `${formatBytes(state.receivedBytes)}${percent}`;
+    }
+
+    this.refs.updateNotesWrap.hidden = !state.notes;
+    this.refs.updateNotes.textContent = state.notes;
+
+    // Avisar una sola vez cuando termina la descarga o aparece un error, sin
+    // tapar la interfaz con toasts repetidos en cada actualización de progreso.
+    if (state.status !== this.lastUpdateStatus) {
+      if (state.status === "ready" && state.message) this.showToast(state.message);
+      else if (state.status === "error" && state.message) this.showToast(state.message);
+      this.lastUpdateStatus = state.status;
+    }
   }
 
   private showToast(message: string): void {

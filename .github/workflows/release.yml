@@ -1,0 +1,505 @@
+name: Release
+
+# Se ejecuta únicamente al empujar un tag v* (por ejemplo v0.2.0).
+on:
+  push:
+    tags: ["v*"]
+
+# Permisos mínimos: los jobs de build solo leen el repositorio. El permiso de
+# escritura se concede exclusivamente al job que publica la release.
+permissions:
+  contents: read
+
+# Una release nunca se cancela a mitad: podría dejar artefactos a medias.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies (ignore scripts for security)
+        run: npm ci --ignore-scripts
+
+      - name: Validate tag matches project versions
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          TAURI_VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+          CARGO_VERSION="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' src-tauri/Cargo.toml | head -n 1)"
+          failed=0
+          for pair in "tauri.conf.json:$TAURI_VERSION" "package.json:$PACKAGE_VERSION" "Cargo.toml:$CARGO_VERSION"; do
+            file="${pair%%:*}"
+            version="${pair#*:}"
+            if [ "$version" != "$TAG_VERSION" ]; then
+              echo "ERROR: $file declara '$version' pero el tag es 'v$TAG_VERSION'" >&2
+              failed=1
+            fi
+          done
+          if [ "$failed" -ne 0 ]; then
+            echo "Actualizá las versiones del proyecto antes de publicar el tag." >&2
+            exit 1
+          fi
+          echo "Versión v$TAG_VERSION coincide con tauri.conf.json, package.json y Cargo.toml."
+
+      - name: Run TypeScript type check
+        run: npx tsc --noEmit
+
+      - name: Run frontend tests
+        run: npm test
+
+  build-android:
+    name: Build Android APK (signed)
+    needs: validate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    env:
+      # La APK solo incluye la experiencia de repaso.
+      VITE_APP_MODE: flashcards
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      # Gradle 9.x (wrapper generado por tauri-cli 2.12) exige JVM 17+.
+      - name: Setup Java 17 (Gradle)
+        uses: actions/setup-java@c5195efecf7bdfc987ee8bae7a71cb8b11521c00 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Rust toolchain + Android target
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Configure Android NDK
+        run: |
+          NDK_DIR="${ANDROID_NDK_LATEST_HOME:-${ANDROID_NDK_HOME:-}}"
+          if [ -z "$NDK_DIR" ]; then
+            NDK_DIR="$(ls -d "${ANDROID_HOME:?}"/ndk/* 2>/dev/null | sort -V | tail -n 1)"
+          fi
+          if [ -z "$NDK_DIR" ] || [ ! -d "$NDK_DIR" ]; then
+            echo "No se encontró el Android NDK." >&2
+            exit 1
+          fi
+          echo "NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+
+      - name: Initialize Tauri Android project
+        run: npm run tauri android init -- --ci
+
+      - name: Patch Android safe-area insets
+        run: npm run android:patch
+
+      - name: Generate app icons for Android
+        run: npm run tauri icon src-tauri/icons/icon-manifest.json
+
+      - name: Verify Android launcher icons
+        run: |
+          RES="src-tauri/gen/android/app/src/main/res"
+          test -f "$RES/mipmap-anydpi-v26/ic_launcher.xml"
+          grep -q 'ic_launcher_foreground' "$RES/mipmap-anydpi-v26/ic_launcher.xml"
+          grep -q '@color/ic_launcher_background' "$RES/mipmap-anydpi-v26/ic_launcher.xml"
+          grep -qi '#0e1c7e' "$RES/values/ic_launcher_background.xml"
+          for f in ic_launcher.png ic_launcher_round.png ic_launcher_foreground.png; do
+            test -f "$RES/mipmap-xxxhdpi/$f"
+          done
+          echo "Android launcher icons verified"
+
+      # INTERNET es necesario para descargar latest.json y el APK. Se mantiene
+      # allowBackup=false y se prohíben permisos de instalación/almacenamiento.
+      - name: Patch manifest (allowBackup=false, INTERNET required)
+        run: |
+          MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+          test -f "$MANIFEST"
+          if grep -q 'android:allowBackup' "$MANIFEST"; then
+            sed -i 's/android:allowBackup="[a-z]*"/android:allowBackup="false"/' "$MANIFEST"
+          else
+            sed -i -E 's/^([[:space:]]*)<application[[:space:]]*$/\1<application android:allowBackup="false" /' "$MANIFEST"
+          fi
+          if ! grep -q 'android:allowBackup' "$MANIFEST"; then
+            sed -i 's/<application /<application android:allowBackup="false" /' "$MANIFEST"
+          fi
+          grep -q 'android:allowBackup="false"' "$MANIFEST"
+          grep -q 'android.permission.INTERNET' "$MANIFEST" || {
+            echo "ERROR: la plantilla de Tauri no declara INTERNET; la actualización de Android no funcionaría." >&2
+            exit 1
+          }
+          if grep -qE 'MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|REQUEST_INSTALL_PACKAGES' "$MANIFEST"; then
+            echo "ERROR: el manifiesto declara permisos de instalación o almacenamiento no permitidos." >&2
+            exit 1
+          fi
+          echo "Manifest verificado:"
+          grep -E 'allowBackup|uses-permission' "$MANIFEST"
+
+      # tauri-plugin-android-fs 2.0.1 fija compileSdk=34 y tauri-android 2.12
+      # exige API 36. Se alinea el plugin en el registry de Cargo.
+      - name: Align android-fs plugin compileSdk
+        run: |
+          cargo fetch --locked --manifest-path src-tauri/Cargo.toml
+          PLUGIN_GRADLE="$(find "${CARGO_HOME:-$HOME/.cargo}/registry/src" \
+            -path '*/tauri-plugin-android-fs-*/android/build.gradle.kts' -print -quit)"
+          if [ -z "$PLUGIN_GRADLE" ]; then
+            echo "ERROR: no se encontró el build.gradle.kts de tauri-plugin-android-fs" >&2
+            exit 1
+          fi
+          sed -i -E 's/^([[:space:]]*compileSdk[[:space:]]*=[[:space:]]*)[0-9]+/\136/' "$PLUGIN_GRADLE"
+          if ! grep -qE '^[[:space:]]*compileSdk[[:space:]]*=[[:space:]]*36' "$PLUGIN_GRADLE"; then
+            echo "ERROR: no se pudo alinear compileSdk a 36 en $PLUGIN_GRADLE" >&2
+            grep -n 'compileSdk' "$PLUGIN_GRADLE" >&2 || true
+            exit 1
+          fi
+          echo "compileSdk del plugin android-fs alineado a 36."
+
+      - name: Build release APK (unsigned)
+        run: npm run tauri android build -- --apk --target aarch64
+
+      - name: Locate Android build tools
+        run: |
+          BUILD_TOOLS="$(find "${ANDROID_HOME:?}/build-tools" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -V | tail -n 1)"
+          if [ -z "$BUILD_TOOLS" ] || [ ! -d "$BUILD_TOOLS" ]; then
+            echo "ERROR: no se encontró ningún directorio en \$ANDROID_HOME/build-tools" >&2
+            exit 1
+          fi
+          APKSIGNER="$BUILD_TOOLS/apksigner"
+          AAPT2="$BUILD_TOOLS/aapt2"
+          ZIPALIGN="$BUILD_TOOLS/zipalign"
+          for tool in "$APKSIGNER" "$AAPT2" "$ZIPALIGN"; do
+            if [ ! -x "$tool" ]; then
+              echo "ERROR: no se encontró el ejecutable $tool" >&2
+              exit 1
+            fi
+          done
+          echo "APKSIGNER=$APKSIGNER" >> "$GITHUB_ENV"
+          echo "AAPT2=$AAPT2" >> "$GITHUB_ENV"
+          echo "ZIPALIGN=$ZIPALIGN" >> "$GITHUB_ENV"
+          echo "Build tools: $BUILD_TOOLS"
+
+      # Solo se expone un booleano derivado: el valor real de cada secreto se
+      # inyecta únicamente en el paso de firma.
+      - name: Verify signing secrets are present
+        env:
+          HAS_ANDROID_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+          HAS_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD != '' }}
+          HAS_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD != '' }}
+          HAS_KEY_ALIAS: ${{ secrets.KEY_ALIAS != '' }}
+        run: |
+          missing=()
+          [ "$HAS_ANDROID_KEYSTORE" = "true" ] || missing+=("ANDROID_KEYSTORE_BASE64")
+          [ "$HAS_KEYSTORE_PASSWORD" = "true" ] || missing+=("KEYSTORE_PASSWORD")
+          [ "$HAS_KEY_PASSWORD" = "true" ] || missing+=("KEY_PASSWORD")
+          [ "$HAS_KEY_ALIAS" = "true" ] || missing+=("KEY_ALIAS")
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "ERROR: faltan secretos de firma: ${missing[*]}" >&2
+            exit 1
+          fi
+          echo "Los 4 secretos de firma están definidos."
+
+      # Los secretos se usan SOLO dentro de este paso: nunca a nivel de job.
+      - name: Sign APK with apksigner (secrets only in this step)
+        id: sign_apk
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > release.keystore
+          chmod 600 release.keystore
+
+          mapfile -t UNSIGNED_APKS < <(find src-tauri/gen/android/app/build/outputs/apk \
+            -path '*/release/*' -name '*.apk' -not -name '*-signed*')
+          if [ "${#UNSIGNED_APKS[@]}" -ne 1 ]; then
+            echo "ERROR: se esperaba exactamente 1 APK release sin firmar; encontrados ${#UNSIGNED_APKS[@]}:" >&2
+            printf '  %s\n' "${UNSIGNED_APKS[@]}" >&2
+            exit 1
+          fi
+          UNSIGNED_APK="${UNSIGNED_APKS[0]}"
+          SIGNED_APK="${UNSIGNED_APK%.apk}-signed.apk"
+
+          "${APKSIGNER:?APKSIGNER no está definido}" sign \
+            --ks release.keystore \
+            --ks-pass env:KEYSTORE_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --ks-key-alias "$KEY_ALIAS" \
+            --out "$SIGNED_APK" \
+            "$UNSIGNED_APK"
+
+          "${APKSIGNER:?APKSIGNER no está definido}" verify --verbose --print-certs "$SIGNED_APK"
+          echo "signed_apk=$SIGNED_APK" >> "$GITHUB_OUTPUT"
+
+      - name: Remove temporary keystore
+        if: always()
+        run: rm -f release.keystore
+
+      - name: Inspect signed APK manifest (security checks)
+        run: |
+          SIGNED_APK="${{ steps.sign_apk.outputs.signed_apk }}"
+          "${ZIPALIGN:?ZIPALIGN no está definido}" -c -v 4 "$SIGNED_APK" > zipalign.txt
+          echo "=== zipalign ==="
+          tail -n 3 zipalign.txt
+
+          "${AAPT2:?AAPT2 no está definido}" dump permissions "$SIGNED_APK" > permissions.txt
+          echo "=== Permissions ==="
+          cat permissions.txt
+
+          # INTERNET es imprescindible para actualizar. Instalación y
+          # almacenamiento siguen prohibidos: el usuario instala el APK a mano.
+          if grep -qE "(MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|WRITE_EXTERNAL_STORAGE|REQUEST_INSTALL_PACKAGES)" permissions.txt; then
+            echo "ERROR: Dangerous permission found in APK" >&2
+            exit 1
+          fi
+          grep -q "android.permission.INTERNET" permissions.txt || {
+            echo "ERROR: falta el permiso INTERNET en la APK" >&2
+            exit 1
+          }
+
+          "${AAPT2:?AAPT2 no está definido}" dump xmltree "$SIGNED_APK" --file AndroidManifest.xml > manifest-dump.xml
+          echo "=== Manifest ==="
+          cat manifest-dump.xml
+
+          if grep -qE 'android:debuggable.*(0xffffffff|=true|"true")' manifest-dump.xml; then
+            echo "ERROR: Release APK is debuggable" >&2
+            exit 1
+          fi
+          if grep -qE 'android:usesCleartextTraffic.*(0xffffffff|=true|"true")' manifest-dump.xml; then
+            echo "ERROR: Cleartext traffic enabled" >&2
+            exit 1
+          fi
+          grep -q 'android:allowBackup' manifest-dump.xml || {
+            echo "ERROR: allowBackup no está declarado en el APK" >&2
+            exit 1
+          }
+          if grep -qE 'android:allowBackup.*(0xffffffff|=true|"true")' manifest-dump.xml; then
+            echo "ERROR: allowBackup no es false" >&2
+            exit 1
+          fi
+          echo "All security checks passed"
+
+      - name: APK summary
+        run: |
+          SIGNED_APK="${{ steps.sign_apk.outputs.signed_apk }}"
+          BADGING="$RUNNER_TEMP/badging.txt"
+          "${AAPT2:?AAPT2 no está definido}" dump badging "$SIGNED_APK" > "$BADGING"
+
+          if ! unzip -l "$SIGNED_APK" | grep -q 'lib/arm64-v8a/'; then
+            echo "ERROR: el APK no contiene bibliotecas nativas arm64-v8a" >&2
+            exit 1
+          fi
+
+          PKG_NAME="$(sed -n "s/^package: name='\([^']*\)'.*/\1/p" "$BADGING" | head -n 1)"
+          VERSION_CODE="$(sed -n "s/^package: .*versionCode='\([^']*\)'.*/\1/p" "$BADGING" | head -n 1)"
+          VERSION_NAME="$(sed -n "s/^package: .*versionName='\([^']*\)'.*/\1/p" "$BADGING" | head -n 1)"
+          MIN_SDK="$(sed -n -E "s/^(minSdkVersion|sdkVersion):'([^']*)'.*/\2/p" "$BADGING" | head -n 1)"
+          TARGET_SDK="$(sed -n "s/^targetSdkVersion:'\([^']*\)'.*/\1/p" "$BADGING" | head -n 1)"
+          PERMS="$(sed -n "s/^uses-permission: name='\([^']*\)'.*/- \`\1\`/p" "$BADGING")"
+          [ -n "$PERMS" ] || PERMS="_ninguno_"
+          FINGERPRINT="$("${APKSIGNER:?APKSIGNER no está definido}" verify --print-certs "$SIGNED_APK" 2>&1 \
+            | grep -m1 'certificate SHA-256 digest:' | sed -E 's/.*certificate SHA-256 digest: *//')"
+          APK_SHA256="$(sha256sum "$SIGNED_APK" | awk '{print $1}')"
+
+          for var in PKG_NAME VERSION_CODE VERSION_NAME MIN_SDK TARGET_SDK FINGERPRINT APK_SHA256; do
+            if [ -z "${!var:-}" ]; then
+              echo "ERROR: no se pudo extraer $var del APK firmado" >&2
+              exit 1
+            fi
+          done
+
+          {
+            echo "## APK release firmado"
+            echo ""
+            echo "| Campo | Valor |"
+            echo "| --- | --- |"
+            echo "| Paquete | \`$PKG_NAME\` |"
+            echo "| versionName | \`$VERSION_NAME\` |"
+            echo "| versionCode | \`$VERSION_CODE\` |"
+            echo "| minSdk | \`$MIN_SDK\` |"
+            echo "| targetSdk | \`$TARGET_SDK\` |"
+            echo "| Nativo arm64-v8a | sí |"
+            echo "| SHA-256 del certificado | \`$FINGERPRINT\` |"
+            echo "| SHA-256 del APK | \`$APK_SHA256\` |"
+            echo ""
+            echo "### Permisos declarados"
+            echo ""
+            echo "$PERMS"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload signed APK artifact
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: release-android
+          path: ${{ steps.sign_apk.outputs.signed_apk }}
+          if-no-files-found: error
+          retention-days: 90
+
+  build-desktop:
+    name: Build desktop (${{ matrix.name }})
+    needs: validate
+    runs-on: ${{ matrix.platform }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux
+            platform: ubuntu-22.04
+            args: "--bundles appimage,deb"
+            rust_targets: ""
+            artifacts: |
+              src-tauri/target/release/bundle/appimage/*.AppImage
+              src-tauri/target/release/bundle/appimage/*.AppImage.sig
+              src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz
+              src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig
+              src-tauri/target/release/bundle/deb/*.deb
+          - name: windows
+            platform: windows-latest
+            args: "--bundles nsis,msi"
+            rust_targets: ""
+            artifacts: |
+              src-tauri/target/release/bundle/nsis/*.exe
+              src-tauri/target/release/bundle/nsis/*.exe.sig
+              src-tauri/target/release/bundle/msi/*.msi
+              src-tauri/target/release/bundle/msi/*.msi.sig
+          - name: macos-universal
+            platform: macos-latest
+            args: "--bundles app,dmg --target universal-apple-darwin"
+            rust_targets: "aarch64-apple-darwin,x86_64-apple-darwin"
+            artifacts: |
+              src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz
+              src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app.tar.gz.sig
+              src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: ${{ matrix.rust_targets }}
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install dependencies (ignore scripts for security)
+        run: npm ci --ignore-scripts
+
+      # Solo se expone un booleano derivado: la clave real se inyecta únicamente
+      # en el paso que ejecuta `npm run tauri build`.
+      - name: Verify updater signing key is present
+        env:
+          HAS_UPDATER_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        run: |
+          if [ "$HAS_UPDATER_SIGNING_KEY" != "true" ]; then
+            echo "ERROR: falta el secreto TAURI_SIGNING_PRIVATE_KEY." >&2
+            exit 1
+          fi
+          echo "La clave de firma del actualizador está definida."
+
+      - name: Generate app icons
+        run: npm run tauri icon src-tauri/icons/icon-manifest.json
+
+      # La clave privada del actualizador se inyecta SOLO en este paso. El flag
+      # createUpdaterArtifacts genera los .sig y los paquetes que consume el
+      # plugin nativo; sin la clave, el build falla y no se publica nada.
+      - name: Build desktop bundles with updater artifacts
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: npm run tauri build -- --config '{"bundle":{"createUpdaterArtifacts":true}}' ${{ matrix.args }}
+
+      - name: Upload desktop artifacts
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: release-desktop-${{ matrix.name }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error
+          retention-days: 90
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: [build-android, build-desktop]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20"
+
+      # Descarga todos los artefactos de esta ejecución y los extrae. El patrón
+      # solo incluye los artefactos de release, nunca el APK de debug.
+      - name: Download release artifacts
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Normalize assets and generate latest.json
+        run: node scripts/prepare-release-assets.mjs release-assets "$GITHUB_REF_NAME"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
+        with:
+          files: release-assets/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          draft: false
+          prerelease: false
+          make_latest: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

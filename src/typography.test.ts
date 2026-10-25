@@ -35,10 +35,9 @@ describe("typography", () => {
     expect(DEFAULT_FONT_SIZES.editor).toBe(15);
     expect(DEFAULT_FONT_SIZES.pageTitle).toBe(32);
     expect(DEFAULT_FONT_SIZES.h1).toBeGreaterThan(DEFAULT_FONT_SIZES.editor);
-    // Las tarjetas se expresan como múltiplos de la interfaz (2.4em / 2em).
-    expect(DEFAULT_FONT_SIZES.flashcardQuestion).toBe(2.4);
-    expect(DEFAULT_FONT_SIZES.flashcardAnswer).toBe(2);
-    expect(fontSizeDefinition("flashcardQuestion").unit).toBe("em");
+    // El texto de las tarjetas se expresa como múltiplo de la interfaz (2.4em).
+    expect(DEFAULT_FONT_SIZES.flashcardText).toBe(2.4);
+    expect(fontSizeDefinition("flashcardText").unit).toBe("em");
     expect(fontSizeDefinition("ui").unit).toBeUndefined();
     expect(new Set(FONT_SIZE_DEFINITIONS.map((definition) => definition.cssVariable)).size).toBe(
       FONT_SIZE_DEFINITIONS.length
@@ -61,18 +60,18 @@ describe("typography", () => {
 
   it("persists clamped values", () => {
     const storage = memoryStorage();
-    expect(writeFontSize("flashcardQuestion", 100, storage)).toBe(3);
+    expect(writeFontSize("flashcardText", 100, storage)).toBe(3);
     expect(storage.values.get("sinnotas-font-size-flashcard-question")).toBe("3");
-    expect(readFontSize("flashcardQuestion", storage)).toBe(3);
+    expect(readFontSize("flashcardText", storage)).toBe(3);
   });
 
   it("migrates legacy pixel card sizes to interface multiples", () => {
     const storage = memoryStorage({
       "sinnotas-font-size-flashcard-question": "20",
+      // La clave de respuesta ya no se usa: pregunta y respuesta comparten tamaño.
       "sinnotas-font-size-flashcard-answer": "18",
     });
-    expect(readFontSize("flashcardQuestion", storage)).toBe(2.7);
-    expect(readFontSize("flashcardAnswer", storage)).toBe(2.4);
+    expect(readFontSize("flashcardText", storage)).toBe(2.7);
   });
 
   it("migrates legacy interface defaults only once", () => {
@@ -109,10 +108,10 @@ describe("typography", () => {
         },
       },
     };
-    applyFontSizes({ ui: 16, h1: 34, flashcardAnswer: 2.2 }, target);
+    applyFontSizes({ ui: 16, h1: 34, flashcardText: 2.2 }, target);
     expect(properties.get("--ls-font-size-ui")).toBe("16px");
     expect(properties.get("--ls-font-size-h1")).toBe("34px");
-    expect(properties.get("--ls-flashcard-answer-em")).toBe("2.2");
+    expect(properties.get("--ls-flashcard-text-em")).toBe("2.2");
     expect(properties.get("--ls-font-size-flashcard-answer")).toBeUndefined();
     expect(properties.get("--ls-font-size-editor")).toBe("15px");
     expect(properties.get("--ls-font-size-h6")).toBe("14px");
@@ -122,11 +121,11 @@ describe("typography", () => {
 
   it("maps storage keys to the documented CSS variable names", () => {
     expect(fontSizeDefinition("pageTitle").cssVariable).toBe("--ls-font-size-page-title");
-    expect(fontSizeDefinition("flashcardQuestion").storageKey).toBe(
+    expect(fontSizeDefinition("flashcardText").storageKey).toBe(
       "sinnotas-font-size-flashcard-question"
     );
-    expect(fontSizeDefinition("flashcardQuestion").cssVariable).toBe(
-      "--ls-flashcard-question-em"
+    expect(fontSizeDefinition("flashcardText").cssVariable).toBe(
+      "--ls-flashcard-text-em"
     );
   });
 

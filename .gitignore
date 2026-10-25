@@ -17,6 +17,9 @@ src-tauri/gen/
 *.p12
 *.pfx
 keystore-secrets.txt
+# Clave privada del actualizador (generada con `tauri signer generate`).
+# La pública vive en tauri.conf.json; la privada solo en GitHub Secrets.
+.tauri/
 
 # Artefactos de compilación y descargas de CI
 *.apk

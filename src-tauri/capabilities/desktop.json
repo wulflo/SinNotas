@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop-updater",
+  "description": "El actualizador nativo y el relanzado solo se compilan en escritorio. Android descarga el APK sin estos permisos.",
+  "platforms": ["linux", "macOS", "windows"],
+  "windows": ["main"],
+  "permissions": ["updater:default", "process:allow-restart"]
+}

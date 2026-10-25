@@ -154,6 +154,7 @@ records are filed there too.
 | [docs/metadata-cache.md](docs/metadata-cache.md) | Persistent binary cache, warm/cold startup, filesystem watcher and path-sanitization guarantees |
 | [docs/flashcards-loading.md](docs/flashcards-loading.md) | Progressive flashcard scan: batching, caching, cancellation and UI integration |
 | [docs/publicacion-apk-android.md](docs/publicacion-apk-android.md) | Publishing the signed APK: secrets, keystore, verification and first upload |
+| [docs/actualizaciones.md](docs/actualizaciones.md) | Hybrid updater: desktop minisign flow, Android APK download, `latest.json` and release process |
 
 ### Historical records and benchmarks
 
@@ -169,6 +170,7 @@ records are filed there too.
 | [docs/2026-10-25-registro-progreso.md](docs/2026-10-25-registro-progreso.md) | Feature and status log for phases F1–F6, later fixes and verification gates |
 | [docs/2026-10-25-fix-layout-review.md](docs/2026-10-25-fix-layout-review.md) | Review card layout, hidden scrollbar, cloze presentation, Android safe-area and accent separator fixes, with verification notes |
 | [docs/2026-10-25-ui-repaso-tipografia-atajos.md](docs/2026-10-25-ui-repaso-tipografia-atajos.md) | Review-mode entry, SVG menu icons, 15 px UI with em-based card typography, instant view switching and double-Enter outdent shortcut |
+| [docs/2026-10-25-auditoria-actualizaciones.md](docs/2026-10-25-auditoria-actualizaciones.md) | Updater threat model: manifest and package tampering, MITM, secrets, Android permissions and residual risks |
 
 ## Tauri application
 
@@ -226,7 +228,7 @@ npm run tauri icon src-tauri/icons/icon-manifest.json
 VITE_APP_MODE=flashcards npm run tauri android build -- --apk --debug
 ```
 
-The `.github/workflows/ci.yml` workflow builds the APK (debug on pushes/PRs and signed release on `v*` tags) and publishes it as a downloadable artifact. Signing secrets are isolated in the `sign_apk` step. To load the secrets, test without creating a release and verify the signature, see [docs/publicacion-apk-android.md](docs/publicacion-apk-android.md).
+The `.github/workflows/ci.yml` workflow builds the APK on pushes/PRs and a signed release APK on `master` or by `workflow_dispatch`; it publishes it as a downloadable artifact but never creates a release. Publishing happens only from a `v*` tag through `.github/workflows/release.yml`. Signing secrets are isolated in the `sign_apk` step. To load the secrets, test without publishing and verify the signature, see [docs/publicacion-apk-android.md](docs/publicacion-apk-android.md); the full update system is described in [docs/actualizaciones.md](docs/actualizaciones.md).
 
 Launch modes:
 

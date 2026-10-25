@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permisos mínimos del frontend: abrir URLs del repositorio y leer imágenes del portapapeles. Los diálogos nativos (carpetas y guardado) los gestiona el backend.",
+  "description": "Permisos mínimos del frontend: abrir URLs del repositorio, leer imágenes del portapapeles, detectar la plataforma y guardar el APK de actualización en la carpeta de descargas de la app. La instalación del APK la hace el usuario manualmente.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -20,6 +20,26 @@
     "core:window:allow-toggle-maximize",
     "core:window:allow-close",
     "core:window:allow-is-maximized",
-    "core:window:allow-start-dragging"
+    "core:window:allow-start-dragging",
+    "os:allow-platform",
+    {
+      "identifier": "fs:allow-mkdir",
+      "allow": [
+        {
+          "path": "$DOWNLOAD"
+        },
+        {
+          "path": "$DOWNLOAD/**"
+        }
+      ]
+    },
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [
+        {
+          "path": "$DOWNLOAD/SinNotas-update.apk"
+        }
+      ]
+    }
   ]
 }
