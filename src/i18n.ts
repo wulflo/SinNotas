@@ -423,7 +423,33 @@ const englishBySpanish: Record<string, string> = {
   "No asignado": "Not assigned",
   "Mapeo de botones adicionales": "Additional button mapping",
   "Visitar repositorio": "Visit repository",
+  // Ajustes > Grafo.
+  "Grafo": "Graph",
+  "Secciones de ajustes": "Settings sections",
+  "Grupos de color por nombre": "Color groups by name",
+  "Pinta los nodos cuyo título contenga el texto indicado. La regla más específica (texto más largo) tiene prioridad y los colores manuales de cada nota siguen por encima de los grupos.": "Colors nodes whose title contains the given text. The most specific rule (longest text) wins, and each page's manual color still takes precedence over the groups.",
+  "Texto del nombre (ej. Diario, Proyecto…)": "Name text (e.g. Journal, Project…)",
+  "Texto del nombre para el grupo de color": "Name text for the color group",
+  "Color del grupo": "Group color",
+  "Añadir grupo": "Add group",
+  "Fuerzas de la simulación": "Simulation forces",
+  "Repulsión": "Repulsion",
+  "Fuerza de enlaces": "Link strength",
+  "Distancia de enlaces": "Link distance",
+  "Atracción al centro": "Center attraction",
+  "Fuerza de colisión": "Collision strength",
+  "Amortiguación": "Damping",
+  "Tamaño de los nodos": "Node size",
+  "Radio base": "Base radius",
+  "Radio por conexión": "Radius per connection",
+  "Radio máximo": "Maximum radius",
+  "Líneas y títulos": "Lines and titles",
+  "Grosor de enlaces": "Link width",
+  "Grosor resaltado": "Highlight width",
+  "Zoom para mostrar títulos": "Zoom to show titles",
   "Los títulos aparecen con fundido al acercar hasta este zoom; al pasar el cursor o seleccionar un nodo se muestran siempre.": "Node titles fade in as you zoom up to this level; hovering or selecting a node always shows them.",
+  "Restablecer valores del grafo": "Reset graph values",
+  "Ajustes del grafo restablecidos.": "Graph settings reset.",
   "📌 Fijadas": "📌 Pinned",
   "Recientes": "Recent",
   "Ver todas las notas": "View all pages",
@@ -913,7 +939,33 @@ const chineseBySpanish: Record<string, string> = {
   "No asignado": "未分配",
   "Mapeo de botones adicionales": "其他按钮映射",
   "Visitar repositorio": "访问仓库",
+  // Ajustes > Grafo.
+  "Grafo": "图谱",
+  "Secciones de ajustes": "设置分区",
+  "Grupos de color por nombre": "按名称分组的颜色",
+  "Pinta los nodos cuyo título contenga el texto indicado. La regla más específica (texto más largo) tiene prioridad y los colores manuales de cada nota siguen por encima de los grupos.": "为标题包含指定文本的节点着色。最具体的规则（文本最长）优先，单个页面的手动颜色仍高于分组。",
+  "Texto del nombre (ej. Diario, Proyecto…)": "名称文本（例如：日记、项目……）",
+  "Texto del nombre para el grupo de color": "颜色分组的名称文本",
+  "Color del grupo": "分组颜色",
+  "Añadir grupo": "添加分组",
+  "Fuerzas de la simulación": "模拟力",
+  "Repulsión": "排斥力",
+  "Fuerza de enlaces": "连接强度",
+  "Distancia de enlaces": "连接距离",
+  "Atracción al centro": "中心吸引力",
+  "Fuerza de colisión": "碰撞力",
+  "Amortiguación": "阻尼",
+  "Tamaño de los nodos": "节点大小",
+  "Radio base": "基础半径",
+  "Radio por conexión": "每个连接的半径",
+  "Radio máximo": "最大半径",
+  "Líneas y títulos": "连线与标题",
+  "Grosor de enlaces": "连接线宽度",
+  "Grosor resaltado": "高亮宽度",
+  "Zoom para mostrar títulos": "显示标题的缩放级别",
   "Los títulos aparecen con fundido al acercar hasta este zoom; al pasar el cursor o seleccionar un nodo se muestran siempre.": "缩放到此级别时节点标题会淡入；悬停或选择节点时始终显示。",
+  "Restablecer valores del grafo": "重置图谱数值",
+  "Ajustes del grafo restablecidos.": "图谱设置已重置。",
   "📌 Fijadas": "📌 已固定",
   "Recientes": "最近",
   "Ver todas las notas": "查看所有页面",
@@ -1238,7 +1290,19 @@ function localizeTextNode(node: Text): void {
     ? previousOriginal
     : node.data;
   originalTexts.set(node, original);
-  const localized = localizedText(original.trim());
+  const trimmed = original.trim();
+  let localized = localizedText(trimmed);
+  // Las etiquetas y ayudas del HTML están partidas en varias líneas por el
+  // formateo del documento. Para encontrarlas en el diccionario comparamos
+  // también con los espacios internos colapsados, pero solo sustituimos si
+  // existe una traducción real: así no se altera el texto sin traducir.
+  const normalized = trimmed.replace(/\s+/g, " ");
+  if (normalized !== trimmed) {
+    const normalizedLocalized = localizedText(normalized);
+    if (normalizedLocalized !== canonicalSpanish(normalized)) {
+      localized = normalizedLocalized;
+    }
+  }
   const leading = original.match(/^\s*/)?.[0] || "";
   const trailing = original.match(/\s*$/)?.[0] || "";
   const nextValue = `${leading}${localized}${trailing}`;

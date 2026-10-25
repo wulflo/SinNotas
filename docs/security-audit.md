@@ -67,8 +67,13 @@ muchas notas. Esta sección sustituye a las conclusiones históricas de abajo.
   `proc-macro-error` son avisos de mantenimiento, no vulnerabilidades
   explotables en el modelo de amenazas actual. Se actualizarán al subir la
   versión de Tauri.
-- **CSP con `style-src 'unsafe-inline'`**: necesario para los estilos dinámicos
-  de la interfaz; no se permite `unsafe-eval` ni scripts inline.
+- **CSP con `style-src 'unsafe-inline'` y `style-src-attr 'unsafe-inline'`**:
+  necesario para los estilos dinámicos de la interfaz y para los atributos
+  `style` que KaTeX usa al posicionar fórmulas. Tauri añade hashes a
+  `style-src` durante el empaquetado; según CSP, esos hashes hacen que
+  `'unsafe-inline'` se ignore para los atributos, así que `style-src-attr`
+  debe declararse explícitamente. No se permite `unsafe-eval` ni scripts
+  inline.
 - **URL de soporte**: si cambia el repositorio, hay que actualizar también
   `src-tauri/capabilities/default.json`; el scope es intencionalmente exacto.
 
@@ -169,7 +174,7 @@ Fix: `npm audit fix --force` (breaking: vite@8, vitest@5)
 | 2.1 | Posible ReDoS en patrones inline (cloze `{{...}}`, wikilink `[[...]]`, math `$...$`, display math `$$...$$`, fenced code) | **Confirmado y corregido** | `renderInline` y `renderBlockContent` reescritos con: cuantificadores acotados `{1,500}`, patrones separados, pre-check de `$` balanceados, lookahead en math display; tests ReDoS en markdown.test.ts | (pendiente commit) | Bajo |
 | 2.2 | KaTeX: faltan `maxSize`, `maxExpand`, tope longitud fórmula | **Parcial** | math.ts:17-18 tiene maxSize/maxExpand; tope 500 chars añadido en regex inline; display math limitado a 50k | (pendiente commit) | Bajo |
 | 2.3 | Auditoría `innerHTML` sin sanitizar | **Confirmado y verificado** | 33 ocurrencias auditadas en desktop.ts, mobile/review-app.ts, i18n.ts. **Todas las entradas de usuario usan sanitización**: `sanitizeHtml()`, `renderMarkdownToHtml()` (llama a sanitizeHtml), `renderMathToHtml()` (KaTeX trust:false). Las demás son: strings estáticos, templates sin interpolación, DOM API, o vaciado (`innerHTML = ""`). **Mejora sugerida**: backlink snippet (desktop.ts:4936-4945) usa escape manual; migrar a `escapeHtml()` o `sanitizeHtml()`. | (pendiente commit) | Bajo |
-| 2.4 | CSP requiere `unsafe-inline` para styles | **Verificado - necesario** | tauri.conf.json:26-27 usa `style-src 'self' 'unsafe-inline'`. Requerido por Tauri para estilos dinámicos (theme switching, CSS-in-JS, style attributes). No se puede eliminar sin romper UI. | (pendiente commit) | Bajo |
+| 2.4 | CSP requiere `unsafe-inline` para styles | **Verificado - necesario** | tauri.conf.json usa `style-src 'self' 'unsafe-inline'; style-src-attr 'unsafe-inline'`. Tauri añade hashes a `style-src` al empaquetar, lo que anula `'unsafe-inline'` para atributos; sin `style-src-attr` los estilos inline de KaTeX se bloquean solo en la app instalada. Requerido también para el cambio de tema y CSS dinámico. No se puede eliminar sin romper la UI. | (pendiente commit) | Bajo |
 
 ### Fase 3: CI y APK
 
