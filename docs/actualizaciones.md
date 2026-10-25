@@ -74,9 +74,16 @@ No hace falta un paso manual de descompresión en el workflow:
 4. `softprops/action-gh-release` publica `release-assets/*` como assets de la
    release.
 
-Los paquetes del actualizador de escritorio se publican comprimidos a
-propósito. El plugin de Tauri descarga y descomprime el `.AppImage.tar.gz` en
-Linux o el `.app.tar.gz` en macOS; en Windows usa el instalador `.exe` de NSIS.
+Los paquetes del actualizador de escritorio se publican con su firma `.sig`
+junto al archivo actualizable. El plugin de Tauri verifica la firma antes de
+instalar y acepta tanto un AppImage sin comprimir como un `.AppImage.tar.gz`:
+
+- Linux: el build actual publica `*.AppImage` + `*.AppImage.sig` directamente.
+  Si una versión futura de Tauri genera `.AppImage.tar.gz`, el script lo
+  prefiere automáticamente y publica también su `.tar.gz.sig`.
+- macOS: `*.app.tar.gz` + `*.app.tar.gz.sig`.
+- Windows: instalador NSIS `.exe` + `.exe.sig` (o MSI si no hubiera NSIS).
+
 Android descarga directamente `app-release.apk`. Además de esos paquetes, la
 release incluye los instaladores sin comprimir (`.AppImage`, `.deb`, `.exe`,
 `.msi`, `.dmg` y `.apk`) para descarga manual.
@@ -192,7 +199,8 @@ ni a ningún otro host.
   AppImage. Quien haya instalado el `.deb` debe descargar el paquete nuevo y
   reinstalarlo a mano; la app le mostrará la versión disponible, pero
   `downloadAndInstall` fallará porque el paquete publicado para
-  `linux-x86_64` es el `.AppImage.tar.gz`.
+  `linux-x86_64` es el `.AppImage` (o su `.AppImage.tar.gz` si el build lo
+  genera).
 - **macOS:** el actualizador reemplaza el `.app`, pero para distribución
   pública conviene firmar y notarizar la app. Un binario sin firma puede ser
   bloqueado por Gatekeeper al abrirlo por primera vez.

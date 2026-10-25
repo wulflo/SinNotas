@@ -107,6 +107,14 @@ function findOne(predicate, description) {
   return matches[0];
 }
 
+function findOptional(predicate, description) {
+  const matches = files.filter((name) => predicate(name.toLowerCase()));
+  if (matches.length > 1) {
+    fail(`Se encontraron varios candidatos para ${description}: ${matches.join(", ")}`);
+  }
+  return matches[0] ?? null;
+}
+
 async function signatureFor(fileName) {
   const sigPath = path.join(assetsDir, `${fileName}.sig`);
   if (!existsSync(sigPath)) {
@@ -132,11 +140,21 @@ async function addUpdaterPlatform(key, fileName) {
   info(`  ${key} -> ${fileName}`);
 }
 
-// Linux: el actualizador oficial solo soporta AppImage.
-const appImageUpdater = findOne(
-  (name) => name.endsWith(".appimage.tar.gz"),
-  "el archivo .AppImage.tar.gz del actualizador"
-);
+// Linux: el actualizador oficial acepta el AppImage sin comprimir y también
+// el .AppImage.tar.gz que generan algunas versiones de Tauri. Preferimos el
+// comprimido si existe y, si no, publicamos el AppImage con su firma.
+const appImageUpdater =
+  findOptional(
+    (name) => name.endsWith(".appimage.tar.gz"),
+    "el archivo .AppImage.tar.gz del actualizador"
+  ) ??
+  findOptional(
+    (name) => name.endsWith(".appimage"),
+    "el archivo .AppImage del actualizador"
+  );
+if (!appImageUpdater) {
+  fail("No se encontró el AppImage del actualizador (.AppImage.tar.gz ni .AppImage).");
+}
 await addUpdaterPlatform("linux-x86_64", appImageUpdater);
 
 // Windows: se prefiere el instalador NSIS (.exe); si no hay, MSI.
