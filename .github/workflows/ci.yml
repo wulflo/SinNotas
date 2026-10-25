@@ -143,6 +143,18 @@ jobs:
       - name: Generate app icons for Android
         run: npm run tauri icon src-tauri/icons/icon-manifest.json
 
+      - name: Verify Android launcher icons
+        run: |
+          RES="src-tauri/gen/android/app/src/main/res"
+          test -f "$RES/mipmap-anydpi-v26/ic_launcher.xml"
+          grep -q 'ic_launcher_foreground' "$RES/mipmap-anydpi-v26/ic_launcher.xml"
+          grep -q '@color/ic_launcher_background' "$RES/mipmap-anydpi-v26/ic_launcher.xml"
+          grep -qi '#0e1c7e' "$RES/values/ic_launcher_background.xml"
+          for f in ic_launcher.png ic_launcher_round.png ic_launcher_foreground.png; do
+            test -f "$RES/mipmap-xxxhdpi/$f"
+          done
+          echo "Android launcher icons verified"
+
       # Con vaults SAF externos y diarios, un backup automático en la nube de
       # Android restauraría índices desincronizados: se fuerza allowBackup=false.
       - name: Patch manifest (allowBackup=false, sin INTERNET)
@@ -272,6 +284,18 @@ jobs:
       # Android generado (gen/android/app/src/main/res).
       - name: Generate app icons for Android
         run: npm run tauri icon src-tauri/icons/icon-manifest.json
+
+      - name: Verify Android launcher icons
+        run: |
+          RES="src-tauri/gen/android/app/src/main/res"
+          test -f "$RES/mipmap-anydpi-v26/ic_launcher.xml"
+          grep -q 'ic_launcher_foreground' "$RES/mipmap-anydpi-v26/ic_launcher.xml"
+          grep -q '@color/ic_launcher_background' "$RES/mipmap-anydpi-v26/ic_launcher.xml"
+          grep -qi '#0e1c7e' "$RES/values/ic_launcher_background.xml"
+          for f in ic_launcher.png ic_launcher_round.png ic_launcher_foreground.png; do
+            test -f "$RES/mipmap-xxxhdpi/$f"
+          done
+          echo "Android launcher icons verified"
 
       # Con vaults SAF externos y diarios, un backup automático en la nube de
       # Android restauraría índices desincronizados: se fuerza allowBackup=false.

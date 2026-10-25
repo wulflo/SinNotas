@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import tauriConfig from "../src-tauri/tauri.conf.json";
 import iconManifest from "../src-tauri/icons/icon-manifest.json";
+import androidBackgroundXml from "../src-tauri/icons/android/values/ic_launcher_background.xml?raw";
+import launcherXml from "../src-tauri/icons/android/mipmap-anydpi-v26/ic_launcher.xml?raw";
+import launcherRoundXml from "../src-tauri/icons/android/mipmap-anydpi-v26/ic_launcher_round.xml?raw";
 
 /**
  * LaTeX usa atributos `style` inline para posicionar superíndices, fracciones y
@@ -20,5 +23,16 @@ describe("seguridad de la app empaquetada", () => {
   it("genera los iconos desde el máster transparente", () => {
     expect(iconManifest.default).toBe("icon-source.png");
     expect(iconManifest.android_fg).toBe("icon-source.png");
+  });
+
+  it("usa el mismo fondo navy en los iconos adaptativos de Android", () => {
+    const color = androidBackgroundXml.match(
+      /<color name="ic_launcher_background">(#[0-9a-fA-F]{6})<\/color>/,
+    )?.[1];
+
+    expect(color?.toLowerCase()).toBe(iconManifest.bg_color.toLowerCase());
+    for (const xml of [launcherXml, launcherRoundXml]) {
+      expect(xml).toContain('@color/ic_launcher_background');
+    }
   });
 });

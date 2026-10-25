@@ -196,6 +196,9 @@ The APK for Android 13 or newer (`minSdkVersion` 33) mounts only the review expe
 # Local build (requires the Android SDK/NDK and the Rust targets)
 npm ci
 npm run tauri android init -- --ci
+# `android init` creates the project with Tauri's default icons. Regenerate
+# them so gen/android gets the real logo instead of a generic launcher icon.
+npm run tauri icon src-tauri/icons/icon-manifest.json
 VITE_APP_MODE=flashcards npm run tauri android build -- --apk --debug
 ```
 
