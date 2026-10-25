@@ -88,6 +88,7 @@ import {
   type ControllerType,
 } from "./gamepad";
 import { renderMarkdownToHtml, sanitizeHtml } from "./editor/markdown";
+import { isAllowedRemoteImageUrl } from "./editor/url-safety";
 import { sanitizePastedHtmlToMarkdown } from "./editor/paste-sanitizer";
 import {
   editMarkdownTable,
@@ -3963,79 +3964,11 @@ function fileUrlToLocalPath(source: string): string | null {
   }
 }
 
-function isSafeImageUrl(urlString: string): boolean {
-  try {
-    const url = new URL(urlString);
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      return false;
-    }
-    const hostname = url.hostname.toLowerCase();
-    if (
-      hostname === "localhost" ||
-      hostname === "0.0.0.0" ||
-      hostname.startsWith("127.") ||
-      hostname.startsWith("192.168.") ||
-      hostname.startsWith("10.") ||
-      hostname.startsWith("169.254.") ||
-      hostname === "[::1]" ||
-      hostname === "::1" ||
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
-      hostname.endsWith(".local")
-    ) {
-      return false;
-    }
-    if (/^\[.*\]$/.test(hostname)) {
-      // Basic check for IPv6 loopback/private not fully covered, reject for safety
-      if (hostname.includes("::1") || hostname.includes("fc") || hostname.includes("fd")) {
-        return false;
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function isPrivateOrLocalHostname(hostname: string): boolean {
-  const host = hostname.trim().toLowerCase();
-  if (!host) return true;
-  if (host === "localhost" || host.endsWith(".localhost")) return true;
-  if (host === "::1" || host === "[::1]") return true;
-
-  const ipv4Match = host.match(/^(\d{1,3})(?:\.(\d{1,3})){3}$/);
-  if (ipv4Match) {
-    const parts = host.split(".").map((part) => Number(part));
-    if (parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true;
-    const [a, b] = parts;
-    if (a === 10) return true;
-    if (a === 127) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    return false;
-  }
-
-  if (host === "::" || host.startsWith("fe80:") || host.startsWith("fc") || host.startsWith("fd")) return true;
-  return false;
-}
-
-function isAllowedRemoteImageUrl(urlString: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(urlString, window.location.href);
-  } catch {
-    return false;
-  }
-  if (!(parsed.protocol === "http:" || parsed.protocol === "https:")) return false;
-  if (isPrivateOrLocalHostname(parsed.hostname)) return false;
-  return isSafeImageUrl(parsed.toString());
-}
-
 async function imageSourceToFile(source: string): Promise<File | null> {
   const trimmed = source.trim();
   if (!trimmed) return null;
   if (/^data:image\//i.test(trimmed)) return dataUrlToImageFile(trimmed);
-  if (!isAllowedRemoteImageUrl(trimmed)) {
+  if (!isAllowedRemoteImageUrl(trimmed, window.location.href)) {
     throw new Error("URL no permitida por motivos de seguridad.");
   }
 
