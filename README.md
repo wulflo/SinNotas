@@ -26,9 +26,9 @@ The current frontend uses neither React nor Tailwind CSS.
 - **Image occlusion:** draw rectangles, ellipses and polygons, move, resize and rotate areas, add hints, and keep those transformations in the block's Markdown metadata.
 - **Images:** supports PNG, JPG/JPEG, WebP, SVG, GIF and BMP. Inserted images are saved to the vault's `assets/` folder.
 - **Kanban tasks:** sort tasks as pending, in progress or completed; move them between columns and hide the completed ones.
-- **Concept map / Graph:** graph view with enhanced physics (D3/Obsidian-like model), navigation and visualization of relationships between pages. Interaction stays alive indefinitely —selection with alternating clicks, click on the background to clear, node dragging, panning (middle/right button), wheel zoom and double-click to reset— and custom node colors propagate to neighbors by influence. See [docs/graph-view.md](docs/graph-view.md).
+- **Concept map / Graph:** graph view with enhanced physics (D3/Obsidian-like model), navigation and visualization of relationships between pages. Interaction stays alive indefinitely —selection with alternating clicks, click on the background to clear, node dragging, panning (middle/right button), wheel zoom and double-click to reset— and custom node colors propagate to neighbors by influence. See [docs/SinNotas.md#grafo-y-mapa-conceptual](docs/SinNotas.md#grafo-y-mapa-conceptual).
 - **Version history (snapshots):** save and restore page snapshots; settings let you delete all snapshots at once.
-- **Fast startup:** local vaults keep a persistent binary metadata cache (`.sinnotas_cache.bin`) so only new or modified notes are parsed on launch. A native filesystem watcher applies external edits incrementally. See [docs/metadata-cache.md](docs/metadata-cache.md).
+- **Fast startup:** local vaults keep a persistent binary metadata cache (`.sinnotas_cache.bin`) so only new or modified notes are parsed on launch. A native filesystem watcher applies external edits incrementally. See [docs/SinNotas.md#cache-de-metadatos-y-watcher](docs/SinNotas.md#cache-de-metadatos-y-watcher).
 - **External vaults:** open Markdown folders through the directory picker and navigate their pages and subfolders.
 - **Journals and pages:** create daily journals by date, browse all pages and check version history.
 - **Export:** export the current page as plain `.txt` text.
@@ -120,7 +120,7 @@ npm run dev
 # open http://localhost:1420/graph-harness.html
 ```
 
-The result appears on the page itself (`HARNESS PASS` expected, 17 gesture checks: selection, background, drag, pan, zoom, colors, stability after settle). After modifying the graph, both the test suite and the harness are mandatory; guidelines and the checklist live in [docs/graph-view.md](docs/graph-view.md).
+The result appears on the page itself (`HARNESS PASS` expected, 17 gesture checks: selection, background, drag, pan, zoom, colors, stability after settle). After modifying the graph, both the test suite and the harness are mandatory; guidelines and the checklist live in [docs/SinNotas.md#grafo-y-mapa-conceptual](docs/SinNotas.md#grafo-y-mapa-conceptual).
 
 Backend tests and lints:
 
@@ -140,42 +140,16 @@ scripts/benchmark-cache.sh
 ```
 
 The script prints cold/warm milliseconds and the speedup, then deletes the
-temporary vault. See [docs/metadata-cache.md](docs/metadata-cache.md).
+temporary vault. See [docs/SinNotas.md#cache-de-metadatos-y-watcher](docs/SinNotas.md#cache-de-metadatos-y-watcher).
 
 ## Documentation
 
-All project documentation lives under `docs/`; the only Markdown file kept at
-the root is this entry-point README. Benchmarks, audits, progress logs and other
-records are filed there too.
-
-### Technical guides
-
-| Document | Contents |
-| --- | --- |
-| [docs/convenciones-docs.md](docs/convenciones-docs.md) | Naming, structure and placement rules for documentation |
-| [docs/graph-view.md](docs/graph-view.md) | Graph view architecture, render/physics loops, anti-regression guidelines (avoid freezes) and the live test bench |
-| [docs/metadata-cache.md](docs/metadata-cache.md) | Persistent binary cache, warm/cold startup, filesystem watcher and path-sanitization guarantees |
-| [docs/flashcards-loading.md](docs/flashcards-loading.md) | Progressive flashcard scan: batching, caching, cancellation and UI integration |
-| [docs/publicacion-apk-android.md](docs/publicacion-apk-android.md) | Publishing the signed APK: secrets, keystore, verification and first upload |
-| [docs/actualizaciones.md](docs/actualizaciones.md) | Hybrid updater: desktop minisign flow, Android APK download, `latest.json` and release process |
-
-### Historical records and benchmarks
-
-| Document | Contents |
-| --- | --- |
-| [docs/2026-10-24-auditoria-seguridad.md](docs/2026-10-24-auditoria-seguridad.md) | Security audit by phase (Rust backend, frontend, CI/APK, SAF, graph), fixed findings and decisions |
-| [docs/2026-10-24-auditoria-seguridad-rendimiento.md](docs/2026-10-24-auditoria-seguridad-rendimiento.md) | 2026-10-24 audit summary: dependency findings, applied patches and performance optimizations |
-| [docs/2026-10-25-auditoria-seguridad-completa.md](docs/2026-10-25-auditoria-seguridad-completa.md) | Complete security audit: dependency review, static mitigations, Android/SAF and recommendations |
-| [docs/2026-10-24-diagnostico-ci-release.md](docs/2026-10-24-diagnostico-ci-release.md) | Historical log of the release CI diagnosis |
-| [docs/2026-10-24-plan-saf-android.md](docs/2026-10-24-plan-saf-android.md) | Historical design plan for external vaults on Android (Storage Access Framework) |
-| [docs/2026-10-25-benchmark-rendimiento.md](docs/2026-10-25-benchmark-rendimiento.md) | 2026-10-25 block scan benchmark (100,000 blocks) |
-| [docs/2026-10-25-benchmark-mobile.md](docs/2026-10-25-benchmark-mobile.md) | 2026-10-25 mobile review benchmark (5,000 cards) |
-| [docs/2026-10-25-registro-progreso.md](docs/2026-10-25-registro-progreso.md) | Feature and status log for phases F1–F6, later fixes and verification gates |
-| [docs/2026-10-25-fix-layout-review.md](docs/2026-10-25-fix-layout-review.md) | Review card layout, hidden scrollbar, cloze presentation, Android safe-area and accent separator fixes, with verification notes |
-| [docs/2026-10-25-ui-repaso-tipografia-atajos.md](docs/2026-10-25-ui-repaso-tipografia-atajos.md) | Review-mode entry, SVG menu icons, 15 px UI with em-based card typography, instant view switching and double-Enter outdent shortcut |
-| [docs/2026-10-25-auditoria-actualizaciones.md](docs/2026-10-25-auditoria-actualizaciones.md) | Updater threat model: manifest and package tampering, MITM, secrets, Android permissions and residual risks |
-| [docs/2026-10-25-fsrs-aprendizaje.md](docs/2026-10-25-fsrs-aprendizaje.md) | Official FSRS-4.5 formulas, learning/relearning steps, persisted card state and practice-only Learning mode with verification notes |
-| [docs/2026-10-25-correcciones-auditoria.md](docs/2026-10-25-correcciones-auditoria.md) | Audit fixes A-F (Node 22, parser depth, revision symlinks, remote images, UI repaints, shortcuts modal), verification and residual risks |
+All project documentation lives in the single technical guide
+[docs/SinNotas.md](docs/SinNotas.md). This README is the entry point. The guide
+covers the architecture, editor and vault, FSRS/Learning mode, the paginated
+mobile notes selector, Android safe area, desktop/Android updater, security,
+performance, build and CI/release steps, current 0.2.1 release data and known
+limitations.
 
 ## Tauri application
 
@@ -220,6 +194,11 @@ Desktop file operations are validated in the backend and limited to the active v
 
 The APK for Android 13 or newer (`minSdkVersion` 33) mounts only the review experience: question, answer, image occlusions, editing the active block and FSRS rating. It does not initialize the editor, journals, Kanban, concept map or graph view.
 
+The **Repasar notas** selector paginates the vault notes at 20 per page and
+renders each page in small animation-frame batches. This matches desktop and
+keeps the modal responsive with thousands of notes; the draft selection is kept
+while moving between pages, and searching returns to page 1.
+
 ```bash
 # Local build (requires the Android SDK/NDK and the Rust targets)
 npm ci
@@ -245,7 +224,7 @@ before running `android init`; the patch script refuses to reuse the old version
 silently. This is only relevant for local builds: CI always regenerates the
 project from scratch.
 
-The `.github/workflows/ci.yml` workflow builds the APK on pushes/PRs and a signed release APK on `master` or by `workflow_dispatch`; it publishes it as a downloadable artifact but never creates a release. Publishing happens only from a `v*` tag through `.github/workflows/release.yml`. Signing secrets are isolated in the `sign_apk` step. To load the secrets, test without publishing and verify the signature, see [docs/publicacion-apk-android.md](docs/publicacion-apk-android.md); the full update system is described in [docs/actualizaciones.md](docs/actualizaciones.md).
+The `.github/workflows/ci.yml` workflow builds the APK on pushes/PRs and a signed release APK on `master` or by `workflow_dispatch`; it publishes it as a downloadable artifact but never creates a release. Publishing happens only from a `v*` tag through `.github/workflows/release.yml`. Signing secrets are isolated in the `sign_apk` step. To load the secrets, test without publishing and verify the signature, see [docs/SinNotas.md#ci-y-publicación](docs/SinNotas.md#ci-y-publicación); the full update system is described in [docs/SinNotas.md#actualizador](docs/SinNotas.md#actualizador).
 
 Launch modes:
 

@@ -40,6 +40,7 @@ import {
 } from "../services/updater";
 import { formatBytes } from "../services/update-utils";
 import { installAndroidSafeArea, type AndroidSafeAreaWindow } from "./android-safe-area";
+import { NOTES_RENDER_CHUNK, paginateNotes } from "./notes-pagination";
 import "./mobile.css";
 
 interface VaultSnapshot {
@@ -241,6 +242,9 @@ class MobileReviewApp {
   private accent: AccentColor = DEFAULT_ACCENT;
   private notesSearch = "";
   private notesDraft = new Map<string, boolean>();
+  private notesCurrentPage = 1;
+  private notesTotalPages = 1;
+  private notesRenderToken = 0;
   private toastTimer: number | null = null;
   private busy = false;
   private learningMode = false;
@@ -275,6 +279,10 @@ class MobileReviewApp {
     notesSheet: HTMLElement;
     notesSearchInput: HTMLInputElement;
     notesList: HTMLElement;
+    notesPagination: HTMLElement;
+    notesPrevButton: HTMLButtonElement;
+    notesNextButton: HTMLButtonElement;
+    notesPageInfo: HTMLElement;
     learningToggle: HTMLButtonElement;
     editor: HTMLElement;
     questionField: HTMLElement;
@@ -491,6 +499,11 @@ class MobileReviewApp {
             </div>
           </div>
           <div class="mobile-notes-list" data-notes-list role="group" aria-label="Notas con tarjetas"></div>
+          <div class="mobile-notes-pagination" data-notes-pagination hidden>
+            <button class="mobile-link-button" type="button" data-action="notes-prev" disabled>← Anterior</button>
+            <span class="mobile-notes-page-info" data-notes-page-info role="status" aria-live="polite">Página 1 de 1</span>
+            <button class="mobile-link-button" type="button" data-action="notes-next" disabled>Siguiente →</button>
+          </div>
           <p class="mobile-editor-hint">Solo las notas marcadas aportan tarjetas al repaso. La búsqueda no cambia la selección.</p>
           <footer class="mobile-editor-actions">
             <button class="mobile-secondary" type="button" data-action="close-notes">Cancelar</button>
@@ -583,6 +596,10 @@ class MobileReviewApp {
       notesSheet: requireElement(this.root, "[data-notes-sheet]"),
       notesSearchInput: requireElement(this.root, "[data-notes-search]"),
       notesList: requireElement(this.root, "[data-notes-list]"),
+      notesPagination: requireElement(this.root, "[data-notes-pagination]"),
+      notesPrevButton: requireElement(this.root, "[data-action='notes-prev']"),
+      notesNextButton: requireElement(this.root, "[data-action='notes-next']"),
+      notesPageInfo: requireElement(this.root, "[data-notes-page-info]"),
       learningToggle: requireElement(this.root, "[data-action='toggle-learning']"),
       editor: requireElement(this.root, "[data-editor]"),
       questionField: requireElement(this.root, "[data-question-field]"),
@@ -699,6 +716,16 @@ class MobileReviewApp {
         this.setAllNotesSelected(true);
       } else if (action === "notes-none") {
         this.setAllNotesSelected(false);
+      } else if (action === "notes-prev") {
+        if (this.notesCurrentPage > 1) {
+          this.notesCurrentPage--;
+          this.renderNotesList();
+        }
+      } else if (action === "notes-next") {
+        if (this.notesCurrentPage < this.notesTotalPages) {
+          this.notesCurrentPage++;
+          this.renderNotesList();
+        }
       } else if (action === "apply-notes") {
         this.applyNotesSelection();
       } else if (action === "set-theme") {
@@ -762,6 +789,8 @@ class MobileReviewApp {
     });
     this.refs.notesSearchInput.addEventListener("input", () => {
       this.notesSearch = this.refs.notesSearchInput.value;
+      // La búsqueda redefine la lista visible: volver a la primera página.
+      this.notesCurrentPage = 1;
       this.renderNotesList();
     });
 
@@ -1037,6 +1066,7 @@ class MobileReviewApp {
       pages.map((title) => [title, active === null || active.includes(title)])
     );
     this.notesSearch = "";
+    this.notesCurrentPage = 1;
     this.refs.notesSearchInput.value = "";
     this.renderNotesList();
     this.refs.notesSheet.hidden = false;
@@ -1044,6 +1074,8 @@ class MobileReviewApp {
   }
 
   private closeNotes(): void {
+    // Invalida los lotes de render pendientes si se cierra a mitad de página.
+    this.notesRenderToken++;
     this.refs.notesSheet.hidden = true;
     this.syncOverlayState();
   }
@@ -1056,14 +1088,27 @@ class MobileReviewApp {
   }
 
   private renderNotesList(): void {
-    const token = normalizeSearchText(this.notesSearch.trim());
+    // Cada render invalida los lotes del anterior. Con cientos de notas, añadir
+    // todas las filas de golpe bloqueaba el WebView y el modal parecía colapsar.
+    const renderToken = ++this.notesRenderToken;
+    const searchToken = normalizeSearchText(this.notesSearch.trim());
     const pages = this.manager.getPagesWithCards();
-    const displayed = token
-      ? pages.filter((title) => normalizeSearchText(title).includes(token))
+    const displayed = searchToken
+      ? pages.filter((title) => normalizeSearchText(title).includes(searchToken))
       : pages;
+    const page = paginateNotes(displayed, this.notesCurrentPage);
+    this.notesCurrentPage = page.currentPage;
+    this.notesTotalPages = page.totalPages;
+
+    this.refs.notesPagination.hidden = page.totalPages <= 1;
+    this.refs.notesPrevButton.disabled = page.currentPage <= 1;
+    this.refs.notesNextButton.disabled = page.currentPage >= page.totalPages;
+    this.refs.notesPageInfo.textContent = `Página ${page.currentPage} de ${page.totalPages}`;
 
     this.refs.notesList.replaceChildren();
+    this.refs.notesList.scrollTop = 0;
     if (pages.length === 0) {
+      this.refs.notesPagination.hidden = true;
       const empty = document.createElement("p");
       empty.className = "mobile-notes-empty";
       empty.textContent = "No hay notas con tarjetas en esta bóveda.";
@@ -1071,6 +1116,7 @@ class MobileReviewApp {
       return;
     }
     if (displayed.length === 0) {
+      this.refs.notesPagination.hidden = true;
       const empty = document.createElement("p");
       empty.className = "mobile-notes-empty";
       empty.textContent = "Ninguna nota coincide con la búsqueda.";
@@ -1078,30 +1124,43 @@ class MobileReviewApp {
       return;
     }
 
-    displayed.forEach((title) => {
-      const row = document.createElement("label");
-      row.className = "mobile-note-option";
+    // Carga escalonada: la página se pinta en lotes pequeños por fotograma.
+    const appendChunk = (startIndex: number): void => {
+      if (renderToken !== this.notesRenderToken) return;
+      const end = Math.min(startIndex + NOTES_RENDER_CHUNK, page.items.length);
+      for (let index = startIndex; index < end; index++) {
+        this.appendNoteOption(page.items[index]);
+      }
+      if (end < page.items.length) {
+        window.requestAnimationFrame(() => appendChunk(end));
+      }
+    };
+    appendChunk(0);
+  }
 
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = this.notesDraft.get(title) ?? false;
-      checkbox.value = title;
-      checkbox.addEventListener("change", () => {
-        this.notesDraft.set(title, checkbox.checked);
-      });
+  private appendNoteOption(title: string): void {
+    const row = document.createElement("label");
+    row.className = "mobile-note-option";
 
-      const name = document.createElement("span");
-      name.className = "mobile-note-title";
-      name.textContent = title;
-
-      const count = this.manager.getCardCountForPage(title);
-      const detail = document.createElement("small");
-      detail.className = "mobile-note-count";
-      detail.textContent = `${count} ${count === 1 ? "tarjeta" : "tarjetas"}`;
-
-      row.append(checkbox, name, detail);
-      this.refs.notesList.appendChild(row);
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.checked = this.notesDraft.get(title) ?? false;
+    checkbox.value = title;
+    checkbox.addEventListener("change", () => {
+      this.notesDraft.set(title, checkbox.checked);
     });
+
+    const name = document.createElement("span");
+    name.className = "mobile-note-title";
+    name.textContent = title;
+
+    const count = this.manager.getCardCountForPage(title);
+    const detail = document.createElement("small");
+    detail.className = "mobile-note-count";
+    detail.textContent = `${count} ${count === 1 ? "tarjeta" : "tarjetas"}`;
+
+    row.append(checkbox, name, detail);
+    this.refs.notesList.appendChild(row);
   }
 
   private applyNotesSelection(): void {

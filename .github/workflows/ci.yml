@@ -380,7 +380,7 @@ jobs:
           done
           if [ "${#missing[@]}" -gt 0 ]; then
             echo "ERROR: faltan secretos de firma: ${missing[*]}" >&2
-            echo "Cargalos con gh secret set NOMBRE (ver docs/publicacion-apk-android.md)." >&2
+            echo "Cargalos con gh secret set NOMBRE (ver docs/SinNotas.md#ci-y-publicación)." >&2
             exit 1
           fi
           echo "Los 4 secretos de firma están definidos."

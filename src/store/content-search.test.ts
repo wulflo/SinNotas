@@ -196,7 +196,7 @@ describe("content-search - rendimiento (sin umbral, solo registro)", () => {
     const searchMs = performance.now() - searchStart;
 
     expect(hits.length).toBeGreaterThan(0);
-    // Registrado en docs/2026-10-25-registro-progreso.md; sin umbral estricto para no hacerlo frágil.
+    // Registrado en docs/SinNotas.md#rendimiento; sin umbral estricto para no hacerlo frágil.
     console.info(
       `[content-search] 2000 páginas × 30 bloques (60000 bloques): update ${buildMs.toFixed(0)}ms, search ${searchMs.toFixed(1)}ms`
     );

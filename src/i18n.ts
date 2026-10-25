@@ -589,6 +589,8 @@ const englishBySpanish: Record<string, string> = {
   "Filtrar notas…": "Filter notes…",
   "Filtrar notas": "Filter notes",
   "Todas": "All",
+  "Anterior": "Previous",
+  "Siguiente": "Next",
   "Notas con tarjetas": "Notes with cards",
   "Solo las notas marcadas aportan tarjetas al repaso. La búsqueda no cambia la selección.": "Only checked notes contribute cards to the review. Searching does not change the selection.",
   "Aplicar selección": "Apply selection",
@@ -1218,6 +1220,8 @@ const chineseBySpanish: Record<string, string> = {
   "Filtrar notas…": "筛选页面…",
   "Filtrar notas": "筛选页面",
   "Todas": "全部",
+  "Anterior": "上一页",
+  "Siguiente": "下一页",
   "Notas con tarjetas": "含卡片的页面",
   "Solo las notas marcadas aportan tarjetas al repaso. La búsqueda no cambia la selección.": "只有勾选的页面会提供复习卡片。搜索不会改变选择。",
   "Aplicar selección": "应用选择",
@@ -1361,6 +1365,8 @@ function localizedText(value: string): string {
     if (direct) return direct;
     const cardMatch = canonical.match(/^Tarjeta (\d+) de (\d+)$/);
     if (cardMatch) return `Card ${cardMatch[1]} of ${cardMatch[2]}`;
+    const pageInfoMatch = canonical.match(/^Página (\d+) de (\d+)$/);
+    if (pageInfoMatch) return `Page ${pageInfoMatch[1]} of ${pageInfoMatch[2]}`;
     const pageCardCountMatch = canonical.match(/^(.+) \((\d+) tarjetas?\)$/);
     if (pageCardCountMatch) {
       return `${pageCardCountMatch[1]} (${pageCardCountMatch[2]} card${pageCardCountMatch[2] === "1" ? "" : "s"})`;
@@ -1440,6 +1446,8 @@ function localizedText(value: string): string {
     if (direct) return direct;
     const cardMatch = canonical.match(/^Tarjeta (\d+) de (\d+)$/);
     if (cardMatch) return `第 ${cardMatch[1]} 张，共 ${cardMatch[2]} 张`;
+    const pageInfoMatch = canonical.match(/^Página (\d+) de (\d+)$/);
+    if (pageInfoMatch) return `第 ${pageInfoMatch[1]} 页，共 ${pageInfoMatch[2]} 页`;
     const pageCardCountMatch = canonical.match(/^(.+) \((\d+) tarjetas?\)$/);
     if (pageCardCountMatch) {
       return `${pageCardCountMatch[1]}（${pageCardCountMatch[2]} 张卡片）`;

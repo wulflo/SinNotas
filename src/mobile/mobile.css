@@ -1501,6 +1501,38 @@ body.mobile-review-body {
   white-space: nowrap;
 }
 
+.mobile-notes-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.mobile-notes-pagination[hidden] {
+  display: none;
+}
+
+.mobile-notes-page-info {
+  flex: 1 1 auto;
+  color: var(--mobile-muted);
+  font-size: calc(12px * var(--mobile-font-scale, 1));
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.mobile-notes-pagination .mobile-link-button {
+  min-height: 40px;
+  padding: 6px 2px;
+  white-space: nowrap;
+}
+
+.mobile-notes-pagination .mobile-link-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 .mobile-notes-empty {
   margin: 0;
   padding: 24px 10px;
