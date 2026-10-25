@@ -16,7 +16,7 @@ SinNotas es una aplicación Tauri v2 con arquitectura file-first. Se ha realizad
 
 ### Backend (Rust/Cargo)
 - **cargo audit:** 7 avisos (todos permitidos)
-  - `glib 0.18.5` - Unsoundness (RUSTSEC-2024-0429) - Mitigado con `cargo update -p glib`
+  - `glib 0.18.5` - Unsoundness (RUSTSEC-2024-0429) - Riesgo residual aceptado: la corrección requiere `glib >= 0.20`, pero `gtk 0.18` (cadena de Tauri/wry) todavía fija la rama 0.18; se actualizará cuando la cadena migre
   - `bincode 1.3.3` - Sin mantenimiento (RUSTSEC-2025-0141) - En evaluación
   - `proc-macro-error 1.0.4` - Sin mantenimiento
   - `zbus_names`, `zvariant`, `zvariant_derive` - Sin mantenimiento (dependencias transversales Tauri)
