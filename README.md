@@ -175,6 +175,7 @@ records are filed there too.
 | [docs/2026-10-25-ui-repaso-tipografia-atajos.md](docs/2026-10-25-ui-repaso-tipografia-atajos.md) | Review-mode entry, SVG menu icons, 15 px UI with em-based card typography, instant view switching and double-Enter outdent shortcut |
 | [docs/2026-10-25-auditoria-actualizaciones.md](docs/2026-10-25-auditoria-actualizaciones.md) | Updater threat model: manifest and package tampering, MITM, secrets, Android permissions and residual risks |
 | [docs/2026-10-25-fsrs-aprendizaje.md](docs/2026-10-25-fsrs-aprendizaje.md) | Official FSRS-4.5 formulas, learning/relearning steps, persisted card state and practice-only Learning mode with verification notes |
+| [docs/2026-10-25-correcciones-auditoria.md](docs/2026-10-25-correcciones-auditoria.md) | Audit fixes A-F (Node 22, parser depth, revision symlinks, remote images, UI repaints, shortcuts modal), verification and residual risks |
 
 ## Tauri application
 
