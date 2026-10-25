@@ -60,6 +60,9 @@ Pasted content goes through a whitelist pipeline (`src/editor/paste-sanitizer.ts
 
 ## Requirements
 
+- **Node.js 22.12 or newer** (Vitest 5 requires it).
+- Rust stable with `rustup`.
+
 On CachyOS, Arch Linux, Manjaro, EndeavourOS
 
 ```bash
