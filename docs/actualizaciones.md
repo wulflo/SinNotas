@@ -60,6 +60,27 @@ El script **falla** si falta una plataforma, una firma `.sig`, la APK o si dos
 artefactos comparten nombre. También aborta si detecta material de clave privada
 en un `.txt`, `.md` o `.json` que se vaya a publicar.
 
+### Artefactos publicados y compresión
+
+No hace falta un paso manual de descompresión en el workflow:
+
+1. `actions/upload-artifact` guarda la salida de cada job como un artefacto ZIP
+   de GitHub Actions.
+2. `actions/download-artifact` descarga y **extrae** esos ZIP en
+   `release-assets/`.
+3. `scripts/prepare-release-assets.mjs` recorre las subcarpetas, mueve los
+   archivos a la raíz, renombra la APK a `app-release.apk` y genera
+   `latest.json`.
+4. `softprops/action-gh-release` publica `release-assets/*` como assets de la
+   release.
+
+Los paquetes del actualizador de escritorio se publican comprimidos a
+propósito. El plugin de Tauri descarga y descomprime el `.AppImage.tar.gz` en
+Linux o el `.app.tar.gz` en macOS; en Windows usa el instalador `.exe` de NSIS.
+Android descarga directamente `app-release.apk`. Además de esos paquetes, la
+release incluye los instaladores sin comprimir (`.AppImage`, `.deb`, `.exe`,
+`.msi`, `.dmg` y `.apk`) para descarga manual.
+
 ## Publicar una versión
 
 1. Actualizar la versión en los tres archivos y hacer commit:
