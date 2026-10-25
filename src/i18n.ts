@@ -610,6 +610,21 @@ const englishBySpanish: Record<string, string> = {
   "Fucsia": "Fuchsia",
   "Tema claro activado": "Light theme enabled",
   "Tema oscuro activado": "Dark theme enabled",
+  "Atajos de teclado": "Keyboard shortcuts",
+  "Cerrar atajos": "Close shortcuts",
+  "Abrir o cerrar esta lista": "Open or close this list",
+  "Mostrar u ocultar la barra lateral": "Show or hide the sidebar",
+  "Buscar o crear una página": "Search or create a page",
+  "Cerrar ventanas y menús": "Close dialogs and menus",
+  "Crear un bullet nuevo": "Create a new bullet",
+  "Salto de línea dentro del bullet": "Line break inside the bullet",
+  "Sangrar bullet": "Indent bullet",
+  "Desangrar bullet": "Outdent bullet",
+  "Seleccionar bullets contiguos": "Select adjacent bullets",
+  "Unir con el bullet anterior": "Merge with the previous bullet",
+  "Mostrar la respuesta": "Show the answer",
+  "Calificar la tarjeta": "Rate the card",
+  "Las teclas de calificación se configuran en Ajustes → Flashcards.": "Rating keys are configured in Settings → Flashcards.",
 };
 
 /**
@@ -1224,6 +1239,21 @@ const chineseBySpanish: Record<string, string> = {
   "Fucsia": "紫红色",
   "Tema claro activado": "已启用浅色主题",
   "Tema oscuro activado": "已启用深色主题",
+  "Atajos de teclado": "键盘快捷键",
+  "Cerrar atajos": "关闭快捷键",
+  "Abrir o cerrar esta lista": "打开或关闭此列表",
+  "Mostrar u ocultar la barra lateral": "显示或隐藏侧边栏",
+  "Buscar o crear una página": "搜索或创建页面",
+  "Cerrar ventanas y menús": "关闭对话框和菜单",
+  "Crear un bullet nuevo": "新建项目符号",
+  "Salto de línea dentro del bullet": "在项目符号内换行",
+  "Sangrar bullet": "增加项目符号缩进",
+  "Desangrar bullet": "减少项目符号缩进",
+  "Seleccionar bullets contiguos": "选择相邻项目符号",
+  "Unir con el bullet anterior": "与上一个项目符号合并",
+  "Mostrar la respuesta": "显示答案",
+  "Calificar la tarjeta": "评价卡片",
+  "Las teclas de calificación se configuran en Ajustes → Flashcards.": "评分按键可在“设置 → 闪卡”中配置。",
 };
 
 const spanishByEnglish = Object.fromEntries(

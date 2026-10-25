@@ -708,13 +708,13 @@ const btnConceptMapZoomIn = document.getElementById("btn-concept-map-zoom-in") a
 const btnConceptMapZoomOut = document.getElementById("btn-concept-map-zoom-out") as HTMLButtonElement;
 const btnConceptMapReset = document.getElementById("btn-concept-map-reset") as HTMLButtonElement;
 const btnConceptMap = document.getElementById("btn-concept-map") as HTMLButtonElement;
-const btnEditorHelp = document.getElementById("btn-editor-help") as HTMLButtonElement | null;
-const editorHelpOverlay = document.getElementById("editor-help-overlay") as HTMLDivElement | null;
-const btnCloseEditorHelp = document.getElementById("btn-close-editor-help") as HTMLButtonElement | null;
+const btnShortcuts = document.getElementById("btn-shortcuts") as HTMLButtonElement | null;
+const shortcutsModalOverlay = document.getElementById("shortcuts-modal-overlay") as HTMLDivElement;
+const btnCloseShortcuts = document.getElementById("btn-close-shortcuts") as HTMLButtonElement | null;
 const conceptMapView = new ConceptMapView("concept-map-canvas", "concept-map-canvas-wrap", "concept-map-empty");
 
 const modalOverlays: HTMLElement[] = [];
-[settingsOverlay, historyModalOverlay, conceptMapOverlay, editorHelpOverlay, appDialogOverlay, vaultManagerOverlay, imageOcclusionOverlay].forEach((o) => {
+[settingsOverlay, historyModalOverlay, conceptMapOverlay, shortcutsModalOverlay, appDialogOverlay, vaultManagerOverlay, imageOcclusionOverlay].forEach((o) => {
   if (o) modalOverlays.push(o);
 });
 modalOverlays.forEach((overlay) => {
@@ -724,6 +724,10 @@ modalOverlays.forEach((overlay) => {
 
 function hasMountedModal(): boolean {
   return modalOverlays.some((overlay) => overlay && overlay.isConnected);
+}
+
+function hasMountedModalExcept(overlay: HTMLElement | null): boolean {
+  return modalOverlays.some((candidate) => candidate !== overlay && candidate.isConnected);
 }
 
 function mountOverlay(overlay: HTMLElement | null): void {
@@ -2433,6 +2437,7 @@ function closeAllModalOverlays(): void {
   closeSettingsOverlay();
   closeHistoryModal();
   closeConceptMap();
+  closeShortcutsModal();
   closeAppDialog();
   if (!imageOcclusionOverlay.hidden) closeImageOcclusionEditor();
   hideAllContextMenus();
@@ -2466,25 +2471,33 @@ conceptMapOverlay.addEventListener("click", (event) => {
   if (event.target === conceptMapOverlay) closeConceptMap();
 });
 
-if (btnEditorHelp && editorHelpOverlay) {
-  btnEditorHelp.addEventListener("click", () => {
-    if (editorHelpOverlay.hidden) {
-      mountOverlay(editorHelpOverlay);
-    } else {
-      unmountOverlay(editorHelpOverlay);
-    }
-  });
+function openShortcutsModal(): void {
+  if (hasMountedModalExcept(shortcutsModalOverlay)) return;
+  mountOverlay(shortcutsModalOverlay);
+  btnCloseShortcuts?.focus();
 }
-if (btnCloseEditorHelp && editorHelpOverlay) {
-  btnCloseEditorHelp.addEventListener("click", () => {
-    unmountOverlay(editorHelpOverlay);
-  });
-  editorHelpOverlay.addEventListener("click", (event) => {
-    if (event.target === editorHelpOverlay) {
-      unmountOverlay(editorHelpOverlay);
-    }
-  });
+
+function closeShortcutsModal(): void {
+  unmountOverlay(shortcutsModalOverlay);
 }
+
+function toggleShortcutsModal(): void {
+  if (shortcutsModalOverlay.isConnected) {
+    closeShortcutsModal();
+  } else {
+    openShortcutsModal();
+  }
+}
+
+btnShortcuts?.addEventListener("click", () => {
+  toggleShortcutsModal();
+});
+btnCloseShortcuts?.addEventListener("click", () => {
+  closeShortcutsModal();
+});
+shortcutsModalOverlay.addEventListener("click", (event) => {
+  if (event.target === shortcutsModalOverlay) closeShortcutsModal();
+});
 
 let pageExportCloseTimer: number | null = null;
 
@@ -11386,6 +11399,14 @@ window.addEventListener("click", (e) => {
 
 /* ==================== GLOBAL KEYBOARD SHORTCUTS ==================== */
 window.addEventListener("keydown", (e: KeyboardEvent) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "/") {
+    // No abrir atajos encima de otro diálogo (ajustes, historial, etc.).
+    if (hasMountedModalExcept(shortcutsModalOverlay)) return;
+    e.preventDefault();
+    toggleShortcutsModal();
+    return;
+  }
+
   if (e.key === "Escape" && wikilinkAutocompleteMenu && !wikilinkAutocompleteMenu.hidden) {
     hideWikilinkAutocomplete();
   }

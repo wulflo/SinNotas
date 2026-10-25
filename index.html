@@ -754,7 +754,7 @@
             <div class="canvas-wrapper">
               <div class="page-title-row">
                 <h1 class="page-title" id="page-title-heading" contenteditable="true" spellcheck="false">Welcome to SinNotas</h1>
-                <button class="btn-icon page-title-action" id="btn-editor-help" type="button" title="Ayuda / Atajos de teclado" aria-label="Ayuda / Atajos de teclado">
+                <button class="btn-icon page-title-action" id="btn-shortcuts" type="button" title="Atajos de teclado" aria-label="Atajos de teclado">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="10"></circle>
                     <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
@@ -1116,26 +1116,43 @@
       </div>
     </div>
 
-    <div class="m3-scrim" id="editor-help-overlay" hidden>
-      <div class="settings-dropdown-menu m3-surface" role="dialog" aria-modal="true" aria-labelledby="editor-help-title" style="max-width: 480px; max-height: 90vh; overflow: auto;">
+    <div class="m3-scrim" id="shortcuts-modal-overlay" hidden>
+      <div class="settings-dropdown-menu m3-surface shortcuts-modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title">
         <div class="settings-dialog-header">
-          <h2 class="m3-dialog-title" id="editor-help-title">Atajos de teclado</h2>
-          <button class="btn-icon" id="btn-close-editor-help" type="button" aria-label="Cerrar ayuda">×</button>
+          <h2 class="m3-dialog-title" id="shortcuts-modal-title">Atajos de teclado</h2>
+          <button class="btn-icon" id="btn-close-shortcuts" type="button" aria-label="Cerrar atajos">×</button>
         </div>
-        <div class="settings-tab-panel active" style="padding: 16px; display: flex; flex-direction: column; gap: 8px;">
-          <div style="display: flex; justify-content: space-between;"><span>Insertar bullet / Nueva línea</span><strong>Enter</strong></div>
-          <div style="display: flex; justify-content: space-between;"><span>Añadir línea en el mismo bullet</span><strong>Shift+Enter</strong></div>
-          <div style="display: flex; justify-content: space-between;"><span>Sangrar bullet</span><strong>Tab</strong></div>
-          <div style="display: flex; justify-content: space-between;"><span>Quitar sangría</span><strong>Shift+Tab</strong></div>
-          <div style="display: flex; justify-content: space-between;"><span>Copiar</span><strong>Ctrl+C</strong></div>
-          <div style="display: flex; justify-content: space-between;"><span>Cortar</span><strong>Ctrl+X</strong></div>
-          <div style="display: flex; justify-content: space-between;"><span>Pegar (texto/HTML)</span><strong>Ctrl+V</strong></div>
-          <div style="display: flex; justify-content: space-between;"><span>Pegar formato / especial</span><strong>Ctrl+Shift+V</strong></div>
-          <div style="display: flex; justify-content: space-between;"><span>Deshacer</span><strong>Ctrl+Z</strong></div>
-          <div style="display: flex; justify-content: space-between;"><span>Rehacer</span><strong>Ctrl+Y</strong></div>
-          <div style="display: flex; justify-content: space-between;"><span>Alternar barra lateral</span><strong>Ctrl+B</strong></div>
-          <div style="display: flex; justify-content: space-between;"><span>Abrir menú slash / comando</span><strong>Ctrl+K</strong></div>
-          <div style="display: flex; justify-content: space-between;"><span>Mover con flechas</span><strong>← ↑ → ↓</strong></div>
+        <div class="shortcuts-modal-body">
+          <section class="shortcuts-group" aria-labelledby="shortcuts-navigation-title">
+            <h3 class="shortcuts-group-title" id="shortcuts-navigation-title">Navegación</h3>
+            <div class="shortcut-row"><span>Abrir o cerrar esta lista</span><kbd>Ctrl/Cmd+/</kbd></div>
+            <div class="shortcut-row"><span>Mostrar u ocultar la barra lateral</span><kbd>Ctrl/Cmd+B</kbd></div>
+            <div class="shortcut-row"><span>Buscar o crear una página</span><kbd>Ctrl/Cmd+K</kbd></div>
+            <div class="shortcut-row"><span>Cerrar ventanas y menús</span><kbd>Esc</kbd></div>
+          </section>
+
+          <section class="shortcuts-group" aria-labelledby="shortcuts-editor-title">
+            <h3 class="shortcuts-group-title" id="shortcuts-editor-title">Editor</h3>
+            <div class="shortcut-row"><span>Crear un bullet nuevo</span><kbd>Enter</kbd></div>
+            <div class="shortcut-row"><span>Salto de línea dentro del bullet</span><kbd>Shift+Enter</kbd></div>
+            <div class="shortcut-row"><span>Sangrar bullet</span><kbd>Tab / Alt+→</kbd></div>
+            <div class="shortcut-row"><span>Desangrar bullet</span><kbd>Shift+Tab / Alt+←</kbd></div>
+            <div class="shortcut-row"><span>Seleccionar bullets contiguos</span><kbd>Shift+↑ / Shift+↓</kbd></div>
+            <div class="shortcut-row"><span>Unir con el bullet anterior</span><kbd>Backspace</kbd></div>
+            <div class="shortcut-row"><span>Copiar bullets seleccionados</span><kbd>Ctrl/Cmd+C</kbd></div>
+            <div class="shortcut-row"><span>Cortar bullets seleccionados</span><kbd>Ctrl/Cmd+X</kbd></div>
+            <div class="shortcut-row"><span>Borrar bullets seleccionados</span><kbd>Del / Backspace</kbd></div>
+            <div class="shortcut-row"><span>Deshacer</span><kbd>Ctrl/Cmd+Z</kbd></div>
+            <div class="shortcut-row"><span>Rehacer</span><kbd>Ctrl/Cmd+Y / Ctrl/Cmd+Shift+Z</kbd></div>
+            <div class="shortcut-row"><span>Pegar sin formato</span><kbd>Ctrl/Cmd+Shift+V</kbd></div>
+          </section>
+
+          <section class="shortcuts-group" aria-labelledby="shortcuts-flashcards-title">
+            <h3 class="shortcuts-group-title" id="shortcuts-flashcards-title">Flashcards</h3>
+            <div class="shortcut-row"><span>Mostrar la respuesta</span><kbd>Space</kbd></div>
+            <div class="shortcut-row"><span>Calificar la tarjeta</span><kbd>1 / 2 / 3 / 4</kbd></div>
+            <p class="shortcuts-note">Las teclas de calificación se configuran en Ajustes → Flashcards.</p>
+          </section>
         </div>
       </div>
     </div>
@@ -1255,11 +1272,9 @@
 
       <div class="menu-item" id="ctx-move-up">
         <span>Mover arriba</span>
-        <span class="menu-shortcut">Alt+↑</span>
       </div>
       <div class="menu-item" id="ctx-move-down">
         <span>Mover abajo</span>
-        <span class="menu-shortcut">Alt+↓</span>
       </div>
 
       <div class="menu-divider"></div>
