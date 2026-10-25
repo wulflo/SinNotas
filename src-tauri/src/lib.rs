@@ -625,6 +625,11 @@ fn default_block_type() -> String {
     "text".to_string()
 }
 
+/// Límite único de profundidad del árbol de bullets. El parser lo aplica para
+/// que el árbol nunca llegue a ser demasiado profundo para serde/bincode, y el
+/// serializador descarta cualquier nodo que lo supere.
+pub(crate) const MAX_BLOCK_DEPTH: usize = 64;
+
 /// Una revisión (snapshot) del historial de versiones de una nota.
 /// Espejo del tipo `PageRevision` del frontend.
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -998,9 +1003,11 @@ pub(crate) fn parse_markdown_with_frontmatter(content: &str) -> (Vec<String>, Ve
             collapsed: false,
         };
 
-        // Pop elements from stack that have >= current indent
+        // Pop elements from stack that have >= current indent. El segundo
+        // término acota la profundidad: las líneas más profundas se convierten
+        // en hermanas a profundidad MAX_BLOCK_DEPTH - 1 en vez de perderse.
         while let Some((last_indent, _)) = stack.last() {
-            if *last_indent >= indent {
+            if *last_indent >= indent || stack.len() >= MAX_BLOCK_DEPTH {
                 let (_, finished_node) = stack.pop().unwrap();
                 if let Some((_, parent)) = stack.last_mut() {
                     parent.children.push(finished_node);
@@ -1042,7 +1049,6 @@ pub(crate) fn parse_markdown_with_frontmatter(content: &str) -> (Vec<String>, Ve
 /// Versión iterativa con límite de profundidad (64) para evitar stack overflow.
 /// Niveles >= 64 se descartan (aplanados).
 fn serialize_blocks_to_markdown(blocks: &[BlockNode], _depth: usize) -> String {
-    const MAX_DEPTH: usize = 64;
     let mut output = String::new();
 
     // Stack para DFS iterativo: (block, depth)
@@ -1058,8 +1064,8 @@ fn serialize_blocks_to_markdown(blocks: &[BlockNode], _depth: usize) -> String {
         .collect();
 
     while let Some(item) = stack.pop() {
-        // Descartar nodos en profundidad >= MAX_DEPTH
-        if item.depth >= MAX_DEPTH {
+        // Descartar nodos en profundidad >= MAX_BLOCK_DEPTH
+        if item.depth >= MAX_BLOCK_DEPTH {
             continue;
         }
         let indent = "  ".repeat(item.depth);
@@ -5460,29 +5466,43 @@ mod tests {
     }
 
     #[test]
-    fn parser_handles_deep_nesting_without_stack_overflow() {
-        // Escalera de 10,000 niveles (indent de 2 espacios por nivel)
-        // El parser usa stack iterativo, no recursión, así que no debe desbordar.
-        // La serialización limita a 64 niveles (los más profundos se aplanan).
+    fn parser_limits_deep_nesting_and_round_trips_all_lines() {
+        // 3,000 líneas con indentación creciente (0, 1, 2, ...). El parser
+        // debe acotar el árbol a MAX_BLOCK_DEPTH para que serde/bincode no
+        // desborden la pila con panic=abort.
+        const LINE_COUNT: usize = 3_000;
         let mut content = String::new();
-        for i in 1..=10_000 {
-            content.push_str(&"  ".repeat(i));
-            content.push_str("- nivel ");
-            content.push_str(&i.to_string());
-            content.push('\n');
+        for indent in 0..LINE_COUNT {
+            content.push_str(&" ".repeat(indent));
+            content.push_str("- x\n");
         }
 
         let (frontmatter, blocks) = parse_markdown_with_frontmatter(&content);
         assert!(frontmatter.is_empty());
-        assert_eq!(blocks.len(), 1); // Un solo árbol profundo
 
-        // Verificar que se puede serializar de vuelta SIN stack overflow
+        // Recorrido iterativo: el árbol puede ser profundo y el test no debe
+        // depender de la pila del sistema.
+        let mut max_depth = 0usize;
+        let mut count = 0usize;
+        let mut stack: Vec<(&BlockNode, usize)> = blocks.iter().map(|block| (block, 0)).collect();
+        while let Some((block, depth)) = stack.pop() {
+            count += 1;
+            max_depth = max_depth.max(depth);
+            for child in &block.children {
+                stack.push((child, depth + 1));
+            }
+        }
+
+        assert_eq!(count, LINE_COUNT);
+        assert!(
+            max_depth < MAX_BLOCK_DEPTH,
+            "profundidad máxima {max_depth} >= {MAX_BLOCK_DEPTH}"
+        );
+
+        // El serializador descarta depth >= 64; el parser deja las líneas más
+        // profundas como hermanas en depth 63, así que no se pierde contenido.
         let serialized = serialize_page_to_markdown(&frontmatter, &blocks);
-        assert!(serialized.contains("nivel 1"));
-        // Niveles > 64 se aplanan (no aparecen en la salida)
-        assert!(serialized.contains("nivel 64"));
-        assert!(!serialized.contains("nivel 65")); // Aplanado
-        assert!(!serialized.contains("nivel 10000")); // Aplanado
+        assert_eq!(serialized.matches("- x\n").count(), LINE_COUNT);
     }
 
     #[test]
