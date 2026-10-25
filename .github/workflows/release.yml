@@ -432,6 +432,7 @@ jobs:
       # Solo se expone un booleano derivado: la clave real se inyecta únicamente
       # en el paso que ejecuta `npm run tauri build`.
       - name: Verify updater signing key is present
+        shell: bash
         env:
           HAS_UPDATER_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
         run: |
