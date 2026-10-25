@@ -15,10 +15,12 @@ comportamiento funcional, añaden pruebas para las rutas de riesgo y no
 desactivan comprobaciones de CI. La verificación local con Node.js 22 y Rust
 pasa completa.
 
-Queda un bloqueo externo: `cargo audit` sigue detectando tres vulnerabilidades
-en `zip 4.6.1`, versión que fija `tauri-plugin-updater 2.14.0`. No se añadió una
-excepción a la auditoría; CI seguirá en rojo en ese paso hasta que el plugin
-acepte `zip >= 9`.
+El bloqueo de `cargo audit` se resolvió con un pin temporal: `tauri-plugin-updater`
+se toma del commit upstream `ba98bfadc4c868c9a7e1a226c83af528e1f11b89` de la
+rama `v2`, que cambia `zip` de 4 a 9. Ese commit solo modifica la dependencia y
+su lockfile. `cargo audit` pasa con 0 vulnerabilidades; no se añadieron
+excepciones ni se desactivó la auditoría. Cuando se publique una versión estable
+del plugin con `zip >= 9`, hay que volver a la dependencia de crates.io.
 
 ## Hallazgos y correcciones
 
@@ -133,6 +135,28 @@ real (por ejemplo, las flechas). El menú contextual de bullets mostraba
 - Se eliminaron las etiquetas `Alt+↑`/`Alt+↓` del menú contextual porque no
   tenían manejador.
 
+## Bloqueo de `cargo audit`
+
+`tauri-plugin-updater 2.14.0` de crates.io fija `zip ^4`, y `zip 4.6.1` tiene
+`RUSTSEC-2026-0367`, `RUSTSEC-2026-0368` y `RUSTSEC-2026-0369`. El arreglo ya
+está en la rama `v2` del repositorio upstream, pero todavía no se publicó en
+crates.io.
+
+Para no desactivar la auditoría, `src-tauri/Cargo.toml` fija el plugin al commit
+`ba98bfadc4c868c9a7e1a226c83af528e1f11b89`:
+
+```toml
+tauri-plugin-updater = { git = "https://github.com/tauri-apps/plugins-workspace", rev = "ba98bfadc4c868c9a7e1a226c83af528e1f11b89" }
+```
+
+El commit upstream solo cambia `zip = "4"` por `zip = "9"` y actualiza su
+`Cargo.lock`; no modifica código del plugin. El lock local queda en `zip 9.1.1`,
+elimina `arbitrary`/`derive_arbitrary` y añade `typed-path`. `cargo audit` pasa
+con 0 vulnerabilidades y conserva los 7 avisos ya existentes.
+
+Este pin es temporal. Al publicarse una versión de `tauri-plugin-updater` con
+`zip >= 9`, hay que volver a `tauri-plugin-updater = "2"` y actualizar el lock.
+
 ## Verificación
 
 Node.js `v22.23.4` (npm `10.9.9`):
@@ -153,7 +177,7 @@ Rust:
 | `cargo fmt --check` | Correcto |
 | `cargo test --locked` | 49 pruebas en verde |
 | `cargo clippy --locked -- -D warnings` | Correcto |
-| `cargo audit --file src-tauri/Cargo.lock` | 3 vulnerabilidades en `zip 4.6.1` y 7 avisos |
+| `cargo audit --file src-tauri/Cargo.lock` | 0 vulnerabilidades y 7 avisos |
 
 `actionlint` no está instalado en el entorno local. El workflow de release no
 se ejecutó con etiquetas para no crear ni mover tags; su diff se revisó
@@ -161,11 +185,11 @@ manualmente y solo contiene los cuatro cambios de `node-version`.
 
 ## Pendientes y riesgos residuales
 
-1. **`zip 4.6.1` en `cargo audit`.** `tauri-plugin-updater 2.14.0` fija
-   `zip ^4`; no hay una versión compatible que permita `zip >= 9`. Afecta a
-   `RUSTSEC-2026-0367`, `RUSTSEC-2026-0368` y `RUSTSEC-2026-0369`. No se
-   añadieron ignores: CI seguirá fallando en `Run cargo audit` hasta que el
-   plugin se actualice o se sustituya el actualizador.
+1. **`zip` en `cargo audit` (resuelto temporalmente).** El pin del updater al
+   commit upstream `ba98bfa` usa `zip 9.1.1`, así que la auditoría ya no falla.
+   Es un pin temporal: al publicarse una versión estable del plugin con
+   `zip >= 9`, hay que volver a `tauri-plugin-updater = "2"` y actualizar el
+   lock. No se añadieron ignores ni se desactivó `cargo audit`.
 2. **`save_dropped_image`.** El comando acepta una ruta absoluta desde el
    frontend y copia el archivo a la bóveda. Si el WebView se compromete, esa
    superficie permite leer archivos arbitrarios con extensión de imagen. Hay
