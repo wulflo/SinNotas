@@ -25,7 +25,7 @@
     "tinypool": ">=1.0.2",
     "typescript": "^5.4.5",
     "vite": "^5.4.19",
-    "vitest": "^3.2.6"
+    "vitest": "^5.0.5"
   },
   "overrides": {
     "esbuild": ">=0.25.0",
