@@ -228,3 +228,48 @@ respuesta completa.
   que los registros que solo documentan cosas viven en `docs/`.
 - Se actualizaron las referencias en `.github/workflows/ci.yml`,
   `src/store/content-search.test.ts` y los enlaces internos entre documentos.
+
+## Insets de Android cuando el WebView no recibe WindowInsets
+
+El parche anterior escuchaba `WindowInsets` únicamente en el WebView. Hay
+versiones de WebView que nunca entregan esas insets a la vista aunque la
+actividad esté en edge-to-edge; en esos equipos `latestSafeAreaInsets` quedaba
+vacío y las barras de estado/navegación seguían tapando el encabezado y las
+acciones del repaso.
+
+Ahora `scripts/patch-android-safe-area.mjs`:
+
+- Conserva el listener del WebView como vía principal.
+- Lee además `ViewCompat.getRootWindowInsets(view)` en el primer layout, en
+  `onResume` y en `onConfigurationChanged`. La raíz de la ventana conserva las
+  insets reales aunque el WebView no las reciba.
+- Solo vuelve a inyectar el script cuando el JSON de insets cambia.
+- Marca el parche como `SinNotasSafeArea v2`. Si detecta el parche anterior,
+  pide borrar `src-tauri/gen/android` y regenerarlo con `tauri android init`
+  antes de aplicarlo, para no dejar una versión vieja silenciosamente.
+
+`src/mobile/android-safe-area.ts` reaplica el valor guardado al montar la vista
+de repaso y en `resize`/`orientationchange`. Cubre el caso en que el script de
+inicio de documento corre antes de que Android entregue las primeras insets. En
+escritorio y en WebView modernos el puente no existe y la función no hace nada.
+
+### Verificación
+
+- `npx tsc --noEmit`: OK.
+- `npm test`: 236 pruebas en 24 archivos, todas en verde.
+- `npm run build` y `VITE_APP_MODE=flashcards npm run build`: OK.
+- `scripts/patch-android-safe-area.mjs` aplicado dos veces sobre un
+  `MainActivity.kt` de plantilla: la primera pasada añade imports, listener,
+  fallback de raíz y puente; la segunda es idempotente.
+- APK debug arm64 compilada localmente sin Android Studio, usando solo las
+  command-line tools del SDK, el NDK 30.0.16248370 y un JDK 21:
+  `src-tauri/gen/android/app/build/outputs/apk/universal/debug/app-universal-debug.apk`
+  (215 MB). Firma: Android Debug; paquete `com.sinnotas.desktop`, `minSdk 33`,
+  `targetSdk 37`.
+- Verificado dentro del APK: `SinNotasSafeArea` y las variables
+  `--sinnotas-safe-area-*` están en el DEX, y `android:allowBackup="false"` está
+  en el manifiesto compilado.
+- La APK debug no puede actualizar la release v0.2.0 firmada con la keystore de
+  release: Android rechaza la instalación por firma distinta. Para conservar
+  los datos de la release hay que instalar una APK firmada con la misma clave
+  (CI con los secretos) o desinstalar antes la release.

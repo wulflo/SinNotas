@@ -42,6 +42,15 @@ describe("FSRS nextInterval (curva de potencia)", () => {
     expect(engine.nextInterval(1000000)).toBe(36500);
   });
 
+  it("formatea minutos, horas, días, meses y años sin ambigüedad", () => {
+    const engine = new FSRSEngine();
+    expect(engine.formatInterval(0.006944444444444444)).toBe("10m");
+    expect(engine.formatInterval(0.5)).toBe("12h");
+    expect(engine.formatInterval(14)).toBe("14d");
+    expect(engine.formatInterval(30)).toBe("1mo");
+    expect(engine.formatInterval(365)).toBe("1y");
+  });
+
   it("la fórmula general coincide: I = (S/FACTOR)·(R^(1/DECAY) − 1)", () => {
     const r = 0.92;
     const engine = new FSRSEngine({ ...defaultFSRSParams, requestRetention: r, maximumInterval: 100000 });
@@ -112,7 +121,46 @@ describe("FSRS - fase de aprendizaje", () => {
     expect(previews[3].item.state).toBe(2);
     expect(previews[3].item.learningStep).toBeUndefined();
     expect(previews[3].intervalText).toBe("4d");
-    expect(previews[4].intervalText).toBe("14d");
+    // Easy conserva la estabilidad acumulada y aplica el bonus de FSRS; ya no
+    // reinicia la tarjeta a S0(4) = 14 días.
+    expect(previews[4].item.state).toBe(2);
+    expect(previews[4].item.stability).toBeGreaterThan(previews[3].item.stability);
+    expect(previews[4].intervalText).toBe("4d");
+  });
+
+  it("Easy en Learning aplica la fórmula de recuerdo y no reinicia a S0(4)", () => {
+    const engine = new FSRSEngine();
+    const learning: FSRSItem = {
+      stability: 3.71,
+      difficulty: 5.16,
+      reps: 1,
+      lapses: 0,
+      state: 1,
+      learningStep: 1,
+    };
+    const previews = engine.previewRatings(learning, 10 / 1440);
+
+    expect(previews[4].item.state).toBe(2);
+    expect(previews[4].item.stability).toBeGreaterThan(learning.stability);
+    expect(previews[4].item.stability).toBeLessThan(defaultFSRSParams.w[3]);
+    expect(previews[4].item.stability).toBeGreaterThan(previews[3].item.stability);
+  });
+
+  it("Easy en Relearning también conserva la estabilidad acumulada", () => {
+    const engine = new FSRSEngine();
+    const relearning: FSRSItem = {
+      stability: 3.71,
+      difficulty: 5.16,
+      reps: 2,
+      lapses: 1,
+      state: 3,
+      learningStep: 0,
+    };
+    const previews = engine.previewRatings(relearning, 10 / 1440);
+
+    expect(previews[4].item.state).toBe(2);
+    expect(previews[4].item.stability).toBeGreaterThan(relearning.stability);
+    expect(previews[4].item.stability).toBeLessThan(defaultFSRSParams.w[3]);
   });
 
   it("Again durante el aprendizaje reinicia al primer paso sin contar lapse", () => {

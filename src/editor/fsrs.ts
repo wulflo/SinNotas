@@ -147,18 +147,21 @@ export class FSRSEngine {
     return Math.min(this.params.maximumInterval, Math.max(1, Math.round(interval)));
   }
 
-  /** Format interval into human-readable text (1m, 10m, 1d, 5d, 2m, 1y). */
+  /**
+   * Format interval into human-readable text (1m, 12h, 5d, 2mo, 1y).
+   * `mo`/`y` evitan que un intervalo de 30 días se confunda con 30 minutos.
+   */
   public formatInterval(days: number): string {
     const minutes = days * 1440;
     if (minutes < 60) return `${Math.max(1, Math.round(minutes))}m`;
-    if (days < 2) return "1d";
+    if (days < 1) return `${Math.max(1, Math.round(minutes / 60))}h`;
     if (days < 30) return `${Math.round(days)}d`;
     if (days < 365) {
-      const months = Math.round(days / 30);
-      return `${months}m`;
+      const months = Math.max(1, Math.round(days / 30));
+      return `${months}mo`;
     }
-    const years = (days / 365).toFixed(1);
-    return `${years}a`;
+    const years = Number((days / 365).toFixed(1));
+    return `${years}y`;
   }
 
   private stepsForState(state: CardState): number[] {
@@ -249,12 +252,13 @@ export class FSRSEngine {
         // memory state so graduation starts from a sensible interval.
         const currentStep = item.learningStep ?? 0;
         nextD = this.nextDifficulty(safeDifficulty, rating);
+        // En Learning, Easy también es un repaso correcto: se aplica la
+        // fórmula de estabilidad de recuerdo, no se reinicia a S0(4). Reiniciar
+        // la estabilidad ignoraba la memoria acumulada durante los pasos.
         nextS =
           rating === 1
             ? this.nextLapseStability(safeDifficulty, safeStability, retrievability)
-            : rating === 4
-              ? this.initStability(4)
-              : this.nextRecallStability(safeDifficulty, safeStability, retrievability, rating);
+            : this.nextRecallStability(safeDifficulty, safeStability, retrievability, rating);
         const transition = this.learningTransition(1, currentStep, rating);
         nextState = transition.state;
         nextLearningStep = transition.learningStep;
@@ -263,17 +267,12 @@ export class FSRSEngine {
         // Relearning uses the same fixed-step mechanism as learning.
         const currentStep = item.learningStep ?? 0;
         nextD = this.nextDifficulty(safeDifficulty, rating);
+        // Igual que en Learning: Easy usa la fórmula de recuerdo y conserva
+        // la estabilidad acumulada; no se fuerza el mínimo de una tarjeta nueva.
         nextS =
           rating === 1
             ? this.nextLapseStability(safeDifficulty, safeStability, retrievability)
-            : rating === 4
-              ? Math.max(this.initStability(4), this.nextRecallStability(
-                  safeDifficulty,
-                  safeStability,
-                  retrievability,
-                  rating
-                ))
-              : this.nextRecallStability(safeDifficulty, safeStability, retrievability, rating);
+            : this.nextRecallStability(safeDifficulty, safeStability, retrievability, rating);
         const transition = this.learningTransition(3, currentStep, rating);
         nextState = transition.state;
         nextLearningStep = transition.learningStep;

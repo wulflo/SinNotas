@@ -1232,6 +1232,20 @@ body {
   filter: blur(0.4px);
 }
 
+/* Las capas de glow se promueven al compositor para que el cambio de tema o
+   de intensidad no obligue a repintar toda la interfaz. */
+.sidebar-left::before,
+.sidebar-left::after,
+.sidebar-header::before,
+.sidebar-header::after,
+.main-container::before,
+.main-container::after,
+.headbar::before,
+.headbar::after,
+.settings-dropdown-menu::after {
+  will-change: transform;
+}
+
 .headbar-completion-progress {
   position: absolute;
   left: 0;
@@ -3419,10 +3433,7 @@ body.no-active-page #btn-delete-page {
 .kanban-task-list {
   flex: 1;
   overflow-y: auto;
-  padding: 12px 16px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  padding: 6px 12px 6px;
 }
 
 .kanban-card {
@@ -4887,6 +4898,98 @@ body.no-active-page #btn-delete-page {
 
 .settings-overlay .settings-tab-panel {
   padding-top: 2px;
+}
+
+/* ==================== KEYBOARD SHORTCUTS MODAL ==================== */
+#shortcuts-modal-overlay {
+  z-index: 2300;
+}
+
+.shortcuts-modal {
+  width: min(560px, calc(100vw - 32px));
+  height: auto;
+  max-height: min(88vh, 760px);
+  padding: 20px;
+}
+
+.shortcuts-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.shortcuts-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shortcuts-group-title {
+  margin-bottom: 4px;
+  color: var(--ls-text-muted);
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--ls-border-subtle);
+  font-size: var(--ls-font-size-ui);
+}
+
+.shortcut-row:last-of-type {
+  border-bottom: none;
+}
+
+.shortcut-row > span {
+  min-width: 0;
+  color: var(--ls-text-primary);
+}
+
+.shortcut-row kbd {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border: 1px solid var(--ls-border-color);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: var(--ls-bg-secondary);
+  color: var(--ls-text-title);
+  font-family: monospace;
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.shortcuts-note {
+  margin-top: 4px;
+  color: var(--ls-text-muted);
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  line-height: 1.4;
+}
+
+@media (max-width: 640px) {
+  .shortcuts-modal {
+    padding: 16px;
+  }
+
+  .shortcut-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .shortcut-row kbd {
+    white-space: normal;
+  }
 }
 
 .context-menu-title {
@@ -6720,9 +6823,12 @@ body.no-active-page #btn-delete-page {
 }
 
 .app-splash-bar-fill {
+  width: 100%;
   height: 100%;
   background: var(--ls-accent);
   border-radius: 2px;
+  transform-origin: left center;
+  will-change: transform;
   animation: splash-bar 1.2s ease-in-out infinite;
 }
 
@@ -6739,16 +6845,13 @@ body.no-active-page #btn-delete-page {
 
 @keyframes splash-bar {
   0% {
-    width: 0%;
-    transform: translateX(0);
+    transform: scaleX(0);
   }
   50% {
-    width: 100%;
-    transform: translateX(0);
+    transform: scaleX(1);
   }
   100% {
-    width: 100%;
-    transform: translateX(100%);
+    transform: translateX(100%) scaleX(1);
   }
 }
 

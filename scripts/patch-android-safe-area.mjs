@@ -2,8 +2,11 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 
 const ANDROID_JAVA_ROOT = resolve("src-tauri/gen/android/app/src/main/java");
-const PATCH_MARKER = "SinNotasSafeArea";
+const PATCH_MARKER = "SinNotasSafeArea v2";
+const LEGACY_MARKER = "SinNotasSafeArea";
 const REQUIRED_IMPORTS = [
+  "import android.content.res.Configuration",
+  "import android.view.View",
   "import android.webkit.JavascriptInterface",
   "import android.webkit.WebView",
   "import androidx.core.view.ViewCompat",
@@ -48,6 +51,15 @@ if (source.includes(PATCH_MARKER)) {
   console.log(`El parche de safe area ya está aplicado en ${mainActivityPath}`);
   process.exit(0);
 }
+if (source.includes(LEGACY_MARKER)) {
+  console.error(
+    `El proyecto Android de ${mainActivityPath} tiene un parche de safe area anterior. ` +
+      "Borrá `src-tauri/gen/android` y regeneralo con " +
+      "`npm run tauri android init -- --ci` antes de ejecutar " +
+      "`npm run android:patch`.",
+  );
+  process.exit(1);
+}
 
 const lastImportIndex = source
   .split("\n")
@@ -69,10 +81,13 @@ if (!classDeclaration) {
 
 const members = [
   "",
+  "  // SinNotasSafeArea v2: publica las insets reales de Android en variables CSS.",
   '  private var latestSafeAreaInsets = ""',
+  "  private var currentWebView: WebView? = null",
   "",
   "  override fun onWebViewCreate(webView: WebView) {",
   "    super.onWebViewCreate(webView)",
+  "    currentWebView = webView",
   "",
   '    webView.addJavascriptInterface(SafeAreaBridge(), "SinNotasSafeArea")',
   "",
@@ -80,16 +95,46 @@ const members = [
   '      WebViewCompat.addDocumentStartJavaScript(webView, SAFE_AREA_SCRIPT, setOf("*"))',
   "    }",
   "",
-  "    ViewCompat.setOnApplyWindowInsetsListener(webView) { view, insets ->",
-  "      val bars = insets.getInsets(",
-  "        WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()",
-  "      )",
-  "      val density = resources.displayMetrics.density",
-  '      latestSafeAreaInsets = """{"top":${(bars.top / density).roundToInt()},"right":${(bars.right / density).roundToInt()},"bottom":${(bars.bottom / density).roundToInt()},"left":${(bars.left / density).roundToInt()}}"""',
-  "      webView.evaluateJavascript(SAFE_AREA_SCRIPT, null)",
+  "    ViewCompat.setOnApplyWindowInsetsListener(webView) { _, insets ->",
+  "      updateSafeAreaInsets(insets)",
   "      insets",
   "    }",
+  "    // Algunos WebView no reciben WindowInsets aunque estén en edge-to-edge.",
+  "    // La raíz de la ventana sí conserva las insets reales.",
+  "    webView.addOnLayoutChangeListener { view, _, _, _, _, _, _, _, _ ->",
+  "      view?.let { applyRootWindowInsets(it) }",
+  "    }",
+  "    webView.post { applyRootWindowInsets(webView) }",
   "    ViewCompat.requestApplyInsets(webView)",
+  "  }",
+  "",
+  "  private fun applyRootWindowInsets(view: View) {",
+  "    ViewCompat.getRootWindowInsets(view)?.let { updateSafeAreaInsets(it) }",
+  "  }",
+  "",
+  "  private fun updateSafeAreaInsets(insets: WindowInsetsCompat) {",
+  "    val bars = insets.getInsets(",
+  "      WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()",
+  "    )",
+  "    val density = resources.displayMetrics.density",
+  '    val json = """{"top":${(bars.top / density).roundToInt()},"right":${(bars.right / density).roundToInt()},"bottom":${(bars.bottom / density).roundToInt()},"left":${(bars.left / density).roundToInt()}}"""',
+  "    if (json == latestSafeAreaInsets) return",
+  "    latestSafeAreaInsets = json",
+  "    currentWebView?.evaluateJavascript(SAFE_AREA_SCRIPT, null)",
+  "  }",
+  "",
+  "  override fun onConfigurationChanged(newConfig: Configuration) {",
+  "    super.onConfigurationChanged(newConfig)",
+  "    currentWebView?.let { webView ->",
+  "      webView.post { applyRootWindowInsets(webView) }",
+  "    }",
+  "  }",
+  "",
+  "  override fun onResume() {",
+  "    super.onResume()",
+  "    currentWebView?.let { webView ->",
+  "      webView.post { applyRootWindowInsets(webView) }",
+  "    }",
   "  }",
   "",
   "  private inner class SafeAreaBridge {",

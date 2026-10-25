@@ -116,6 +116,12 @@ export class FlashcardsManager {
   private isAnswerRevealed = false;
   private fsrs = new FSRSEngine();
   private allowedPages: Set<string> | null = null;
+  /**
+   * Cuando está activo, la cola incluye también las tarjetas que todavía no
+   * vencen. Lo usa el modo Aprendizaje para poder repasar toda la bóveda sin
+   * tocar el calendario FSRS.
+   */
+  private includeAllCards = false;
 
   constructor() {}
 
@@ -132,6 +138,28 @@ export class FlashcardsManager {
   /** Devuelve el filtro de notas activo, o null cuando se repasan todas las notas. */
   public getPageFilter(): string[] | null {
     return this.allowedPages ? Array.from(this.allowedPages).sort() : null;
+  }
+
+  /**
+   * Incluye en la cola todas las tarjetas del filtro actual, aunque no estén
+   * vencidas. Es la base del modo Aprendizaje y también permite repasar de
+   * verdad, en la misma sesión, las tarjetas que se acaban de practicar.
+   */
+  public setIncludeAllCards(include: boolean, order: FlashcardReviewOrder = "new-first"): void {
+    this.includeAllCards = include;
+    this.applyPageFilter(order);
+  }
+
+  /**
+   * Reconstruye la cola con todas las tarjetas del filtro actual, ignorando
+   * temporalmente su fecha de vencimiento. No cambia `includeAllCards`: los
+   * escaneos posteriores vuelven al comportamiento normal si se desactivó el
+   * modo Aprendizaje.
+   */
+  public restartWithAllCards(order: FlashcardReviewOrder = "new-first"): void {
+    this.reviewCards = this.orderReviewCards(this.cards, order);
+    this.currentIndex = 0;
+    this.isAnswerRevealed = false;
   }
 
   /** Devuelve los títulos de las notas que contienen al menos una flashcard
@@ -704,10 +732,10 @@ export class FlashcardsManager {
     this.cards = this.allowedPages
       ? this.allCards.filter((card) => this.allowedPages!.has(card.pageTitle))
       : this.allCards;
-    this.reviewCards = this.orderReviewCards(
-      this.cards.filter((card) => this.isDue(card, new Date())),
-      order
-    );
+    const sessionCards = this.includeAllCards
+      ? this.cards
+      : this.cards.filter((card) => this.isDue(card, new Date()));
+    this.reviewCards = this.orderReviewCards(sessionCards, order);
     this.currentIndex = 0;
     this.isAnswerRevealed = false;
   }
@@ -778,10 +806,17 @@ export class FlashcardsManager {
   }
 
   /**
-   * Apply FSRS rating (1: Again, 2: Hard, 3: Good, 4: Easy)
-   * Returns updated FSRS item and next interval in days
+   * Apply FSRS rating (1: Again, 2: Hard, 3: Good, 4: Easy).
+   *
+   * `persist = false` avanza la sesión pero no modifica la programación de la
+   * tarjeta. Es lo que usa el modo Aprendizaje: así, al desactivarlo, las
+   * tarjetas conservan su estado FSRS y vuelven a estar disponibles para un
+   * repaso real.
    */
-  public rate(rating: FSRSRating): {
+  public rate(
+    rating: FSRSRating,
+    persist = true
+  ): {
     card: Flashcard;
     fsrs: FSRSItem;
     intervalDays: number;
@@ -793,16 +828,18 @@ export class FlashcardsManager {
     const previews = this.fsrs.previewRatings(card.fsrs, this.elapsedDays(card));
     const chosen = previews[rating];
 
-    card.fsrs = chosen.item;
-    card.lastIntervalDays = chosen.intervalDays;
-    card.easeFactor = Math.max(
-      1.3,
-      card.easeFactor + (rating === 1 ? -0.2 : rating === 2 ? -0.15 : rating === 4 ? 0.15 : 0)
-    );
-    card.dueDate = new Date(
-      Date.parse(chosen.item.lastReviewDate || new Date().toISOString()) +
-        chosen.intervalDays * 86_400_000
-    ).toISOString();
+    if (persist) {
+      card.fsrs = chosen.item;
+      card.lastIntervalDays = chosen.intervalDays;
+      card.easeFactor = Math.max(
+        1.3,
+        card.easeFactor + (rating === 1 ? -0.2 : rating === 2 ? -0.15 : rating === 4 ? 0.15 : 0)
+      );
+      card.dueDate = new Date(
+        Date.parse(chosen.item.lastReviewDate || new Date().toISOString()) +
+          chosen.intervalDays * 86_400_000
+      ).toISOString();
+    }
 
     this.currentIndex += 1;
     this.isAnswerRevealed = false;

@@ -307,6 +307,72 @@ describe("FlashcardsManager - instantáneas FSRS para deshacer repasos", () => {
   });
 });
 
+describe("FlashcardsManager - modo Aprendizaje", () => {
+  it("rate(..., false) avanza sin modificar FSRS ni la fecha de vencimiento", () => {
+    const manager = new FlashcardsManager();
+    manager.scanVault(pages, "new-first");
+    const card = manager.getCurrentCard()!;
+    const before = { ...card.fsrs };
+
+    manager.rate(3, false);
+
+    expect(card.fsrs).toEqual(before);
+    expect(card.dueDate).toBeUndefined();
+    expect(card.lastIntervalDays).toBe(0);
+    expect(manager.getCurrentCard()?.pageTitle).toBe("Nota B");
+
+    // La tarjeta sigue vencida: al volver a escanear aparece de nuevo.
+    expect(manager.scanVault(pages, "new-first")).toHaveLength(2);
+  });
+
+  it("setIncludeAllCards incluye las tarjetas que aún no vencen", () => {
+    const future = makePage(
+      "future",
+      "Futura",
+      [
+        "Pregunta futura :: Respuesta futura",
+        "card-s:: 10",
+        "card-d:: 5",
+        "card-reps:: 3",
+        "card-lapses:: 0",
+        "last-reviewed:: 2026-10-24T00:00:00.000Z",
+        "interval-days:: 30",
+        "due-date:: 2026-11-23T00:00:00.000Z",
+        "card-state:: 2",
+      ].join("\n")
+    );
+    const manager = new FlashcardsManager();
+
+    manager.scanVault([future], "new-first");
+    expect(manager.getCardsCount()).toBe(0);
+
+    manager.setIncludeAllCards(true);
+    expect(manager.getCardsCount()).toBe(1);
+    expect(manager.getCurrentCard()?.pageTitle).toBe("Futura");
+
+    manager.setIncludeAllCards(false);
+    expect(manager.getCardsCount()).toBe(0);
+  });
+
+  it("al desactivar el modo, restartWithAllCards vuelve a mostrar todas las tarjetas", () => {
+    const manager = new FlashcardsManager();
+    manager.setIncludeAllCards(true);
+    manager.scanVault(pages, "new-first");
+    expect(manager.getCardsCount()).toBe(2);
+
+    // Practica las dos tarjetas sin guardar.
+    manager.rate(3, false);
+    manager.rate(3, false);
+    expect(manager.getCurrentCard()).toBeNull();
+
+    // Desactivar: se reconstruye la cola con todas para repasar de verdad.
+    manager.setIncludeAllCards(false);
+    manager.restartWithAllCards();
+    expect(manager.getCardsCount()).toBe(2);
+    expect(manager.getCurrentCard()?.pageTitle).toBe("Nota A");
+  });
+});
+
 describe("FlashcardsManager - persistencia del estado FSRS", () => {
   const learningContent = [
     "Pregunta :: Respuesta #card",

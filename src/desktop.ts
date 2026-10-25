@@ -88,6 +88,7 @@ import {
   type ControllerType,
 } from "./gamepad";
 import { renderMarkdownToHtml, sanitizeHtml } from "./editor/markdown";
+import { isAllowedRemoteImageUrl } from "./editor/url-safety";
 import { sanitizePastedHtmlToMarkdown } from "./editor/paste-sanitizer";
 import {
   editMarkdownTable,
@@ -707,13 +708,13 @@ const btnConceptMapZoomIn = document.getElementById("btn-concept-map-zoom-in") a
 const btnConceptMapZoomOut = document.getElementById("btn-concept-map-zoom-out") as HTMLButtonElement;
 const btnConceptMapReset = document.getElementById("btn-concept-map-reset") as HTMLButtonElement;
 const btnConceptMap = document.getElementById("btn-concept-map") as HTMLButtonElement;
-const btnEditorHelp = document.getElementById("btn-editor-help") as HTMLButtonElement | null;
-const editorHelpOverlay = document.getElementById("editor-help-overlay") as HTMLDivElement | null;
-const btnCloseEditorHelp = document.getElementById("btn-close-editor-help") as HTMLButtonElement | null;
+const btnShortcuts = document.getElementById("btn-shortcuts") as HTMLButtonElement | null;
+const shortcutsModalOverlay = document.getElementById("shortcuts-modal-overlay") as HTMLDivElement;
+const btnCloseShortcuts = document.getElementById("btn-close-shortcuts") as HTMLButtonElement | null;
 const conceptMapView = new ConceptMapView("concept-map-canvas", "concept-map-canvas-wrap", "concept-map-empty");
 
 const modalOverlays: HTMLElement[] = [];
-[settingsOverlay, historyModalOverlay, conceptMapOverlay, editorHelpOverlay, appDialogOverlay, vaultManagerOverlay, imageOcclusionOverlay].forEach((o) => {
+[settingsOverlay, historyModalOverlay, conceptMapOverlay, shortcutsModalOverlay, appDialogOverlay, vaultManagerOverlay, imageOcclusionOverlay].forEach((o) => {
   if (o) modalOverlays.push(o);
 });
 modalOverlays.forEach((overlay) => {
@@ -723,6 +724,10 @@ modalOverlays.forEach((overlay) => {
 
 function hasMountedModal(): boolean {
   return modalOverlays.some((overlay) => overlay && overlay.isConnected);
+}
+
+function hasMountedModalExcept(overlay: HTMLElement | null): boolean {
+  return modalOverlays.some((candidate) => candidate !== overlay && candidate.isConnected);
 }
 
 function mountOverlay(overlay: HTMLElement | null): void {
@@ -2432,6 +2437,7 @@ function closeAllModalOverlays(): void {
   closeSettingsOverlay();
   closeHistoryModal();
   closeConceptMap();
+  closeShortcutsModal();
   closeAppDialog();
   if (!imageOcclusionOverlay.hidden) closeImageOcclusionEditor();
   hideAllContextMenus();
@@ -2465,25 +2471,33 @@ conceptMapOverlay.addEventListener("click", (event) => {
   if (event.target === conceptMapOverlay) closeConceptMap();
 });
 
-if (btnEditorHelp && editorHelpOverlay) {
-  btnEditorHelp.addEventListener("click", () => {
-    if (editorHelpOverlay.hidden) {
-      mountOverlay(editorHelpOverlay);
-    } else {
-      unmountOverlay(editorHelpOverlay);
-    }
-  });
+function openShortcutsModal(): void {
+  if (hasMountedModalExcept(shortcutsModalOverlay)) return;
+  mountOverlay(shortcutsModalOverlay);
+  btnCloseShortcuts?.focus();
 }
-if (btnCloseEditorHelp && editorHelpOverlay) {
-  btnCloseEditorHelp.addEventListener("click", () => {
-    unmountOverlay(editorHelpOverlay);
-  });
-  editorHelpOverlay.addEventListener("click", (event) => {
-    if (event.target === editorHelpOverlay) {
-      unmountOverlay(editorHelpOverlay);
-    }
-  });
+
+function closeShortcutsModal(): void {
+  unmountOverlay(shortcutsModalOverlay);
 }
+
+function toggleShortcutsModal(): void {
+  if (shortcutsModalOverlay.isConnected) {
+    closeShortcutsModal();
+  } else {
+    openShortcutsModal();
+  }
+}
+
+btnShortcuts?.addEventListener("click", () => {
+  toggleShortcutsModal();
+});
+btnCloseShortcuts?.addEventListener("click", () => {
+  closeShortcutsModal();
+});
+shortcutsModalOverlay.addEventListener("click", (event) => {
+  if (event.target === shortcutsModalOverlay) closeShortcutsModal();
+});
 
 let pageExportCloseTimer: number | null = null;
 
@@ -3963,79 +3977,11 @@ function fileUrlToLocalPath(source: string): string | null {
   }
 }
 
-function isSafeImageUrl(urlString: string): boolean {
-  try {
-    const url = new URL(urlString);
-    if (url.protocol !== "http:" && url.protocol !== "https:") {
-      return false;
-    }
-    const hostname = url.hostname.toLowerCase();
-    if (
-      hostname === "localhost" ||
-      hostname === "0.0.0.0" ||
-      hostname.startsWith("127.") ||
-      hostname.startsWith("192.168.") ||
-      hostname.startsWith("10.") ||
-      hostname.startsWith("169.254.") ||
-      hostname === "[::1]" ||
-      hostname === "::1" ||
-      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
-      hostname.endsWith(".local")
-    ) {
-      return false;
-    }
-    if (/^\[.*\]$/.test(hostname)) {
-      // Basic check for IPv6 loopback/private not fully covered, reject for safety
-      if (hostname.includes("::1") || hostname.includes("fc") || hostname.includes("fd")) {
-        return false;
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function isPrivateOrLocalHostname(hostname: string): boolean {
-  const host = hostname.trim().toLowerCase();
-  if (!host) return true;
-  if (host === "localhost" || host.endsWith(".localhost")) return true;
-  if (host === "::1" || host === "[::1]") return true;
-
-  const ipv4Match = host.match(/^(\d{1,3})(?:\.(\d{1,3})){3}$/);
-  if (ipv4Match) {
-    const parts = host.split(".").map((part) => Number(part));
-    if (parts.some((n) => !Number.isInteger(n) || n < 0 || n > 255)) return true;
-    const [a, b] = parts;
-    if (a === 10) return true;
-    if (a === 127) return true;
-    if (a === 169 && b === 254) return true;
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    if (a === 192 && b === 168) return true;
-    return false;
-  }
-
-  if (host === "::" || host.startsWith("fe80:") || host.startsWith("fc") || host.startsWith("fd")) return true;
-  return false;
-}
-
-function isAllowedRemoteImageUrl(urlString: string): boolean {
-  let parsed: URL;
-  try {
-    parsed = new URL(urlString, window.location.href);
-  } catch {
-    return false;
-  }
-  if (!(parsed.protocol === "http:" || parsed.protocol === "https:")) return false;
-  if (isPrivateOrLocalHostname(parsed.hostname)) return false;
-  return isSafeImageUrl(parsed.toString());
-}
-
 async function imageSourceToFile(source: string): Promise<File | null> {
   const trimmed = source.trim();
   if (!trimmed) return null;
   if (/^data:image\//i.test(trimmed)) return dataUrlToImageFile(trimmed);
-  if (!isAllowedRemoteImageUrl(trimmed)) {
+  if (!isAllowedRemoteImageUrl(trimmed, window.location.href)) {
     throw new Error("URL no permitida por motivos de seguridad.");
   }
 
@@ -11453,6 +11399,14 @@ window.addEventListener("click", (e) => {
 
 /* ==================== GLOBAL KEYBOARD SHORTCUTS ==================== */
 window.addEventListener("keydown", (e: KeyboardEvent) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "/") {
+    // No abrir atajos encima de otro diálogo (ajustes, historial, etc.).
+    if (hasMountedModalExcept(shortcutsModalOverlay)) return;
+    e.preventDefault();
+    toggleShortcutsModal();
+    return;
+  }
+
   if (e.key === "Escape" && wikilinkAutocompleteMenu && !wikilinkAutocompleteMenu.hidden) {
     hideWikilinkAutocomplete();
   }
@@ -11716,6 +11670,46 @@ function scheduleAfterFirstPaint(task: () => void, delay = 0): void {
   }
 }
 
+/**
+ * Pinta una vez las vistas que aún no se han abierto, en tiempo ocioso. Así el
+ * primer cambio de vista no paga a la vez el escaneo de datos y la creación
+ * del DOM. No cambia la vista activa ni el historial de navegación.
+ */
+function schedulePrewarmHiddenViews(): void {
+  if (!desktopReady) return;
+
+  const tasks: Array<{ view: ViewType; run: () => void }> = [
+    { view: "journals", run: renderJournalsView },
+    { view: "all-pages", run: renderAllPagesView },
+    { view: "kanban", run: renderKanbanBoard },
+  ];
+  const pending = tasks.filter((task) => task.view !== currentView);
+
+  const scheduleNext = (): void => {
+    if (pending.length === 0) return;
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(runNext, { timeout: 3000 });
+    } else {
+      window.setTimeout(runNext, 120);
+    }
+  };
+
+  const runNext = (): void => {
+    const task = pending.shift();
+    if (!task) return;
+    if (task.view !== currentView) {
+      try {
+        task.run();
+      } catch (error) {
+        console.error(`No se pudo precalentar la vista ${task.view}:`, error);
+      }
+    }
+    scheduleNext();
+  };
+
+  scheduleNext();
+}
+
 async function initializeDesktopApp(): Promise<void> {
   initThemeAndTypography();
   initUpdateSettings();
@@ -11783,6 +11777,9 @@ async function initializeDesktopApp(): Promise<void> {
       .catch((error) => {
         console.error("No se pudo inicializar el subsistema de snapshots:", error);
       });
+
+    // Precalienta las vistas ocultas una vez que la app ya responde.
+    window.setTimeout(() => schedulePrewarmHiddenViews(), 2500);
 
     // El arrastre de imágenes solo se necesita cuando el usuario interactúa.
     if (isTauri()) {

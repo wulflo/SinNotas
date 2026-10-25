@@ -18,8 +18,8 @@
 
 use crate::{
     is_safe_note_component, journal_date_from_relative_path, parse_markdown_with_frontmatter,
-    resolve_note_path, stable_content_hash, BlockNode, PageData, SkippedEntry, NOTE_MAX_BYTES,
-    RESERVED_DIRS,
+    resolve_note_path, stable_content_hash, BlockNode, PageData, SkippedEntry, MAX_BLOCK_DEPTH,
+    NOTE_MAX_BYTES, RESERVED_DIRS,
 };
 use bincode::Options;
 use regex::Regex;
@@ -41,7 +41,6 @@ const CACHE_FORMAT_VERSION: u32 = 1;
 /// caches implausible).
 const MAX_CACHE_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_BLOCKS_PER_NOTE: usize = 200_000;
-const MAX_BLOCK_DEPTH: usize = 64;
 const MAX_BLOCK_CONTENT_BYTES: usize = 2 * 1024 * 1024;
 const MAX_BLOCK_ID_BYTES: usize = 160;
 const MAX_FRONTMATTER_LINES: usize = 20_000;

@@ -60,6 +60,9 @@ Pasted content goes through a whitelist pipeline (`src/editor/paste-sanitizer.ts
 
 ## Requirements
 
+- **Node.js 22.12 or newer** (Vitest 5 requires it).
+- Rust stable with `rustup`.
+
 On CachyOS, Arch Linux, Manjaro, EndeavourOS
 
 ```bash
@@ -172,6 +175,7 @@ records are filed there too.
 | [docs/2026-10-25-ui-repaso-tipografia-atajos.md](docs/2026-10-25-ui-repaso-tipografia-atajos.md) | Review-mode entry, SVG menu icons, 15 px UI with em-based card typography, instant view switching and double-Enter outdent shortcut |
 | [docs/2026-10-25-auditoria-actualizaciones.md](docs/2026-10-25-auditoria-actualizaciones.md) | Updater threat model: manifest and package tampering, MITM, secrets, Android permissions and residual risks |
 | [docs/2026-10-25-fsrs-aprendizaje.md](docs/2026-10-25-fsrs-aprendizaje.md) | Official FSRS-4.5 formulas, learning/relearning steps, persisted card state and practice-only Learning mode with verification notes |
+| [docs/2026-10-25-correcciones-auditoria.md](docs/2026-10-25-correcciones-auditoria.md) | Audit fixes A-F (Node 22, parser depth, revision symlinks, remote images, UI repaints, shortcuts modal), verification and residual risks |
 
 ## Tauri application
 
@@ -226,8 +230,20 @@ npm run android:patch
 # `android init` creates the project with Tauri's default icons. Regenerate
 # them so gen/android gets the real logo instead of a generic launcher icon.
 npm run tauri icon src-tauri/icons/icon-manifest.json
-VITE_APP_MODE=flashcards npm run tauri android build -- --apk --debug
+VITE_APP_MODE=flashcards npm run tauri android build -- --apk --debug --target aarch64
 ```
+
+Android Studio is not required: the SDK command-line tools, platform/build-tools,
+NDK and a JDK 17+ are enough. Point `ANDROID_HOME` and `NDK_HOME` at the
+installed SDK and NDK before running the commands. The debug APK is written to
+`src-tauri/gen/android/app/build/outputs/apk/`; it is signed with the debug
+key, so it cannot update an APK signed with the release key (uninstall the
+release build first or install it with a different application ID).
+
+If `src-tauri/gen/android` already contains an older safe-area patch, delete it
+before running `android init`; the patch script refuses to reuse the old version
+silently. This is only relevant for local builds: CI always regenerates the
+project from scratch.
 
 The `.github/workflows/ci.yml` workflow builds the APK on pushes/PRs and a signed release APK on `master` or by `workflow_dispatch`; it publishes it as a downloadable artifact but never creates a release. Publishing happens only from a `v*` tag through `.github/workflows/release.yml`. Signing secrets are isolated in the `sign_apk` step. To load the secrets, test without publishing and verify the signature, see [docs/publicacion-apk-android.md](docs/publicacion-apk-android.md); the full update system is described in [docs/actualizaciones.md](docs/actualizaciones.md).
 

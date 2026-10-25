@@ -230,6 +230,51 @@ async function fetchWithTimeout(
   }
 }
 
+/**
+ * Lee y valida el manifiesto que devuelve GitHub.
+ *
+ * GitHub sirve los assets de una release como `application/octet-stream`
+ * aunque el contenido sea JSON. Validar el `Content-Type` producía el falso
+ * error "La respuesta de GitHub no es un manifiesto JSON" en Android. La
+ * validación real es el límite de tamaño, `JSON.parse` y
+ * `parseReleaseManifest`; una respuesta HTML falla igualmente al parsear.
+ *
+ * Se exporta para poder probar la regresión sin hacer una petición de red.
+ */
+export async function readAndroidManifestResponse(
+  response: Response
+): Promise<ReleaseManifest> {
+  if (!response.ok) {
+    throw new UpdateError(
+      `GitHub respondió con HTTP ${response.status}.`,
+      "http"
+    );
+  }
+
+  const text = await response.text();
+  if (text.length > MAX_MANIFEST_BYTES) {
+    throw new UpdateError("El manifiesto de actualización es demasiado grande.", "invalid-manifest");
+  }
+
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    throw new UpdateError("El manifiesto de actualización no es JSON válido.", "invalid-manifest");
+  }
+
+  const release = parseReleaseManifest(raw, ANDROID_UPDATE_PLATFORM_KEY);
+  if (!release.asset.sha256) {
+    // Sin huella no se puede verificar la integridad de la descarga: se falla
+    // cerrado en lugar de aceptar un archivo potencialmente corrupto.
+    throw new UpdateError(
+      "La release no publica la huella SHA-256 del APK; no se puede verificar la descarga.",
+      "checksum"
+    );
+  }
+  return release;
+}
+
 async function fetchAndroidManifest(): Promise<ReleaseManifest> {
   const { response, dispose } = await fetchWithTimeout(
     UPDATE_MANIFEST_URL,
@@ -245,43 +290,7 @@ async function fetchAndroidManifest(): Promise<ReleaseManifest> {
   );
 
   try {
-    if (!response.ok) {
-      throw new UpdateError(
-        `GitHub respondió con HTTP ${response.status}.`,
-        "http"
-      );
-    }
-
-    const contentType = response.headers.get("content-type") ?? "";
-    if (contentType && !/json/i.test(contentType)) {
-      throw new UpdateError(
-        "La respuesta de GitHub no es un manifiesto JSON.",
-        "invalid-manifest"
-      );
-    }
-
-    const text = await response.text();
-    if (text.length > MAX_MANIFEST_BYTES) {
-      throw new UpdateError("El manifiesto de actualización es demasiado grande.", "invalid-manifest");
-    }
-
-    let raw: unknown;
-    try {
-      raw = JSON.parse(text);
-    } catch {
-      throw new UpdateError("El manifiesto de actualización no es JSON válido.", "invalid-manifest");
-    }
-
-    const release = parseReleaseManifest(raw, ANDROID_UPDATE_PLATFORM_KEY);
-    if (!release.asset.sha256) {
-      // Sin huella no se puede verificar la integridad de la descarga: se falla
-      // cerrado en lugar de aceptar un archivo potencialmente corrupto.
-      throw new UpdateError(
-        "La release no publica la huella SHA-256 del APK; no se puede verificar la descarga.",
-        "checksum"
-      );
-    }
-    return release;
+    return await readAndroidManifestResponse(response);
   } finally {
     dispose();
   }

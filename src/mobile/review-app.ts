@@ -20,6 +20,7 @@ import {
   currentLanguagePreference,
   initializeLocalization,
   setLanguagePreference,
+  translate,
   type LanguagePreference,
 } from "../i18n";
 import {
@@ -38,6 +39,7 @@ import {
   type UpdateState,
 } from "../services/updater";
 import { formatBytes } from "../services/update-utils";
+import { installAndroidSafeArea, type AndroidSafeAreaWindow } from "./android-safe-area";
 import "./mobile.css";
 
 interface VaultSnapshot {
@@ -626,6 +628,10 @@ class MobileReviewApp {
     const splash = document.getElementById("app-splash");
     document.body.replaceChildren(this.root);
     if (splash) document.body.appendChild(splash);
+    // Reaplica las insets nativas cuando el documento ya está montado: en
+    // WebView < 140 el script de inicio puede correr antes de que Android
+    // entregue los valores reales.
+    installAndroidSafeArea(window as unknown as AndroidSafeAreaWindow);
     // Fallback de seguridad: ocultar splash tras 15 segundos si algo se cuelga
     const splashTimeout = window.setTimeout(() => {
       try {
@@ -636,6 +642,9 @@ class MobileReviewApp {
     this.applyAccent(this.readStoredAccent(), false);
     this.applyStoredFontSizes();
     this.learningMode = this.readStoredLearningMode();
+    // El modo Aprendizaje debe incluir también las tarjetas que aún no vencen,
+    // incluso si la app se abre con el interruptor ya activo.
+    this.manager.setIncludeAllCards(this.learningMode);
     this.updateLearningSwitch();
     this.updateLanguageButtons();
     this.bindEvents();
@@ -1148,11 +1157,11 @@ class MobileReviewApp {
     const card = this.manager.getCurrentCard();
     if (!card) return;
 
-    const result = this.manager.rate(rating);
+    // En modo Aprendizaje la tarjeta avanza, pero no se modifica su estado
+    // FSRS ni su fecha de vencimiento: es una sesión de práctica sin guardar.
+    const result = this.manager.rate(rating, !this.learningMode);
     if (!result) return;
 
-    // En modo Aprendizaje la tarjeta avanza en memoria, pero no se toca la
-    // bóveda ni el diario de repasos: es una sesión de práctica sin FSRS.
     if (this.learningMode) {
       this.render();
       this.updateHistoryButtons();
@@ -1631,18 +1640,35 @@ class MobileReviewApp {
     } catch {
       // El cambio de modo sigue funcionando aunque no se pueda persistir.
     }
+
+    // Al activar el modo, la cola se reinicia con todas las tarjetas (no solo
+    // las vencidas). Al desactivarlo también se reinicia con todas para poder
+    // repasar de verdad, en esta misma sesión, lo que se acaba de practicar.
+    // Los escaneos posteriores vuelven a la cola normal de vencidas.
+    this.manager.setIncludeAllCards(active);
+    this.manager.restartWithAllCards();
+
     this.updateLearningSwitch();
     this.render();
     this.showToast(
-      active
-        ? "Modo aprendizaje activado: los repasos no se guardan."
-        : "Modo aprendizaje desactivado: los repasos se guardan."
+      translate(
+        active
+          ? "Modo aprendizaje activado: los repasos no se guardan."
+          : "Modo aprendizaje desactivado: los repasos se guardan."
+      )
     );
   }
 
   private updateLearningSwitch(): void {
+    const label = translate("Aprendizaje");
+    const detail = translate("Repasa sin guardar el progreso FSRS");
     this.refs.learningToggle.setAttribute("aria-checked", String(this.learningMode));
+    this.refs.learningToggle.setAttribute("aria-label", label);
     this.refs.learningToggle.classList.toggle("is-active", this.learningMode);
+    const strong = this.refs.learningToggle.querySelector("strong");
+    const small = this.refs.learningToggle.querySelector("small");
+    if (strong) strong.textContent = label;
+    if (small) small.textContent = detail;
     this.root.classList.toggle("is-learning-mode", this.learningMode);
   }
 
@@ -2031,7 +2057,7 @@ class MobileReviewApp {
         : "BÁSICA";
     this.refs.source.textContent = card.pageTitle;
     this.refs.fsrs.textContent = this.learningMode
-      ? "Aprendizaje · sin guardar"
+      ? translate("Aprendizaje · sin guardar")
       : `S ${card.fsrs.stability}d · D ${card.fsrs.difficulty} · ${card.fsrs.reps} reps`;
 
     if (card.cardType === "image-occlusion") {
