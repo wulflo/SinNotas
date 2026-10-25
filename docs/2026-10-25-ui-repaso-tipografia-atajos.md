@@ -15,7 +15,8 @@
 Se reemplazaron los emojis del menú por iconos SVG de trazo, todos en
 `var(--mobile-accent)`:
 
-- Tarjetas para **Repaso**.
+- Interruptor verde/rojo para **Aprendizaje** (sustituye al antiguo acceso de
+  Repaso; ver `docs/2026-10-25-fsrs-aprendizaje.md`).
 - Lista/documento para **Repasar notas**.
 - Lápiz para **Abrir páginas y editor**.
 - Controles deslizantes para **Ajustes**.

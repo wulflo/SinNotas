@@ -115,6 +115,7 @@ function sanitizeSnapshot(value: unknown): CardScheduleSnapshot {
   const lapses = safeNumber(candidate.lapses);
   const intervalDays = safeNumber(candidate.intervalDays);
   const easeFactor = safeNumber(candidate.easeFactor);
+  const state = safeNumber(candidate.state);
   const learningStep = safeNumber(candidate.learningStep);
   const lastReviewDate = safeString(candidate.lastReviewDate, 128);
   const dueDate = safeString(candidate.dueDate, 128);
@@ -125,6 +126,9 @@ function sanitizeSnapshot(value: unknown): CardScheduleSnapshot {
   if (lapses !== undefined) snapshot.lapses = Math.max(0, Math.floor(lapses));
   if (intervalDays !== undefined) snapshot.intervalDays = Math.max(0, intervalDays);
   if (easeFactor !== undefined) snapshot.easeFactor = Math.max(1, easeFactor);
+  if (state !== undefined && Number.isInteger(state) && state >= 0 && state <= 3) {
+    snapshot.state = state as 0 | 1 | 2 | 3;
+  }
   if (learningStep !== undefined) snapshot.learningStep = Math.max(0, Math.floor(learningStep));
   if (lastReviewDate) snapshot.lastReviewDate = lastReviewDate;
   if (dueDate) snapshot.dueDate = dueDate;

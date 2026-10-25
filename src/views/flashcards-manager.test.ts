@@ -295,11 +295,76 @@ describe("FlashcardsManager - instantáneas FSRS para deshacer repasos", () => {
       snapshot
     )).toBe(true);
     expect(restored).toContain("image-occlusions:: 0.1,0.1,0.2,0.2,#ff0000");
+    // Las instantáneas antiguas sin `state` se restauran como Learning porque
+    // conservan el paso de aprendizaje.
+    expect(restored).toContain("card-state:: 1");
   });
 
   it("detecta programaciones distintas para no pisar cambios de otro dispositivo", () => {
     const first = FlashcardsManager.readScheduleSnapshot(reviewedContent);
     const second = { ...first, reps: 2, lastReviewDate: "2026-10-25T10:00:00.000Z" };
     expect(FlashcardsManager.scheduleSnapshotsEqual(first, second)).toBe(false);
+  });
+});
+
+describe("FlashcardsManager - persistencia del estado FSRS", () => {
+  const learningContent = [
+    "Pregunta :: Respuesta #card",
+    "card-s:: 3.71",
+    "card-d:: 5.16",
+    "card-reps:: 1",
+    "card-lapses:: 0",
+    "last-reviewed:: 2020-01-01T00:00:00.000Z",
+    "interval-days:: 0.006944444444444444",
+    "ease-factor:: 2.5",
+    "due-date:: 2020-01-01T00:10:00.000Z",
+    "card-state:: 1",
+    "card-learn-step:: 1",
+  ].join("\n");
+
+  it("conserva Learning y el paso al recargar la bóveda", () => {
+    const manager = new FlashcardsManager();
+    manager.scanVault([makePage("learning", "Aprendizaje", learningContent)], "new-first");
+
+    const card = manager.getCurrentCard();
+    expect(card?.fsrs).toMatchObject({ state: 1, learningStep: 1 });
+  });
+
+  it("migra tarjetas antiguas con card-learn-step a Learning", () => {
+    const legacy = learningContent
+      .split("\n")
+      .filter((line) => !line.startsWith("card-state::"))
+      .join("\n");
+    const manager = new FlashcardsManager();
+    manager.scanVault([makePage("legacy", "Antigua", legacy)], "new-first");
+
+    const card = manager.getCurrentCard();
+    expect(card?.fsrs).toMatchObject({ state: 1, learningStep: 1 });
+  });
+
+  it("escribe card-state al programar y lo elimina al borrar el progreso", () => {
+    const updated = FlashcardsManager.updateBlockFSRS(
+      "Pregunta :: Respuesta #card",
+      {
+        stability: 3.71,
+        difficulty: 5.16,
+        reps: 1,
+        lapses: 0,
+        state: 1,
+        learningStep: 1,
+        lastReviewDate: "2026-10-25T10:00:00.000Z",
+      },
+      0.006944444444444444,
+      2.5
+    );
+
+    expect(updated).toContain("card-state:: 1");
+    expect(updated).toContain("card-learn-step:: 1");
+    expect(FlashcardsManager.readScheduleSnapshot(updated).state).toBe(1);
+
+    const cleared = FlashcardsManager.clearFSRSProgress(updated);
+    expect(cleared).not.toContain("card-state::");
+    expect(cleared).not.toContain("card-learn-step::");
+    expect(cleared).toBe("Pregunta :: Respuesta #card");
   });
 });

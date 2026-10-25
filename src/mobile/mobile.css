@@ -1171,6 +1171,58 @@ body.mobile-review-body {
   right: 8px;
 }
 
+.mobile-learning-toggle {
+  grid-template-columns: clamp(38px, calc(20px * var(--mobile-font-scale, 1)), 46px) minmax(0, 1fr) auto;
+}
+
+.mobile-learning-toggle:focus-visible {
+  outline: 2px solid var(--mobile-accent);
+  outline-offset: 2px;
+}
+
+.mobile-learning-toggle .mobile-switch {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  position: relative;
+  align-self: center;
+  justify-self: end;
+  width: 46px;
+  height: 26px;
+  border: 1px solid color-mix(in srgb, #ef4444 60%, var(--mobile-border));
+  border-radius: 999px;
+  background: #ef4444;
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.18);
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+
+.mobile-learning-toggle .mobile-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.35);
+  transition: transform 160ms ease;
+}
+
+.mobile-learning-toggle.is-active .mobile-switch,
+.mobile-learning-toggle[aria-checked="true"] .mobile-switch {
+  border-color: color-mix(in srgb, #22c55e 65%, var(--mobile-border));
+  background: #22c55e;
+}
+
+.mobile-learning-toggle.is-active .mobile-switch::after,
+.mobile-learning-toggle[aria-checked="true"] .mobile-switch::after {
+  transform: translateX(20px);
+}
+
+.mobile-review.is-learning-mode .mobile-card-fsrs {
+  color: color-mix(in srgb, #f59e0b 70%, var(--mobile-text));
+}
+
 .mobile-settings-editor {
   width: min(560px, 100%);
 }

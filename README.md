@@ -22,7 +22,7 @@ The current frontend uses neither React nor Tailwind CSS.
 - **Markdown:** renders inline formatting for bold, italics, underline, highlight and wikilinks. Wikilinks let you open pages and look up backlinks.
 - **Inline tags:** `#tag` labels are highlighted with a pill in the theme's accent color.
 - **Tables:** tables are stored as native Markdown; Cloze text `==...==` also works inside table cells. Includes full graphical editing with a context menu to add/remove rows and columns, plus drag-and-drop reordering of rows and columns.
-- **Flashcards:** basic, Cloze and image occlusion cards with FSRS-4.5 scheduling; includes focus mode, a Pomodoro timer, review statistics and a progress visualization that grows with your practice. New cards go through a learning phase (short fixed steps: 1 min, 10 min, 1 day) before graduating to FSRS review, avoiding wide initial interval jumps that act as false positives. From the Flashcards settings, reviews can be filtered by note (each note acts as a deck with its own cards) so you don't review everything at once.
+- **Flashcards:** basic, Cloze and image occlusion cards with FSRS-4.5 scheduling; includes focus mode, a Pomodoro timer, review statistics and a progress visualization that grows with your practice. New cards go through a learning phase (short fixed steps: 1 min, 10 min) before graduating to FSRS review, avoiding wide initial interval jumps that act as false positives; the learning state is persisted so a card does not jump back to Review after reloading. From the Flashcards settings, reviews can be filtered by note (each note acts as a deck with its own cards) so you don't review everything at once.
 - **Image occlusion:** draw rectangles, ellipses and polygons, move, resize and rotate areas, add hints, and keep those transformations in the block's Markdown metadata.
 - **Images:** supports PNG, JPG/JPEG, WebP, SVG, GIF and BMP. Inserted images are saved to the vault's `assets/` folder.
 - **Kanban tasks:** sort tasks as pending, in progress or completed; move them between columns and hide the completed ones.
@@ -171,6 +171,7 @@ records are filed there too.
 | [docs/2026-10-25-fix-layout-review.md](docs/2026-10-25-fix-layout-review.md) | Review card layout, hidden scrollbar, cloze presentation, Android safe-area and accent separator fixes, with verification notes |
 | [docs/2026-10-25-ui-repaso-tipografia-atajos.md](docs/2026-10-25-ui-repaso-tipografia-atajos.md) | Review-mode entry, SVG menu icons, 15 px UI with em-based card typography, instant view switching and double-Enter outdent shortcut |
 | [docs/2026-10-25-auditoria-actualizaciones.md](docs/2026-10-25-auditoria-actualizaciones.md) | Updater threat model: manifest and package tampering, MITM, secrets, Android permissions and residual risks |
+| [docs/2026-10-25-fsrs-aprendizaje.md](docs/2026-10-25-fsrs-aprendizaje.md) | Official FSRS-4.5 formulas, learning/relearning steps, persisted card state and practice-only Learning mode with verification notes |
 
 ## Tauri application
 

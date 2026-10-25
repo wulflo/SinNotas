@@ -1,6 +1,6 @@
 import { Flashcard, PageData, BlockNode, FlashcardType, ImageOcclusionRegion } from "../types";
 import { getAllBlocksFlat } from "../editor/tree-engine";
-import { FSRSEngine, FSRSItem, FSRSRating } from "../editor/fsrs";
+import { CardState, FSRSEngine, FSRSItem, FSRSRating } from "../editor/fsrs";
 import {
   isSystemPropertyLine,
   renderMarkdownToHtml,
@@ -43,7 +43,21 @@ export interface CardScheduleSnapshot {
   intervalDays?: number;
   easeFactor?: number;
   dueDate?: string;
+  state?: CardState;
   learningStep?: number;
+}
+
+/**
+ * Reconstruye el estado de una instantánea antigua que aún no guardaba
+ * `card-state`. Las tarjetas con paso de aprendizaje son Learning, las que ya
+ * tienen repasos son Review y el resto New.
+ */
+function inferSnapshotState(snapshot: CardScheduleSnapshot): CardState | undefined {
+  if (snapshot.state !== undefined) return snapshot.state;
+  if (!snapshot.lastReviewDate) return undefined;
+  if (snapshot.learningStep !== undefined) return 1;
+  if (snapshot.reps !== undefined) return snapshot.reps > 0 ? 2 : 0;
+  return 2;
 }
 
 /**
@@ -138,6 +152,7 @@ export class FlashcardsManager {
     const repsMatch = content.match(/card-reps::\s*(\d+)/i);
     const lapsesMatch = content.match(/card-lapses::\s*(\d+)/i);
     const lastReviewedMatch = content.match(/last-reviewed::\s*(\S+)/i);
+    const stateMatch = content.match(/card-state::\s*([0-3])/i);
     const learningStepMatch = content.match(/card-learn-step::\s*(\d+)/i);
 
     const stability = sMatch ? parseFloat(sMatch[1]) : 0;
@@ -146,12 +161,23 @@ export class FlashcardsManager {
     const lapses = lapsesMatch ? parseInt(lapsesMatch[1], 10) : 0;
     const learningStep = learningStepMatch ? parseInt(learningStepMatch[1], 10) : undefined;
 
+    // Las tarjetas antiguas no guardaban `card-state`. Si tienen un paso de
+    // aprendizaje, hay que reconstruir el estado Learning; antes se infería
+    // Review en cuanto reps > 0 y la tarjeta saltaba de fase al recargar.
+    const state: CardState = stateMatch
+      ? (Number(stateMatch[1]) as CardState)
+      : learningStep !== undefined && (reps > 0 || lastReviewedMatch)
+        ? 1
+        : reps === 0
+          ? 0
+          : 2;
+
     return {
       stability: stability || 0.4,
       difficulty: difficulty || 5.0,
       reps,
       lapses,
-      state: reps === 0 ? 0 : 2,
+      state,
       ...(lastReviewedMatch ? { lastReviewDate: lastReviewedMatch[1] } : {}),
       ...(learningStep !== undefined ? { learningStep } : {}),
     };
@@ -231,7 +257,7 @@ export class FlashcardsManager {
     return content
       .split(/\r?\n/)
       .filter((line) =>
-        !/^(?:card-s|card-d|card-reps|card-lapses|card-last-interval|last-reviewed|interval-days|ease-factor|due-date|card-learn-step)::/i.test(
+        !/^(?:card-s|card-d|card-reps|card-lapses|card-last-interval|last-reviewed|interval-days|ease-factor|due-date|card-state|card-learn-step)::/i.test(
           line.trim()
         )
       )
@@ -302,6 +328,7 @@ export class FlashcardsManager {
       intervalDays: readNumber(/(?:interval-days|card-last-interval)::\s*([\d.]+)/i),
       easeFactor: readNumber(/ease-factor::\s*([\d.]+)/i),
       dueDate: readText(/due-date::\s*(\S+)/i),
+      state: readNumber(/card-state::\s*([0-3])/i) as CardState | undefined,
       learningStep: readNumber(/card-learn-step::\s*(\d+)/i),
     };
 
@@ -326,12 +353,16 @@ export class FlashcardsManager {
       .replace(/\n?interval-days::[^\n]*/gi, "")
       .replace(/\n?ease-factor::[^\n]*/gi, "")
       .replace(/\n?due-date::[^\n]*/gi, "")
+      .replace(/\n?card-state::[^\n]*/gi, "")
       .replace(/\n?card-learn-step::[^\n]*/gi, "")
       .trim();
 
     // Una tarjeta nueva no tiene last-reviewed: se queda sin programación.
     if (!snapshot.lastReviewDate) return cleaned;
 
+    // Los diarios antiguos no guardaban `state`; se reconstruye para que
+    // deshacer un repaso no pierda la fase Learning/Relearning.
+    const state = inferSnapshotState(snapshot) ?? 0;
     const lines = [
       `card-s:: ${snapshot.stability ?? 0.4}`,
       `card-d:: ${snapshot.difficulty ?? 5}`,
@@ -341,6 +372,7 @@ export class FlashcardsManager {
       `interval-days:: ${snapshot.intervalDays ?? 0}`,
       `ease-factor:: ${snapshot.easeFactor ?? 2.5}`,
       `due-date:: ${snapshot.dueDate ?? snapshot.lastReviewDate}`,
+      `card-state:: ${state}`,
     ];
     if (snapshot.learningStep !== undefined) {
       lines.push(`card-learn-step:: ${snapshot.learningStep}`);
@@ -362,6 +394,7 @@ export class FlashcardsManager {
       intervalDays: snapshot.intervalDays ?? null,
       easeFactor: snapshot.easeFactor ?? null,
       dueDate: snapshot.dueDate ?? null,
+      state: inferSnapshotState(snapshot) ?? null,
       learningStep: snapshot.learningStep ?? null,
     });
     return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
@@ -385,11 +418,13 @@ export class FlashcardsManager {
       .replace(/\n?interval-days::[^\n]*/gi, "")
       .replace(/\n?ease-factor::[^\n]*/gi, "")
       .replace(/\n?due-date::[^\n]*/gi, "")
+      .replace(/\n?card-state::[^\n]*/gi, "")
+      .replace(/\n?card-learn-step::[^\n]*/gi, "")
       .trim();
 
     const lastReviewed = fsrs.lastReviewDate || new Date().toISOString();
     const dueDate = new Date(Date.parse(lastReviewed) + intervalDays * 86_400_000).toISOString();
-    const props = `\ncard-s:: ${fsrs.stability}\ncard-d:: ${fsrs.difficulty}\ncard-reps:: ${fsrs.reps}\ncard-lapses:: ${fsrs.lapses}\nlast-reviewed:: ${lastReviewed}\ninterval-days:: ${intervalDays}\nease-factor:: ${easeFactor}\ndue-date:: ${dueDate}${fsrs.learningStep !== undefined ? `\ncard-learn-step:: ${fsrs.learningStep}` : ""}`;
+    const props = `\ncard-s:: ${fsrs.stability}\ncard-d:: ${fsrs.difficulty}\ncard-reps:: ${fsrs.reps}\ncard-lapses:: ${fsrs.lapses}\nlast-reviewed:: ${lastReviewed}\ninterval-days:: ${intervalDays}\nease-factor:: ${easeFactor}\ndue-date:: ${dueDate}\ncard-state:: ${fsrs.state}${fsrs.learningStep !== undefined ? `\ncard-learn-step:: ${fsrs.learningStep}` : ""}`;
     return cleaned + props;
   }
 

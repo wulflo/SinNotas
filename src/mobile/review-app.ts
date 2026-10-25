@@ -82,6 +82,7 @@ interface OcclusionDragState {
 const ACCENT_STORAGE_KEY = "sinnotas-accent";
 const THEME_STORAGE_KEY = "sinnotas-theme";
 const FLASHCARD_PAGES_STORAGE_KEY = "sinnotas-flashcard-pages";
+const LEARNING_MODE_STORAGE_KEY = "sinnotas-learning-mode";
 const DEFAULT_ACCENT = "teal" as const;
 type MobileTheme = "light" | "dark";
 const ACCENT_COLORS = [
@@ -240,6 +241,7 @@ class MobileReviewApp {
   private notesDraft = new Map<string, boolean>();
   private toastTimer: number | null = null;
   private busy = false;
+  private learningMode = false;
   private imageRequest = 0;
   private updateUiReady = false;
   private lastUpdateStatus: UpdateState["status"] = "idle";
@@ -271,6 +273,7 @@ class MobileReviewApp {
     notesSheet: HTMLElement;
     notesSearchInput: HTMLInputElement;
     notesList: HTMLElement;
+    learningToggle: HTMLButtonElement;
     editor: HTMLElement;
     questionField: HTMLElement;
     answerField: HTMLElement;
@@ -523,10 +526,11 @@ class MobileReviewApp {
             <button class="mobile-icon-button" type="button" data-action="close-drawer" aria-label="Cerrar menú">${MOBILE_ICONS.close}</button>
           </header>
           <div class="mobile-drawer-actions">
-            <button class="mobile-drawer-action" type="button" data-action="review">
+            <button class="mobile-drawer-action mobile-learning-toggle" type="button" data-action="toggle-learning" role="switch" aria-checked="false" aria-label="Aprendizaje">
               <span aria-hidden="true">${MOBILE_ICONS.cards}</span>
-              <strong>Repaso</strong>
-              <small>Volver a la tarjeta actual</small>
+              <strong>Aprendizaje</strong>
+              <small>Repasa sin guardar el progreso FSRS</small>
+              <span class="mobile-switch" aria-hidden="true"></span>
             </button>
             <button class="mobile-drawer-action mobile-notes-button" type="button" data-action="notes">
               <span aria-hidden="true">${MOBILE_ICONS.notes}</span>
@@ -577,6 +581,7 @@ class MobileReviewApp {
       notesSheet: requireElement(this.root, "[data-notes-sheet]"),
       notesSearchInput: requireElement(this.root, "[data-notes-search]"),
       notesList: requireElement(this.root, "[data-notes-list]"),
+      learningToggle: requireElement(this.root, "[data-action='toggle-learning']"),
       editor: requireElement(this.root, "[data-editor]"),
       questionField: requireElement(this.root, "[data-question-field]"),
       answerField: requireElement(this.root, "[data-answer-field]"),
@@ -630,6 +635,8 @@ class MobileReviewApp {
     this.applyTheme(this.readStoredTheme() ?? this.systemTheme(), false);
     this.applyAccent(this.readStoredAccent(), false);
     this.applyStoredFontSizes();
+    this.learningMode = this.readStoredLearningMode();
+    this.updateLearningSwitch();
     this.updateLanguageButtons();
     this.bindEvents();
     this.initUpdateSettings();
@@ -666,8 +673,10 @@ class MobileReviewApp {
         window.location.reload();
       } else if (action === "menu") {
         this.openDrawer();
-      } else if (action === "close-drawer" || action === "review") {
+      } else if (action === "close-drawer") {
         this.closeDrawer();
+      } else if (action === "toggle-learning") {
+        this.setLearningMode(!this.learningMode);
       } else if (action === "settings") {
         this.openSettings();
       } else if (action === "close-settings") {
@@ -1142,6 +1151,14 @@ class MobileReviewApp {
     const result = this.manager.rate(rating);
     if (!result) return;
 
+    // En modo Aprendizaje la tarjeta avanza en memoria, pero no se toca la
+    // bóveda ni el diario de repasos: es una sesión de práctica sin FSRS.
+    if (this.learningMode) {
+      this.render();
+      this.updateHistoryButtons();
+      return;
+    }
+
     const page = this.pages.find((candidate) => candidate.title === result.card.pageTitle);
     if (!page) {
       this.showToast("La nota de esta tarjeta ya no está disponible.");
@@ -1598,6 +1615,37 @@ class MobileReviewApp {
     this.refs.fontSizeValue.value = `${sizes.ui} px`;
   }
 
+  private readStoredLearningMode(): boolean {
+    try {
+      return localStorage.getItem(LEARNING_MODE_STORAGE_KEY) === "true";
+    } catch {
+      // Si el WebView bloquea localStorage, el modo sigue funcionando en memoria.
+      return false;
+    }
+  }
+
+  private setLearningMode(active: boolean): void {
+    this.learningMode = active;
+    try {
+      localStorage.setItem(LEARNING_MODE_STORAGE_KEY, String(active));
+    } catch {
+      // El cambio de modo sigue funcionando aunque no se pueda persistir.
+    }
+    this.updateLearningSwitch();
+    this.render();
+    this.showToast(
+      active
+        ? "Modo aprendizaje activado: los repasos no se guardan."
+        : "Modo aprendizaje desactivado: los repasos se guardan."
+    );
+  }
+
+  private updateLearningSwitch(): void {
+    this.refs.learningToggle.setAttribute("aria-checked", String(this.learningMode));
+    this.refs.learningToggle.classList.toggle("is-active", this.learningMode);
+    this.root.classList.toggle("is-learning-mode", this.learningMode);
+  }
+
   private updateLanguageButtons(): void {
     const preference = currentLanguagePreference();
     this.refs.settingsSheet
@@ -1616,8 +1664,7 @@ class MobileReviewApp {
       .querySelector<HTMLElement>("[data-action='menu']")
       ?.setAttribute("aria-expanded", "true");
     this.syncOverlayState();
-    const first = this.refs.drawer.querySelector<HTMLButtonElement>("[data-action='review']");
-    window.setTimeout(() => first?.focus(), 30);
+    window.setTimeout(() => this.refs.learningToggle.focus(), 30);
   }
 
   private closeDrawer(): void {
@@ -1983,7 +2030,9 @@ class MobileReviewApp {
         ? "CLOZE"
         : "BÁSICA";
     this.refs.source.textContent = card.pageTitle;
-    this.refs.fsrs.textContent = `S ${card.fsrs.stability}d · D ${card.fsrs.difficulty} · ${card.fsrs.reps} reps`;
+    this.refs.fsrs.textContent = this.learningMode
+      ? "Aprendizaje · sin guardar"
+      : `S ${card.fsrs.stability}d · D ${card.fsrs.difficulty} · ${card.fsrs.reps} reps`;
 
     if (card.cardType === "image-occlusion") {
       this.refs.question.appendChild(this.createImagePreview(card, revealed));

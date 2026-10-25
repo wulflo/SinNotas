@@ -57,6 +57,37 @@ describe("diario de repasos compartido", () => {
     expect(parseReviewProgress(null).entries).toEqual([]);
   });
 
+  it("conserva el estado FSRS válido y descarta valores fuera de rango", () => {
+    const parsed = parseReviewProgress(
+      JSON.stringify({
+        version: 1,
+        entries: [
+          makeEvent({
+            id: "learning",
+            after: {
+              stability: 3.71,
+              difficulty: 5.16,
+              reps: 1,
+              lapses: 0,
+              lastReviewDate: "2026-10-24T10:00:00.000Z",
+              intervalDays: 10 / 1440,
+              state: 1,
+              learningStep: 1,
+            },
+          }),
+          makeEvent({
+            id: "invalid-state",
+            after: { reps: 2, state: 9 as never },
+          }),
+        ],
+      })
+    );
+
+    expect(parsed.entries).toHaveLength(2);
+    expect(parsed.entries[0].after).toMatchObject({ state: 1, learningStep: 1 });
+    expect(parsed.entries[1].after.state).toBeUndefined();
+  });
+
   it("une historiales de dos equipos sin duplicar repasos", () => {
     const left: ReviewProgressFile = {
       version: 1,
