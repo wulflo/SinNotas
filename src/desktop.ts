@@ -11649,6 +11649,46 @@ function scheduleAfterFirstPaint(task: () => void, delay = 0): void {
   }
 }
 
+/**
+ * Pinta una vez las vistas que aún no se han abierto, en tiempo ocioso. Así el
+ * primer cambio de vista no paga a la vez el escaneo de datos y la creación
+ * del DOM. No cambia la vista activa ni el historial de navegación.
+ */
+function schedulePrewarmHiddenViews(): void {
+  if (!desktopReady) return;
+
+  const tasks: Array<{ view: ViewType; run: () => void }> = [
+    { view: "journals", run: renderJournalsView },
+    { view: "all-pages", run: renderAllPagesView },
+    { view: "kanban", run: renderKanbanBoard },
+  ];
+  const pending = tasks.filter((task) => task.view !== currentView);
+
+  const scheduleNext = (): void => {
+    if (pending.length === 0) return;
+    if (typeof window.requestIdleCallback === "function") {
+      window.requestIdleCallback(runNext, { timeout: 3000 });
+    } else {
+      window.setTimeout(runNext, 120);
+    }
+  };
+
+  const runNext = (): void => {
+    const task = pending.shift();
+    if (!task) return;
+    if (task.view !== currentView) {
+      try {
+        task.run();
+      } catch (error) {
+        console.error(`No se pudo precalentar la vista ${task.view}:`, error);
+      }
+    }
+    scheduleNext();
+  };
+
+  scheduleNext();
+}
+
 async function initializeDesktopApp(): Promise<void> {
   initThemeAndTypography();
   initUpdateSettings();
@@ -11716,6 +11756,9 @@ async function initializeDesktopApp(): Promise<void> {
       .catch((error) => {
         console.error("No se pudo inicializar el subsistema de snapshots:", error);
       });
+
+    // Precalienta las vistas ocultas una vez que la app ya responde.
+    window.setTimeout(() => schedulePrewarmHiddenViews(), 2500);
 
     // El arrastre de imágenes solo se necesita cuando el usuario interactúa.
     if (isTauri()) {

@@ -54,9 +54,12 @@
         background: color-mix(in srgb, var(--ls-text-secondary, #a6adc8) 15%, transparent);
       }
       #app-splash .app-splash-bar-fill {
+        width: 100%;
         height: 100%;
         border-radius: 2px;
         background: var(--ls-accent, #89b4fa);
+        transform-origin: left center;
+        will-change: transform;
         animation: splash-bar 1.2s ease-in-out infinite;
       }
       @keyframes splash-fade-in {
@@ -64,9 +67,9 @@
         to { opacity: 1; transform: scale(1); }
       }
       @keyframes splash-bar {
-        0% { width: 0%; transform: translateX(0); }
-        50% { width: 100%; transform: translateX(0); }
-        100% { width: 100%; transform: translateX(100%); }
+        0% { transform: scaleX(0); }
+        50% { transform: scaleX(1); }
+        100% { transform: translateX(100%) scaleX(1); }
       }
     </style>
   </head>

@@ -278,8 +278,8 @@ export class VirtualList<T> {
       } else if (this.rowIndexes.get(key) !== index) {
         this.rowIndexes.set(key, index);
       }
-      row.style.top = `${this.offsets[index]}px`;
     }
+    this.positionRows();
 
     const anchorIndex = findIndexAtOffset(this.offsets, Math.max(0, visibleTop));
     const oldAnchorOffset = this.offsets[anchorIndex] ?? 0;
@@ -299,6 +299,9 @@ export class VirtualList<T> {
     if (changed) {
       this.offsets = buildOffsets(this.heights);
       this.spacer.style.height = `${this.offsets[this.offsets.length - 1]}px`;
+      // Recoloca antes del siguiente frame: si cambia la altura de una fila,
+      // las de abajo deben moverse en el mismo pintado y no solaparse.
+      this.positionRows();
       // Evita el salto visual cuando cambia la altura de filas ya visibles.
       const nextAnchorOffset = this.offsets[anchorIndex] ?? oldAnchorOffset;
       if (nextAnchorOffset !== oldAnchorOffset) {
@@ -312,6 +315,15 @@ export class VirtualList<T> {
         this.overscan
       );
       if (nextRange.start !== start || nextRange.end !== end) this.scheduleRender();
+    }
+  }
+
+  /** Aplica la posición actual a todas las filas montadas. */
+  private positionRows(): void {
+    for (const [key, row] of this.rows) {
+      const index = this.rowIndexes.get(key);
+      if (index === undefined) continue;
+      row.style.top = `${this.offsets[index]}px`;
     }
   }
 
