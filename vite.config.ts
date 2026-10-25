@@ -35,6 +35,9 @@ export default defineConfig({
     // Android 13+ usa WebView Chromium 108+; ES2021 es seguro y reduce el
     // tamaño del bundle frente a transformaciones legacy.
     target: "es2021",
+    sourcemap: false,
+    minify: "esbuild",
+    chunkSizeWarningLimit: 1000,
     rollupOptions: {
       output: {
         manualChunks(id) {

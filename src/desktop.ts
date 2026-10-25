@@ -654,31 +654,32 @@ const btnConceptMapZoomIn = document.getElementById("btn-concept-map-zoom-in") a
 const btnConceptMapZoomOut = document.getElementById("btn-concept-map-zoom-out") as HTMLButtonElement;
 const btnConceptMapReset = document.getElementById("btn-concept-map-reset") as HTMLButtonElement;
 const btnConceptMap = document.getElementById("btn-concept-map") as HTMLButtonElement;
+const btnEditorHelp = document.getElementById("btn-editor-help") as HTMLButtonElement | null;
+const editorHelpOverlay = document.getElementById("editor-help-overlay") as HTMLDivElement | null;
+const btnCloseEditorHelp = document.getElementById("btn-close-editor-help") as HTMLButtonElement | null;
 const conceptMapView = new ConceptMapView("concept-map-canvas", "concept-map-canvas-wrap", "concept-map-empty");
 
-const modalOverlays = [
-  settingsOverlay,
-  historyModalOverlay,
-  conceptMapOverlay,
-  appDialogOverlay,
-  vaultManagerOverlay,
-  imageOcclusionOverlay,
-];
+const modalOverlays: HTMLElement[] = [];
+[settingsOverlay, historyModalOverlay, conceptMapOverlay, editorHelpOverlay, appDialogOverlay, vaultManagerOverlay, imageOcclusionOverlay].forEach((o) => {
+  if (o) modalOverlays.push(o);
+});
 modalOverlays.forEach((overlay) => {
   overlay.hidden = true;
   overlay.remove();
 });
 
 function hasMountedModal(): boolean {
-  return modalOverlays.some((overlay) => overlay.isConnected);
+  return modalOverlays.some((overlay) => overlay && overlay.isConnected);
 }
 
-function mountOverlay(overlay: HTMLElement): void {
+function mountOverlay(overlay: HTMLElement | null): void {
+  if (!overlay) return;
   if (!overlay.isConnected) document.body.appendChild(overlay);
   overlay.hidden = false;
 }
 
-function unmountOverlay(overlay: HTMLElement): void {
+function unmountOverlay(overlay: HTMLElement | null): void {
+  if (!overlay) return;
   overlay.hidden = true;
   overlay.remove();
 }
@@ -2190,6 +2191,26 @@ conceptMapOverlay.addEventListener("click", (event) => {
   if (event.target === conceptMapOverlay) closeConceptMap();
 });
 
+if (btnEditorHelp && editorHelpOverlay) {
+  btnEditorHelp.addEventListener("click", () => {
+    if (editorHelpOverlay.hidden) {
+      mountOverlay(editorHelpOverlay);
+    } else {
+      unmountOverlay(editorHelpOverlay);
+    }
+  });
+}
+if (btnCloseEditorHelp && editorHelpOverlay) {
+  btnCloseEditorHelp.addEventListener("click", () => {
+    unmountOverlay(editorHelpOverlay);
+  });
+  editorHelpOverlay.addEventListener("click", (event) => {
+    if (event.target === editorHelpOverlay) {
+      unmountOverlay(editorHelpOverlay);
+    }
+  });
+}
+
 function setPageExportMenuOpen(open: boolean): void {
   pageExportDropdown.hidden = !open;
   pageExportToggle.setAttribute("aria-expanded", String(open));
@@ -3601,11 +3622,47 @@ function fileUrlToLocalPath(source: string): string | null {
   }
 }
 
+function isSafeImageUrl(urlString: string): boolean {
+  try {
+    const url = new URL(urlString);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return false;
+    }
+    const hostname = url.hostname.toLowerCase();
+    if (
+      hostname === "localhost" ||
+      hostname === "0.0.0.0" ||
+      hostname.startsWith("127.") ||
+      hostname.startsWith("192.168.") ||
+      hostname.startsWith("10.") ||
+      hostname.startsWith("169.254.") ||
+      hostname === "[::1]" ||
+      hostname === "::1" ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname) ||
+      hostname.endsWith(".local")
+    ) {
+      return false;
+    }
+    if (/^\[.*\]$/.test(hostname)) {
+      // Basic check for IPv6 loopback/private not fully covered, reject for safety
+      if (hostname.includes("::1") || hostname.includes("fc") || hostname.includes("fd")) {
+        return false;
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function imageSourceToFile(source: string): Promise<File | null> {
   const trimmed = source.trim();
   if (!trimmed) return null;
   if (/^data:image\//i.test(trimmed)) return dataUrlToImageFile(trimmed);
   if (!/^(?:https?:|blob:)/i.test(trimmed)) return null;
+  if (!isSafeImageUrl(trimmed)) {
+    throw new Error("URL no permitida por motivos de seguridad.");
+  }
 
   const response = await fetch(trimmed);
   if (!response.ok) throw new Error(`La imagen respondió con ${response.status}.`);
@@ -3890,7 +3947,18 @@ function clipboardHtmlImageSource(clipboard: DataTransfer | null): string | null
   const html = clipboard?.getData("text/html");
   if (html) {
     try {
-      const documentFragment = new DOMParser().parseFromString(html, "text/html");
+      let sanitizedHtml = html;
+      try {
+        const DOMPurifyModule = (window as any).DOMPurify;
+        if (DOMPurifyModule && typeof DOMPurifyModule.sanitize === "function") {
+          sanitizedHtml = DOMPurifyModule.sanitize(html, { ALLOWED_TAGS: ["img"], ALLOWED_ATTR: ["src", "srcset"], FORBID_TAGS: ["script", "iframe", "object", "embed"], FORBID_ATTR: ["onerror", "onload", "onclick"] });
+        } else {
+          sanitizedHtml = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<[^>]+on\w+\s*=[^>]+>/gi, (m: string) => m.replace(/on\w+\s*=[^>\s]+/gi, ""));
+        }
+      } catch {
+        sanitizedHtml = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/ on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+      }
+      const documentFragment = new DOMParser().parseFromString(sanitizedHtml, "text/html");
       const image = documentFragment.querySelector("img");
       const source = image?.getAttribute("src")?.trim()
         || image?.getAttribute("srcset")?.split(",")[0]?.trim().split(/\s+/)[0]

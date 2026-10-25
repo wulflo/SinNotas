@@ -75,7 +75,7 @@ export function splitTableRow(line: string): string[] {
 
 /** Escapa los pipes para que una celda no rompa la estructura de la tabla. */
 export function escapeTableCell(value: string): string {
-  return value.replace(/\r?\n/g, " ").replace(/\|/g, "\\|");
+  return value.replace(/\r?\n/g, " ").replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
 }
 
 function parseAlignment(cell: string): TableAlignment {

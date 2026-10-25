@@ -177,7 +177,7 @@ function elementToLines(element: MinimalDomElement, depth: number): string[] {
     )) {
       const cells = (row as MinimalDomElement).childNodes
         .filter((cell) => cell.nodeType === ELEMENT_NODE)
-        .map((cell) => childrenToInline(cell.childNodes).replace(/\|/g, "\\|").trim() || " ");
+        .map((cell) => childrenToInline(cell.childNodes).replace(/\\/g, "\\\\").replace(/\|/g, "\\|").trim() || " ");
       if (cells.length) lines.push(`| ${cells.join(" | ")} |`);
     }
     return lines;
@@ -193,7 +193,7 @@ function elementToLines(element: MinimalDomElement, depth: number): string[] {
   if (tag === "TR") {
     const cells = children
       .filter((cell) => cell.nodeType === ELEMENT_NODE)
-      .map((cell) => childrenToInline(cell.childNodes).replace(/\|/g, "\\|").trim() || " ");
+      .map((cell) => childrenToInline(cell.childNodes).replace(/\\/g, "\\\\").replace(/\|/g, "\\|").trim() || " ");
     return cells.length ? [`| ${cells.join(" | ")} |`] : [];
   }
 
@@ -264,11 +264,40 @@ export function sanitizeDomNodeTree(root: MinimalDomNode): string {
  * devuelve Markdown plano sanitizado o "" si el HTML es inválido o demasiado
  * grande. El llamador recurre a `text/plain` cuando el resultado es "".
  */
+function sanitizeHtmlString(html: string): string {
+  try {
+    // Try to use DOMPurify if available in global/browser context
+    // @ts-ignore
+    const DOMPurifyGlobal = typeof window !== "undefined" ? (window as any).DOMPurify : undefined;
+    if (DOMPurifyGlobal && typeof DOMPurifyGlobal.sanitize === "function") {
+      return DOMPurifyGlobal.sanitize(html, {
+        ALLOWED_TAGS: ["p", "div", "br", "b", "strong", "i", "em", "u", "s", "del", "strike", "code", "pre", "ul", "ol", "li", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "table", "thead", "tbody", "tr", "th", "td", "span", "a", "img"],
+        ALLOWED_ATTR: [],
+        FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "input", "button", "select", "textarea"],
+        FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur", "onsubmit"]
+      });
+    }
+  } catch {
+    // ignore
+  }
+  // Fallback regex sanitization
+  let sanitized = html.replace(/<script[\s\S]*?<\/script>/gi, "");
+  sanitized = sanitized.replace(/<style[\s\S]*?<\/style>/gi, "");
+  sanitized = sanitized.replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
+  sanitized = sanitized.replace(/<object[\s\S]*?<\/object>/gi, "");
+  sanitized = sanitized.replace(/<embed[\s\S]*?>/gi, "");
+  // Remove event handlers
+  sanitized = sanitized.replace(/ on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  sanitized = sanitized.replace(/<([^>]+)\s+on\w+\s*=[^>]+>/gi, "<$1>");
+  return sanitized;
+}
+
 export function sanitizePastedHtmlToMarkdown(html: string): string {
   if (typeof DOMParser === "undefined") return "";
   if (!html) return "";
   if (html.length > MAX_PASTED_HTML_LENGTH) return "";
-  const doc = new DOMParser().parseFromString(html, "text/html");
+  const sanitized = sanitizeHtmlString(html);
+  const doc = new DOMParser().parseFromString(sanitized, "text/html");
   if (!doc?.body) return "";
   // El cuerpo real es un HTMLElement del DOM; por diseño este módulo solo
   // accede a nodeType/nodeName/textContent/childNodes de la interfaz mínima.
