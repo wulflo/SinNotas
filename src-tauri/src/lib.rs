@@ -655,10 +655,7 @@ fn revisions_file_path(root: &Path, note_path: &Path) -> Result<PathBuf, String>
         .map_err(|_| "La nota no pertenece al vault activo.".to_string())?
         .to_string_lossy()
         .replace('\\', "/");
-    Ok(root
-        .join(".sinnotas")
-        .join("revisions")
-        .join(format!("{relative}.json")))
+    resolve_vault_path(root, &format!(".sinnotas/revisions/{relative}.json"))
 }
 
 /// Lee las revisiones de una nota desde su archivo en disco.
@@ -5032,6 +5029,34 @@ mod tests {
         assert!(revisions_path.exists());
 
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn revisions_paths_reject_sinnotas_symlink_outside_the_vault() {
+        use std::os::unix::fs::symlink;
+
+        let base = std::env::temp_dir().join(format!(
+            "sinnotas-revisions-symlink-test-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let root = base.join("vault");
+        let outside = base.join("outside");
+        fs::create_dir_all(&root).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        symlink(&outside, root.join(".sinnotas")).unwrap();
+
+        let canonical_root = fs::canonicalize(&root).unwrap();
+        let note = canonical_root.join("pages/nota.md");
+
+        assert!(revisions_file_path(&canonical_root, &note).is_err());
+        assert!(!outside.join("revisions/pages/nota.md.json").exists());
+
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]
