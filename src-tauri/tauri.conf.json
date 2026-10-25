@@ -35,7 +35,7 @@
     "active": true,
     "category": "Education",
     "targets": "all",
-    "publisher": "Wulflo",
+    "publisher": "wulflo",
     "copyright": "Copyright © 2026 Wulflo",
     "shortDescription": "Editor outliner local y sistema de notas personal",
     "android": {

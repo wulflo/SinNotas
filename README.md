@@ -52,6 +52,7 @@ The current frontend uses neither React nor Tailwind CSS.
 - **Ctrl/Cmd + B:** collapse / expand the sidebar.
 - **Ctrl/Cmd + K:** quick search and quick page creation (omnibar).
 - **Up / Down arrows:** move the caret between blocks when it is at the start/end of the current block.
+- **Botón ? (Ayuda):** abre el modal con todos los atajos de teclado desde el encabezado del editor.
 
 ## Clipboard security
 

@@ -748,7 +748,7 @@ body {
   color: var(--ls-text-primary);
   text-decoration: none;
   cursor: pointer;
-  transition: background-color 0.35s ease, color 0.35s ease, transform 0.25s ease, box-shadow 0.25s ease, padding 0.25s ease;
+  transition: background-color 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), color 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), padding-left 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   user-select: none;
   font-size: var(--ls-font-size-ui);
   font-weight: 500;
@@ -1185,7 +1185,7 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease, transform 0.25s ease;
+  transition: background-color 0.35s cubic-bezier(0.25, 0.8, 0.25, 1), color 0.35s cubic-bezier(0.25, 0.8, 0.25, 1), border-color 0.35s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.35s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
   position: relative;
 }
 
