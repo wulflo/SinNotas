@@ -381,6 +381,7 @@ jobs:
               src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz
               src-tauri/target/release/bundle/appimage/*.AppImage.tar.gz.sig
               src-tauri/target/release/bundle/deb/*.deb
+              src-tauri/target/release/bundle/deb/*.deb.sig
           - name: windows
             platform: windows-latest
             args: "--bundles nsis,msi"
@@ -454,6 +455,29 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run tauri build -- --config '{"bundle":{"createUpdaterArtifacts":true}}' ${{ matrix.args }}
+
+      # Tauri firma AppImage/NSIS/MSI, pero no genera .deb.sig. El plugin
+      # updater 2.14+ sí puede instalar .deb, así que firmamos el paquete con la
+      # misma clave minisign y lo anunciamos como linux-x86_64-deb.
+      - name: Sign Linux .deb for updater
+        if: matrix.platform == 'ubuntu-22.04'
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          DEB="$(find src-tauri/target/release/bundle/deb -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          if [ -z "$DEB" ]; then
+            echo "ERROR: no se encontró el .deb para firmar." >&2
+            exit 1
+          fi
+          npx tauri signer sign "$DEB" \
+            --app-version "${GITHUB_REF_NAME#v}" \
+            --private-key "$TAURI_SIGNING_PRIVATE_KEY" \
+            --password "$TAURI_SIGNING_PRIVATE_KEY_PASSWORD"
+          test -s "$DEB.sig"
+          echo "Firma .deb generada: $DEB.sig"
 
       - name: Upload desktop artifacts
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0

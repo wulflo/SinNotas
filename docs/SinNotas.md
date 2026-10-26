@@ -1,6 +1,6 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.2.1 · **Fecha:** 2026-10-25
+**Versión:** 0.2.2 · **Fecha:** 2026-10-25
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
@@ -92,8 +92,17 @@ vuelve a aplicar el parche.
 ### Escritorio
 
 Usa el plugin nativo `updater` de Tauri. Verifica la firma minisign del paquete
-y relanza la app. En Linux solo reemplaza instalaciones AppImage; un `.deb`
-instalado debe actualizarse con el paquete nuevo.
+y relanza la app. En Linux el manifiesto publica dos destinos:
+
+- `linux-x86_64`: AppImage firmado. Lo usan las instalaciones AppImage.
+- `linux-x86_64-deb`: `.deb` firmado con la misma clave. El plugin 2.14+ lo
+  descarga, verifica la firma y lo instala con `pkexec`/`sudo`, pidiendo
+  autorización. Lo usan las instalaciones Debian/Ubuntu.
+
+La v0.2.2 es la primera release que anuncia `linux-x86_64-deb`. Por eso, una
+instalación `.deb` de 0.2.0/0.2.1 debe instalar 0.2.2 manualmente una vez; a
+partir de ahí las releases siguientes se actualizan desde la app. La firma que
+valida el updater es minisign, no una firma de paquete Debian.
 
 ### Android
 
@@ -204,7 +213,10 @@ la clave de release.
 - `.github/workflows/ci.yml`: lint/test, APK debug y APK release firmada en
   `master` o por `workflow_dispatch`. Publica artefactos, no crea releases.
 - `.github/workflows/release.yml`: se dispara con tags `v*`, genera los paquetes
-  de escritorio, la APK, `latest.json` y publica la release.
+  de escritorio, la APK, `latest.json` y publica la release. El job Linux firma
+  además el `.deb` con `tauri signer sign --app-version` y sube `.deb.sig`.
+- `scripts/prepare-release-assets.mjs` exige `linux-x86_64-deb` y falla si
+  falta el `.deb` o su firma, igual que con el resto de plataformas.
 - Secretos de firma Android: `ANDROID_KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`,
   `KEY_PASSWORD`, `KEY_ALIAS`.
 - Secretos del updater de escritorio: `TAURI_SIGNING_PRIVATE_KEY`,
@@ -213,7 +225,7 @@ la clave de release.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Versión actual: `0.2.1` (`versionCode 2001`)
+- Versión actual: `0.2.2` (`versionCode 2002`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):
@@ -228,7 +240,10 @@ la clave de release.
   `Content-Type`; requiere instalar la APK corregida manualmente una vez.
 - El `latest.json` de GitHub debe actualizarse con la versión y el SHA-256 de la
   APK publicada. Un artefacto local de CI no actualiza el manifiesto.
-- El actualizador de escritorio en Linux solo reemplaza AppImage.
+- Una instalación `.deb` de 0.2.0/0.2.1 debe instalar 0.2.2 manualmente una vez;
+  desde 0.2.2 el updater ya puede descargar e instalar el `.deb`.
+- La actualización automática de `.deb` no se probó de extremo a extremo en
+  hardware real: requiere `pkexec`/`sudo` y una instalación 0.2.2 previa.
 - Las bóvedas externas en Android dependen del acceso SAF autorizado por el
   usuario; no se interpretan URIs como rutas locales.
 - La APK Android es solo de repaso: no incluye editor completo, diarios, Kanban,
@@ -237,7 +252,7 @@ la clave de release.
 ## Verificación actual
 
 - `npx tsc --noEmit`: correcto.
-- `npm test`: **246 pruebas en 26 archivos**.
+- `npm test`: **248 pruebas en 27 archivos**.
 - CI de `master`: lint/test, APK debug y APK release firmada.
 - Firma, paquete, `versionCode`, safe area y manifiesto Android verificados con
   `apksigner` y `aapt`.

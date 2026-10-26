@@ -10,6 +10,9 @@
  *   manifiesto de Android).
  * - Genera `latest.json` con las entradas de escritorio que entiende el plugin
  *   oficial de Tauri y la entrada `android-aarch64` que consume la APK.
+ * - Publica dos entradas Linux: `linux-x86_64` para AppImage y
+ *   `linux-x86_64-deb` para instalaciones Debian/Ubuntu. El plugin elige la
+ *   variante según el tipo de bundle de la app instalada.
  * - Falla si falta una plataforma o una firma, para no publicar una release
  *   que dejaría a los usuarios sin poder actualizar.
  */
@@ -23,6 +26,7 @@ const RELEASE_BASE = `https://github.com/${REPOSITORY}/releases/download`;
 const MAX_APK_BYTES = 150 * 1024 * 1024;
 const REQUIRED_PLATFORMS = [
   "linux-x86_64",
+  "linux-x86_64-deb",
   "windows-x86_64",
   "darwin-aarch64",
   "darwin-x86_64",
@@ -156,6 +160,15 @@ if (!appImageUpdater) {
   fail("No se encontró el AppImage del actualizador (.AppImage.tar.gz ni .AppImage).");
 }
 await addUpdaterPlatform("linux-x86_64", appImageUpdater);
+
+// Linux .deb: el plugin 2.14+ instala el paquete con pkexec/sudo y verifica
+// esta misma firma minisign antes de ejecutar dpkg. La clave se usa solo en
+// el paso de firma del workflow de release.
+const debUpdater = findOne(
+  (name) => name.endsWith(".deb"),
+  "el paquete .deb del actualizador"
+);
+await addUpdaterPlatform("linux-x86_64-deb", debUpdater);
 
 // Windows: se prefiere el instalador NSIS (.exe); si no hay, MSI.
 const windowsCandidates = files.filter(
