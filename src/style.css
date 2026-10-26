@@ -2283,6 +2283,11 @@ body.no-active-page #btn-delete-page {
   display: none;
 }
 
+body.is-bullet-selecting {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
 .block-bullet-handle {
   width: 42px;
   min-width: 42px;
@@ -5864,7 +5869,22 @@ body.no-active-page #btn-delete-page {
   max-width: 100%;
   margin-left: auto;
   margin-right: auto;
+  padding-left: 1.5em;
   text-align: left;
+}
+
+.card-question li,
+.card-answer li {
+  margin: 0.18em 0;
+}
+
+/* Cada nivel anidado necesita una sangría claramente visible incluso con el
+ * tamaño grande de las flashcards; el valor por defecto del navegador es
+ * demasiado pequeño para listas profundas. */
+.card-question :is(ul, ol) :is(ul, ol),
+.card-answer :is(ul, ol) :is(ul, ol) {
+  margin: 0.2em 0;
+  padding-left: 1.75em;
 }
 
 .card-question pre,

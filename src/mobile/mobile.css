@@ -476,7 +476,18 @@ body.mobile-review-body {
 .mobile-answer ul,
 .mobile-answer ol {
   margin: 0.4em 0;
-  padding-left: 1.35em;
+  padding-left: 1.5em;
+}
+
+.mobile-question :is(ul, ol) :is(ul, ol),
+.mobile-answer :is(ul, ol) :is(ul, ol) {
+  margin: 0.2em 0;
+  padding-left: 1.75em;
+}
+
+.mobile-question li,
+.mobile-answer li {
+  margin: 0.18em 0;
 }
 
 .mobile-question code,
@@ -1659,6 +1670,62 @@ body.mobile-review-body {
   font-size: calc(12px * var(--mobile-font-scale, 1));
   font-variant-numeric: tabular-nums;
   text-align: center;
+}
+
+.mobile-vault-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--mobile-bg);
+}
+
+.mobile-vault-gate[hidden] {
+  display: none;
+}
+
+.mobile-vault-gate-card {
+  display: flex;
+  width: min(420px, 100%);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  padding: 28px 24px;
+  border: 1px solid var(--mobile-border);
+  border-radius: 24px;
+  background: var(--mobile-bg-elevated);
+  box-shadow: var(--mobile-shadow);
+  text-align: center;
+}
+
+.mobile-vault-gate-logo {
+  display: inline-flex;
+  width: 52px;
+  height: 52px;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  border-radius: 16px;
+  background: var(--mobile-accent);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.mobile-vault-gate-card h1 {
+  margin: 0;
+  color: var(--mobile-title);
+  font-size: calc(22px * var(--mobile-font-scale, 1));
+}
+
+.mobile-vault-gate-card p {
+  margin: 0;
+  color: var(--mobile-muted);
+  font-size: calc(14px * var(--mobile-font-scale, 1));
+  line-height: 1.5;
 }
 
 .mobile-toast {

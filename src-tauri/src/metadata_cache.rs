@@ -10,7 +10,8 @@
 //! Security notes:
 //! - Relative paths are validated with the same whitelist used by the rest of
 //!   the backend (`resolve_note_path`): no `..`, URIs, null bytes, reserved
-//!   folders (`chronos`, `.sinnotas`, `.git`) or temporary names.
+//!   folders (legacy `chronos`/`progress`, `.sinnotas`, `.git`) or temporary
+//!   names.
 //! - A cache file is untrusted input. Entries are re-validated and sanitized
 //!   before they can become `PageData` for the frontend.
 //! - The cache file never follows symlinks and is written atomically with a

@@ -764,7 +764,7 @@ export class VaultStore {
   }
 
   /**
-   * Restaura un snapshot desde `chronos/`. El backend guarda antes una copia
+   * Restaura un snapshot desde `.sinnotas/chronos/`. El backend guarda antes una copia
    * de seguridad del estado actual, de modo que la restauración también se
    * puede deshacer desde el historial.
    */

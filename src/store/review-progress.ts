@@ -6,11 +6,11 @@ import type { CardScheduleSnapshot } from "../views/flashcards-manager";
 /**
  * Diario de repasos compartido por escritorio y Android.
  *
- * Vive en `progress/reviews.json` dentro de la bóveda (nunca en localStorage,
- * salvo el modo web de demostración). Así el historial de repasos viaja con
- * las notas cuando el usuario cambia de equipo. El archivo no contiene el
- * texto de las tarjetas: solo identidad estable, valoración y las propiedades
- * FSRS anteriores/posteriores necesarias para deshacer o rehacer.
+ * Vive en `.sinnotas/progress/reviews.json` dentro de la bóveda (nunca en
+ * localStorage, salvo el modo web de demostración). Así el historial de repasos
+ * viaja con las notas cuando el usuario cambia de equipo. El archivo no
+ * contiene el texto de las tarjetas: solo identidad estable, valoración y las
+ * propiedades FSRS anteriores/posteriores necesarias para deshacer o rehacer.
  */
 
 export type ReviewProgressState = "applied" | "undone";
@@ -59,6 +59,9 @@ const DEVICE_ID_STORAGE_KEY = "sinnotas-review-device-id";
 const MAX_ENTRIES = 4000;
 /** Deja margen frente al límite de 5 MB del backend. */
 const MAX_FILE_BYTES = 4_500_000;
+/** El diario compartido no conserva repasos de hace más de un año. */
+const MAX_AGE_DAYS = 365;
+const MAX_AGE_MS = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
 const MAX_TEXT_LENGTH = 4096;
 
 function emptyFile(): ReviewProgressFile {
@@ -72,13 +75,28 @@ function utf8Size(value: string): number {
   return value.length * 3;
 }
 
+/** Descarta repasos que ya no aportan al historial de deshacer/rehacer. */
+function pruneExpiredEntries(
+  entries: ReviewProgressEvent[],
+  now = Date.now()
+): ReviewProgressEvent[] {
+  const cutoff = now - MAX_AGE_MS;
+  return entries.filter((entry) => {
+    const at = Date.parse(entry.at);
+    return Number.isFinite(at) && at >= cutoff;
+  });
+}
+
 /**
  * Ordena, limita el número de repasos y recorta los más antiguos si el JSON
  * supera el tamaño que acepta el backend. Así una bóveda con títulos o rutas
  * enormes no puede dejar el diario en un estado que nunca se pueda guardar.
  */
-function limitProgressFile(entries: ReviewProgressEvent[]): ReviewProgressFile {
-  let limited = [...entries]
+function limitProgressFile(
+  entries: ReviewProgressEvent[],
+  now = Date.now()
+): ReviewProgressFile {
+  let limited = pruneExpiredEntries(entries, now)
     .sort((left, right) => left.at.localeCompare(right.at))
     .slice(-MAX_ENTRIES);
   let serialized = JSON.stringify({ version: 1, entries: limited });
@@ -435,7 +453,7 @@ export class ReviewProgressStore {
         localStorage.setItem(PROGRESS_STORAGE_KEY, JSON.stringify(this.file));
       }
     } catch (error) {
-      console.error("No se pudo guardar el diario de repasos en progress/reviews.json:", error);
+      console.error("No se pudo guardar el diario de repasos en .sinnotas/progress/reviews.json:", error);
     }
   }
 }

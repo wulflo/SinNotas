@@ -26,6 +26,13 @@ Rutas principales:
 | `src-tauri/src/` | Comandos Rust, sistema de archivos, caché, SAF y watcher. |
 | `.github/workflows/` | CI, APK firmada y publicación de releases. |
 
+Dentro de la bóveda, la app solo escribe datos administrados en
+`.sinnotas/`: los snapshots viven en `.sinnotas/chronos/` y el diario de
+repasos en `.sinnotas/progress/reviews.json`. Las carpetas antiguas `chronos/`
+y `progress/` se migran automáticamente al cargar la bóveda. El diario de
+repasos conserva como máximo 4.000 entradas, 5 MB y 365 días; los repasos más
+antiguos se descartan para que el archivo no crezca indefinidamente.
+
 ## Funcionalidad esencial
 
 - Editor outliner con bullets jerárquicos, arrastre, selección múltiple, atajos,
@@ -153,24 +160,25 @@ vuelve a aplicar el parche.
 
 ## Bóveda en Android
 
-La APK no abre el selector SAF ni pide permisos de almacenamiento. La bóveda
-vive en el directorio privado de la aplicación:
+La APK abre el selector SAF de directorios (`show_open_dir_dialog`) para que el
+usuario elija cualquier carpeta accesible. El permiso de lectura y escritura se
+conserva entre reinicios con `grant_persistable_dir_access`, y la representación
+serializada del `DirPath` se guarda en el frontend y se pasa a `load_vault`, que
+usa `SafStorage` para leer y escribir las notas.
 
-```text
-/data/data/com.sinnotas.desktop/files
-```
+En el modo repaso, el primer arranque sin una bóveda guardada abre el selector
+automáticamente. Si el usuario cancela o el permiso ya no es válido, se muestra
+una pantalla central para volver a elegir la carpeta en lugar de cargar el
+directorio privado `files`. El botón **Cambiar bóveda** usa el mismo selector.
+Al pasar a **Abrir páginas y editor** se conserva la raíz seleccionada, de modo
+que el editor completo trabaja sobre la misma bóveda; si aún no hay ninguna,
+también ofrece el selector SAF.
 
-Si ese directorio no se puede crear, se usa el almacenamiento externo específico
-de la app (`/storage/emulated/0/Android/data/com.sinnotas.desktop/files`). El
-arranque usa `app_data_dir()` y el botón **Abrir otra bóveda** devuelve la misma
-raíz interna y la registra como autorizada, de modo que la app no vuelve a pedir
-acceso ni confirmación en cada inicio.
-
-Las bóvedas SAF de versiones anteriores siguen siendo legibles mientras el
-sistema conserve el permiso, pero el flujo nuevo prioriza el almacenamiento
-privado. Para respaldar o sincronizar, se usa la exportación de la app o una
-copia de seguridad del sistema; el directorio interno no es visible desde el
-gestor de archivos.
+El directorio privado de la aplicación
+(`/data/data/com.sinnotas.desktop/files`) sigue existiendo como bóveda interna
+de respaldo para el modo web y para el editor cuando se cancela la selección.
+Para respaldar o sincronizar una bóveda SAF se usa el servicio de archivos que
+prefiera el usuario.
 
 ## Actualizador
 
@@ -257,7 +265,8 @@ scripts/benchmark-cache.sh
   symlinks que escapan de la bóveda y URIs `content://`, `file://` o `http://`.
 - El portapapeles pasa por una lista blanca; nunca se inyecta HTML crudo.
 - La CSP solo permite `self` e IPC. Las descargas las hacen plugins nativos.
-- Android no pide permisos de almacenamiento ni `REQUEST_INSTALL_PACKAGES`.
+- Android accede solo a la carpeta que el usuario autoriza mediante el selector
+  SAF y conserva ese permiso; no solicita acceso global al almacenamiento.
 - `allowBackup=false` en el manifiesto Android.
 - La APK release se firma con la clave de release; los secretos solo existen en
   el paso de firma de CI.
@@ -379,8 +388,11 @@ sobre el commit correcto y se empuja de nuevo.
 ## Limitaciones conocidas
 
 - Las bóvedas externas en Android dependen del acceso SAF autorizado por el
-  usuario; no se interpretan URIs como rutas locales. La v0.2.8 usa el
-  directorio privado de la app para la bóveda y no abre el diálogo SAF.
+  usuario; no se interpretan URIs como rutas locales. Si se revoca el permiso o
+  se mueve la carpeta, hay que volver a elegirla desde la pantalla de bóveda.
+- Los snapshots del editor completo siguen siendo una función de escritorio:
+  el backend los resuelve con rutas de filesystem y no están disponibles sobre
+  una bóveda SAF.
 - La APK abre en modo repaso. El editor completo, con diarios, Kanban, grafo y
   mapa conceptual, se abre desde **Abrir páginas y editor**.
 - El fix de safe area del editor completo se validó con estilos computados en el
@@ -398,7 +410,7 @@ sobre el commit correcto y se empuja de nuevo.
 ## Verificación actual
 
 - `npx tsc --noEmit`: correcto.
-- `npm test`: **270 pruebas en 29 archivos**; incluye los pesos oficiales de
+- `npm test`: **271 pruebas en 29 archivos**; incluye los pesos oficiales de
   FSRS-4.5, las regresiones de oclusión y las pruebas de mazos jerárquicos.
 - `cargo check --manifest-path src-tauri/Cargo.toml --lib`: correcto.
 - CI de `master`: lint/test, APK debug y APK release firmada.

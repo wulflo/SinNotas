@@ -573,7 +573,7 @@
 
               <section class="settings-tab-panel" role="tabpanel" data-settings-panel="saved" hidden>
                 <div class="settings-section-title">Snapshots por nota</div>
-                <p class="settings-help">Los snapshots se activan desde el historial de cada nota. Aquí puedes ver las notas que los tienen activos, cuántas versiones guardan y borrarlas. Al vencer el periodo configurado, las versiones se eliminan automáticamente y solo queda la nota original. Las copias viven en la carpeta visible chronos/ dentro del vault.</p>
+                <p class="settings-help">Los snapshots se activan desde el historial de cada nota. Aquí puedes ver las notas que los tienen activos, cuántas versiones guardan y borrarlas. Al vencer el periodo configurado, las versiones se eliminan automáticamente y solo queda la nota original. Las copias viven en la carpeta interna .sinnotas/chronos/ dentro del vault.</p>
                 <div class="sync-box">
                   <div class="settings-row">
                     <span class="settings-help" style="margin: 0;">Seguimiento de snapshots activos</span>
@@ -1085,7 +1085,7 @@
           </div>
         </div>
         <div class="history-modal-footer">
-          <span style="font-size: calc(12px * var(--ls-font-scale, 1)); color: var(--ls-text-muted);">Los snapshots se guardan en chronos/ mientras la nota esté activa. Al vencer el periodo o desactivarlos se eliminan.</span>
+          <span style="font-size: calc(12px * var(--ls-font-scale, 1)); color: var(--ls-text-muted);">Los snapshots se guardan en .sinnotas/chronos/ mientras la nota esté activa. Al vencer el periodo o desactivarlos se eliminan.</span>
           <button class="btn-primary" id="btn-restore-version" style="display: none;">Restaurar esta Versión</button>
         </div>
       </div>
@@ -1261,10 +1261,10 @@
     <div class="custom-context-menu m3-surface" id="bullet-context-menu" role="menu" aria-label="Menú de bullet">
       <div class="context-menu-title">Bullet</div>
       <div class="menu-item" id="ctx-task">
-        <span><span class="menu-symbol" aria-hidden="true">☑</span> Alternar Tarea (TODO / DOING / DONE)</span>
+        <span>Alternar Tarea (TODO / DOING / DONE)</span>
       </div>
       <div class="menu-item" id="ctx-due-date">
-        <span><span class="menu-symbol" aria-hidden="true">▦</span> Fecha de vencimiento</span>
+        <span>Fecha de vencimiento</span>
         <span class="menu-shortcut" id="ctx-due-date-value"></span>
       </div>
 
@@ -1288,7 +1288,7 @@
         <span class="menu-shortcut">Ctrl+X</span>
       </div>
       <div class="menu-item" id="ctx-insert-image">
-        <span><span class="menu-symbol" aria-hidden="true">▣</span> Insertar imagen</span>
+        <span>Insertar imagen</span>
       </div>
 
       <div class="menu-divider"></div>

@@ -27,7 +27,7 @@ The current frontend uses neither React nor Tailwind CSS.
 - **Images:** supports PNG, JPG/JPEG, WebP, SVG, GIF and BMP. Inserted images are saved to the vault's `assets/` folder.
 - **Kanban tasks:** sort tasks as pending, in progress or completed; move them between columns and hide the completed ones.
 - **Concept map / Graph:** graph view with a custom force-directed physics model, navigation and visualization of relationships between pages. Interaction stays alive indefinitely —selection with alternating clicks, click on the background to clear, node dragging, panning (middle/right button), wheel zoom and double-click to reset— and custom node colors propagate to neighbors by influence. See [docs/SinNotas.md#grafo-y-mapa-conceptual](docs/SinNotas.md#grafo-y-mapa-conceptual).
-- **Version history (snapshots):** save and restore page snapshots; settings let you delete all snapshots at once.
+- **Version history (snapshots):** save and restore page snapshots; settings let you delete all snapshots at once. Snapshots live in `.sinnotas/chronos/` and legacy `chronos/` folders are migrated automatically.
 - **Fast startup:** local vaults keep a persistent binary metadata cache (`.sinnotas_cache.bin`) so only new or modified notes are parsed on launch. A native filesystem watcher applies external edits incrementally. See [docs/SinNotas.md#cache-de-metadatos-y-watcher](docs/SinNotas.md#cache-de-metadatos-y-watcher).
 - **External vaults:** open Markdown folders through the directory picker and navigate their pages and subfolders.
 - **Journals and pages:** create daily journals by date, browse all pages and check version history.
@@ -209,6 +209,13 @@ Desktop file operations are validated in the backend and limited to the active v
 
 The APK for Android 13 or newer (`minSdkVersion` 33) opens in the review experience: question, answer, image occlusions, editing the active block and FSRS rating. From **Abrir páginas y editor** it can load the full desktop editor, including journals, Kanban, concept map and graph view. Both surfaces respect the Android status and navigation bars through the native safe-area bridge.
 
+On Android the vault is a real user folder selected through SAF. The first
+review launch without a saved vault opens the system directory picker; the app
+persists read/write access and keeps that root when switching to the full
+editor. Cancelling or losing the permission shows a central vault gate instead
+of silently loading the private `files` directory. The **Cambiar bóveda** button
+uses the same picker.
+
 Android updates are downloaded with the native HTTP plugin and saved through
 MediaStore in `Descargas/SinNotas/`, so any file manager can open the APK and
 hand it to the system installer. The app does not install the APK by itself.
@@ -255,11 +262,17 @@ Launch modes:
 - `VITE_APP_MODE=desktop`: forces the full application.
 - No variable: Tauri detects `TAURI_ENV_PLATFORM=android|ios` (or a mobile user agent) and opens the review view; on desktop it opens the full application.
 
-The review build mounts the review app first; the desktop editor is a separate dynamic chunk that loads only when the user opens **Abrir páginas y editor**. On first run, the APK seeds sample notes into the app's internal vault so FSRS, Cloze and occlusions can be tried without depending on the desktop app.
+The review build mounts the review app first; the desktop editor is a separate dynamic chunk that loads only when the user opens **Abrir páginas y editor**. An empty SAF vault stays empty (sample notes are not injected into a user-selected folder), so FSRS, Cloze and occlusions can be tried from the existing notes or from a fresh internal vault when no SAF folder is chosen.
+
+Inside any vault, app-managed data lives under `.sinnotas/`: snapshots in
+`.sinnotas/chronos/` and review progress in
+`.sinnotas/progress/reviews.json`. Legacy `chronos/` and `progress/` folders are
+migrated on load. Review progress keeps at most 4,000 events, 5 MB and 365 days
+of history, so the journal cannot grow without bound.
 
 ### Paths and Scoped Storage
 
-The backend only accepts real paths inside the active vault root. `resolve_vault_path` rejects `..`, absolute paths outside the root, NUL bytes, symlinks escaping the vault and Android URIs (`content://`, `file://`, `http://`, etc.). The APK works over its internal vault; Scoped Storage URIs are not interpreted as file names and cannot read outside the authorized folder.
+The backend only accepts real paths inside the active vault root. `resolve_vault_path` rejects `..`, absolute paths outside the root, NUL bytes, symlinks escaping the vault and Android URIs (`content://`, `file://`, `http://`, etc.). Android SAF folders are handled by the native `tauri-plugin-android-fs` storage backend (`SafStorage`), not by treating the scoped URI as a filesystem path, so access is limited to the tree the user authorized.
 
 ### Review HTML safety
 

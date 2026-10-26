@@ -198,7 +198,7 @@ vault.onBeforeSave((page) => {
   documentHistory.capture(page.id, page.blocks, page.title);
 });
 
-/* Historial de snapshots: la configuración vive en el backend (chronos/). */
+/* Historial de snapshots: la configuración vive en el backend (.sinnotas/chronos/). */
 
 let cursorState: CursorState | null = {
   blockId: currentPage.blocks[0]?.id || "b-1",
@@ -215,6 +215,8 @@ let selectedBulletIds: string[] = [];
 let bulletSelectionAnchorId: string | null = null;
 let pointerSelectionActive = false;
 let boxSelectionStart: { x: number; y: number } | null = null;
+let boxSelectionRoot: HTMLElement | null = null;
+let pendingBoxSelection: { x: number; y: number; root: HTMLElement } | null = null;
 let boxSelectionOverlay: HTMLDivElement | null = null;
 let slashMenu: HTMLDivElement | null = null;
 let slashMenuState: {
@@ -305,7 +307,7 @@ const flashcardsManager = new FlashcardsManager();
 const flashcardLoader = new FlashcardLoader(flashcardsManager);
 let desktopReady = false;
 let flashcardLoading = false;
-/** Diario compartido en progress/reviews.json para deshacer repasos. */
+/** Diario compartido en .sinnotas/progress/reviews.json para deshacer repasos. */
 const reviewProgress = new ReviewProgressStore();
 let reviewHistoryActionInFlight = false;
 const storedFlashcardReviewOrder = localStorage.getItem("sinnotas-flashcard-review-order");
@@ -644,7 +646,7 @@ const btnFlashcardPagesSave = document.getElementById("btn-flashcard-pages-save"
 const flashcardPagesStatus = document.getElementById("flashcard-pages-status") as HTMLSpanElement;
 const flashcardPagesSearch = document.getElementById("flashcard-pages-search") as HTMLInputElement | null;
 const flashcardPagesSort = document.getElementById("flashcard-pages-sort") as HTMLSelectElement | null;
-// Snapshots (activados por nota, con historial en chronos/)
+// Snapshots (activados por nota, con historial en .sinnotas/chronos/)
 const snapshotStatusText = document.getElementById("snapshot-status-text") as HTMLSpanElement;
 const snapshotStateDot = document.getElementById("snapshot-state-dot") as HTMLSpanElement;
 const btnSnapshotToggle = document.getElementById("btn-snapshot-toggle") as HTMLInputElement;
@@ -2354,7 +2356,7 @@ btnDeleteAllSnapshots.addEventListener("click", async () => {
     return;
   }
   const confirmed = await confirmAction(
-    "Se borrarán todas las versiones guardadas de todas las notas en chronos/. Las notas originales no se tocarán. ¿Continuar?",
+    "Se borrarán todas las versiones guardadas de todas las notas en .sinnotas/chronos/. Las notas originales no se tocarán. ¿Continuar?",
     "Borrar todos"
   );
   if (!confirmed) return;
@@ -5332,49 +5334,104 @@ function renderBlocksTree() {
   }
 }
 
-blocksContainer.addEventListener("pointerdown", (event: PointerEvent) => {
-  if (event.button !== 0 || !(event.target instanceof Element)) return;
-  if (
-    event.target === blocksContainer &&
-    !event.shiftKey
-  ) {
-    clearBulletSelection();
-    window.getSelection()?.removeAllRanges();
-    boxSelectionStart = { x: event.clientX, y: event.clientY };
-    const overlay = getBoxSelectionOverlay();
-    overlay.hidden = false;
-    overlay.style.left = `${event.clientX}px`;
-    overlay.style.top = `${event.clientY}px`;
-    overlay.style.width = "0";
-    overlay.style.height = "0";
-    pointerSelectionActive = true;
-    blocksContainer.setPointerCapture(event.pointerId);
-    event.preventDefault();
-    return;
-  }
-  const row = event.target.closest<HTMLElement>(".block-row");
-  const item = row?.closest<HTMLElement>(".block-item");
-  const id = item?.dataset.id;
-  if (!row || !id) return;
-  if (event.target.closest(".collapse-toggle, .block-properties")) return;
-  const targetIsEditorOrBullet = event.target.closest(".block-editor, .bullet-dot");
-  if (targetIsEditorOrBullet && !event.shiftKey) return;
-  if (event.shiftKey) {
-    selectBulletRange(bulletSelectionAnchorId || id, id);
-  } else {
-    clearBulletSelection();
-    bulletSelectionAnchorId = id;
-    selectedBulletIds = [id];
-    refreshBulletSelection();
-  }
-  if (!(event.target.closest(".block-editor"))) {
-    item.querySelector<HTMLElement>(":scope > .block-row .block-editor")?.focus();
-  }
+function beginBoxSelection(event: PointerEvent, root: HTMLElement): void {
+  clearBulletSelection();
+  window.getSelection()?.removeAllRanges();
+  boxSelectionRoot = root;
+  boxSelectionStart = { x: event.clientX, y: event.clientY };
+  pendingBoxSelection = null;
+  const overlay = getBoxSelectionOverlay();
+  overlay.hidden = false;
+  overlay.style.left = `${event.clientX}px`;
+  overlay.style.top = `${event.clientY}px`;
+  overlay.style.width = "0";
+  overlay.style.height = "0";
   pointerSelectionActive = true;
+  document.body.classList.add("is-bullet-selecting");
+  event.preventDefault();
+}
+
+function installBlockSelectionHandler(root: HTMLElement): void {
+  root.addEventListener("pointerdown", (event: PointerEvent) => {
+    if (event.button !== 0 || !(event.target instanceof Element)) return;
+    if (event.target === root && !event.shiftKey) {
+      beginBoxSelection(event, root);
+      return;
+    }
+    const row = event.target.closest<HTMLElement>(".block-row");
+    const item = row?.closest<HTMLElement>(".block-item");
+    const id = item?.dataset.id;
+    if (!row || !id) return;
+    if (event.target.closest(".collapse-toggle, .block-properties")) return;
+    const targetIsEditorOrBullet = event.target.closest(".block-editor, .bullet-dot");
+    if (targetIsEditorOrBullet && !event.shiftKey) return;
+    if (event.shiftKey) {
+      selectBulletRange(bulletSelectionAnchorId || id, id);
+    } else {
+      clearBulletSelection();
+      bulletSelectionAnchorId = id;
+      selectedBulletIds = [id];
+      refreshBulletSelection();
+    }
+    if (!event.target.closest(".block-editor")) {
+      item.querySelector<HTMLElement>(":scope > .block-row .block-editor")?.focus();
+    }
+    pointerSelectionActive = true;
+    // Un arrastre que empieza en el fondo de una fila también puede convertirse
+    // en selección por caja: así no hace falta acertar en un hueco de la fila.
+    if (!targetIsEditorOrBullet && !event.shiftKey) {
+      pendingBoxSelection = { x: event.clientX, y: event.clientY, root };
+      document.body.classList.add("is-bullet-selecting");
+    }
+  });
+}
+
+installBlockSelectionHandler(blocksContainer);
+{
+  const journalsContainer = document.getElementById("journals-container");
+  if (journalsContainer) installBlockSelectionHandler(journalsContainer);
+}
+
+// Zona vacía alrededor de los bullets (debajo del último, márgenes del lienzo).
+// Al arrastrar desde aquí se dibuja la caja de selección aunque el puntero no
+// empiece exactamente sobre el contenedor de bloques.
+[document.querySelector<HTMLElement>("#view-editor .content-scroll"),
+  document.querySelector<HTMLElement>("#view-journals .content-scroll")].forEach((scrollRoot) => {
+  if (!scrollRoot) return;
+  scrollRoot.addEventListener("pointerdown", (event: PointerEvent) => {
+    if (event.button !== 0 || !(event.target instanceof Element)) return;
+    const view = scrollRoot.closest<HTMLElement>(".view-panel");
+    if (!view || !view.classList.contains("active-view")) return;
+    if (
+      event.target.closest(
+        ".block-row, .block-editor, .bullet-dot, .collapse-toggle, .block-properties, " +
+          ".page-title-row, .page-properties-container, .references-panel, .journal-calendar, " +
+          ".journal-date-badge, button, a, input, textarea, select, [contenteditable='true']"
+      )
+    ) {
+      return;
+    }
+    const root = currentView === "journals"
+      ? document.getElementById("journals-container")
+      : blocksContainer;
+    if (root) beginBoxSelection(event, root);
+  });
 });
 
 window.addEventListener("pointermove", (event: PointerEvent) => {
   if (!pointerSelectionActive) return;
+  if (pendingBoxSelection) {
+    const dx = event.clientX - pendingBoxSelection.x;
+    const dy = event.clientY - pendingBoxSelection.y;
+    if (Math.hypot(dx, dy) < 5) return;
+    const pending = pendingBoxSelection;
+    pendingBoxSelection = null;
+    boxSelectionRoot = pending.root;
+    boxSelectionStart = { x: pending.x, y: pending.y };
+    window.getSelection()?.removeAllRanges();
+    document.body.classList.add("is-bullet-selecting");
+    getBoxSelectionOverlay().hidden = false;
+  }
   if (boxSelectionStart) {
     const left = Math.min(boxSelectionStart.x, event.clientX);
     const top = Math.min(boxSelectionStart.y, event.clientY);
@@ -5387,22 +5444,23 @@ window.addEventListener("pointermove", (event: PointerEvent) => {
     overlay.style.height = `${height}px`;
 
     const selectionRect = new DOMRect(left, top, width, height);
-    const selected = new Set<string>();
-    blocksContainer.querySelectorAll<HTMLElement>(".block-item[data-id]").forEach((item) => {
+    const selected: string[] = [];
+    const root = boxSelectionRoot ?? blocksContainer;
+    root.querySelectorAll<HTMLElement>(".block-item[data-id]").forEach((item) => {
+      if (!item.offsetParent) return;
       const row = item.querySelector<HTMLElement>(":scope > .block-row");
       const id = item.dataset.id;
       if (!row || !id) return;
       const rect = row.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
       if (
         rect.right >= selectionRect.left &&
         rect.left <= selectionRect.right &&
         rect.bottom >= selectionRect.top &&
         rect.top <= selectionRect.bottom
-      ) selected.add(id);
+      ) selected.push(id);
     });
-    selectedBulletIds = getFlatVisibleBlocks(currentPage.blocks)
-      .filter((block) => selected.has(block.id))
-      .map((block) => block.id);
+    selectedBulletIds = selected;
     refreshBulletSelection();
     return;
   }
@@ -5414,11 +5472,17 @@ window.addEventListener("pointermove", (event: PointerEvent) => {
   }
 });
 
-window.addEventListener("pointerup", () => {
+function finishPointerSelection(): void {
   pointerSelectionActive = false;
+  pendingBoxSelection = null;
   boxSelectionStart = null;
+  boxSelectionRoot = null;
+  document.body.classList.remove("is-bullet-selecting");
   if (boxSelectionOverlay) boxSelectionOverlay.hidden = true;
-});
+}
+
+window.addEventListener("pointerup", finishPointerSelection);
+window.addEventListener("pointercancel", finishPointerSelection);
 
 document.addEventListener("keydown", (event: KeyboardEvent) => {
   if (selectedBulletIds.length === 0) return;
@@ -6570,7 +6634,7 @@ function startSnapshotPolling(): void {
   }, SNAPSHOT_POLL_INTERVAL_MS);
 }
 
-/** Convierte el historial antiguo (`.sinnotas/revisions`) a `chronos/`. */
+/** Convierte el historial antiguo (`.sinnotas/revisions`) a `.sinnotas/chronos/`. */
 async function migrateLegacySnapshotFiles(): Promise<void> {
   if (!isTauri()) return;
   try {
@@ -9952,7 +10016,7 @@ function applyFSRSRating(rating: FSRSRating) {
           )
           .then(() => updateReviewHistoryButtons())
           .catch((error: unknown) => {
-            console.error("No se pudo guardar el repaso en progress/reviews.json:", error);
+            console.error("No se pudo guardar el repaso en .sinnotas/progress/reviews.json:", error);
           });
       }
     }
@@ -11791,11 +11855,24 @@ async function installVaultCacheDeltaListener(): Promise<void> {
   }
 }
 
+function isAndroidDesktopRuntime(): boolean {
+  const platform = (import.meta.env.TAURI_ENV_PLATFORM || "").toLowerCase();
+  return isTauri() && (platform === "android" || /android/i.test(navigator.userAgent));
+}
+
 async function initializeNativeVault(): Promise<void> {
   if (!isTauri()) return;
 
   clearResolvedImages();
-  const savedRootPath = vault.getActiveRootPath();
+  let savedRootPath = vault.getActiveRootPath();
+  if (isAndroidDesktopRuntime() && !savedRootPath) {
+    try {
+      savedRootPath = await invoke<string | null>("pick_vault_root");
+    } catch (error) {
+      console.error("No se pudo abrir el selector de bóvedas de Android:", error);
+      showToast("No se pudo abrir el selector de carpetas. Se usará la bóveda interna.");
+    }
+  }
   try {
     const snapshot = await invoke<VaultSnapshot>("load_vault", { rootPath: savedRootPath });
     if (snapshot.pages.length > 0 || savedRootPath) {

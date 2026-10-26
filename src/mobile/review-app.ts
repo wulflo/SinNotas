@@ -116,6 +116,11 @@ function isAccentColor(value: string | null | undefined): value is AccentColor {
   return ACCENT_COLORS.some((accent) => accent.id === value);
 }
 
+function isAndroidRuntime(): boolean {
+  const platform = (import.meta.env.TAURI_ENV_PLATFORM || "").toLowerCase();
+  return isTauri() && (platform === "android" || /android/i.test(navigator.userAgent));
+}
+
 function cloneOcclusionRegion(region: ImageOcclusionRegion): ImageOcclusionRegion {
   return {
     ...region,
@@ -320,6 +325,8 @@ class MobileReviewApp {
     updateStatus: HTMLElement;
     updateNotesWrap: HTMLDetailsElement;
     updateNotes: HTMLElement;
+    vaultGate: HTMLElement;
+    vaultGateMessage: HTMLElement;
     toast: HTMLElement;
   };
 
@@ -571,6 +578,15 @@ class MobileReviewApp {
         </aside>
       </div>
 
+      <div class="mobile-vault-gate" data-vault-gate hidden>
+        <section class="mobile-vault-gate-card" role="dialog" aria-modal="true" aria-labelledby="mobile-vault-gate-title">
+          <span class="mobile-vault-gate-logo" aria-hidden="true">Sn</span>
+          <h1 id="mobile-vault-gate-title">Elige tu bóveda</h1>
+          <p data-vault-gate-message>Selecciona la carpeta donde están tus notas. Sin Notas recordará el permiso para las próximas veces.</p>
+          <button class="mobile-primary" type="button" data-action="choose-vault">Elegir carpeta</button>
+        </section>
+      </div>
+
       <div class="mobile-toast" data-toast role="status" aria-live="polite"></div>
     `;
 
@@ -637,6 +653,8 @@ class MobileReviewApp {
       updateStatus: requireElement(this.root, "[data-update-status]"),
       updateNotesWrap: requireElement(this.root, "[data-update-notes]"),
       updateNotes: requireElement(this.root, "[data-update-notes-content]"),
+      vaultGate: requireElement(this.root, "[data-vault-gate]"),
+      vaultGateMessage: requireElement(this.root, "[data-vault-gate-message]"),
       toast: requireElement(this.root, "[data-toast]"),
     };
   }
@@ -670,9 +688,44 @@ class MobileReviewApp {
     this.updateLanguageButtons();
     this.bindEvents();
     this.initUpdateSettings();
-    void this.loadAndApply(this.vault.getActiveRootPath(), undefined, true).finally(() => {
+    void this.bootstrapVault().finally(() => {
       window.clearTimeout(splashTimeout);
     });
+  }
+
+  /**
+   * En Android el primer arranque debe elegir una carpeta real mediante SAF.
+   * Antes se abría siempre el directorio privado `files`, lo que impedía usar
+   * una bóveda existente del usuario.
+   */
+  private async bootstrapVault(): Promise<void> {
+    let rootPath = this.vault.getActiveRootPath();
+    if (isAndroidRuntime()) {
+      if (!rootPath) {
+        try {
+          rootPath = await invoke<string | null>("pick_vault_root");
+        } catch (error) {
+          console.error("No se pudo abrir el selector inicial de bóvedas:", error);
+          rootPath = null;
+        }
+        if (!rootPath) {
+          hideAppSplash();
+          this.showVaultGate();
+          return;
+        }
+      }
+    }
+    await this.loadAndApply(rootPath, undefined, true);
+  }
+
+  private showVaultGate(message?: string): void {
+    if (message) this.refs.vaultGateMessage.textContent = translate(message);
+    this.refs.vaultGate.hidden = false;
+    this.setBusy(false);
+  }
+
+  private hideVaultGate(): void {
+    this.refs.vaultGate.hidden = true;
   }
 
   private bindEvents(): void {
@@ -694,6 +747,8 @@ class MobileReviewApp {
         void this.loadAndApply(this.vault.getActiveRootPath(), "Tarjetas actualizadas");
       } else if (action === "vault") {
         this.closeSettings();
+        void this.pickVault();
+      } else if (action === "choose-vault") {
         void this.pickVault();
       } else if (action === "full-editor") {
         requestDesktopEditor();
@@ -890,10 +945,16 @@ class MobileReviewApp {
     } catch (error) {
       console.error("No se pudo cargar la bóveda de repaso:", error);
       if (initial) {
-        this.showEmpty(
-          "No se pudo abrir la bóveda",
-          "Comprueba los permisos de la carpeta e inténtalo de nuevo."
-        );
+        if (isAndroidRuntime()) {
+          this.showVaultGate(
+            "No se pudo abrir la bóveda guardada. Elige la carpeta de nuevo para renovar el permiso."
+          );
+        } else {
+          this.showEmpty(
+            "No se pudo abrir la bóveda",
+            "Comprueba los permisos de la carpeta e inténtalo de nuevo."
+          );
+        }
       }
       this.showToast(`No se pudo cargar la bóveda: ${errorMessage(error)}`);
     } finally {
@@ -997,6 +1058,7 @@ class MobileReviewApp {
     snapshot: VaultSnapshot,
     preserve?: { cardId: string; revealed: boolean }
   ): void {
+    this.hideVaultGate();
     this.pages = snapshot.pages;
     this.vault.replaceVault(snapshot.pages, snapshot.rootPath, snapshot.vaultName);
     this.history.clearAll();

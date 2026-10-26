@@ -322,7 +322,9 @@ export class FlashcardsManager {
   private formatChildAnswers(blocks: BlockNode[], depth = 0): string[] {
     return blocks.flatMap((block) => {
       const text = this.getCardText(block);
-      const line = text ? `${"  ".repeat(depth)}• ${text}` : "";
+      // Cuatro espacios por nivel: con el tamaño grande de las flashcards, dos
+      // espacios no bastan para distinguir un hijo de su padre en listas largas.
+      const line = text ? `${"    ".repeat(depth)}• ${text}` : "";
       return [
         ...(line ? [line] : []),
         ...this.formatChildAnswers(block.children || [], depth + 1),

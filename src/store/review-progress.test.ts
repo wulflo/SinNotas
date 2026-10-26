@@ -7,13 +7,21 @@ import {
   type ReviewProgressFile,
 } from "./review-progress";
 
+function isoDaysAgo(days: number, extraMinutes = 0): string {
+  return new Date(Date.now() - days * 86_400_000 + extraMinutes * 60_000).toISOString();
+}
+
+function isoDateDaysAgo(days: number): string {
+  return isoDaysAgo(days).slice(0, 10);
+}
+
 function makeEvent(overrides: Partial<ReviewProgressEvent> = {}): ReviewProgressEvent {
   return {
     id: "event-1",
-    at: "2026-10-24T10:00:00.000Z",
-    date: "2026-10-24",
+    at: isoDaysAgo(1),
+    date: isoDateDaysAgo(1),
     deviceId: "device-a",
-    updatedAt: "2026-10-24T10:00:00.000Z",
+    updatedAt: isoDaysAgo(1),
     state: "applied",
     pagePath: "pages/Nota.md",
     pageTitle: "Nota",
@@ -26,10 +34,10 @@ function makeEvent(overrides: Partial<ReviewProgressEvent> = {}): ReviewProgress
       stability: 3.17,
       difficulty: 5.28,
       reps: 1,
-      lastReviewDate: "2026-10-24T10:00:00.000Z",
+      lastReviewDate: isoDaysAgo(1),
       intervalDays: 1,
       easeFactor: 2.5,
-      dueDate: "2026-10-25T10:00:00.000Z",
+      dueDate: isoDaysAgo(0),
     },
     ...overrides,
   };
@@ -91,13 +99,13 @@ describe("diario de repasos compartido", () => {
   it("une historiales de dos equipos sin duplicar repasos", () => {
     const left: ReviewProgressFile = {
       version: 1,
-      entries: [makeEvent({ id: "a", at: "2026-10-24T10:00:00.000Z" })],
+      entries: [makeEvent({ id: "a", at: isoDaysAgo(1, 0) })],
     };
     const right: ReviewProgressFile = {
       version: 1,
       entries: [
-        makeEvent({ id: "b", at: "2026-10-24T11:00:00.000Z" }),
-        makeEvent({ id: "a", at: "2026-10-24T10:00:00.000Z" }),
+        makeEvent({ id: "b", at: isoDaysAgo(1, 60) }),
+        makeEvent({ id: "a", at: isoDaysAgo(1, 0) }),
       ],
     };
     const merged = mergeReviewProgress(left, right);
@@ -108,12 +116,12 @@ describe("diario de repasos compartido", () => {
     const applied = makeEvent({
       id: "same",
       state: "applied",
-      updatedAt: "2026-10-24T10:00:00.000Z",
+      updatedAt: isoDaysAgo(1),
     });
     const undone = makeEvent({
       id: "same",
       state: "undone",
-      updatedAt: "2026-10-24T10:05:00.000Z",
+      updatedAt: isoDaysAgo(0),
     });
     const merged = mergeReviewProgress(
       { version: 1, entries: [applied] },
@@ -121,6 +129,19 @@ describe("diario de repasos compartido", () => {
     );
     expect(merged.entries).toHaveLength(1);
     expect(merged.entries[0].state).toBe("undone");
+  });
+
+  it("descarta los repasos de más de un año para acotar el diario", () => {
+    const parsed = parseReviewProgress(
+      JSON.stringify({
+        version: 1,
+        entries: [
+          makeEvent({ id: "recent", at: isoDaysAgo(10), date: isoDateDaysAgo(10) }),
+          makeEvent({ id: "old", at: isoDaysAgo(400), date: isoDateDaysAgo(400) }),
+        ],
+      })
+    );
+    expect(parsed.entries.map((entry) => entry.id)).toEqual(["recent"]);
   });
 });
 

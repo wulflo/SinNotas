@@ -64,7 +64,7 @@ pub trait VaultStorage: Send + Sync {
     /// Lee bytes de imagen (para asset protocol)
     async fn read_image(&self, relative_path: &str) -> Result<Vec<u8>, String>;
 
-    /// Lee un archivo interno de progreso (por ejemplo progress/reviews.json).
+    /// Lee un archivo interno de progreso (`.sinnotas/progress/reviews.json`).
     /// No se expone como nota y la ruta siempre la valida el backend.
     async fn read_progress_file(&self, relative_path: &str) -> Result<Option<String>, String>;
 
@@ -751,8 +751,13 @@ pub struct VaultSnapshot {
     pub skipped: Vec<SkippedEntry>,
 }
 
-/// Carpeta visible del vault donde viven los snapshots manuales/automáticos.
+/// Carpeta interna del vault para datos administrados por la app. Las carpetas
+/// `chronos` y `progress` vivían antes en la raíz y se migran aquí.
+const INTERNAL_FOLDER: &str = ".sinnotas";
+/// Carpeta de snapshots manuales/automáticos dentro de `.sinnotas/`.
 const SNAPSHOT_FOLDER: &str = "chronos";
+/// Carpeta del diario de repasos dentro de `.sinnotas/`.
+const PROGRESS_FOLDER: &str = "progress";
 const SNAPSHOT_CONFIG_FILE: &str = "config.json";
 const SNAPSHOT_FORMAT_VERSION: u32 = 1;
 const SNAPSHOT_MAX_DAYS: u32 = 30;
@@ -764,7 +769,7 @@ static SNAPSHOT_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 /// Tolerancia para no confundir pequeños ajustes de reloj con un salto real.
 const SNAPSHOT_CLOCK_TOLERANCE_MS: i64 = 5 * 60 * 1000;
 
-/// Configuración de snapshots del vault. Se guarda en `chronos/config.json`
+/// Configuración de snapshots del vault. Se guarda en `.sinnotas/chronos/config.json`
 /// para que viaje con la bóveda y no dependa del almacenamiento del webview.
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
@@ -1107,7 +1112,8 @@ fn serialize_page_to_markdown(frontmatter: &[String], blocks: &[BlockNode]) -> S
 }
 
 /// Nombres de carpetas reservadas que nunca deben ser accesibles como notas.
-const RESERVED_DIRS: &[&str] = &["chronos", ".sinnotas", ".git"];
+/// `chronos` y `progress` son las ubicaciones antiguas, migradas a `.sinnotas/`.
+const RESERVED_DIRS: &[&str] = &["chronos", "progress", ".sinnotas", ".git"];
 
 /// Patrón de archivos temporales que el backend crea (`.sinnotas-tmp`).
 const TEMP_FILE_PATTERN: &str = ".sinnotas-tmp";
@@ -1135,10 +1141,12 @@ pub(crate) fn is_safe_note_component(component: &str) -> bool {
 }
 
 /// Archivo interno donde vive el diario de repasos.
-const REVIEW_PROGRESS_PATH: &str = "progress/reviews.json";
+const REVIEW_PROGRESS_PATH: &str = ".sinnotas/progress/reviews.json";
 /// Límite defensivo para el diario: 5 MB y 4000 repasos como máximo.
 const REVIEW_PROGRESS_MAX_BYTES: usize = 5 * 1024 * 1024;
 const REVIEW_PROGRESS_MAX_ENTRIES: usize = 4000;
+/// Los repasos más antiguos se eliminan para que el archivo no crezca sin fin.
+const REVIEW_PROGRESS_MAX_AGE_DAYS: i64 = 365;
 
 /// Solo se permite el archivo fijo de progreso. No se aceptan rutas
 /// arbitrarias, `..`, URIs ni nombres temporales.
@@ -1153,7 +1161,7 @@ fn validate_progress_relative_path(relative_path: &str) -> Result<(), String> {
 /// y que no atraviese carpetas reservadas ni use nombres de temporales.
 /// A diferencia de `resolve_vault_path`, esta función es estricta para notas:
 /// - Exige extensión `.md`
-/// - Rechaza `chronos/`, `.sinnotas/`, `.git/` en cualquier nivel
+/// - Rechaza `chronos/`, `progress/`, `.sinnotas/`, `.git/` en cualquier nivel
 /// - Rechaza nombres que contengan `.sinnotas-tmp`
 pub(crate) fn resolve_note_path(root: &Path, requested_path: &str) -> Result<PathBuf, String> {
     if requested_path.contains('\0') {
@@ -1193,7 +1201,7 @@ pub(crate) fn resolve_note_path(root: &Path, requested_path: &str) -> Result<Pat
                 .ok_or_else(|| "Componente de ruta no válido UTF-8.".to_string())?;
             if !is_safe_note_component(text) {
                 return Err(format!(
-                    "Componente de ruta no permitido: {text}. No se permiten carpetas reservadas (chronos, .sinnotas, .git) ni nombres de temporales."
+                    "Componente de ruta no permitido: {text}. No se permiten carpetas reservadas (chronos, progress, .sinnotas, .git) ni nombres de temporales."
                 ));
             }
         }
@@ -1248,7 +1256,7 @@ pub(crate) fn resolve_note_path(root: &Path, requested_path: &str) -> Result<Pat
 fn resolve_vault_path(root: &Path, requested_path: &str) -> Result<PathBuf, String> {
     // Para rutas genéricas (imágenes, assets, etc.) se mantiene la validación
     // original sin exigir .md ni rechazar carpetas reservadas, ya que assets/
-    // puede vivir junto a chronos/.sinnotas. Las validaciones de seguridad
+    // puede vivir junto a `.sinnotas/`. Las validaciones de seguridad
     // (null bytes, URIs, path traversal, symlinks) se conservan.
     if requested_path.contains('\0') {
         return Err("La ruta contiene caracteres nulos no permitidos.".to_string());
@@ -1756,19 +1764,104 @@ pub(crate) fn stable_content_hash(bytes: &[u8]) -> String {
     format!("{hash:016x}")
 }
 
-fn snapshot_root(root: &Path) -> Result<PathBuf, String> {
+/// Ruta relativa de una carpeta interna (siempre dentro de `.sinnotas/`).
+fn internal_vault_relative(folder: &str) -> String {
+    format!("{INTERNAL_FOLDER}/{folder}")
+}
+
+/// Devuelve una carpeta interna del vault, creándola si hace falta y
+/// comprobando que el resultado canónico sigue dentro de la bóveda.
+fn internal_vault_folder(root: &Path, folder: &str) -> Result<PathBuf, String> {
     let canonical_root = fs::canonicalize(root).map_err(|err| err.to_string())?;
-    let folder = resolve_vault_path(&canonical_root, SNAPSHOT_FOLDER)?;
-    fs::create_dir_all(&folder).map_err(|err| err.to_string())?;
-    let canonical_folder = fs::canonicalize(&folder).map_err(|err| err.to_string())?;
-    if !canonical_folder.starts_with(&canonical_root) || !canonical_folder.is_dir() {
-        return Err("La carpeta de snapshots no pertenece al vault activo.".to_string());
+    let path = resolve_vault_path(&canonical_root, &internal_vault_relative(folder))?;
+    fs::create_dir_all(&path).map_err(|err| err.to_string())?;
+    let canonical_path = fs::canonicalize(&path).map_err(|err| err.to_string())?;
+    if !canonical_path.starts_with(&canonical_root) || !canonical_path.is_dir() {
+        return Err("La carpeta interna no pertenece al vault activo.".to_string());
     }
-    Ok(canonical_folder)
+    Ok(canonical_path)
+}
+
+fn snapshot_root(root: &Path) -> Result<PathBuf, String> {
+    internal_vault_folder(root, SNAPSHOT_FOLDER)
+}
+
+/// Mueve el contenido de `source` a `destination`. Si el destino ya existe,
+/// combina carpeta por carpeta sin sobrescribir archivos. No sigue enlaces
+/// simbólicos: una bóveda manipulada no puede sacar datos fuera del vault.
+fn move_or_merge_directory(source: &Path, destination: &Path) -> Result<(), String> {
+    let metadata = match fs::symlink_metadata(source) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.to_string()),
+    };
+    if metadata.file_type().is_symlink() || !metadata.is_dir() {
+        return Ok(());
+    }
+
+    if !destination.exists() {
+        if let Some(parent) = destination.parent() {
+            if let Ok(metadata) = fs::symlink_metadata(parent) {
+                if metadata.file_type().is_symlink() || !metadata.is_dir() {
+                    return Err("La carpeta interna del vault no es válida.".to_string());
+                }
+            }
+            fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        return fs::rename(source, destination).map_err(|error| error.to_string());
+    }
+
+    let destination_metadata =
+        fs::symlink_metadata(destination).map_err(|error| error.to_string())?;
+    if destination_metadata.file_type().is_symlink() || !destination_metadata.is_dir() {
+        return Err("La carpeta de destino no es un directorio real.".to_string());
+    }
+    fs::create_dir_all(destination).map_err(|error| error.to_string())?;
+    let entries = fs::read_dir(source).map_err(|error| error.to_string())?;
+    for entry in entries {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let source_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        let entry_metadata =
+            fs::symlink_metadata(&source_path).map_err(|error| error.to_string())?;
+        if entry_metadata.file_type().is_symlink() {
+            continue;
+        }
+        if entry_metadata.is_dir() {
+            move_or_merge_directory(&source_path, &destination_path)?;
+        } else if !destination_path.exists() {
+            fs::rename(&source_path, &destination_path).map_err(|error| error.to_string())?;
+        }
+    }
+
+    // Solo se retira la carpeta antigua si quedó vacía; si había conflictos,
+    // se conserva para no borrar datos que el usuario todavía podría necesitar.
+    let _ = fs::remove_dir(source);
+    Ok(())
+}
+
+/// Migra `chronos/` y `progress/` a `.sinnotas/` una sola vez. Es idempotente:
+/// los vaults nuevos ya no tienen las carpetas antiguas en la raíz.
+fn migrate_internal_folders(root: &Path) -> Result<(), String> {
+    let internal = root.join(INTERNAL_FOLDER);
+    fs::create_dir_all(&internal).map_err(|error| error.to_string())?;
+    let internal_metadata = fs::symlink_metadata(&internal).map_err(|error| error.to_string())?;
+    if internal_metadata.file_type().is_symlink() || !internal_metadata.is_dir() {
+        return Err("La carpeta interna del vault no puede ser un enlace simbólico.".to_string());
+    }
+
+    move_or_merge_directory(&root.join(SNAPSHOT_FOLDER), &internal.join(SNAPSHOT_FOLDER))?;
+
+    let progress_destination = internal.join(PROGRESS_FOLDER);
+    if let Some(parent) = progress_destination.parent() {
+        fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+    }
+    move_or_merge_directory(&root.join(PROGRESS_FOLDER), &progress_destination)?;
+    Ok(())
 }
 
 /// Clave relativa segura de una nota (sin `.md`). Evita `..`, rutas absolutas y
-/// enlaces simbólicos: el resultado siempre se usa dentro de `chronos/`.
+/// enlaces simbólicos: el resultado siempre se usa dentro de `.sinnotas/chronos/`.
 fn snapshot_note_key(root: &Path, note_path: &Path) -> Result<String, String> {
     let relative = note_path
         .strip_prefix(root)
@@ -1814,7 +1907,7 @@ fn snapshot_note_relative_path(root: &Path, note_path: &Path) -> Result<String, 
     Ok(format!("{}.md", snapshot_note_key(root, note_path)?))
 }
 
-/// Cada nota guarda su propia configuración dentro de `chronos/<nota>/`.
+/// Cada nota guarda su propia configuración dentro de `.sinnotas/chronos/<nota>/`.
 /// Así el interruptor y el vencimiento son independientes por página y viajan
 /// con la nota cuando se renombra.
 fn snapshot_config_path_for_note(root: &Path, note_path: &Path) -> Result<PathBuf, String> {
@@ -2217,7 +2310,10 @@ fn collect_note_files(root: &Path) -> Result<Vec<PathBuf>, String> {
                 return true;
             }
             let name = entry.file_name().to_string_lossy();
-            !matches!(name.as_ref(), SNAPSHOT_FOLDER | ".sinnotas" | ".git")
+            !matches!(
+                name.as_ref(),
+                SNAPSHOT_FOLDER | PROGRESS_FOLDER | ".sinnotas" | ".git"
+            )
         });
     for entry in walker {
         let entry = entry.map_err(|err| err.to_string())?;
@@ -2230,7 +2326,7 @@ fn collect_note_files(root: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(notes)
 }
 
-/// Todos los `config.json` de snapshots por nota dentro de `chronos/`.
+/// Todos los `config.json` de snapshots por nota dentro de `.sinnotas/chronos/`.
 /// Queda fuera el antiguo `chronos/config.json` global (profundidad 1).
 fn snapshot_config_files(root: &Path) -> Vec<PathBuf> {
     let Ok(folder) = snapshot_root(root) else {
@@ -2251,7 +2347,7 @@ fn snapshot_config_files(root: &Path) -> Vec<PathBuf> {
     files
 }
 
-/// Convierte la carpeta `chronos/<ruta>/` en la ruta relativa de su nota.
+/// Convierte la carpeta `.sinnotas/chronos/<ruta>/` en la ruta relativa de su nota.
 fn note_path_for_snapshot_dir(root: &Path, dir: &Path) -> Result<PathBuf, String> {
     let folder = snapshot_root(root)?;
     let relative = dir
@@ -2355,7 +2451,7 @@ fn delete_note_snapshots_from_root(root: &Path, note_path: &Path) -> Result<(), 
 }
 
 /// Elimina todos los snapshots del vault, sin tocar las notas originales.
-/// Vacía el contenido de `chronos/` (configuraciones, versiones y temporales)
+/// Vacía el contenido de `.sinnotas/chronos/` (configuraciones, versiones y temporales)
 /// pero conserva la carpeta raíz para futuros snapshots. Devuelve el número de
 /// entradas eliminadas. Nunca sigue enlaces simbólicos.
 fn delete_all_snapshots_from_root(root: &Path) -> Result<usize, String> {
@@ -2666,7 +2762,7 @@ fn restore_snapshot_from_root(
 }
 
 /// Migra el historial antiguo de `.sinnotas/revisions` al nuevo formato de
-/// `chronos/`. Es idempotente: los archivos ya migrados se omiten.
+/// `.sinnotas/chronos/`. Es idempotente: los archivos ya migrados se omiten.
 fn migrate_legacy_revisions(root: &Path, ignore_marker: bool) -> Result<(), String> {
     let legacy_root = root.join(".sinnotas").join("revisions");
     if !legacy_root.is_dir() {
@@ -2848,11 +2944,10 @@ fn require_vault_approval(
 /// Devuelve la raíz de la bóveda activa (ya autorizada). `None` si el usuario
 /// canceló.
 ///
-/// En Android no se abre un diálogo SAF: la bóveda vive en el directorio
-/// privado de la aplicación (`/data/data/<paquete>/files`), con el directorio
-/// externo específico de la app como respaldo. Así se evita pedir permisos de
-/// almacenamiento y repetir el diálogo en cada arranque. En iOS se usa el vault
-/// interno. En desktop se abre el selector nativo de carpetas.
+/// En Android se abre el selector SAF de directorios y se conserva el permiso
+/// de lectura/escritura entre reinicios. La representación serializada del
+/// `DirPath` se guarda en el frontend y `load_vault` la reconoce. En iOS se usa
+/// el vault interno. En desktop se abre el selector nativo de carpetas.
 #[tauri::command]
 async fn pick_vault_root(
     app: AppHandle,
@@ -2860,34 +2955,22 @@ async fn pick_vault_root(
 ) -> Result<Option<String>, String> {
     #[cfg(target_os = "android")]
     {
-        // El identificador coincide con el paquete Android y con el directorio
-        // privado que usa el sistema para la app.
-        let identifier = app.config().identifier.clone();
-        let candidates = [
-            PathBuf::from(format!("/data/data/{identifier}/files")),
-            PathBuf::from(format!(
-                "/storage/emulated/0/Android/data/{identifier}/files"
-            )),
-        ];
-        for dir in candidates {
-            if fs::create_dir_all(&dir).is_ok() {
-                let root = fs::canonicalize(&dir).unwrap_or(dir);
-                // La raíz es privada de la app, pero load_vault exige que esté
-                // en la lista de bóvedas autorizadas para las rutas explícitas.
-                {
-                    let mut approved = approved_roots
-                        .0
-                        .lock()
-                        .map_err(|_| "No se pudo guardar la bóveda autorizada.".to_string())?;
-                    if !approved.iter().any(|path| path == &root) {
-                        approved.push(root.clone());
-                    }
-                    persist_approved_vault_roots(&app, &approved)?;
-                }
-                return Ok(Some(root.to_string_lossy().into_owned()));
-            }
-        }
-        Err("No se pudo preparar el almacenamiento interno de la aplicación.".to_string())
+        use tauri_plugin_android_fs::PersistableAccessMode;
+
+        let _ = approved_roots;
+        let Some(dir_path) = app
+            .android_fs()
+            .show_open_dir_dialog()
+            .map_err(|error| format!("No se pudo abrir el selector de carpetas: {error}"))?
+        else {
+            return Ok(None);
+        };
+        app.android_fs()
+            .grant_persistable_dir_access(&dir_path, PersistableAccessMode::ReadAndWrite)
+            .map_err(|error| format!("No se pudo conservar el permiso de la carpeta: {error}"))?;
+        let serialized = tauri_plugin_android_fs::convert_dir_path_to_string(&dir_path)
+            .map_err(|error| format!("La ruta SAF no es válida: {error}"))?;
+        Ok(Some(serialized))
     }
 
     #[cfg(target_os = "ios")]
@@ -3098,25 +3181,30 @@ async fn load_vault(
             require_vault_approval(&app, &approved_roots, &canonical_root)?;
             let root = canonical_root;
 
+            if let Err(error) = migrate_internal_folders(&root) {
+                eprintln!("No se pudieron migrar las carpetas internas del vault: {error}");
+            }
+
             // Permitir el nuevo directorio en el asset protocol scope
             app.asset_protocol_scope()
                 .allow_directory(&root, true)
                 .map_err(|err| err.to_string())?;
 
             // Prohibir explícitamente las carpetas internas para que no sean
-            // accesibles vía asset: chronos/, .sinnotas/ y progress/.
-            let chronos_path = root.join("chronos");
-            let sinnotas_path = root.join(".sinnotas");
-            let progress_path = root.join("progress");
+            // accesibles vía asset: `.sinnotas/` y las antiguas `chronos/` y
+            // `progress/` que aún no se hayan migrado.
+            let internal_path = root.join(INTERNAL_FOLDER);
+            let legacy_chronos_path = root.join(SNAPSHOT_FOLDER);
+            let legacy_progress_path = root.join(PROGRESS_FOLDER);
             let _ = app
                 .asset_protocol_scope()
-                .forbid_directory(&chronos_path, true);
+                .forbid_directory(&internal_path, true);
             let _ = app
                 .asset_protocol_scope()
-                .forbid_directory(&sinnotas_path, true);
+                .forbid_directory(&legacy_chronos_path, true);
             let _ = app
                 .asset_protocol_scope()
-                .forbid_directory(&progress_path, true);
+                .forbid_directory(&legacy_progress_path, true);
 
             let vault_name = root
                 .file_name()
@@ -3158,23 +3246,27 @@ async fn load_vault(
             fs::create_dir_all(&root).map_err(|err| err.to_string())?;
             let root = fs::canonicalize(root).map_err(|err| err.to_string())?;
 
+            if let Err(error) = migrate_internal_folders(&root) {
+                eprintln!("No se pudieron migrar las carpetas internas del vault: {error}");
+            }
+
             app.asset_protocol_scope()
                 .allow_directory(&root, true)
                 .map_err(|err| err.to_string())?;
 
             // Prohibir las carpetas internas también en el vault predeterminado
-            let chronos_path = root.join("chronos");
-            let sinnotas_path = root.join(".sinnotas");
-            let progress_path = root.join("progress");
+            let internal_path = root.join(INTERNAL_FOLDER);
+            let legacy_chronos_path = root.join(SNAPSHOT_FOLDER);
+            let legacy_progress_path = root.join(PROGRESS_FOLDER);
             let _ = app
                 .asset_protocol_scope()
-                .forbid_directory(&chronos_path, true);
+                .forbid_directory(&internal_path, true);
             let _ = app
                 .asset_protocol_scope()
-                .forbid_directory(&sinnotas_path, true);
+                .forbid_directory(&legacy_chronos_path, true);
             let _ = app
                 .asset_protocol_scope()
-                .forbid_directory(&progress_path, true);
+                .forbid_directory(&legacy_progress_path, true);
 
             let vault_name = "Vault local".to_string();
             let (pages, skipped) = match cache_state.activate(&app, &root) {
@@ -3513,6 +3605,25 @@ async fn save_page(
     Ok(())
 }
 
+/// Fecha de corte (`YYYY-MM-DD`) para descartar repasos demasiado antiguos.
+fn review_progress_cutoff_date(now_millis: i64) -> String {
+    let days = now_millis
+        .div_euclid(1000)
+        .div_euclid(86_400)
+        .saturating_sub(REVIEW_PROGRESS_MAX_AGE_DAYS);
+    let (year, month, day) = civil_date_from_days(days);
+    format!("{year:04}-{month:02}-{day:02}")
+}
+
+fn progress_entry_is_recent(entry: &serde_json::Value, cutoff_date: &str) -> bool {
+    let Some(at) = entry.get("at").and_then(|value| value.as_str()) else {
+        return false;
+    };
+    at.get(..10)
+        .map(|date| date >= cutoff_date)
+        .unwrap_or(false)
+}
+
 /// Valida y une el diario de repasos. Los repasos son inmutables salvo por
 /// `state`/`updatedAt` (deshacer/rehacer); para un mismo id gana la versión
 /// más reciente. Así dos dispositivos pueden guardar sin sobrescribir el
@@ -3581,6 +3692,8 @@ fn merge_review_progress_json(existing: Option<&str>, incoming: &str) -> Result<
             .unwrap_or("")
             .cmp(right.get("at").and_then(|at| at.as_str()).unwrap_or(""))
     });
+    let cutoff_date = review_progress_cutoff_date(now_millis().unwrap_or(0));
+    entries.retain(|entry| progress_entry_is_recent(entry, &cutoff_date));
     if entries.len() > REVIEW_PROGRESS_MAX_ENTRIES {
         entries = entries.split_off(entries.len() - REVIEW_PROGRESS_MAX_ENTRIES);
     }
@@ -3592,7 +3705,7 @@ fn merge_review_progress_json(existing: Option<&str>, incoming: &str) -> Result<
     .map_err(|error| error.to_string())
 }
 
-/// Lee el diario compartido de `progress/reviews.json`.
+/// Lee el diario compartido de `.sinnotas/progress/reviews.json`.
 #[tauri::command]
 async fn read_review_progress(
     state: tauri::State<'_, ActiveVault>,
@@ -3760,7 +3873,7 @@ fn read_note_snapshots(
     read_note_snapshots_from_root(&root, &note)
 }
 
-/// Restaura una nota desde un snapshot concreto de `chronos/`.
+/// Restaura una nota desde un snapshot concreto de `.sinnotas/chronos/`.
 #[tauri::command(async)]
 fn restore_snapshot(
     file_path: String,
@@ -4323,10 +4436,12 @@ fn delete_page(
             let _ = fs::remove_file(&revisions_path);
         }
     }
-    // Los snapshots nuevos viven en `chronos/<ruta relativa>/`.
+    // Los snapshots nuevos viven en `.sinnotas/chronos/<ruta relativa>/`.
     if let Ok(snapshot_dir) = snapshot_dir_for_note(&root, &path) {
-        if snapshot_dir.starts_with(root.join(SNAPSHOT_FOLDER)) && snapshot_dir.is_dir() {
-            let _ = fs::remove_dir_all(snapshot_dir);
+        if let Ok(snapshot_root_dir) = snapshot_root(&root) {
+            if snapshot_dir.starts_with(&snapshot_root_dir) && snapshot_dir.is_dir() {
+                let _ = fs::remove_dir_all(snapshot_dir);
+            }
         }
     }
     Ok(())
@@ -4428,7 +4543,7 @@ fn rename_page(
             }
         }
 
-        // Los snapshots de `chronos/` siguen a la nota en su renombrado.
+        // Los snapshots de `.sinnotas/chronos/` siguen a la nota en su renombrado.
         let _ = move_snapshot_dir_for_note(&root, &old_p, &new_p);
     }
     if let Some(runtime) = cache_state.current() {
@@ -5161,6 +5276,14 @@ mod tests {
         fs::canonicalize(root).unwrap()
     }
 
+    /// Fecha UTC reciente para fixtures de progreso; no depende del día en que
+    /// se ejecuten las pruebas (la retención descarta eventos de más de un año).
+    fn recent_iso_date(day_offset: i64) -> String {
+        let days = now_millis().unwrap().div_euclid(1000).div_euclid(86_400) + day_offset;
+        let (year, month, day) = civil_date_from_days(days);
+        format!("{year:04}-{month:02}-{day:02}")
+    }
+
     #[test]
     fn snapshot_config_is_clamped_to_the_safe_window() {
         let config = SnapshotConfig {
@@ -5381,7 +5504,7 @@ mod tests {
 
         assert!(snapshot_note_key(&root, &note).is_ok());
         let dir = snapshot_dir_for_note(&root, &note).unwrap();
-        assert!(dir.starts_with(root.join(SNAPSHOT_FOLDER)));
+        assert!(dir.starts_with(root.join(".sinnotas").join(SNAPSHOT_FOLDER)));
         assert!(snapshot_note_key(&root, Path::new("/etc/passwd")).is_err());
         assert!(snapshot_dir_for_note(&root, &root.join("nota.txt")).is_err());
 
@@ -5555,6 +5678,39 @@ mod tests {
         assert_eq!(pages.len(), 1);
         assert_eq!(pages[0].title, "normal");
         assert!(skipped.is_empty());
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn legacy_internal_folders_are_migrated_under_sinnotas() {
+        let root = snapshot_test_root("internal-migration");
+        fs::create_dir_all(root.join("chronos/nota")).unwrap();
+        fs::write(root.join("chronos/nota/config.json"), "{}").unwrap();
+        fs::create_dir_all(root.join("progress")).unwrap();
+        fs::write(
+            root.join("progress/reviews.json"),
+            "{\"version\":1,\"entries\":[]}",
+        )
+        .unwrap();
+
+        migrate_internal_folders(&root).unwrap();
+
+        assert!(!root.join("chronos").exists());
+        assert!(!root.join("progress").exists());
+        assert_eq!(
+            fs::read_to_string(root.join(".sinnotas/chronos/nota/config.json")).unwrap(),
+            "{}"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join(".sinnotas/progress/reviews.json")).unwrap(),
+            "{\"version\":1,\"entries\":[]}"
+        );
+
+        // Es idempotente: una segunda carga no duplica ni mueve nada.
+        migrate_internal_folders(&root).unwrap();
+        assert!(root.join(".sinnotas/chronos/nota/config.json").is_file());
+        assert!(root.join(".sinnotas/progress/reviews.json").is_file());
 
         fs::remove_dir_all(root).unwrap();
     }
@@ -5863,19 +6019,21 @@ mod tests {
 
     #[test]
     fn review_progress_merge_deduplicates_and_keeps_latest_state() {
+        let today = recent_iso_date(0);
+        let yesterday = recent_iso_date(-1);
         let existing = serde_json::json!({
             "version": 1,
             "entries": [
                 {
                     "id": "same",
-                    "at": "2026-10-24T10:00:00.000Z",
-                    "updatedAt": "2026-10-24T10:00:00.000Z",
+                    "at": format!("{today}T10:00:00.000Z"),
+                    "updatedAt": format!("{today}T10:00:00.000Z"),
                     "state": "applied"
                 },
                 {
                     "id": "old",
-                    "at": "2026-10-23T10:00:00.000Z",
-                    "updatedAt": "2026-10-23T10:00:00.000Z",
+                    "at": format!("{yesterday}T10:00:00.000Z"),
+                    "updatedAt": format!("{yesterday}T10:00:00.000Z"),
                     "state": "applied"
                 }
             ]
@@ -5886,14 +6044,14 @@ mod tests {
             "entries": [
                 {
                     "id": "same",
-                    "at": "2026-10-24T10:00:00.000Z",
-                    "updatedAt": "2026-10-24T10:05:00.000Z",
+                    "at": format!("{today}T10:00:00.000Z"),
+                    "updatedAt": format!("{today}T10:05:00.000Z"),
                     "state": "undone"
                 },
                 {
                     "id": "new",
-                    "at": "2026-10-24T11:00:00.000Z",
-                    "updatedAt": "2026-10-24T11:00:00.000Z",
+                    "at": format!("{today}T11:00:00.000Z"),
+                    "updatedAt": format!("{today}T11:00:00.000Z"),
                     "state": "applied"
                 }
             ]
@@ -5914,10 +6072,43 @@ mod tests {
     }
 
     #[test]
+    fn review_progress_drops_events_older_than_one_year() {
+        assert_eq!(review_progress_cutoff_date(0), "1969-01-01");
+
+        let now = now_millis().unwrap();
+        let cutoff = review_progress_cutoff_date(now);
+        let cutoff_days = now
+            .div_euclid(1000)
+            .div_euclid(86_400)
+            .saturating_sub(REVIEW_PROGRESS_MAX_AGE_DAYS);
+        let (year, month, day) = civil_date_from_days(cutoff_days - 1);
+        let too_old = format!("{year:04}-{month:02}-{day:02}T00:00:00.000Z");
+        let recent = format!("{cutoff}T00:00:00.000Z");
+
+        let incoming = serde_json::json!({
+            "version": 1,
+            "entries": [
+                { "id": "old", "at": too_old, "updatedAt": too_old, "state": "applied" },
+                { "id": "recent", "at": recent, "updatedAt": recent, "state": "applied" }
+            ]
+        })
+        .to_string();
+
+        let merged = merge_review_progress_json(None, &incoming).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&merged).unwrap();
+        let entries = value
+            .get("entries")
+            .and_then(|entries| entries.as_array())
+            .unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["id"], "recent");
+    }
+
+    #[test]
     fn review_progress_merge_rejects_invalid_files_and_unsafe_path_is_fixed() {
         assert!(merge_review_progress_json(None, "no json").is_err());
         assert!(merge_review_progress_json(None, "{\"version\":1}").is_err());
-        assert!(validate_progress_relative_path("progress/reviews.json").is_ok());
+        assert!(validate_progress_relative_path(".sinnotas/progress/reviews.json").is_ok());
         assert!(validate_progress_relative_path("../reviews.json").is_err());
         assert!(validate_progress_relative_path("progress/other.json").is_err());
     }
