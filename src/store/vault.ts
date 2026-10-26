@@ -339,6 +339,10 @@ export class VaultStore {
       }
     }
     this.pages.forEach((page) => normalizeBlockTypes(page.blocks));
+    // Normalizar rutas heredadas (absolutas/prefijadas) a rutas relativas.
+    this.pages.forEach((page) => {
+      page.path = this.toRelativeNotePath(page.path, this.activeRootPath);
+    });
 
     if (isTauri()) {
       // Ya migradas las revisiones, la copia completa del vault sobra en localStorage.
@@ -470,12 +474,45 @@ export class VaultStore {
     return this.activeVaultName;
   }
 
+  /** Convierte una ruta de nota a ruta relativa al vault activo. */
+  private toRelativeNotePath(path: string, rootPath?: string | null): string {
+    let normalized = (path || "").replace(/\\/g, "/").trim();
+    if (!normalized) return normalized;
+
+    const normalizedRoot = rootPath?.replace(/\\/g, "/").replace(/\/+$/, "");
+    if (normalizedRoot && normalized.startsWith(`${normalizedRoot}/`)) {
+      normalized = normalized.slice(normalizedRoot.length + 1);
+    }
+
+    // Si la ruta sigue siendo absoluta o quedó prefijada por una raíz antigua
+    // (p. ej. un JSON de SAF), conservamos solo la parte relativa a partir de
+    // las carpetas de notas conocidas.
+    const pagesIndex = normalized.lastIndexOf("/pages/");
+    const journalsIndex = normalized.lastIndexOf("/journals/");
+    const knownIndex = Math.max(pagesIndex, journalsIndex);
+    if (knownIndex >= 0) {
+      normalized = normalized.slice(knownIndex + 1);
+    } else if (/^(?:\/|[a-z]:\/)/i.test(normalized)) {
+      // Último recurso: quedarse con el nombre de archivo.
+      normalized = normalized.split("/").pop() || normalized;
+    }
+
+    return normalized.replace(/^\/+/, "");
+  }
+
   public getActiveRootPath(): string | null {
     return this.activeRootPath;
   }
 
   public replaceVault(pages: PageData[], rootPath: string, vaultName: string): void {
     pages.forEach((page) => normalizeBlockTypes(page.blocks));
+    // Las rutas de las notas deben ser relativas al vault. En algunos vaults
+    // (especialmente SAF en Android) el frontend pudo haber guardado rutas
+    // absolutas o prefijadas con la raíz; las normalizamos aquí para que el
+    // backend resuelva siempre dentro del vault activo.
+    pages.forEach((page) => {
+      page.path = this.toRelativeNotePath(page.path, rootPath);
+    });
     // Descartar escrituras diferidas del vault anterior.
     this.pendingSaves.forEach((entry) => window.clearTimeout(entry.timer));
     this.pendingSaves.clear();
@@ -805,9 +842,7 @@ export class VaultStore {
     const existing = this.getPageByTitle(normalizedTitle);
     if (existing) return existing;
 
-    const pagePath = this.activeRootPath
-      ? `${this.activeRootPath.replace(/[\\/]+$/, "")}/pages/${normalizedTitle}.md`
-      : `pages/${normalizedTitle}.md`;
+    const pagePath = `pages/${normalizedTitle}.md`;
     const newPage: PageData = {
       id: "p-" + Math.random().toString(36).substring(2, 9),
       title: normalizedTitle,
@@ -846,13 +881,10 @@ export class VaultStore {
       title = `${baseTitle} (${suffix})`;
       suffix += 1;
     }
-    const root = this.activeRootPath?.replace(/[\\/]+$/, "");
     const page: PageData = {
       id: "p-" + Math.random().toString(36).substring(2, 9),
       title,
-      path: root
-        ? `${root}/journals/${compactDate}.md`
-        : `journals/${compactDate}.md`,
+      path: `journals/${compactDate}.md`,
       isJournal: true,
       journalDate: date,
       updatedAt: new Date().toISOString().replace("T", " ").substring(0, 16),
@@ -915,9 +947,10 @@ export class VaultStore {
     const pending = Promise.all(previous)
       .then(operation)
       .catch((error: unknown) => {
+        const detail = error instanceof Error ? error.message : String(error);
         console.error(`No se pudo ${operationName} mediante Tauri:`, error);
         window.dispatchEvent(new CustomEvent("vault-operation-error", {
-          detail: `No se pudo ${operationName}. Verifica los permisos de escritura del vault.`,
+          detail: `No se pudo ${operationName}: ${detail}`,
         }));
         if (propagateError) throw error;
       });
