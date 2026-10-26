@@ -1,6 +1,10 @@
 declare const __APP_MODE__: "desktop" | "flashcards";
 
 import { hideAppSplash } from "./splash";
+import {
+  installAndroidSafeArea,
+  type AndroidSafeAreaWindow,
+} from "./mobile/android-safe-area";
 
 /**
  * Punto de entrada único de Sin Notas.
@@ -34,6 +38,9 @@ async function bootstrap(): Promise<void> {
     if (surfaceMode === "desktop") {
       if (shouldUseMobileFullEditor(platformMode, request)) {
         document.body.classList.add("mobile-full-editor");
+        // La APK dibuja bajo la barra de estado también en el editor completo.
+        // Reaplica las insets nativas al montar esta superficie.
+        installAndroidSafeArea(window as unknown as AndroidSafeAreaWindow);
       }
       await import("./desktop");
       return;

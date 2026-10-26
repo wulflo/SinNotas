@@ -7079,6 +7079,15 @@ body.no-active-page #btn-delete-page {
   display: none;
 }
 
+body.mobile-full-editor {
+  /* En Android la app dibuja bajo la barra de estado. El puente nativo
+     publica las insets reales; env() cubre WebView/iOS que ya las calculan. */
+  --mobile-full-safe-top: max(env(safe-area-inset-top, 0px), var(--sinnotas-safe-area-top, 0px));
+  --mobile-full-safe-right: max(env(safe-area-inset-right, 0px), var(--sinnotas-safe-area-right, 0px));
+  --mobile-full-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--sinnotas-safe-area-bottom, 0px));
+  --mobile-full-safe-left: max(env(safe-area-inset-left, 0px), var(--sinnotas-safe-area-left, 0px));
+}
+
 body.mobile-full-editor .mobile-editor-only {
   display: flex;
 }
@@ -7089,6 +7098,13 @@ body.mobile-full-editor .desktop-review-only {
 
 body.mobile-full-editor #app {
   flex-direction: column;
+  height: 100dvh;
+}
+
+body.mobile-full-editor .headbar {
+  height: calc(var(--ls-headbar-height) + var(--mobile-full-safe-top));
+  padding: var(--mobile-full-safe-top) max(16px, var(--mobile-full-safe-right)) 0
+    max(16px, var(--mobile-full-safe-left));
 }
 
 body.mobile-full-editor .sidebar-left {
@@ -7096,6 +7112,8 @@ body.mobile-full-editor .sidebar-left {
   left: 0;
   top: 0;
   height: 100dvh;
+  padding: var(--mobile-full-safe-top) var(--mobile-full-safe-right)
+    var(--mobile-full-safe-bottom) var(--mobile-full-safe-left);
   z-index: 200;
   transform: translateX(-100%);
   transition: transform 0.2s ease;
@@ -7111,6 +7129,15 @@ body.mobile-full-editor .main-container {
   height: 100dvh;
 }
 
+body.mobile-full-editor .view-panel {
+  height: auto;
+  min-height: 0;
+}
+
+body.mobile-full-editor .content-scroll {
+  padding-bottom: calc(100px + var(--mobile-full-safe-bottom));
+}
+
 @media (max-width: 1024px) {
   body.mobile-full-editor .sidebar-left {
     width: 85vw;
@@ -7119,8 +7146,8 @@ body.mobile-full-editor .main-container {
   }
 
   body.mobile-full-editor .content-scroll {
-    padding-left: 14px;
-    padding-right: 14px;
+    padding-left: max(14px, var(--mobile-full-safe-left));
+    padding-right: max(14px, var(--mobile-full-safe-right));
   }
 }
 
