@@ -855,6 +855,10 @@ class MobileReviewApp {
     window.addEventListener("focus", () => {
       void this.syncFromDiskIfIdle();
     });
+    window.addEventListener("vault-operation-error", (event) => {
+      const message = (event as CustomEvent<string>).detail;
+      if (message) this.showToast(message);
+    });
     document.addEventListener("visibilitychange", () => {
       if (!document.hidden) void this.syncFromDiskIfIdle();
     });
@@ -2180,9 +2184,9 @@ class MobileReviewApp {
       : card.imageOcclusion
         ? [card.imageOcclusion]
         : [];
-    const visibleMasks = revealed
-      ? regions.filter((region) => region !== card.imageOcclusion)
-      : regions;
+    // En la respuesta se muestra únicamente la imagen limpia, sin máscaras ni
+    // contornos: la oclusión solo tiene sentido durante la pregunta.
+    const visibleMasks = revealed ? [] : regions;
 
     const layer = document.createElement("div");
     layer.className = "mobile-image-mask-layer";

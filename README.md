@@ -148,7 +148,7 @@ All project documentation lives in the single technical guide
 [docs/SinNotas.md](docs/SinNotas.md). This README is the entry point. The guide
 covers the architecture, editor and vault, FSRS/Learning mode, the paginated
 mobile notes selector, Android safe area, desktop/Android updater, security,
-performance, build and CI/release steps, current 0.2.7 release data and known
+performance, build and CI/release steps, current 0.2.8 release data and known
 limitations.
 
 ## Tauri application

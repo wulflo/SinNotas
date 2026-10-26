@@ -85,6 +85,14 @@ function clampNumber(value: number, minimum: number, maximum: number): number {
 }
 
 /**
+ * Redondea a 4 casas decimales. Evita que el redondeo de floating-point haga
+ * que el tamaño guardado difiera del que el usuario dibujó con el cursor.
+ */
+function roundRegionValue(value: number): number {
+  return Math.round(value * 10000) / 10000;
+}
+
+/**
  * Mantiene una región dentro de la imagen y con un tamaño mínimo usable.
  * Se aplica al editar coordenadas desde la APK para que ni un gesto ni un dato
  * manipulado puedan producir máscaras fuera del lienzo.
@@ -92,10 +100,10 @@ function clampNumber(value: number, minimum: number, maximum: number): number {
 export function clampImageOcclusionRegion(
   region: ImageOcclusionRegion
 ): ImageOcclusionRegion {
-  const width = clampNumber(region.width, 0.02, 1);
-  const height = clampNumber(region.height, 0.02, 1);
-  const x = clampNumber(region.x, 0, 1 - width);
-  const y = clampNumber(region.y, 0, 1 - height);
+  const width = roundRegionValue(clampNumber(region.width, 0.02, 1));
+  const height = roundRegionValue(clampNumber(region.height, 0.02, 1));
+  const x = roundRegionValue(clampNumber(region.x, 0, 1 - width));
+  const y = roundRegionValue(clampNumber(region.y, 0, 1 - height));
   return normalizeImageOcclusionRegion({
     ...region,
     x,
@@ -103,8 +111,8 @@ export function clampImageOcclusionRegion(
     width,
     height,
     points: region.points?.map((point) => ({
-      x: clampNumber(point.x, 0, 1),
-      y: clampNumber(point.y, 0, 1),
+      x: roundRegionValue(clampNumber(point.x, 0, 1)),
+      y: roundRegionValue(clampNumber(point.y, 0, 1)),
     })),
   }) ?? region;
 }

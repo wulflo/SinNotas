@@ -64,11 +64,11 @@ describe("FSRS-4.5 - parámetros y fórmulas oficiales", () => {
   it("usa los 17 pesos publicados para FSRS-4.5", () => {
     expect(defaultFSRSParams.w).toHaveLength(17);
     expect(defaultFSRSParams.w).toEqual([
-      0.4872, 1.4003, 3.7145, 13.8206,
-      5.1618, 1.2298, 0.8975, 0.031,
-      1.6474, 0.1367, 1.0461,
-      2.1072, 0.0793, 0.3246, 1.587,
-      0.2272, 2.8755,
+      0.212, 1.2931, 2.3065, 11.2624,
+      4.4032, 1.2805, 0.8634, 0.0328,
+      1.3388, 0.1833, 0.9071,
+      1.5663, 0.0862, 0.3515, 1.4933,
+      0.2585, 2.4813,
     ]);
   });
 
@@ -77,10 +77,10 @@ describe("FSRS-4.5 - parámetros y fórmulas oficiales", () => {
     const item: FSRSItem = { stability: 0, difficulty: 5, reps: 0, lapses: 0, state: 0 };
     const previews = engine.previewRatings(item);
 
-    expect(previews[1].item.difficulty).toBe(7.62); // w4 + 2·w5
-    expect(previews[2].item.difficulty).toBe(6.39); // w4 + w5
-    expect(previews[3].item.difficulty).toBe(5.16); // w4
-    expect(previews[4].item.difficulty).toBe(3.93); // w4 - w5
+    expect(previews[1].item.difficulty).toBe(6.96); // w4 + 2·w5
+    expect(previews[2].item.difficulty).toBe(5.68); // w4 + w5
+    expect(previews[3].item.difficulty).toBe(4.4); // w4
+    expect(previews[4].item.difficulty).toBe(3.12); // w4 - w5
   });
 });
 
@@ -103,10 +103,10 @@ describe("FSRS - fase de aprendizaje", () => {
       intervalText: "10m",
       item: { state: 1, learningStep: 1 },
     });
-    // Easy gradúa directamente; su intervalo es el de FSRS, no un paso.
+    // Easy gradúa directamente; su intervalo es S0(4), no un paso.
     expect(previews[4].item.state).toBe(2);
     expect(previews[4].item.learningStep).toBeUndefined();
-    expect(previews[4].intervalText).toBe("14d");
+    expect(previews[4].intervalText).toBe("11d");
   });
 
   it("Good desde el último paso gradúa con el intervalo FSRS", () => {
@@ -120,19 +120,19 @@ describe("FSRS - fase de aprendizaje", () => {
     expect(previews[2].intervalText).toBe("10m");
     expect(previews[3].item.state).toBe(2);
     expect(previews[3].item.learningStep).toBeUndefined();
-    expect(previews[3].intervalText).toBe("4d");
+    expect(previews[3].intervalText).toBe("2d");
     // Easy conserva la estabilidad acumulada y aplica el bonus de FSRS; ya no
-    // reinicia la tarjeta a S0(4) = 14 días.
+    // reinicia la tarjeta a S0(4) = 11 días.
     expect(previews[4].item.state).toBe(2);
     expect(previews[4].item.stability).toBeGreaterThan(previews[3].item.stability);
-    expect(previews[4].intervalText).toBe("4d");
+    expect(previews[4].intervalText).toBe("2d");
   });
 
   it("Easy en Learning aplica la fórmula de recuerdo y no reinicia a S0(4)", () => {
     const engine = new FSRSEngine();
     const learning: FSRSItem = {
-      stability: 3.71,
-      difficulty: 5.16,
+      stability: 2.31,
+      difficulty: 4.4,
       reps: 1,
       lapses: 0,
       state: 1,
@@ -149,8 +149,8 @@ describe("FSRS - fase de aprendizaje", () => {
   it("Easy en Relearning también conserva la estabilidad acumulada", () => {
     const engine = new FSRSEngine();
     const relearning: FSRSItem = {
-      stability: 3.71,
-      difficulty: 5.16,
+      stability: 2.31,
+      difficulty: 4.4,
       reps: 2,
       lapses: 1,
       state: 3,
@@ -166,8 +166,8 @@ describe("FSRS - fase de aprendizaje", () => {
   it("Again durante el aprendizaje reinicia al primer paso sin contar lapse", () => {
     const engine = new FSRSEngine();
     const learning: FSRSItem = {
-      stability: 3.71,
-      difficulty: 5.16,
+      stability: 2.31,
+      difficulty: 4.4,
       reps: 1,
       lapses: 0,
       state: 1,

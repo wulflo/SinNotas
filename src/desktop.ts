@@ -99,6 +99,7 @@ import {
 } from "./editor/markdown-table";
 import {
   appendOcclusionMasks,
+  clampImageOcclusionRegion,
   parseImageOcclusions,
 } from "./editor/image-occlusion";
 import { renderMathToHtml } from "./editor/math";
@@ -3759,7 +3760,9 @@ function saveBlockImageOcclusions(
     ...parseImageOcclusions(node.content)
       .filter((region) => region.source !== source)
       .map(cloneImageOcclusionRegion),
-    ...regions.map((region) => cloneImageOcclusionRegion({ ...region, source })),
+    ...regions.map((region) =>
+      cloneImageOcclusionRegion(clampImageOcclusionRegion({ ...region, source }))
+    ),
   ];
   if (merged.length > 0) retained.push(`image-occlusions:: ${JSON.stringify(merged)}`);
   node.content = `${prefix}${visibleText}${retained.length ? `\n${retained.join("\n")}` : ""}`;
@@ -9438,9 +9441,9 @@ function createImageOcclusionPreview(card: Flashcard, revealed: boolean): HTMLDi
     const regions = card.imageOcclusions?.length
       ? card.imageOcclusions
       : [card.imageOcclusion];
-    const visibleMasks = revealed
-      ? regions.filter((region) => region !== card.imageOcclusion)
-      : regions;
+    // En la respuesta se muestra únicamente la imagen limpia, sin máscaras ni
+    // contornos: la oclusión solo tiene sentido durante la pregunta.
+    const visibleMasks = revealed ? [] : regions;
     if (visibleMasks.length === 0) return preview;
     const layer = document.createElement("div");
     layer.className = "flashcard-image-mask-layer";
@@ -9695,17 +9698,10 @@ function handleRevealAnswer() {
   if (card?.cardType === "image-occlusion") {
     const preview = cardQuestionEl.querySelector(".flashcard-image-preview") as HTMLDivElement;
     const layer = preview?.querySelector(".flashcard-image-mask-layer") as HTMLDivElement;
-    const image = preview?.querySelector("img") as HTMLImageElement;
-    if (card.imageOcclusion && layer && image) {
-      const regions = card.imageOcclusions?.length
-        ? card.imageOcclusions
-        : [card.imageOcclusion];
-      const visibleMasks = regions.filter((region) => region !== card.imageOcclusion);
-      layer.innerHTML = "";
-      if (visibleMasks.length > 0) {
-        appendOcclusionMasks(layer, visibleMasks, image);
-      }
-    }
+    // Al revelar se retiran las máscaras: la respuesta muestra solo la imagen
+    // limpia. Antes se volvían a dibujar los contornos de las demás regiones,
+    // un remanente de cuando se mostraban ambas versiones a la vez.
+    layer?.replaceChildren();
   }
   syncClozeRevealLayout(card, true);
   cardAnswerEl.classList.add("visible");

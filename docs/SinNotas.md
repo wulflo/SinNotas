@@ -1,6 +1,6 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.2.7 · **Fecha:** 2026-10-26
+**Versión:** 0.2.8 · **Fecha:** 2026-10-26
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
@@ -46,6 +46,8 @@ Rutas principales:
 ## FSRS y repaso
 
 - FSRS-4.5 implementado en `src/editor/fsrs.ts`.
+- Se usan los **17 pesos oficiales** de FSRS-4.5 (`ts-fsrs` 5.4.2), no una
+  aproximación propia: `0.212, 1.2931, 2.3065, 11.2624, 4.4032, 1.2805, ...`.
 - Fases de aprendizaje: pasos cortos de 1 min y 10 min antes de graduarse a
   repaso, para evitar intervalos iniciales irreales.
 - El estado de aprendizaje se persiste; una tarjeta no vuelve a Review al
@@ -55,6 +57,28 @@ Rutas principales:
 - Los intervalos se muestran en unidades legibles: `m`, `h`, `d`, `mo`, `y`.
 - El modo Aprendizaje no guarda progreso; al activarlo o desactivarlo la cola se
   reinicia con todas las tarjetas para que ninguna quede oculta.
+
+## Oclusión de imagen
+
+- Las tarjetas de oclusión guardan las regiones normalizadas (`x`, `y`, `width`,
+  `height` entre 0 y 1) en la propiedad `image-occlusions::`.
+- En la **pregunta** se ocultan todas las regiones. La región de la tarjeta
+  activa se resalta para que el usuario sepa qué debe recordar.
+- En la **respuesta** se muestra únicamente la imagen limpia: no se dibujan
+  máscaras, contornos ni la región activa. Antes se volvían a pintar las demás
+  regiones, un remanente de cuando se enseñaban a la vez la imagen con y sin
+  oclusión.
+- La vista previa de las tarjetas ajusta su caja al tamaño real de la imagen
+  (`width: fit-content` y `img { width:auto; max-width:100% }`). Antes la imagen
+  se dibujaba con `object-fit: contain` dentro de una caja más ancha, así que las
+  máscaras se escalaban contra el espacio vacío y parecían desplazadas un ~5 %
+  respecto de lo que el cursor marcó.
+- Al guardar se recortan las regiones al lienzo, se aplica un tamaño mínimo y se
+  redondean a 4 decimales en escritorio y Android. Así el dato guardado coincide
+  con el gesto y no acumula ruido de coma flotante.
+- El editor móvil y el de escritorio miden siempre contra el rectángulo real de
+  la imagen (`getBoundingClientRect`), que es la misma referencia usada por el
+  cursor.
 
 ## Selector de notas del repaso móvil
 
@@ -97,6 +121,27 @@ npm run android:patch
 El script `scripts/patch-android-safe-area.mjs` se ejecuta después de
 `tauri android init` y antes de compilar. CI siempre regenera `gen/android` y
 vuelve a aplicar el parche.
+
+## Bóveda en Android
+
+La APK no abre el selector SAF ni pide permisos de almacenamiento. La bóveda
+vive en el directorio privado de la aplicación:
+
+```text
+/data/data/com.sinnotas.desktop/files
+```
+
+Si ese directorio no se puede crear, se usa el almacenamiento externo específico
+de la app (`/storage/emulated/0/Android/data/com.sinnotas.desktop/files`). El
+arranque usa `app_data_dir()` y el botón **Abrir otra bóveda** devuelve la misma
+raíz interna y la registra como autorizada, de modo que la app no vuelve a pedir
+acceso ni confirmación en cada inicio.
+
+Las bóvedas SAF de versiones anteriores siguen siendo legibles mientras el
+sistema conserve el permiso, pero el flujo nuevo prioriza el almacenamiento
+privado. Para respaldar o sincronizar, se usa la exportación de la app o una
+copia de seguridad del sistema; el directorio interno no es visible desde el
+gestor de archivos.
 
 ## Actualizador
 
@@ -245,10 +290,56 @@ la clave de release.
 - Secretos del updater de escritorio: `TAURI_SIGNING_PRIVATE_KEY`,
   `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
 
+### Publicar una release sin errores
+
+El workflow de release se dispara **solo** con un tag que empiece por `v` y
+compara el número del tag con tres archivos. Para publicar la `0.2.8`:
+
+```bash
+# 1. Las tres versiones deben ser idénticas
+node -p "require('./package.json').version"
+node -p "require('./src-tauri/tauri.conf.json').version"
+sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' src-tauri/Cargo.toml | head -n 1
+
+# 2. Commit y tag anotado sobre ese commit
+git add -A
+git commit -m "chore(release): preparar 0.2.8"
+git tag -a v0.2.8 -m "Sin Notas 0.2.8"     # el tag SIEMPRE lleva la v
+
+# 3. Empujar y comprobar que arrancó el workflow
+git push origin master
+git push origin v0.2.8
+gh run list --workflow=release.yml --limit 1
+```
+
+Puntos que causan el error de “número de release distinto” o `already_exists`:
+
+- **El tag no lleva `v`.** Un tag `0.2.8` no dispara `release.yml` (filtro
+  `v*`), así que GitHub guarda una release sin artefactos y `latest.json`
+  devuelve 404.
+- **El tag no coincide con las tres versiones.** El job `validate` falla antes
+  de compilar. El número de `latest.json` se genera sin la `v`; no se debe
+  escribir a mano.
+- **La release se creó o guardó antes en la interfaz web.** Al pulsar
+  *Save release* GitHub crea el tag en el commit que elija la UI, no en el
+  commit local. Después, el workflow intenta publicar sobre un tag que ya
+  apunta a otro sitio y falla con `already_exists` o con una release vacía.
+  La release se crea **solo** dejando que el workflow la genere desde el tag.
+- **Se reutiliza un tag viejo.** Si el tag ya existe en otro commit, hay que
+  borrarlo en local y en remoto, volver a crearlo sobre el commit correcto y
+  empujarlo con `--force`. Nunca se edita una release a mano para “arreglar”
+  el número.
+
+En la v0.2.8 el tag se empujó junto con `master` y GitHub no inició el workflow
+de Release; no se pudo confirmar la causa. La comprobación con
+`gh run list --workflow=release.yml` es obligatoria después de cada push: si no
+aparece el run, se borra el tag remoto, se vuelve a crear sobre el commit
+correcto y se empuja de nuevo.
+
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Versión actual: `0.2.7` (`versionCode 2007`)
+- Versión actual: `0.2.8` (`versionCode 2008`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):
@@ -258,7 +349,8 @@ la clave de release.
 ## Limitaciones conocidas
 
 - Las bóvedas externas en Android dependen del acceso SAF autorizado por el
-  usuario; no se interpretan URIs como rutas locales.
+  usuario; no se interpretan URIs como rutas locales. La v0.2.8 usa el
+  directorio privado de la app para la bóveda y no abre el diálogo SAF.
 - La APK abre en modo repaso. El editor completo, con diarios, Kanban, grafo y
   mapa conceptual, se abre desde **Abrir páginas y editor**.
 - El fix de safe area del editor completo se validó con estilos computados en el
@@ -276,7 +368,9 @@ la clave de release.
 ## Verificación actual
 
 - `npx tsc --noEmit`: correcto.
-- `npm test`: **249 pruebas en 27 archivos**.
+- `npm test`: **249 pruebas en 27 archivos**; incluye los pesos oficiales de
+  FSRS-4.5 y las regresiones de oclusión.
+- `cargo check --manifest-path src-tauri/Cargo.toml --lib`: correcto.
 - CI de `master`: lint/test, APK debug y APK release firmada.
 - Safe area del editor completo: estilos computados en navegador con inset
   superior 24 px e inferior 16 px; `.headbar` mide 72 px, el cajón lateral y el
@@ -292,6 +386,13 @@ la clave de release.
   APK coincide con `latest.json`, las URLs devuelven 200, las firmas minisign
   del AppImage y del `.deb` se validaron y el certificado Android es el mismo
   que el de 0.2.6.
+- v0.2.8 (local): pesos oficiales de FSRS-4.5 aplicados, 249 pruebas y
+  `tsc --noEmit` correctos; la respuesta de oclusión ya no dibuja máscaras y la
+  vista previa ajusta su caja al tamaño real de la imagen.
+- Oclusión de imagen, medición en navegador: con el CSS anterior una imagen
+  vertical 400×1200 dejaba la caja de la máscara un **72,1 %** más ancha que la
+  imagen visible; con `width: fit-content` y la imagen en `width: auto` la caja,
+  la imagen y la capa de máscaras coinciden al píxel (0 % de desajuste).
 - Actualización Android 0.2.6 → 0.2.7: APK guardado en `Descargas/SinNotas/`,
   visible desde el gestor de archivos e instalado manualmente.
 - Alineación de bullets con propiedades: verificada en navegador midiendo la

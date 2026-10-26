@@ -2845,12 +2845,14 @@ fn require_vault_approval(
     persist_approved_vault_roots(app, &approved)
 }
 
-/// Abre el selector nativo de carpetas desde el backend y devuelve la raíz
-/// elegida (ya autorizada). `None` si el usuario canceló.
+/// Devuelve la raíz de la bóveda activa (ya autorizada). `None` si el usuario
+/// canceló.
 ///
-/// En Android usa SAF (Storage Access Framework) via plugin android-fs.
-/// En iOS usa el vault interno.
-/// En desktop usa el selector nativo de carpetas.
+/// En Android no se abre un diálogo SAF: la bóveda vive en el directorio
+/// privado de la aplicación (`/data/data/<paquete>/files`), con el directorio
+/// externo específico de la app como respaldo. Así se evita pedir permisos de
+/// almacenamiento y repetir el diálogo en cada arranque. En iOS se usa el vault
+/// interno. En desktop se abre el selector nativo de carpetas.
 #[tauri::command]
 async fn pick_vault_root(
     app: AppHandle,
@@ -2858,27 +2860,34 @@ async fn pick_vault_root(
 ) -> Result<Option<String>, String> {
     #[cfg(target_os = "android")]
     {
-        // En Android, usar el selector SAF via plugin android-fs
-        let _ = (&app, &approved_roots);
-        use tauri_plugin_android_fs::{AndroidFs, AndroidFsExt};
-        if let Some(dir_path) = app
-            .android_fs()
-            .show_open_dir_dialog()
-            .map_err(|e| e.to_string())?
-        {
-            // Conservar el acceso tras reiniciar la app. Si el proveedor no lo
-            // permite, la bóveda sigue funcionando durante esta sesión.
-            if let Err(error) = app.android_fs().grant_persistable_dir_access(
-                &dir_path,
-                tauri_plugin_android_fs::PersistableAccessMode::ReadAndWrite,
-            ) {
-                eprintln!("No se pudo persistir el permiso SAF: {error}");
+        // El identificador coincide con el paquete Android y con el directorio
+        // privado que usa el sistema para la app.
+        let identifier = app.config().identifier.clone();
+        let candidates = [
+            PathBuf::from(format!("/data/data/{identifier}/files")),
+            PathBuf::from(format!(
+                "/storage/emulated/0/Android/data/{identifier}/files"
+            )),
+        ];
+        for dir in candidates {
+            if fs::create_dir_all(&dir).is_ok() {
+                let root = fs::canonicalize(&dir).unwrap_or(dir);
+                // La raíz es privada de la app, pero load_vault exige que esté
+                // en la lista de bóvedas autorizadas para las rutas explícitas.
+                {
+                    let mut approved = approved_roots
+                        .0
+                        .lock()
+                        .map_err(|_| "No se pudo guardar la bóveda autorizada.".to_string())?;
+                    if !approved.iter().any(|path| path == &root) {
+                        approved.push(root.clone());
+                    }
+                    persist_approved_vault_roots(&app, &approved)?;
+                }
+                return Ok(Some(root.to_string_lossy().into_owned()));
             }
-            let uri = tauri_plugin_android_fs::convert_dir_path_to_string(&dir_path)
-                .map_err(|e| e.to_string())?;
-            return Ok(Some(uri));
         }
-        Ok(None)
+        Err("No se pudo preparar el almacenamiento interno de la aplicación.".to_string())
     }
 
     #[cfg(target_os = "ios")]

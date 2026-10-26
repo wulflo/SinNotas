@@ -586,7 +586,8 @@ body.mobile-review-body {
 
 .mobile-image-preview {
   position: relative;
-  width: min(100%, 620px);
+  width: fit-content;
+  max-width: 100%;
   margin: 0 auto;
   overflow: hidden;
   border-radius: 14px;
@@ -595,7 +596,9 @@ body.mobile-review-body {
 
 .mobile-image-preview > img {
   display: block;
-  width: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
   max-height: min(54vh, 560px);
   border-radius: inherit;
   object-fit: contain;
@@ -641,6 +644,7 @@ body.mobile-review-body {
 .mobile-image-preview.has-error {
   display: grid;
   place-items: center;
+  width: min(100%, 620px);
   min-height: 180px;
 }
 

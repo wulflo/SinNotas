@@ -581,6 +581,9 @@ export class VaultStore {
       this.pendingSaves.delete(page.id);
       void this.persistPage(page).catch((error: unknown) => {
         console.error("No se pudo guardar la nota:", error);
+        window.dispatchEvent(new CustomEvent("vault-operation-error", {
+          detail: "No se pudo guardar la nota. Verifica el espacio de almacenamiento local.",
+        }));
       });
     }, SAVE_DEBOUNCE_MS);
 
