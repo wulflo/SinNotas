@@ -267,9 +267,13 @@ la clave de release.
 - Safe area del editor completo: estilos computados en navegador con inset
   superior 24 px e inferior 16 px; `.headbar` mide 72 px, el cajón lateral y el
   contenido reservan sus insets y el layout encaja en el viewport.
-- Release v0.2.2: APK `versionCode 2002`, `.deb.sig` y `latest.json` con
-  `linux-x86_64-deb` verificados; la firma, el paquete y el manifiesto Android
-  se comprobaron con `apksigner` y `aapt`.
+- Release v0.2.3: APK `versionName 0.2.3` / `versionCode 2003`, firmas v3,
+  `.deb.sig` y `latest.json` verificados; las URLs de AppImage, `.deb`, Windows,
+  macOS y Android devuelven 200. Las firmas minisign del AppImage y del `.deb`
+  se validaron contra la clave pública del updater.
+- El generador de `latest.json` normaliza los espacios de los assets a puntos,
+  igual que GitHub, para que las URLs publicadas coincidan con los nombres
+  reales de los archivos.
 
 ## Política de documentación
 
