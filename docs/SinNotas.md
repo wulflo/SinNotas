@@ -1,6 +1,6 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.2.5 · **Fecha:** 2026-10-26
+**Versión:** 0.2.6 · **Fecha:** 2026-10-26
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
@@ -122,9 +122,14 @@ usa `@tauri-apps/plugin-http` para:
 2. Validar tamaño, JSON y esquema.
 3. Descargar el APK de `android-aarch64`.
 4. Verificar su SHA-256 contra el manifiesto.
-5. Guardarlo en la carpeta privada de descargas de la app.
+5. Guardarlo temporalmente en la caché privada y copiarlo a
+   `Descargas/SinNotas/` mediante MediaStore (`tauri-plugin-android-fs`).
 
-La instalación es manual: la app no ejecuta ni instala el APK.
+Así el APK queda en el almacenamiento público de Descargas, visible para los
+gestores de archivos y para el instalador de Android. No se usan permisos
+legacy de almacenamiento: `minSdk 33` y MediaStore permiten escribir archivos
+propios en Descargas. La instalación sigue siendo manual: la app no ejecuta ni
+instala el APK.
 
 **Fix 0.2.0/0.2.1:** GitHub sirve los assets de release como
 `application/octet-stream`, incluso cuando el contenido es JSON. El código
@@ -233,7 +238,7 @@ la clave de release.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Versión actual: `0.2.5` (`versionCode 2005`)
+- Versión actual: `0.2.6` (`versionCode 2006`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):
@@ -258,6 +263,8 @@ la clave de release.
   mapa conceptual, se abre desde **Abrir páginas y editor**.
 - El fix de safe area del editor completo se validó con estilos computados en el
   navegador; falta confirmarlo en un dispositivo Android real.
+- El guardado del APK en `Descargas/SinNotas/` usa MediaStore; falta confirmarlo
+  en un dispositivo Android real.
 
 ## Verificación actual
 

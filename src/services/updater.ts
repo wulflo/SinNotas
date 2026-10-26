@@ -4,14 +4,15 @@
  * - Escritorio (Windows/Linux/macOS): usa el plugin nativo `updater`, que
  *   verifica la firma minisign del paquete y luego relanza la app.
  * - Android: descarga el APK desde la release de GitHub con el plugin HTTP
- *   nativo (los assets de GitHub no envían CORS) y lo guarda en la carpeta de
- *   descargas privada de la app. La instalación es manual: la APK no se ejecuta
- *   ni se instala desde la aplicación.
+ *   nativo (los assets de GitHub no envían CORS), lo guarda temporalmente en la
+ *   caché privada y el backend lo mueve a la carpeta pública de Descargas con
+ *   MediaStore. La instalación es manual: la APK no se ejecuta ni se instala
+ *   desde la aplicación.
  *
  * Ninguna comprobación se hace automáticamente: el usuario debe pulsar
  * "Buscar actualizaciones". Así la app no genera tráfico de red por sí sola.
  */
-import { isTauri } from "@tauri-apps/api/core";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { platform } from "@tauri-apps/plugin-os";
 import {
@@ -30,7 +31,6 @@ export const UPDATE_MANIFEST_URL =
   "https://github.com/wulflo/SinNotas/releases/latest/download/latest.json";
 export const ANDROID_UPDATE_PLATFORM_KEY = "android-aarch64";
 export const ANDROID_APK_FILE_NAME = "SinNotas-update.apk";
-export const ANDROID_APK_DISPLAY_PATH = `Descargas de la app/${ANDROID_APK_FILE_NAME}`;
 
 const CHECK_TIMEOUT_MS = 20_000;
 const DOWNLOAD_TIMEOUT_MS = 15 * 60_000;
@@ -369,22 +369,27 @@ async function sha256Hex(bytes: Uint8Array): Promise<string> {
   return bytesToHex(digest);
 }
 
-async function saveAndroidApk(bytes: Uint8Array): Promise<void> {
-  const { writeFile, mkdir, BaseDirectory } = await import("@tauri-apps/plugin-fs");
+async function saveAndroidApk(bytes: Uint8Array): Promise<string> {
+  const { writeFile, BaseDirectory } = await import("@tauri-apps/plugin-fs");
   try {
-    await mkdir("", { baseDir: BaseDirectory.Download, recursive: true });
+    // La caché privada siempre es escribible. El backend copia este archivo a
+    // Descargas pública mediante MediaStore y lo elimina al terminar.
+    await writeFile(ANDROID_APK_FILE_NAME, bytes, { baseDir: BaseDirectory.AppCache });
   } catch (error) {
-    // La carpeta de descargas de la app puede existir ya; el error real se
-    // manifiesta al escribir el archivo.
-    console.warn("[updater] No se pudo preparar la carpeta de descargas:", error);
+    console.error("[updater] No se pudo preparar el APK temporal:", error);
+    throw new UpdateError(
+      "No se pudo preparar el APK para guardarlo en Descargas.",
+      "write-failed"
+    );
   }
 
   try {
-    await writeFile(ANDROID_APK_FILE_NAME, bytes, { baseDir: BaseDirectory.Download });
+    return await invoke<string>("save_android_apk");
   } catch (error) {
-    console.error("[updater] No se pudo guardar el APK:", error);
+    console.error("[updater] No se pudo guardar el APK en Descargas:", error);
+    const detail = error instanceof Error ? error.message : String(error);
     throw new UpdateError(
-      "No se pudo guardar el APK en la carpeta de descargas.",
+      `No se pudo guardar el APK en Descargas. ${detail}`,
       "write-failed"
     );
   }
@@ -453,18 +458,19 @@ async function downloadAndroidUpdate(release: ReleaseManifest): Promise<UpdateSt
       );
     }
 
-    emit({ message: "Guardando el APK…" });
-    await saveAndroidApk(bytes);
+    emit({ message: "Guardando el APK en Descargas…" });
+    const savedPath = await saveAndroidApk(bytes);
+    const savedFileName = savedPath.split("/").pop() || ANDROID_APK_FILE_NAME;
 
     return emit({
       status: "ready",
       progress: 1,
       receivedBytes: bytes.byteLength,
       totalBytes: bytes.byteLength,
-      apkFileName: ANDROID_APK_FILE_NAME,
+      apkFileName: savedFileName,
       message:
-        `APK guardado como ${ANDROID_APK_DISPLAY_PATH}. Abrí un gestor de archivos con acceso a ` +
-        `Android/data/com.sinnotas.desktop/files/Download y tocá el archivo para instalarlo.`,
+        `APK guardado en ${savedPath}. Abrí un gestor de archivos, entrá en ` +
+        `Descargas/SinNotas y tocá el archivo para instalarlo.`,
     });
   } finally {
     dispose();

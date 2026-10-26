@@ -4527,6 +4527,65 @@ fn list_system_fonts() -> Vec<String> {
     families.into_iter().collect()
 }
 
+/// Guarda en la carpeta pública de Descargas el APK que el frontend descargó
+/// previamente en la caché privada de la app.
+///
+/// En Android se usa MediaStore a través de `tauri-plugin-android-fs`, así el
+/// archivo queda visible para cualquier gestor de archivos y para el
+/// instalador del sistema. No se usan permisos de almacenamiento legacy:
+/// `minSdk` es 33 y MediaStore resuelve la escritura de archivos propios.
+#[tauri::command(async)]
+fn save_android_apk(app: AppHandle) -> Result<String, String> {
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_android_fs::{PublicGeneralPurposeDir, PublicStorage};
+
+        const TEMP_APK_FILE_NAME: &str = "SinNotas-update.apk";
+        const PUBLIC_SUBDIR: &str = "SinNotas";
+        const PUBLIC_APK_FILE_NAME: &str = "SinNotas-update.apk";
+
+        let cache_dir = app
+            .path()
+            .app_cache_dir()
+            .map_err(|error| format!("No se pudo resolver la caché de la app: {error}"))?;
+        let temp_path = cache_dir.join(TEMP_APK_FILE_NAME);
+        let mut source = fs::File::open(&temp_path)
+            .map_err(|error| format!("No se pudo abrir el APK descargado: {error}"))?;
+
+        let relative_path = format!("{PUBLIC_SUBDIR}/{PUBLIC_APK_FILE_NAME}");
+        let saved_path = app
+            .android_fs()
+            .public_storage()
+            .write_with_contents_writer(
+                PublicGeneralPurposeDir::Download,
+                &relative_path,
+                Some("application/vnd.android.package-archive"),
+                |destination| std::io::copy(&mut source, destination).map(|_| ()),
+            )
+            .map_err(|error| format!("No se pudo guardar el APK en Descargas: {error}"));
+
+        drop(source);
+        // El APK temporal ya no hace falta, tanto si se copió como si falló.
+        let _ = fs::remove_file(&temp_path);
+
+        let saved_path = saved_path?;
+        // MediaStore puede renombrar si ya existe un archivo con el mismo
+        // nombre; devolvemos el nombre real para que el mensaje de la interfaz
+        // coincida con lo que verá el usuario.
+        let file_name = app
+            .android_fs()
+            .get_file_name(&saved_path)
+            .unwrap_or_else(|_| PUBLIC_APK_FILE_NAME.to_string());
+        Ok(format!("Descargas/{PUBLIC_SUBDIR}/{file_name}"))
+    }
+
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        Err("Guardar el APK en Descargas solo está disponible en Android.".to_string())
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[allow(unused_mut)]
@@ -4591,7 +4650,8 @@ pub fn run() {
             find_backlinks,
             delete_page,
             open_note_with_default_app,
-            rename_page
+            rename_page,
+            save_android_apk
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

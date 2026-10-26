@@ -2352,11 +2352,15 @@ body.no-active-page #btn-delete-page {
 
 .block-properties {
   width: 12px;
-  flex: 0 0 12px;
   margin: 0;
   color: var(--ls-text-muted);
   font-size: calc(11px * var(--ls-font-scale, 1));
-  position: relative;
+  /* El indicador vive en el espacio libre del handle y no participa en el
+     flex: así el bullet conserva la misma posición tenga o no propiedades. */
+  position: absolute;
+  top: 50%;
+  right: 1px;
+  transform: translateY(-50%);
 }
 
 .block-properties summary {

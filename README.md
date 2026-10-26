@@ -148,7 +148,7 @@ All project documentation lives in the single technical guide
 [docs/SinNotas.md](docs/SinNotas.md). This README is the entry point. The guide
 covers the architecture, editor and vault, FSRS/Learning mode, the paginated
 mobile notes selector, Android safe area, desktop/Android updater, security,
-performance, build and CI/release steps, current 0.2.5 release data and known
+performance, build and CI/release steps, current 0.2.6 release data and known
 limitations.
 
 ## Tauri application
@@ -204,6 +204,10 @@ Desktop file operations are validated in the backend and limited to the active v
 ## Android application (review + full editor)
 
 The APK for Android 13 or newer (`minSdkVersion` 33) opens in the review experience: question, answer, image occlusions, editing the active block and FSRS rating. From **Abrir páginas y editor** it can load the full desktop editor, including journals, Kanban, concept map and graph view. Both surfaces respect the Android status and navigation bars through the native safe-area bridge.
+
+Android updates are downloaded with the native HTTP plugin and saved through
+MediaStore in `Descargas/SinNotas/`, so any file manager can open the APK and
+hand it to the system installer. The app does not install the APK by itself.
 
 The **Repasar notas** selector paginates the vault notes at 20 per page and
 renders each page in small animation-frame batches. This matches desktop and

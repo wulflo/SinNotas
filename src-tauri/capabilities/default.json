@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Permisos mínimos del frontend: abrir URLs del repositorio, leer imágenes del portapapeles, detectar la plataforma y guardar el APK de actualización en la carpeta de descargas de la app. La instalación del APK la hace el usuario manualmente.",
+  "description": "Permisos mínimos del frontend: abrir URLs del repositorio, leer imágenes del portapapeles, detectar la plataforma y guardar temporalmente el APK de actualización en la caché de la app. El backend lo mueve a Descargas pública y la instalación la hace el usuario manualmente.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -23,21 +23,10 @@
     "core:window:allow-start-dragging",
     "os:allow-platform",
     {
-      "identifier": "fs:allow-mkdir",
-      "allow": [
-        {
-          "path": "$DOWNLOAD"
-        },
-        {
-          "path": "$DOWNLOAD/**"
-        }
-      ]
-    },
-    {
       "identifier": "fs:allow-write-file",
       "allow": [
         {
-          "path": "$DOWNLOAD/SinNotas-update.apk"
+          "path": "$APPCACHE/SinNotas-update.apk"
         }
       ]
     }

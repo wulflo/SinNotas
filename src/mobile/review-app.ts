@@ -473,7 +473,7 @@ class MobileReviewApp {
               <pre data-update-notes-content></pre>
             </details>
           </div>
-          <p class="mobile-editor-hint">Sin Notas solo consulta GitHub cuando pulsás el botón. El APK se guarda en la carpeta de descargas privada de la app; abrilo desde un gestor de archivos para instalarlo.</p>
+          <p class="mobile-editor-hint">Sin Notas solo consulta GitHub cuando pulsás el botón. El APK se guarda en Descargas/SinNotas; abrilo desde un gestor de archivos para instalarlo.</p>
 
           <h3 class="mobile-appearance-title">Bóveda y mantenimiento</h3>
           <div class="mobile-settings-actions">
