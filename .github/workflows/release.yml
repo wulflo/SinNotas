@@ -431,7 +431,7 @@ jobs:
         run: npm ci --ignore-scripts
 
       # Solo se expone un booleano derivado: la clave real se inyecta únicamente
-      # en el paso que ejecuta `npm run tauri build`.
+      # en los pasos que compilan y firman los artefactos del updater.
       - name: Verify updater signing key is present
         shell: bash
         env:
@@ -446,9 +446,10 @@ jobs:
       - name: Generate app icons
         run: npm run tauri icon src-tauri/icons/icon-manifest.json
 
-      # La clave privada del actualizador se inyecta SOLO en este paso. El flag
-      # createUpdaterArtifacts genera los .sig y los paquetes que consume el
-      # plugin nativo; sin la clave, el build falla y no se publica nada.
+      # La clave privada del actualizador se inyecta SOLO en los pasos de build
+      # y firma del .deb. El flag createUpdaterArtifacts genera los .sig y los
+      # paquetes que consume el plugin nativo; sin la clave, el build falla y no
+      # se publica nada.
       - name: Build desktop bundles with updater artifacts
         shell: bash
         env:
