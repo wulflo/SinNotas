@@ -1,0 +1,34 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Permisos mínimos del frontend: abrir URLs del repositorio, leer imágenes del portapapeles, detectar la plataforma y guardar temporalmente el APK de actualización en la caché de la app. El backend lo mueve a Descargas pública y la instalación la hace el usuario manualmente.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        {
+          "url": "https://github.com/wulflo/SinNotas"
+        }
+      ]
+    },
+    "clipboard-manager:allow-read-image",
+    "clipboard-manager:allow-read-text",
+    "core:window:allow-destroy",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-is-maximized",
+    "core:window:allow-start-dragging",
+    "os:allow-platform",
+    {
+      "identifier": "fs:allow-write-file",
+      "allow": [
+        {
+          "path": "$APPCACHE/SinNotas-update.apk"
+        }
+      ]
+    }
+  ]
+}

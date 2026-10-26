@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <title>HARNESS RUNNING</title>
+  <style>
+    body { margin: 0; font: 12px/1.4 monospace; background: #10151c; color: #c9d1d9; }
+    #wrap { position: relative; width: 100vw; height: 70vh; }
+    #graph-canvas { width: 100%; height: 100%; display: block; background: #161b22; }
+    #results { padding: 8px 12px; height: 28vh; overflow: auto; white-space: pre-wrap; }
+    .pass { color: #3fb950; } .fail { color: #f85149; }
+  </style>
+</head>
+<body>
+  <div id="wrap"><canvas id="graph-canvas"></canvas></div>
+  <div id="results"></div>
+  <script type="module" src="/src/dev/graph-harness.ts"></script>
+</body>
+</html>

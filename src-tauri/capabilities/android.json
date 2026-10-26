@@ -1,0 +1,17 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "android-updater",
+  "description": "Android no puede leer los assets de GitHub Releases con el fetch del WebView porque no envían cabeceras CORS. El plugin HTTP nativo descarga latest.json y el APK, y el scope limita las peticiones a las releases de este repositorio.",
+  "platforms": ["android"],
+  "windows": ["main"],
+  "permissions": [
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://github.com/wulflo/SinNotas/releases/*"
+        }
+      ]
+    }
+  ]
+}

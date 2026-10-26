@@ -1,0 +1,1444 @@
+<!DOCTYPE html>
+<html lang="es" data-font="sans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>SinNotas</title>
+    <!-- Sin fuentes externas: la app funciona sin conexión y no filtra
+         peticiones a Google Fonts. Usa las fuentes del sistema. -->
+    <!-- Estilos críticos del splash: se aplican antes de cargar CSS/JS para que
+         nunca aparezca el HTML sin estilo (especialmente en Android). -->
+    <style>
+      #app-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: var(--ls-bg, #1e1e2e);
+        z-index: 99999;
+        transition: opacity 0.4s ease, visibility 0.4s ease;
+      }
+      #app-splash.is-hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      #app-splash .app-splash-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+        animation: splash-fade-in 0.6s ease;
+      }
+      #app-splash .app-splash-logo {
+        width: 72px;
+        height: 72px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, var(--ls-accent, #89b4fa) 0%, color-mix(in srgb, var(--ls-accent, #89b4fa) 70%, transparent) 100%);
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: calc(28px * var(--ls-font-scale, 1));
+        font-weight: 700;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        letter-spacing: -0.02em;
+        box-shadow: 0 8px 32px color-mix(in srgb, var(--ls-accent, #89b4fa) 40%, transparent);
+      }
+      #app-splash .app-splash-bar {
+        width: 200px;
+        height: 3px;
+        border-radius: 2px;
+        overflow: hidden;
+        background: color-mix(in srgb, var(--ls-text-secondary, #a6adc8) 15%, transparent);
+      }
+      #app-splash .app-splash-bar-fill {
+        width: 100%;
+        height: 100%;
+        border-radius: 2px;
+        background: var(--ls-accent, #89b4fa);
+        transform-origin: left center;
+        will-change: transform;
+        animation: splash-bar 1.2s ease-in-out infinite;
+      }
+      @keyframes splash-fade-in {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
+      }
+      @keyframes splash-bar {
+        0% { transform: scaleX(0); }
+        50% { transform: scaleX(1); }
+        100% { transform: translateX(100%) scaleX(1); }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app-splash" class="app-splash">
+      <div class="app-splash-inner">
+        <div class="app-splash-logo">Sn</div>
+        <div class="app-splash-bar"><div class="app-splash-bar-fill"></div></div>
+      </div>
+    </div>
+    <div id="app">
+      <!-- LEFT SIDEBAR -->
+      <aside class="sidebar-left" id="sidebar-left">
+        <div class="sidebar-header">
+          <div class="graph-identity">
+            <div class="graph-icon">Sn</div>
+            <span>Sin Notas</span>
+          </div>
+        </div>
+
+        <!-- Acceso destacado al repaso (encima del buscador) -->
+        <div class="sidebar-review-entry">
+          <button class="sidebar-review-button desktop-review-only" id="btn-enter-review-mode" type="button" title="Abrir el modo repaso">
+            <span class="sidebar-review-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="7" width="14" height="12" rx="2.5"></rect>
+                <path d="M7 3.5h10.5A2.5 2.5 0 0 1 20 6v9"></path>
+                <path d="M7.5 12h5"></path>
+              </svg>
+            </span>
+            <span class="sidebar-review-label">Modo repaso</span>
+            <span class="sidebar-review-arrow" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 12h14"></path>
+                <path d="m13 6 6 6-6 6"></path>
+              </svg>
+            </span>
+          </button>
+          <button class="sidebar-review-button mobile-editor-only" id="btn-mobile-back-to-review" type="button" title="Volver al repaso">
+            <span class="sidebar-review-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="7" width="14" height="12" rx="2.5"></rect>
+                <path d="M7 3.5h10.5A2.5 2.5 0 0 1 20 6v9"></path>
+                <path d="M7.5 12h5"></path>
+              </svg>
+            </span>
+            <span class="sidebar-review-label">Volver al repaso</span>
+            <span class="sidebar-review-arrow" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 12H5"></path>
+                <path d="m11 18-6-6 6-6"></path>
+              </svg>
+            </span>
+          </button>
+        </div>
+
+        <!-- Integrated Search & Omnibar in Sidebar -->
+        <div class="sidebar-search-container">
+          <div class="sidebar-search-box">
+            <span class="sidebar-search-icon">🔍</span>
+            <input
+              type="text"
+              id="sidebar-search-input"
+              class="sidebar-search-input"
+              placeholder="Buscar o crear nota..."
+              autocomplete="off"
+            />
+            <span class="sidebar-search-shortcut">⌘K</span>
+
+            <!-- Floating Omnibar Results Dropdown -->
+            <div class="search-results-dropdown" id="search-results-dropdown">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Translated Sidebar Navigation -->
+        <nav class="sidebar-nav">
+          <a class="nav-item active" id="nav-editor">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+            </svg>
+            <span>Editor</span>
+          </a>
+          <a class="nav-item" id="nav-journals">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span>Diarios</span>
+          </a>
+          <a class="nav-item" id="nav-flashcards">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+            </svg>
+            <span>Flashcards</span>
+          </a>
+          <a class="nav-item" id="nav-graph">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="18" cy="5" r="3"></circle>
+              <circle cx="6" cy="12" r="3"></circle>
+              <circle cx="18" cy="19" r="3"></circle>
+              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+            </svg>
+            <span>Vista gráfica</span>
+          </a>
+          <a class="nav-item" id="nav-kanban">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="5" height="18" rx="1"></rect>
+              <rect x="11" y="3" width="5" height="12" rx="1"></rect>
+              <rect x="19" y="3" width="5" height="8" rx="1"></rect>
+            </svg>
+            <span>Tareas</span>
+          </a>
+          <a class="nav-item" id="nav-all-pages">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+            </svg>
+            <span>Todas las páginas</span>
+          </a>
+        </nav>
+
+        <div class="sidebar-section-title">Páginas recientes</div>
+        <div class="pages-list" id="sidebar-pages-list">
+          <!-- Populated from vault -->
+        </div>
+
+        <div class="sidebar-footer">
+          <button class="vault-switch-button" id="btn-select-vault" type="button" title="Gestionar bóvedas">
+            <span class="vault-status-dot"></span>
+            <span id="active-vault-name">Vault local</span>
+            <span aria-hidden="true">▾</span>
+          </button>
+        </div>
+      </aside>
+
+      <!-- MAIN WORKSPACE -->
+      <main class="main-container">
+        <!-- HEADBAR (Cleaned without '+' button) -->
+        <header class="headbar" data-tauri-drag-region>
+          <div class="headbar-left">
+            <button class="btn-icon" id="btn-toggle-sidebar" title="Colapsar / Desplegar Barra Lateral (Ctrl+B)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="9" y1="3" x2="9" y2="21"></line>
+              </svg>
+            </button>
+
+            <div class="nav-history">
+              <button class="btn-icon" id="btn-history-back" title="Atrás">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+              </button>
+              <button class="btn-icon" id="btn-history-forward" title="Adelante">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            </div>
+
+            <div class="headbar-page-breadcrumb" id="headbar-breadcrumb">
+              Welcome to SinNotas
+            </div>
+          </div>
+
+          <div class="headbar-actions">
+            <div class="pomodoro-mini" id="headbar-pomodoro" hidden>
+              <span id="headbar-pomodoro-clock">25:00</span>
+              <button class="btn-icon" id="headbar-pomodoro-toggle" type="button" title="Pomodoro">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+              </button>
+            </div>
+            <div class="page-export-menu">
+              <button class="btn-icon" id="btn-open-page-export" type="button" title="Exportar página actual" aria-label="Exportar página actual" aria-expanded="false">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 3v12"></path>
+                  <path d="m7 10 5 5 5-5"></path>
+                  <path d="M5 17v3h14v-3"></path>
+                </svg>
+              </button>
+              <div class="page-export-dropdown m3-surface" id="page-export-dropdown" hidden>
+                <button class="page-export-option" id="btn-export-current-text" type="button">Exportar como texto (.txt)</button>
+              </div>
+            </div>
+
+            <!-- Page Version History Button -->
+            <button class="btn-icon" id="btn-page-history" title="Historial de Versiones (Snapshots)">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+            </button>
+
+            <!-- Delete Page Button -->
+            <button class="btn-icon" id="btn-delete-page" title="Eliminar Página Actual" style="color: #e06c75;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+            </button>
+
+            <!-- Settings Menu Trigger (Gear Icon) -->
+            <button class="btn-icon" id="btn-settings-toggle" title="Ajustes y Apariencia">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+            </button>
+
+            <div class="window-controls" data-tauri-no-drag>
+              <button class="btn-window-control" id="btn-window-minimize" type="button" title="Minimizar" aria-label="Minimizar">
+                <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M0 6h12" stroke="currentColor" stroke-width="1.2"/></svg>
+              </button>
+              <button class="btn-window-control" id="btn-window-maximize" type="button" title="Maximizar" aria-label="Maximizar">
+                <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><rect x="1" y="1" width="10" height="10" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+              </button>
+              <button class="btn-window-control btn-window-close" id="btn-window-close" type="button" title="Cerrar" aria-label="Cerrar">
+                <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M1 1l10 10M11 1l-10 10" stroke="currentColor" stroke-width="1.2"/></svg>
+              </button>
+            </div>
+
+            <!-- Settings Floating Dropdown Menu -->
+            <div class="m3-scrim settings-overlay" id="settings-overlay" hidden>
+              <div class="settings-dropdown-menu m3-surface" id="settings-dropdown-menu" role="dialog" aria-modal="true" aria-label="Configuración">
+              <div class="settings-dialog-header">
+                <h2 class="m3-dialog-title">Configuración</h2>
+                <button class="btn-icon" id="btn-close-settings" type="button" aria-label="Cerrar configuración">×</button>
+              </div>
+              <div class="settings-tabs" role="tablist" aria-label="Secciones de ajustes">
+                <button class="settings-tab active" type="button" role="tab" aria-selected="true" data-settings-tab="appearance">Apariencia</button>
+                <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="flashcards">Flashcards</button>
+                <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="graph">Grafo</button>
+                <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="saved">Guardado</button>
+                <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="review">Repaso</button>
+                <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="pomodoro">Pomodoro</button>
+                <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="advanced">Avanzado</button>
+              </div>
+
+              <section class="settings-tab-panel active" role="tabpanel" data-settings-panel="appearance">
+                <div class="settings-section-title">Tema Visual</div>
+                <div class="settings-row">
+                  <span>Modo Oscuro / Claro</span>
+                  <button class="font-option-btn active" id="btn-theme-switch">Alternar Modo</button>
+                </div>
+
+                <div class="settings-section-title">Color de interfaz</div>
+                <div class="accent-selector" role="group" aria-label="Color de interfaz">
+                  <button class="accent-option" type="button" data-accent-option="blue" aria-label="Azul" title="Azul"></button>
+                  <button class="accent-option" type="button" data-accent-option="green" aria-label="Verde" title="Verde"></button>
+                  <button class="accent-option" type="button" data-accent-option="violet" aria-label="Violeta" title="Violeta"></button>
+                  <button class="accent-option" type="button" data-accent-option="amber" aria-label="Ámbar" title="Ámbar"></button>
+                  <button class="accent-option" type="button" data-accent-option="rose" aria-label="Rosa" title="Rosa"></button>
+                  <button class="accent-option" type="button" data-accent-option="cyan" aria-label="Cian" title="Cian"></button>
+                  <button class="accent-option" type="button" data-accent-option="teal" aria-label="Turquesa" title="Turquesa"></button>
+                  <button class="accent-option" type="button" data-accent-option="indigo" aria-label="Índigo" title="Índigo"></button>
+                  <button class="accent-option" type="button" data-accent-option="orange" aria-label="Naranja" title="Naranja"></button>
+                  <button class="accent-option" type="button" data-accent-option="fuchsia" aria-label="Fucsia" title="Fucsia"></button>
+                </div>
+
+                <div class="settings-section-title">Luminosidad del glow</div>
+                <label class="page-width-control" for="glow-intensity-slider">
+                  <input id="glow-intensity-slider" type="range" min="0" max="100" step="50" value="100" />
+                  <output id="glow-intensity-value" for="glow-intensity-slider">100%</output>
+                </label>
+                <p class="settings-help">0 % sin glow · 50 % glow bajo · 100 % glow actual.</p>
+
+                <div class="settings-section-title">Tipografía del Editor</div>
+                <div class="font-selector-grid">
+                  <button class="font-option-btn active" data-font="sans">Sans (sistema)</button>
+                  <button class="font-option-btn" data-font="serif">Serif (Georgia)</button>
+                  <button class="font-option-btn" data-font="mono">Mono (sistema)</button>
+                  <button class="font-option-btn" data-font="dyslexic">Dyslexic</button>
+                </div>
+                <div class="settings-row" style="margin-top: 18px;">
+                  <label for="system-font-select" style="display: flex; flex-direction: column; gap: 8px; flex: 1;">
+                    <span>Tipografía del sistema</span>
+                    <select id="system-font-select" aria-label="Seleccionar tipografía instalada en el sistema">
+                      <option value="">-- Seleccionar tipografía del sistema --</option>
+                    </select>
+                    <span class="settings-help" style="margin-top: 4px;">Selecciona cualquier tipografía instalada en tu dispositivo.</span>
+                  </label>
+                </div>
+
+                <div class="settings-section-title">Tamaño de texto</div>
+                <p class="settings-help">Ajusta por separado la interfaz, el editor, los títulos y las tarjetas. Se guarda en este dispositivo y se comparte con la versión móvil.</p>
+                <div class="typography-controls" id="typography-controls"></div>
+                <div class="typography-controls-footer">
+                  <button class="font-option-btn" id="btn-reset-typography" type="button">Restaurar tamaños</button>
+                </div>
+
+                <div class="settings-section-title">Ancho de página</div>
+                <label class="page-width-control" for="page-width-slider">
+                  <input id="page-width-slider" type="range" min="600" max="1200" step="20" value="820" />
+                  <output id="page-width-value" for="page-width-slider">820 px</output>
+                </label>
+
+                <div class="settings-section-title">Idioma de la interfaz</div>
+                <label class="settings-language-control" for="interface-language">
+                  <span>Idioma de la interfaz</span>
+                  <select id="interface-language">
+                    <option value="auto">Automático (Sistema)</option>
+                    <option value="es">Español</option>
+                    <option value="en">English</option>
+                    <option value="zh">中文</option>
+                  </select>
+                </label>
+
+                <a
+                  class="settings-support-link"
+                  id="btn-support"
+                  href="https://github.com/wulflo/SinNotas"
+                  rel="noopener noreferrer"
+                >
+                  <span data-i18n="Visitar repositorio">Visitar repositorio</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M14 4h6v6M20 4l-9 9"></path>
+                    <path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"></path>
+                  </svg>
+                </a>
+              </section>
+
+              <section class="settings-tab-panel" role="tabpanel" data-settings-panel="flashcards" hidden>
+                <div class="settings-section-title">Orden de repaso</div>
+                <p class="settings-help">Elige qué tarjetas quieres ver primero al iniciar una sesión de repaso.</p>
+                <div class="sync-box">
+                  <div class="settings-row">
+                    <label for="flashcard-review-order">Orden de las tarjetas</label>
+                    <select id="flashcard-review-order">
+                      <option value="new-first">Nuevas primero</option>
+                      <option value="reviews-first">Repasos primero</option>
+                      <option value="mixed">Orden mezclado</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="settings-section-title">Recalcular propiedades</div>
+                <p class="settings-help">Actualiza las propiedades de programación de todas las tarjetas del vault.</p>
+                <div class="sync-box">
+                  <div class="settings-row">
+                    <label for="flashcard-recalc-action">Acción de recálculo</label>
+                    <select id="flashcard-recalc-action">
+                      <option value="due-dates">Recalcular vencimientos</option>
+                      <option value="reset">Restablecer FSRS</option>
+                    </select>
+                  </div>
+                  <p class="settings-help" id="flashcard-recalc-help">Recalcula la fecha de vencimiento usando la última revisión y el intervalo programado.</p>
+                  <div class="advanced-actions">
+                    <button class="font-option-btn" id="btn-flashcard-recalc" type="button">Aplicar recálculo</button>
+                  </div>
+                  <div class="settings-help" id="flashcard-recalc-status" role="status" aria-live="polite"></div>
+                </div>
+
+                <div class="settings-section-title">Notas incluidas en el repaso</div>
+                <p class="settings-help">Cada nota actúa como un mazo que contiene sus flashcards. Selecciona las notas cuyas tarjetas se repasarán y pulsa "Guardar selección"; las desmarcadas quedarán excluidas de la sesión de repaso.</p>
+                <div class="sync-box" id="flashcard-pages-container">
+                  <div class="flashcard-pages-controls">
+                    <input type="text" id="flashcard-pages-search" placeholder="Buscar en el título..." aria-label="Filtrar notas por palabra en el título" />
+                    <select id="flashcard-pages-sort" aria-label="Orden de la lista de notas">
+                      <option value="title-asc">Nombre A-Z</option>
+                      <option value="title-desc">Nombre Z-A</option>
+                      <option value="created-desc">Creación (más reciente)</option>
+                      <option value="created-asc">Creación (más antigua)</option>
+                    </select>
+                    <button type="button" class="font-option-btn" id="btn-flashcard-pages-select-all">Marcar todo</button>
+                    <button type="button" class="font-option-btn" id="btn-flashcard-pages-select-none">Ninguna</button>
+                    <button type="button" class="font-option-btn flashcard-pages-save" id="btn-flashcard-pages-save" disabled>Guardar selección</button>
+                    <span class="flashcard-pages-status" id="flashcard-pages-status" role="status" aria-live="polite"></span>
+                  </div>
+                  <div class="flashcard-pages-list" id="flashcard-pages-list">
+                    <!-- Se renderiza por notas (una casilla por nota con tarjetas) -->
+                  </div>
+                  <div class="flashcard-pages-pagination" id="flashcard-pages-pagination" hidden>
+                    <button class="btn-pagination" id="flashcard-pages-prev" type="button" disabled>← Anterior</button>
+                    <span class="pagination-info" id="flashcard-pages-page-info">Página 1 de 1</span>
+                    <button class="btn-pagination" id="flashcard-pages-next" type="button" disabled>Siguiente →</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="settings-tab-panel" role="tabpanel" data-settings-panel="graph" hidden>
+                <div class="settings-section-title">Grupos de color por nombre</div>
+                <p class="settings-help">
+                  Pinta los nodos cuyo título contenga el texto indicado. La regla más
+                  específica (texto más largo) tiene prioridad y los colores manuales
+                  de cada nota siguen por encima de los grupos.
+                </p>
+                <div class="sync-box">
+                  <div class="graph-color-rules" id="graph-color-rules"></div>
+                  <div class="graph-color-rule-add">
+                    <input
+                      id="graph-rule-name"
+                      type="text"
+                      placeholder="Texto del nombre (ej. Diario, Proyecto…)"
+                      aria-label="Texto del nombre para el grupo de color"
+                    />
+                    <input
+                      id="graph-rule-color"
+                      type="color"
+                      value="#3b82f6"
+                      aria-label="Color del grupo"
+                    />
+                    <button class="font-option-btn" id="btn-add-graph-color-rule" type="button">
+                      Añadir grupo
+                    </button>
+                  </div>
+                </div>
+
+                <div class="settings-section-title">Fuerzas de la simulación</div>
+                <div class="sync-box graph-settings-box">
+                  <label class="graph-range-control" for="graph-repulsion">
+                    <span>Repulsión</span>
+                    <input id="graph-repulsion" type="range" min="100" max="1500" step="50" value="600" />
+                    <output id="graph-repulsion-value" for="graph-repulsion">600</output>
+                  </label>
+                  <label class="graph-range-control" for="graph-link-strength">
+                    <span>Fuerza de enlaces</span>
+                    <input id="graph-link-strength" type="range" min="0.05" max="1.5" step="0.05" value="0.55" />
+                    <output id="graph-link-strength-value" for="graph-link-strength">0.55</output>
+                  </label>
+                  <label class="graph-range-control" for="graph-link-distance">
+                    <span>Distancia de enlaces</span>
+                    <input id="graph-link-distance" type="range" min="40" max="220" step="5" value="100" />
+                    <output id="graph-link-distance-value" for="graph-link-distance">100 px</output>
+                  </label>
+                  <label class="graph-range-control" for="graph-center-strength">
+                    <span>Atracción al centro</span>
+                    <input id="graph-center-strength" type="range" min="0" max="0.05" step="0.001" value="0.006" />
+                    <output id="graph-center-strength-value" for="graph-center-strength">0.006</output>
+                  </label>
+                  <label class="graph-range-control" for="graph-collision-strength">
+                    <span>Fuerza de colisión</span>
+                    <input id="graph-collision-strength" type="range" min="0" max="2" step="0.1" value="1" />
+                    <output id="graph-collision-strength-value" for="graph-collision-strength">1.0</output>
+                  </label>
+                  <label class="graph-range-control" for="graph-velocity-decay">
+                    <span>Amortiguación</span>
+                    <input id="graph-velocity-decay" type="range" min="0.1" max="0.9" step="0.05" value="0.5" />
+                    <output id="graph-velocity-decay-value" for="graph-velocity-decay">0.50</output>
+                  </label>
+                </div>
+
+                <div class="settings-section-title">Tamaño de los nodos</div>
+                <div class="sync-box graph-settings-box">
+                  <label class="graph-range-control" for="graph-node-base">
+                    <span>Radio base</span>
+                    <input id="graph-node-base" type="range" min="2" max="12" step="0.5" value="5" />
+                    <output id="graph-node-base-value" for="graph-node-base">5.0 px</output>
+                  </label>
+                  <label class="graph-range-control" for="graph-node-connections">
+                    <span>Radio por conexión</span>
+                    <input id="graph-node-connections" type="range" min="0" max="3" step="0.1" value="0" />
+                    <output id="graph-node-connections-value" for="graph-node-connections">0.0 px</output>
+                  </label>
+                  <label class="graph-range-control" for="graph-node-max">
+                    <span>Radio máximo</span>
+                    <input id="graph-node-max" type="range" min="6" max="30" step="1" value="14" />
+                    <output id="graph-node-max-value" for="graph-node-max">14 px</output>
+                  </label>
+                </div>
+
+                <div class="settings-section-title">Líneas y títulos</div>
+                <div class="sync-box graph-settings-box">
+                  <label class="graph-range-control" for="graph-link-width">
+                    <span>Grosor de enlaces</span>
+                    <input id="graph-link-width" type="range" min="0.5" max="4" step="0.1" value="1" />
+                    <output id="graph-link-width-value" for="graph-link-width">1.0 px</output>
+                  </label>
+                  <label class="graph-range-control" for="graph-link-highlight-width">
+                    <span>Grosor resaltado</span>
+                    <input id="graph-link-highlight-width" type="range" min="1" max="8" step="0.5" value="2" />
+                    <output id="graph-link-highlight-width-value" for="graph-link-highlight-width">2.0 px</output>
+                  </label>
+                  <label class="graph-range-control" for="graph-label-zoom">
+                    <span>Zoom para mostrar títulos</span>
+                    <input id="graph-label-zoom" type="range" min="1" max="4" step="0.1" value="2" />
+                    <output id="graph-label-zoom-value" for="graph-label-zoom">2.00×</output>
+                  </label>
+                  <p class="settings-help" style="margin: 0;">
+                    Los títulos aparecen con fundido al acercar hasta este zoom;
+                    al pasar el cursor o seleccionar un nodo se muestran siempre.
+                  </p>
+                </div>
+
+                <div class="advanced-actions">
+                  <button class="font-option-btn" id="btn-reset-graph-settings" type="button">
+                    Restablecer valores del grafo
+                  </button>
+                </div>
+              </section>
+
+              <section class="settings-tab-panel" role="tabpanel" data-settings-panel="saved" hidden>
+                <div class="settings-section-title">Snapshots por nota</div>
+                <p class="settings-help">Los snapshots se activan desde el historial de cada nota. Aquí puedes ver las notas que los tienen activos, cuántas versiones guardan y borrarlas. Al vencer el periodo configurado, las versiones se eliminan automáticamente y solo queda la nota original. Las copias viven en la carpeta visible chronos/ dentro del vault.</p>
+                <div class="sync-box">
+                  <div class="settings-row">
+                    <span class="settings-help" style="margin: 0;">Seguimiento de snapshots activos</span>
+                    <button type="button" class="font-option-btn" id="btn-open-snapshot-history">Abrir historial de esta nota</button>
+                  </div>
+                  <div class="snapshot-notes-list" id="snapshot-active-notes-list">
+                    <!-- Se renderiza con las notas que tienen snapshots activos -->
+                  </div>
+                </div>
+              </section>
+
+              <section class="settings-tab-panel" role="tabpanel" data-settings-panel="review" hidden>
+                <div class="settings-section-title">Gamepad (Mando)</div>
+                <p class="settings-help">Configura un mando Bluetooth o USB para controlar Flashcards y otras funciones.</p>
+                <div class="sync-box">
+                  <div class="settings-row">
+                    <label for="gamepad-enabled-checkbox">Activar soporte de gamepad</label>
+                    <input type="checkbox" id="gamepad-enabled-checkbox" />
+                  </div>
+                  <div class="settings-row">
+                    <label for="gamepad-controller-type">Tipo de mando</label>
+                    <select id="gamepad-controller-type" class="sync-input-field"></select>
+                  </div>
+                  <div class="settings-row">
+                    <button type="button" class="font-option-btn" id="btn-gamepad-detect">Detectar mando</button>
+                    <span class="sync-status-badge" id="gamepad-status-indicator">Mando desactivado</span>
+                  </div>
+                </div>
+
+                <div class="settings-section-title">Mapeo de botones para Flashcards</div>
+                <p class="settings-help">Asigna los botones del mando a las respuestas de FSRS (Otra vez, Difícil, Bien, Fácil).</p>
+                <div class="sync-box">
+                  <div class="settings-row">
+                    <label for="gamepad-btn-again">Botón para "Otra vez":</label>
+                    <select id="gamepad-btn-again" class="sync-input-field">
+                    </select>
+                  </div>
+                  <div class="settings-row">
+                    <label for="gamepad-btn-hard">Botón para "Difícil":</label>
+                    <select id="gamepad-btn-hard" class="sync-input-field">
+                    </select>
+                  </div>
+                  <div class="settings-row">
+                    <label for="gamepad-btn-good">Botón para "Bien":</label>
+                    <select id="gamepad-btn-good" class="sync-input-field">
+                    </select>
+                  </div>
+                  <div class="settings-row">
+                    <label for="gamepad-btn-easy">Botón para "Fácil":</label>
+                    <select id="gamepad-btn-easy" class="sync-input-field">
+                    </select>
+                  </div>
+                </div>
+
+                <div class="settings-section-title">Mapeo de botones adicionales</div>
+                <div class="sync-box">
+                  <div class="settings-row">
+                    <label for="gamepad-btn-show-answer">Botón para "Mostrar respuesta":</label>
+                    <select id="gamepad-btn-show-answer" class="sync-input-field">
+                    </select>
+                  </div>
+                  <div class="settings-row">
+                    <label for="gamepad-btn-focus-mode">Botón para "Modo focus":</label>
+                    <select id="gamepad-btn-focus-mode" class="sync-input-field">
+                    </select>
+                  </div>
+                  <div class="settings-row">
+                    <label for="gamepad-btn-undo-review">Botón para "Deshacer repaso":</label>
+                    <select id="gamepad-btn-undo-review" class="sync-input-field">
+                    </select>
+                  </div>
+                  <div class="settings-row">
+                    <label for="gamepad-btn-redo-review">Botón para "Rehacer repaso":</label>
+                    <select id="gamepad-btn-redo-review" class="sync-input-field">
+                    </select>
+                  </div>
+                </div>
+
+                <div class="settings-section-title">Atajos de teclado para Flashcards</div>
+                <p class="settings-help">Elige la tecla que califica cada tarjeta durante el repaso.</p>
+                <div class="sync-box">
+                  <div class="settings-row">
+                    <label for="flashcard-key-again">Tecla para "Otra vez"</label>
+                    <input type="text" id="flashcard-key-again" maxlength="1" value="1" />
+                  </div>
+                  <div class="settings-row">
+                    <label for="flashcard-key-hard">Tecla para "Difícil"</label>
+                    <input type="text" id="flashcard-key-hard" maxlength="1" value="2" />
+                  </div>
+                  <div class="settings-row">
+                    <label for="flashcard-key-good">Tecla para "Bien"</label>
+                    <input type="text" id="flashcard-key-good" maxlength="1" value="3" />
+                  </div>
+                  <div class="settings-row">
+                    <label for="flashcard-key-easy">Tecla para "Fácil"</label>
+                    <input type="text" id="flashcard-key-easy" maxlength="1" value="4" />
+                  </div>
+                </div>
+              </section>
+
+              <section class="settings-tab-panel" role="tabpanel" data-settings-panel="pomodoro" hidden>
+                <div class="settings-section-title">Pomodoro</div>
+                <p class="settings-help">Configura los tiempos de enfoque y descanso, y cuántas sesiones completar antes de un descanso largo.</p>
+                <div class="sync-box">
+                  <div class="settings-row">
+                    <label for="pomodoro-focus-duration">Tiempo de enfoque (minutos)</label>
+                    <select id="pomodoro-focus-duration"></select>
+                  </div>
+                  <div class="settings-row">
+                    <label for="pomodoro-break-duration">Descanso corto (minutos)</label>
+                    <select id="pomodoro-break-duration"></select>
+                  </div>
+                  <div class="settings-row">
+                    <label for="pomodoro-long-break-duration">Descanso largo (minutos)</label>
+                    <select id="pomodoro-long-break-duration"></select>
+                  </div>
+                  <div class="settings-row">
+                    <label for="pomodoro-sessions-before-long-break">Sesiones antes del descanso largo</label>
+                    <select id="pomodoro-sessions-before-long-break"></select>
+                  </div>
+                  <div class="settings-row">
+                    <label for="pomodoro-show-headbar">Mostrar en la barra superior</label>
+                    <input type="checkbox" id="pomodoro-show-headbar" checked />
+                  </div>
+                </div>
+              </section>
+
+              <section class="settings-tab-panel" role="tabpanel" data-settings-panel="advanced" hidden>
+                <div id="update-settings-section">
+                  <div class="settings-section-title">Actualizaciones</div>
+                  <p class="settings-help">Sin Notas solo consulta GitHub cuando pulsás el botón. En escritorio, el paquete se verifica con la firma del actualizador antes de instalarse.</p>
+                  <div class="sync-box update-box">
+                    <div class="settings-row">
+                      <span>Versión instalada</span>
+                      <strong id="update-current-version">—</strong>
+                    </div>
+                    <div class="settings-row" id="update-available-row" hidden>
+                      <span>Nueva versión</span>
+                      <strong id="update-new-version">—</strong>
+                    </div>
+                    <div class="advanced-actions">
+                      <button class="font-option-btn" id="btn-check-updates" type="button">Buscar actualizaciones</button>
+                      <button class="font-option-btn btn-primary" id="btn-install-update" type="button" hidden>Descargar e instalar</button>
+                    </div>
+                    <div class="update-progress" id="update-progress-wrap" hidden>
+                      <progress id="update-progress" max="1" value="0"></progress>
+                      <span id="update-progress-label"></span>
+                    </div>
+                    <p class="settings-help update-status" id="update-status" role="status" aria-live="polite"></p>
+                    <details class="update-notes" id="update-notes-wrap" hidden>
+                      <summary>Notas de la versión</summary>
+                      <pre id="update-notes"></pre>
+                    </details>
+                  </div>
+                </div>
+
+                <div class="settings-section-title">Mantenimiento</div>
+                <p class="settings-help">Estas acciones no eliminan tus notas. La limpieza de adjuntos solo borra imágenes de <code>assets</code> que no estén referenciadas en ninguna nota.</p>
+                <div class="advanced-actions">
+                  <button class="font-option-btn" id="btn-clear-bullet-properties" type="button">Borrar propiedades de los bullets</button>
+                  <button class="font-option-btn" id="btn-clean-unused-attachments" type="button">Eliminar imágenes no usadas de assets</button>
+                  <button class="font-option-btn" id="btn-clear-cache" type="button">Borrar caché</button>
+                  <button class="font-option-btn" id="btn-clear-flashcard-stats" type="button">Borrar estadísticas de repaso</button>
+                  <button class="font-option-btn snapshot-danger" id="btn-delete-all-snapshots" type="button">Borrar todos los snapshots</button>
+                  <button class="font-option-btn" id="btn-reload-app" type="button">Recargar aplicación</button>
+                </div>
+                <p class="settings-help" id="unused-attachments-status" role="status" aria-live="polite"></p>
+              </section>
+            </div>
+            </div>
+          </div>
+          <div class="headbar-completion-progress" id="completion-progress" aria-hidden="true"></div>
+        </header>
+
+        <!-- VIEW 1: OUTLINER CANVAS (EDITOR) -->
+        <section class="view-panel active-view" id="view-editor">
+          <div class="content-scroll">
+            <div class="canvas-wrapper">
+              <div class="page-title-row">
+                <h1 class="page-title" id="page-title-heading" contenteditable="true" spellcheck="false">Welcome to SinNotas</h1>
+                <button class="btn-icon page-title-action" id="btn-shortcuts" type="button" title="Atajos de teclado" aria-label="Atajos de teclado">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                  </svg>
+                </button>
+                <button class="btn-icon page-title-action" id="btn-concept-map" type="button" title="Convertir en mapa conceptual" aria-label="Convertir en mapa conceptual">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="9" y="2.5" width="6" height="5" rx="1.5"></rect>
+                    <rect x="2.5" y="16.5" width="6" height="5" rx="1.5"></rect>
+                    <rect x="15.5" y="16.5" width="6" height="5" rx="1.5"></rect>
+                    <path d="M12 7.5v4"></path>
+                    <path d="M5.5 16.5v-5h13v5"></path>
+                  </svg>
+                </button>
+              </div>
+
+              <div class="page-properties-container" id="page-properties-container"></div>
+
+              <div class="blocks-tree" id="blocks-container">
+                <!-- Blocks -->
+              </div>
+
+              <button class="add-bullet-btn" id="btn-add-bullet" type="button" title="Añadir bullet al final">+</button>
+
+              <section class="references-panel" id="references-section">
+                <div class="references-header">
+                  <div class="references-title">
+                    <span data-i18n="Referencias vinculadas">Referencias vinculadas</span>
+                    <span class="ref-count-badge" id="ref-count">0</span>
+                  </div>
+                </div>
+                <div id="backlinks-list">
+                  <!-- Backlinks -->
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 2: JOURNALS (DIARIOS) -->
+        <section class="view-panel" id="view-journals">
+          <div class="content-scroll">
+            <div class="canvas-wrapper" id="journals-container">
+              <!-- Chronological journals -->
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 3: FLASHCARDS (TARJETAS DE REPASO FSRS-4.5 & CLOZE) -->
+        <section class="view-panel" id="view-flashcards">
+          <div class="flashcards-container">
+            <div class="flashcard-header">
+              <div class="flashcard-heading">
+                <h2 style="font-size: calc(20px * var(--ls-font-scale, 1)); font-weight: 700; color: var(--ls-text-title);">Flashcards</h2>
+                <div class="flashcard-tabs" role="tablist" aria-label="Vistas de Flashcards">
+                  <button class="flashcard-tab active" id="tab-flashcard-review" role="tab" aria-selected="true">Repasar</button>
+                  <button class="flashcard-tab" id="tab-flashcard-explorer" role="tab" aria-selected="false">Explorador de Tarjetas</button>
+                </div>
+              </div>
+              <div class="flashcard-header-actions">
+                <button class="font-option-btn flashcard-history-button" id="btn-review-undo" type="button" aria-label="Deshacer último repaso" title="Deshacer último repaso (Ctrl+Z)" disabled>↶</button>
+                <button class="font-option-btn flashcard-history-button" id="btn-review-redo" type="button" aria-label="Rehacer repaso" title="Rehacer repaso (Ctrl+Y)" disabled>↷</button>
+                <button class="font-option-btn flashcard-sync-button" id="btn-flashcards-refresh" type="button" title="Sincronizar cambios de la bóveda" aria-label="Sincronizar cambios de la bóveda">↻</button>
+                <button class="font-option-btn flashcard-focus-toggle" id="btn-flashcard-focus" type="button" aria-pressed="false">Modo focus</button>
+                <span class="flashcard-progress" id="card-progress">Tarjeta 0 de 0</span>
+              </div>
+            </div>
+
+            <div class="flashcard-review-layout" id="flashcard-review-layout">
+              <div class="flashcard-box" id="flashcard-review-pane">
+                <div class="flashcard-card-header">
+                  <span class="flashcard-type-pill" id="card-type-pill">BÁSICA</span>
+                </div>
+                <div>
+                  <div class="card-source-tag">
+                    <span id="card-source">Origen: General</span>
+                    <span class="fsrs-stats-badge" id="card-fsrs-badge">S: 0.4d • D: 5.0</span>
+                  </div>
+                  <div class="card-question markdown-rendered" id="card-question">Cargando preguntas de tus notas...</div>
+                </div>
+
+                <div class="card-answer markdown-rendered" id="card-answer">
+                  Respuesta revelada aquí.
+                </div>
+
+                <div class="card-actions-area">
+                  <button class="btn-primary" id="btn-show-answer">Mostrar Respuesta (Espacio)</button>
+                  <div class="fsrs-buttons" id="fsrs-actions">
+                    <button class="btn-fsrs again" data-rating="1">
+                      <span>Otra vez</span>
+                      <small id="int-again">10m</small>
+                    </button>
+                    <button class="btn-fsrs hard" data-rating="2">
+                      <span>Difícil</span>
+                      <small id="int-hard">1d</small>
+                    </button>
+                    <button class="btn-fsrs good" data-rating="3">
+                      <span>Bien</span>
+                      <small id="int-good">3d</small>
+                    </button>
+                    <button class="btn-fsrs easy" data-rating="4">
+                      <span>Fácil</span>
+                      <small id="int-easy">8d</small>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <aside class="flashcard-review-tools" id="flashcard-review-tools" aria-label="Estadísticas y temporizador">
+                <section class="focus-panel">
+                  <div class="focus-panel-heading">
+                    <h3>Pomodoro</h3>
+                    <span id="pomodoro-mode">Enfoque</span>
+                  </div>
+                  <div class="pomodoro-clock" id="pomodoro-clock" aria-live="polite">25:00</div>
+                  <div class="pomodoro-actions">
+                    <button class="btn-primary" id="btn-pomodoro-toggle" type="button">Iniciar</button>
+                    <button class="font-option-btn" id="btn-pomodoro-reset" type="button">Reiniciar</button>
+                  </div>
+                </section>
+                <section class="focus-panel focus-stats">
+                  <h3>Estadísticas</h3>
+                  <div><span>Repasos hoy</span><strong id="flashcard-stat-today">0</strong></div>
+                  <div><span>Repasos totales</span><strong id="flashcard-stat-total">0</strong></div>
+                  <div><span>Minutos de enfoque</span><strong id="flashcard-stat-focus">0</strong></div>
+                </section>
+                <section class="focus-panel focus-tree-panel">
+                  <div class="focus-panel-heading">
+                    <h3>Progreso</h3>
+                    <span id="flashcard-points-badge">0 pts</span>
+                  </div>
+                  <svg class="focus-tree" id="flashcard-growth-tree" viewBox="0 0 160 160" role="img" aria-label="Progreso de repasos"></svg>
+                  <span id="flashcard-tree-progress">0 puntos · Protón</span>
+                </section>
+              </aside>
+            </div>
+            <div class="flashcard-explorer" id="flashcard-explorer-pane" role="tabpanel" hidden>
+              <div class="flashcard-explorer-header">
+                <div class="flashcard-explorer-title-group">
+                  <h3>Explorador de tarjetas</h3>
+                  <span class="flashcard-progress" id="flashcard-explorer-count">0 tarjetas</span>
+                </div>
+                <div class="flashcard-explorer-controls">
+                  <label class="flashcard-explorer-search" for="flashcard-explorer-search">
+                    <span class="visually-hidden">Buscar tarjetas</span>
+                    <input
+                      id="flashcard-explorer-search"
+                      type="search"
+                      placeholder="Buscar en pregunta, respuesta o nota…"
+                      autocomplete="off"
+                      spellcheck="false"
+                    />
+                  </label>
+                  <label class="flashcard-explorer-sort" for="flashcard-explorer-sort">
+                    Ordenar por
+                    <select id="flashcard-explorer-sort">
+                      <option value="due-date">Próximo repaso</option>
+                      <option value="last-reviewed">Último repaso</option>
+                      <option value="created-at">Fecha de creación</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+              <div class="flashcard-explorer-list" id="flashcard-explorer-list"></div>
+              <div class="table-pagination flashcard-explorer-pagination" id="flashcard-explorer-pagination" hidden>
+                <button class="btn-pagination" id="flashcard-explorer-prev" type="button">Anterior</button>
+                <span id="flashcard-explorer-page-info">Página 1 de 1</span>
+                <button class="btn-pagination" id="flashcard-explorer-next" type="button">Siguiente</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 4: GRAPH VIEW (VISTA GRÁFICA) -->
+        <section class="view-panel" id="view-graph">
+          <div class="graph-container">
+            <canvas id="graph-canvas"></canvas>
+            <div class="graph-legend">
+              Haz clic en un nodo para ver su contenido · Arrastra para mover · Doble clic para restablecer
+            </div>
+            <aside class="graph-preview" id="graph-preview" aria-hidden="true" aria-label="Contenido de la nota">
+              <header class="graph-preview-header">
+                <div class="graph-preview-heading">
+                  <span class="graph-preview-kicker" id="graph-preview-kicker">Página</span>
+                  <h2 class="graph-preview-title" id="graph-preview-title"></h2>
+                </div>
+                <button
+                  class="graph-preview-close"
+                  id="graph-preview-close"
+                  type="button"
+                  aria-label="Cerrar vista previa"
+                >×</button>
+              </header>
+              <div class="graph-preview-body" id="graph-preview-body"></div>
+              <footer class="graph-preview-footer">
+                <span class="graph-preview-meta" id="graph-preview-meta"></span>
+                <div class="graph-preview-colors" id="graph-preview-colors"></div>
+                <button class="graph-preview-open" id="graph-preview-open" type="button">Abrir nota</button>
+              </footer>
+            </aside>
+          </div>
+        </section>
+
+        <!-- VIEW 5: KANBAN BOARD (TABLERO KANBAN) -->
+        <section class="view-panel" id="view-kanban">
+          <div class="kanban-board-container">
+            <div class="kanban-header">
+              <h2 style="font-size: calc(22px * var(--ls-font-scale, 1)); font-weight: 700; color: var(--ls-text-title);">Seguimiento de tareas</h2>
+              <span class="badge-tag" id="kanban-total-count">0 tareas activas</span>
+              <label class="kanban-hide-completed-control" for="kanban-hide-completed">
+                <input type="checkbox" id="kanban-hide-completed" />
+                <span>Ocultar completados</span>
+              </label>
+            </div>
+            <div class="kanban-grid">
+              <!-- Column 1: To Do -->
+              <div class="kanban-column" data-kanban-status="todo">
+                <div class="kanban-column-header todo">
+                  <span data-i18n>Por hacer (TODO / LATER)</span>
+                  <span class="badge-tag" id="count-todo">0</span>
+                </div>
+                <div class="kanban-task-list" id="kanban-todo-list"></div>
+              </div>
+
+              <!-- Column 2: Doing -->
+              <div class="kanban-column" data-kanban-status="doing">
+                <div class="kanban-column-header doing">
+                  <span data-i18n>En progreso (DOING / NOW)</span>
+                  <span class="badge-tag" id="count-doing">0</span>
+                </div>
+                <div class="kanban-task-list" id="kanban-doing-list"></div>
+              </div>
+
+              <!-- Column 3: Done -->
+              <div class="kanban-column" data-kanban-status="done">
+                <div class="kanban-column-header done">
+                  <span data-i18n>Completado (DONE)</span>
+                  <span class="badge-tag" id="count-done">0</span>
+                </div>
+                <div class="kanban-task-list" id="kanban-done-list"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 6: ALL PAGES (TODAS LAS PÁGINAS) -->
+        <section class="view-panel" id="view-all-pages">
+          <div class="table-view-container">
+            <div class="table-view-header">
+              <h2 style="font-size: calc(22px * var(--ls-font-scale, 1)); font-weight: 700; color: var(--ls-text-title);">Todas las Páginas</h2>
+              <span class="badge-tag" id="all-pages-count">0 páginas</span>
+            </div>
+            <table class="all-pages-table">
+              <thead>
+                <tr>
+                  <th>Título de Página</th>
+                  <th>Bloques</th>
+                  <th>Tipo</th>
+                  <th>Última Actualización</th>
+                  <th style="text-align: right;">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="all-pages-tbody">
+                <!-- Dynamically populated -->
+              </tbody>
+            </table>
+            <div class="table-pagination" id="all-pages-pagination" hidden>
+              <button class="btn-pagination" id="all-pages-prev" type="button" disabled>← Anterior</button>
+              <span class="pagination-info" id="all-pages-page-info">Página 1 de 1</span>
+              <button class="btn-pagination" id="all-pages-next" type="button" disabled>Siguiente →</button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <!-- PAGE REVISION HISTORY MODAL -->
+    <div class="history-modal-overlay m3-scrim" id="history-modal-overlay" hidden>
+      <div class="history-modal m3-surface">
+        <div class="history-modal-header">
+          <h3 style="font-size: calc(16px * var(--ls-font-scale, 1)); font-weight: 700; color: var(--ls-text-title);" id="history-modal-title">
+            Historial de Versiones: Nota
+          </h3>
+          <button class="btn-icon" id="btn-close-history">✕</button>
+        </div>
+        <div class="snapshot-toolbar">
+          <div class="snapshot-toolbar-head">
+            <span class="snapshot-state-dot is-off" id="snapshot-state-dot" aria-hidden="true"></span>
+            <span class="snapshot-status-text" id="snapshot-status-text">Snapshots desactivados.</span>
+          </div>
+          <div class="snapshot-toolbar-actions">
+            <label class="snapshot-toggle-switch" title="Activar/Desactivar snapshots de esta nota">
+              <input type="checkbox" id="btn-snapshot-toggle" role="switch" aria-label="Activar snapshots de esta nota" />
+              <span class="snapshot-toggle-slider"></span>
+              <span class="snapshot-toggle-label" id="snapshot-toggle-label">Activar snapshots</span>
+            </label>
+          </div>
+          <form class="snapshot-activate-form" id="snapshot-activate-form" hidden>
+            <div class="snapshot-form-grid">
+              <label>
+                <span>Duración (días)</span>
+                <input id="snapshot-duration-days" type="number" min="1" max="30" step="1" value="7" required />
+              </label>
+              <label>
+                <span>Intervalo (horas)</span>
+                <input id="snapshot-interval-hours" type="number" min="1" max="168" step="1" value="4" required />
+              </label>
+              <label class="snapshot-limit-label">
+                <span><input id="snapshot-limit-enabled" type="checkbox" checked /> Límite diario por nota</span>
+                <input id="snapshot-max-per-day" type="number" min="1" max="96" step="1" value="8" />
+              </label>
+            </div>
+            <p class="snapshot-help">Al activar se guarda una versión ahora y otra cada intervalo si la nota cambió. La ventana dura como máximo 30 días; al vencer, las versiones se eliminan y solo queda la nota original.</p>
+            <p class="snapshot-form-error" id="snapshot-form-error" role="alert"></p>
+            <span class="snapshot-folder-hint" id="snapshot-folder-hint"></span>
+          </form>
+        </div>
+        <div class="history-modal-body">
+          <div class="history-revisions-list" id="history-revisions-list">
+            <!-- Snapshots list -->
+          </div>
+          <div class="history-preview-panel">
+            <div class="settings-section-title" id="history-preview-meta">Vista previa de la versión</div>
+            <div class="history-preview-content" id="history-preview-content">
+              Selecciona una versión para inspeccionar su contenido.
+            </div>
+          </div>
+        </div>
+        <div class="history-modal-footer">
+          <span style="font-size: calc(12px * var(--ls-font-scale, 1)); color: var(--ls-text-muted);">Los snapshots se guardan en chronos/ mientras la nota esté activa. Al vencer el periodo o desactivarlos se eliminan.</span>
+          <button class="btn-primary" id="btn-restore-version" style="display: none;">Restaurar esta Versión</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONCEPT MAP MODAL -->
+    <div class="concept-map-overlay m3-scrim" id="concept-map-overlay" hidden>
+      <div class="concept-map-modal m3-surface">
+        <div class="concept-map-header">
+          <div class="concept-map-heading">
+            <h3 id="concept-map-title">Mapa conceptual</h3>
+            <span class="concept-map-subtitle" id="concept-map-subtitle">Bullets de la nota</span>
+          </div>
+          <div class="concept-map-tools">
+            <button class="btn-icon" id="btn-concept-map-zoom-out" type="button" title="Alejar" aria-label="Alejar">−</button>
+            <button class="btn-icon" id="btn-concept-map-zoom-in" type="button" title="Acercar" aria-label="Acercar">+</button>
+            <button class="btn-icon" id="btn-concept-map-reset" type="button" title="Centrar" aria-label="Centrar">⛶</button>
+            <button class="btn-icon" id="btn-close-concept-map" type="button" title="Cerrar" aria-label="Cerrar">✕</button>
+          </div>
+        </div>
+        <div class="concept-map-canvas-wrap" id="concept-map-canvas-wrap">
+          <canvas id="concept-map-canvas" aria-label="Mapa conceptual de la nota"></canvas>
+          <div class="concept-map-empty" id="concept-map-empty" hidden>Esta nota no tiene bullets para convertir en mapa.</div>
+        </div>
+        <div class="concept-map-footer">
+          <span>Arrastra para mover · Rueda del ratón para hacer zoom · Doble clic para centrar</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="m3-scrim" id="shortcuts-modal-overlay" hidden>
+      <div class="settings-dropdown-menu m3-surface shortcuts-modal" role="dialog" aria-modal="true" aria-labelledby="shortcuts-modal-title">
+        <div class="settings-dialog-header">
+          <h2 class="m3-dialog-title" id="shortcuts-modal-title">Atajos de teclado</h2>
+          <button class="btn-icon" id="btn-close-shortcuts" type="button" aria-label="Cerrar atajos">×</button>
+        </div>
+        <div class="shortcuts-modal-body">
+          <section class="shortcuts-group" aria-labelledby="shortcuts-navigation-title">
+            <h3 class="shortcuts-group-title" id="shortcuts-navigation-title">Navegación</h3>
+            <div class="shortcut-row"><span>Abrir o cerrar esta lista</span><kbd>Ctrl/Cmd+/</kbd></div>
+            <div class="shortcut-row"><span>Mostrar u ocultar la barra lateral</span><kbd>Ctrl/Cmd+B</kbd></div>
+            <div class="shortcut-row"><span>Buscar o crear una página</span><kbd>Ctrl/Cmd+K</kbd></div>
+            <div class="shortcut-row"><span>Cerrar ventanas y menús</span><kbd>Esc</kbd></div>
+          </section>
+
+          <section class="shortcuts-group" aria-labelledby="shortcuts-editor-title">
+            <h3 class="shortcuts-group-title" id="shortcuts-editor-title">Editor</h3>
+            <div class="shortcut-row"><span>Crear un bullet nuevo</span><kbd>Enter</kbd></div>
+            <div class="shortcut-row"><span>Salto de línea dentro del bullet</span><kbd>Shift+Enter</kbd></div>
+            <div class="shortcut-row"><span>Sangrar bullet</span><kbd>Tab / Alt+→</kbd></div>
+            <div class="shortcut-row"><span>Desangrar bullet</span><kbd>Shift+Tab / Alt+←</kbd></div>
+            <div class="shortcut-row"><span>Seleccionar bullets contiguos</span><kbd>Shift+↑ / Shift+↓</kbd></div>
+            <div class="shortcut-row"><span>Unir con el bullet anterior</span><kbd>Backspace</kbd></div>
+            <div class="shortcut-row"><span>Copiar bullets seleccionados</span><kbd>Ctrl/Cmd+C</kbd></div>
+            <div class="shortcut-row"><span>Cortar bullets seleccionados</span><kbd>Ctrl/Cmd+X</kbd></div>
+            <div class="shortcut-row"><span>Borrar bullets seleccionados</span><kbd>Del / Backspace</kbd></div>
+            <div class="shortcut-row"><span>Deshacer</span><kbd>Ctrl/Cmd+Z</kbd></div>
+            <div class="shortcut-row"><span>Rehacer</span><kbd>Ctrl/Cmd+Y / Ctrl/Cmd+Shift+Z</kbd></div>
+            <div class="shortcut-row"><span>Pegar sin formato</span><kbd>Ctrl/Cmd+Shift+V</kbd></div>
+          </section>
+
+          <section class="shortcuts-group" aria-labelledby="shortcuts-flashcards-title">
+            <h3 class="shortcuts-group-title" id="shortcuts-flashcards-title">Flashcards</h3>
+            <div class="shortcut-row"><span>Mostrar la respuesta</span><kbd>Space</kbd></div>
+            <div class="shortcut-row"><span>Calificar la tarjeta</span><kbd>1 / 2 / 3 / 4</kbd></div>
+            <p class="shortcuts-note">Las teclas de calificación se configuran en Ajustes → Flashcards.</p>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- TEXT CONTEXT MENU (Click Derecho en el Contenido de un Bullet) -->
+    <div class="custom-context-menu m3-surface" id="custom-context-menu" role="menu" aria-label="Menú de texto">
+      <div class="context-menu-title">Texto</div>
+      <div class="context-menu-format-bar">
+        <button class="fmt-btn" data-fmt="bold" title="Negrita (**)">B</button>
+        <button class="fmt-btn" data-fmt="italic" title="Cursiva (*)" style="font-style: italic;">I</button>
+        <button class="fmt-btn" data-fmt="underline" title="Subrayado (<u>)" style="text-decoration: underline;">U</button>
+        <button class="fmt-btn" data-fmt="strike" title="Tachado (~~)" style="text-decoration: line-through;">S</button>
+        <button class="fmt-btn" data-fmt="code" title="Código (`)" style="font-family: monospace;">&lt;&gt;</button>
+      </div>
+
+      <div class="context-text-selection" id="context-text-selection" hidden>
+        <button class="menu-item" id="ctx-text-copy" type="button">
+          <span>Copiar selección</span>
+          <span class="menu-shortcut">Ctrl+C</span>
+        </button>
+        <button class="menu-item" id="ctx-text-cut" type="button">
+          <span>Cortar selección</span>
+          <span class="menu-shortcut">Ctrl+X</span>
+        </button>
+        <button class="menu-item danger" id="ctx-text-delete" type="button">
+          <span>Borrar selección</span>
+          <span class="menu-shortcut">Del</span>
+        </button>
+      </div>
+
+      <div class="menu-divider"></div>
+      <button class="menu-item" id="ctx-indent" type="button">
+        <span>Aumentar sangría</span>
+        <span class="menu-shortcut">Tab</span>
+      </button>
+      <button class="menu-item" id="ctx-outdent" type="button">
+        <span>Disminuir sangría</span>
+        <span class="menu-shortcut">Shift+Tab</span>
+      </button>
+      <div class="menu-divider"></div>
+
+      <button class="menu-item" id="ctx-text-paste" type="button">
+        <span>Pegar</span>
+        <span class="menu-shortcut">Ctrl+V</span>
+      </button>
+      <button class="menu-item" id="ctx-text-paste-plain" type="button">
+        <span>Pegar sin formato</span>
+        <span class="menu-shortcut">Ctrl+Shift+V</span>
+      </button>
+      <div class="menu-divider"></div>
+
+      <button class="menu-item" id="ctx-clear-format" type="button">
+        <span><span class="menu-symbol" aria-hidden="true">⌫</span> Limpiar formato</span>
+      </button>
+
+      <div class="context-submenu">
+        <button class="menu-item context-submenu-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+          <span>Flashcards</span>
+          <span class="context-submenu-arrow" aria-hidden="true">›</span>
+        </button>
+        <div class="context-submenu-panel" role="menu">
+          <button class="menu-item" id="ctx-cloze" type="button"><span><span class="menu-symbol" aria-hidden="true">&#x2702;&#xFE0E;</span> Hueco Cloze (==...==)</span></button>
+          <button class="menu-item" id="ctx-flashcard" type="button"><span><span class="menu-symbol" aria-hidden="true">★</span> Crear Flashcard (#card)</span></button>
+          <button class="menu-item" id="ctx-image-occlusion" type="button" hidden><span><span class="menu-symbol" aria-hidden="true">▧</span> Oclusión de imagen</span></button>
+        </div>
+      </div>
+
+      <div class="context-submenu">
+        <button class="menu-item context-submenu-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+          <span>Encabezado / Heading</span>
+          <span class="context-submenu-arrow" aria-hidden="true">›</span>
+        </button>
+        <div class="context-submenu-panel context-heading-panel" role="menu">
+          <div class="context-heading-grid">
+            <button class="menu-item" data-heading="1" type="button">H1</button>
+            <button class="menu-item" data-heading="2" type="button">H2</button>
+            <button class="menu-item" data-heading="3" type="button">H3</button>
+            <button class="menu-item" data-heading="4" type="button">H4</button>
+            <button class="menu-item" data-heading="5" type="button">H5</button>
+            <button class="menu-item" data-heading="6" type="button">H6</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="context-submenu">
+        <button class="menu-item context-submenu-trigger" type="button" aria-haspopup="true" aria-expanded="false">
+          <span>Color</span>
+          <span class="context-submenu-arrow" aria-hidden="true">›</span>
+        </button>
+        <div class="context-submenu-panel context-color-panel" role="menu">
+          <label class="context-color-mode"><input type="radio" name="context-color-mode" value="text" checked /> Texto</label>
+          <label class="context-color-mode"><input type="radio" name="context-color-mode" value="background" /> Fondo</label>
+          <div class="context-color-palette">
+            <button class="context-color-swatch" data-color="#dc2626" type="button" aria-label="Rojo" title="Rojo"></button>
+            <button class="context-color-swatch" data-color="#2563eb" type="button" aria-label="Azul" title="Azul"></button>
+            <button class="context-color-swatch" data-color="#16a34a" type="button" aria-label="Verde" title="Verde"></button>
+            <button class="context-color-swatch" data-color="#ca8a04" type="button" aria-label="Amarillo" title="Amarillo"></button>
+            <button class="context-color-swatch" data-color="#9333ea" type="button" aria-label="Morado" title="Morado"></button>
+          </div>
+          <button class="menu-item" id="ctx-clear-color" type="button">Quitar color</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- BULLET CONTEXT MENU (Click Derecho en el Icono de Bullet) -->
+    <div class="custom-context-menu m3-surface" id="bullet-context-menu" role="menu" aria-label="Menú de bullet">
+      <div class="context-menu-title">Bullet</div>
+      <div class="menu-item" id="ctx-task">
+        <span><span class="menu-symbol" aria-hidden="true">☑</span> Alternar Tarea (TODO / DOING / DONE)</span>
+      </div>
+      <div class="menu-item" id="ctx-due-date">
+        <span><span class="menu-symbol" aria-hidden="true">▦</span> Fecha de vencimiento</span>
+        <span class="menu-shortcut" id="ctx-due-date-value"></span>
+      </div>
+
+      <div class="menu-divider"></div>
+
+      <div class="menu-item" id="ctx-move-up">
+        <span>Mover arriba</span>
+      </div>
+      <div class="menu-item" id="ctx-move-down">
+        <span>Mover abajo</span>
+      </div>
+
+      <div class="menu-divider"></div>
+
+      <div class="menu-item" id="ctx-copy">
+        <span id="ctx-copy-label">Copiar bullet</span>
+        <span class="menu-shortcut">Ctrl+C</span>
+      </div>
+      <div class="menu-item" id="ctx-cut">
+        <span id="ctx-cut-label">Cortar bullet</span>
+        <span class="menu-shortcut">Ctrl+X</span>
+      </div>
+      <div class="menu-item" id="ctx-insert-image">
+        <span><span class="menu-symbol" aria-hidden="true">▣</span> Insertar imagen</span>
+      </div>
+
+      <div class="menu-divider"></div>
+
+      <div class="menu-item danger" id="ctx-delete">
+        <span id="ctx-delete-label">Eliminar bullet</span>
+        <span class="menu-shortcut">Del</span>
+      </div>
+    </div>
+
+    <!-- SIDEBAR NOTE CONTEXT MENU (Click Derecho en Notas) -->
+    <div class="custom-context-menu m3-surface" id="sidebar-context-menu">
+      <div class="context-menu-title">Menú</div>
+      <div class="menu-item" id="sctx-open">
+        <span><span class="menu-symbol" aria-hidden="true">◉</span> Abrir nota</span>
+      </div>
+      <div class="menu-item" id="sctx-open-system">
+        <span><span class="menu-symbol" aria-hidden="true">◇</span> Abrir con aplicación predeterminada</span>
+      </div>
+      <div class="menu-item" id="sctx-rename">
+        <span><span class="menu-symbol" aria-hidden="true">✎</span> Renombrar</span>
+      </div>
+      <div class="menu-item" id="sctx-copy-link">
+        <span><span class="menu-symbol" aria-hidden="true">⧉</span> Copiar enlace [[...]]</span>
+      </div>
+      <div class="menu-item" id="sctx-pin">
+        <span><span class="menu-symbol" aria-hidden="true">📌</span> <span id="sctx-pin-label">Fijar nota</span></span>
+      </div>
+      <div class="menu-divider"></div>
+      <div class="menu-item danger" id="sctx-delete">
+        <span><span class="menu-symbol" aria-hidden="true">✕</span> Eliminar nota</span>
+      </div>
+    </div>
+
+    <!-- NAVIGATION CONTEXT MENU (reemplaza el menú nativo del webview) -->
+    <div class="custom-context-menu m3-surface" id="navigation-context-menu" role="menu" aria-label="Menú de navegación">
+      <div class="context-menu-title">Navegación</div>
+      <button class="menu-item" id="navctx-back" type="button">
+        <span><span class="menu-symbol" aria-hidden="true">←</span> Atrás</span>
+      </button>
+      <button class="menu-item" id="navctx-forward" type="button">
+        <span><span class="menu-symbol" aria-hidden="true">→</span> Adelante</span>
+      </button>
+      <div class="menu-divider"></div>
+      <button class="menu-item" id="navctx-reload" type="button">
+        <span><span class="menu-symbol" aria-hidden="true">⟳</span> Recargar</span>
+      </button>
+    </div>
+
+    <input id="image-file-input" type="file" accept=".png,.jpg,.jpeg,.webp,.svg,.gif,.bmp,image/png,image/jpeg,image/webp,image/svg+xml,image/gif,image/bmp" hidden />
+
+    <div class="app-dialog-overlay m3-scrim" id="app-dialog-overlay" hidden>
+      <form class="app-dialog m3-surface" id="app-dialog-form" role="dialog" aria-modal="true" aria-labelledby="app-dialog-title">
+        <h2 class="m3-dialog-title" id="app-dialog-title">Renombrar nota</h2>
+        <p id="app-dialog-message" hidden></p>
+        <label id="app-dialog-input-label" for="app-dialog-input">Nombre de la nota</label>
+        <input id="app-dialog-input" type="text" maxlength="120" autocomplete="off" required />
+        <p id="app-dialog-error" class="app-dialog-error" role="alert" hidden></p>
+        <div class="app-dialog-actions">
+          <button class="font-option-btn" id="app-dialog-cancel" type="button">Cancelar</button>
+          <button class="btn-primary" id="app-dialog-accept" type="submit">Renombrar</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="vault-manager-overlay m3-scrim" id="vault-manager-overlay" hidden>
+      <section class="vault-manager m3-surface" role="dialog" aria-modal="true" aria-labelledby="vault-manager-title">
+        <header class="vault-manager-header">
+          <div>
+            <h2 class="m3-dialog-title" id="vault-manager-title">Bóvedas</h2>
+            <p class="vault-manager-help">Cambia entre tus bóvedas o añade una carpeta. Si eliges una carpeta vacía, se preparará como bóveda nueva. Tus notas no se mueven.</p>
+          </div>
+          <button class="btn-icon" id="btn-close-vault-manager" type="button" aria-label="Cerrar gestor de bóvedas">×</button>
+        </header>
+        <div class="vault-manager-list" id="vault-manager-list"></div>
+        <footer class="vault-manager-footer">
+          <button class="btn-primary" id="btn-add-vault" type="button">Añadir bóveda…</button>
+          <span class="vault-manager-status" id="vault-manager-status" role="status" aria-live="polite"></span>
+        </footer>
+      </section>
+    </div>
+
+    <div class="image-occlusion-overlay m3-scrim" id="image-occlusion-overlay" hidden>
+      <section class="image-occlusion-dialog m3-surface" role="dialog" aria-modal="true" aria-labelledby="image-occlusion-title">
+        <header class="image-occlusion-header">
+          <div>
+            <h2 id="image-occlusion-title">Oclusión de imagen</h2>
+            <p>Arrastra sobre la imagen para crear tarjetas que oculten zonas.</p>
+          </div>
+          <button class="btn-icon" id="btn-close-image-occlusion" type="button" aria-label="Cerrar">×</button>
+        </header>
+        <div class="image-occlusion-stage" id="image-occlusion-stage">
+          <img id="image-occlusion-source" alt="Imagen para oclusión" />
+          <div class="image-occlusion-layer" id="image-occlusion-layer"></div>
+        </div>
+        <div class="image-occlusion-toolbar" aria-label="Herramientas de oclusión">
+          <label>
+            <span>Forma</span>
+            <select id="image-occlusion-shape">
+              <option value="rect">Rectángulo</option>
+              <option value="ellipse">Elipse</option>
+              <option value="polygon">Polígono</option>
+            </select>
+          </label>
+          <label>
+            <span>Color</span>
+            <input id="image-occlusion-color" type="color" value="#4ade80" />
+          </label>
+          <label class="image-occlusion-hint-control">
+            <span>Pista / texto</span>
+            <input id="image-occlusion-hint" type="text" placeholder="Escribe una pista para el área seleccionada" />
+          </label>
+          <div class="image-occlusion-scale-tools">
+            <button class="font-option-btn" id="image-occlusion-scale-down" type="button" title="Reducir al 90%">−</button>
+            <button class="font-option-btn" id="image-occlusion-scale-up" type="button" title="Ampliar al 110%">+</button>
+            <button class="font-option-btn" id="image-occlusion-rotate-left" type="button" title="Girar 15° a la izquierda">↶</button>
+            <button class="font-option-btn" id="image-occlusion-rotate-right" type="button" title="Girar 15° a la derecha">↷</button>
+          </div>
+          <div class="image-occlusion-tool-group">
+            <span class="image-occlusion-tool-label">Alinear</span>
+            <div class="image-occlusion-align-tools">
+              <button class="font-option-btn" id="image-occlusion-align-left" type="button" title="Alinear el área seleccionada a la izquierda">⬅</button>
+              <button class="font-option-btn" id="image-occlusion-align-center" type="button" title="Centrar horizontalmente el área seleccionada">⬌</button>
+              <button class="font-option-btn" id="image-occlusion-align-right" type="button" title="Alinear el área seleccionada a la derecha">➡</button>
+              <button class="font-option-btn" id="image-occlusion-align-top" type="button" title="Alinear el área seleccionada arriba">⬆</button>
+              <button class="font-option-btn" id="image-occlusion-align-middle" type="button" title="Centrar verticalmente el área seleccionada">⬍</button>
+              <button class="font-option-btn" id="image-occlusion-align-bottom" type="button" title="Alinear el área seleccionada abajo">⬇</button>
+            </div>
+          </div>
+          <div class="image-occlusion-tool-group">
+            <span class="image-occlusion-tool-label">Distribuir</span>
+            <div class="image-occlusion-align-tools">
+              <button class="font-option-btn" id="image-occlusion-distribute-horizontal" type="button" title="Distribuir todas las áreas horizontalmente">⇔</button>
+              <button class="font-option-btn" id="image-occlusion-distribute-vertical" type="button" title="Distribuir todas las áreas verticalmente">⇕</button>
+            </div>
+          </div>
+          <button class="font-option-btn" id="image-occlusion-finish-polygon" type="button" hidden>Finalizar polígono</button>
+          <span class="image-occlusion-instructions">Dibuja el polígono haciendo clic en cada punto y finalízalo con doble clic.</span>
+        </div>
+        <div class="image-occlusion-list" id="image-occlusion-list"></div>
+        <footer class="image-occlusion-footer">
+          <button class="font-option-btn" id="btn-cancel-image-occlusion" type="button">Cancelar</button>
+          <button class="btn-primary" id="btn-save-image-occlusion" type="button">Guardar oclusiones</button>
+        </footer>
+      </section>
+    </div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div class="toast-notification" id="toast-notification">¡Mensaje del sistema!</div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

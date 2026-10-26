@@ -1,0 +1,55 @@
+# Dependabot configuration for SinNotas
+# Auto-updates for GitHub Actions, npm, and Cargo dependencies
+
+version: 2
+updates:
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Bogota"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+    open-pull-requests-limit: 10
+
+  # npm (frontend)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Bogota"
+    labels:
+      - "dependencies"
+      - "npm"
+    commit-message:
+      prefix: "deps(frontend)"
+    open-pull-requests-limit: 10
+    ignore:
+      # Ignore major version updates for breaking changes (vite, vitest)
+      - dependency-name: "vite"
+        update-type: "version-update:semver-major"
+      - dependency-name: "vitest"
+        update-type: "version-update:semver-major"
+
+  # Cargo (Rust backend)
+  - package-ecosystem: "cargo"
+    directory: "/src-tauri"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Bogota"
+    labels:
+      - "dependencies"
+      - "rust"
+    commit-message:
+      prefix: "deps(backend)"
+    open-pull-requests-limit: 10

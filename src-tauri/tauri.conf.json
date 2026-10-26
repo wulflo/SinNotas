@@ -1,0 +1,73 @@
+{
+  "$schema": "https://schema.tauri.app/v2/config",
+  "productName": "Sin Notas",
+  "version": "0.2.7",
+  "identifier": "com.sinnotas.desktop",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Sin Notas",
+        "width": 1240,
+        "height": 840,
+        "minWidth": 680,
+        "minHeight": 500,
+        "decorations": false,
+        "transparent": false,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost https://asset.localhost data: blob:; style-src 'self' 'unsafe-inline'; style-src-attr 'unsafe-inline'; font-src 'self' data:; media-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'; worker-src 'none'; manifest-src 'none';",
+      "devCsp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://localhost:1420 ws://localhost:1420; img-src 'self' asset: http://asset.localhost https://asset.localhost data: blob: http://localhost:1420; style-src 'self' 'unsafe-inline'; style-src-attr 'unsafe-inline'; font-src 'self' data:; media-src 'self' data: blob:; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'; worker-src 'none'; manifest-src 'none';",
+      "assetProtocol": {
+        "enable": true,
+        "scope": ["$APPDATA/**"]
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "category": "Education",
+    "targets": "all",
+    "publisher": "wulflo",
+    "copyright": "Copyright © 2026 Wulflo",
+    "shortDescription": "Editor outliner local y sistema de notas personal",
+    "android": {
+      "minSdkVersion": 33
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "nsis": {
+        "headerImage": "icons/nsis-header.bmp",
+        "sidebarImage": "icons/nsis-sidebar.bmp"
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/wulflo/SinNotas/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDk2QTAwQTYwQ0U1MzFGNUEKUldSYUgxUE9ZQXFnbGlCTFdyNktyOFRoUWFUZ1JhZXlTVldSWmtDNUU1Y3grR1RJSDdjRnR4ZGgK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}
