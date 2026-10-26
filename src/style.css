@@ -1942,7 +1942,7 @@ select {
 .flashcard-pages-list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
   max-height: 220px;
   overflow-y: auto;
   padding: 6px 8px;
@@ -1951,20 +1951,85 @@ select {
   border-radius: 6px;
 }
 
-.flashcard-pages-list .settings-row {
+/* Árbol de mazos: la indentación se calcula con --deck-depth para que cada
+ * nivel quede alineado sin depender de márgenes anidados. */
+.flashcard-deck-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 2px 0;
-  cursor: default;
+  gap: 4px;
+  min-height: 26px;
+  padding: 1px 4px 1px calc(2px + var(--deck-depth, 0) * 16px);
+  border-radius: 5px;
+  color: var(--ls-text-primary);
+  font-size: var(--ls-font-size-ui);
 }
 
-.flashcard-pages-list .settings-row label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.flashcard-deck-row:hover {
+  background: var(--ls-accent-subtle);
+}
+
+.flashcard-deck-toggle {
+  display: grid;
+  place-items: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ls-text-muted);
+  font: inherit;
+  font-size: 11px;
+  line-height: 1;
   cursor: pointer;
-  width: 100%;
+}
+
+.flashcard-deck-toggle:hover {
+  background: var(--ls-bg-secondary);
+  color: var(--ls-text-title);
+}
+
+.flashcard-deck-toggle.is-placeholder {
+  pointer-events: none;
+}
+
+.flashcard-deck-label {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.flashcard-deck-label input[type="checkbox"] {
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--ls-accent);
+  cursor: pointer;
+}
+
+.flashcard-deck-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flashcard-deck-row.is-search-match .flashcard-deck-name {
+  color: var(--ls-accent);
+  font-weight: 600;
+}
+
+.flashcard-deck-count {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding-left: 8px;
+  color: var(--ls-text-muted);
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .snapshot-notes-list {

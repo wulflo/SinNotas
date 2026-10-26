@@ -433,12 +433,12 @@
                   <div class="settings-help" id="flashcard-recalc-status" role="status" aria-live="polite"></div>
                 </div>
 
-                <div class="settings-section-title">Notas incluidas en el repaso</div>
-                <p class="settings-help">Cada nota actúa como un mazo que contiene sus flashcards. Selecciona las notas cuyas tarjetas se repasarán y pulsa "Guardar selección"; las desmarcadas quedarán excluidas de la sesión de repaso.</p>
+                <div class="settings-section-title">Mazos incluidos en el repaso</div>
+                <p class="settings-help">Cada nota actúa como un mazo que contiene sus flashcards. Usa <code>→</code> en el título para crear mazos y submazos, por ejemplo <code>Salud mental → Ansiedad → Tema 1</code>. También se acepta <code>::</code> al escribir: se convertirá en <code>→</code> porque los dos puntos no son válidos en nombres de archivo en Windows. Marca un mazo para incluir todas sus notas hijas y pulsa "Guardar selección".</p>
                 <div class="sync-box" id="flashcard-pages-container">
                   <div class="flashcard-pages-controls">
-                    <input type="text" id="flashcard-pages-search" placeholder="Buscar en el título..." aria-label="Filtrar notas por palabra en el título" />
-                    <select id="flashcard-pages-sort" aria-label="Orden de la lista de notas">
+                    <input type="text" id="flashcard-pages-search" placeholder="Buscar mazo o nota..." aria-label="Filtrar mazos y notas por título" />
+                    <select id="flashcard-pages-sort" aria-label="Orden de la lista de mazos">
                       <option value="title-asc">Nombre A-Z</option>
                       <option value="title-desc">Nombre Z-A</option>
                       <option value="created-desc">Creación (más reciente)</option>
@@ -449,8 +449,8 @@
                     <button type="button" class="font-option-btn flashcard-pages-save" id="btn-flashcard-pages-save" disabled>Guardar selección</button>
                     <span class="flashcard-pages-status" id="flashcard-pages-status" role="status" aria-live="polite"></span>
                   </div>
-                  <div class="flashcard-pages-list" id="flashcard-pages-list">
-                    <!-- Se renderiza por notas (una casilla por nota con tarjetas) -->
+                  <div class="flashcard-pages-list" id="flashcard-pages-list" role="tree" aria-multiselectable="true" aria-label="Mazos y notas con flashcards">
+                    <!-- Se renderiza un árbol: mazos raíz, submazos y notas -->
                   </div>
                   <div class="flashcard-pages-pagination" id="flashcard-pages-pagination" hidden>
                     <button class="btn-pagination" id="flashcard-pages-prev" type="button" disabled>← Anterior</button>

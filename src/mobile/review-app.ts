@@ -14,6 +14,16 @@ import { initialVaultPages, VaultStore } from "../store/vault";
 import { ReviewProgressStore, type ReviewProgressEvent } from "../store/review-progress";
 import type { BlockNode, Flashcard, FlashcardType, ImageOcclusionRegion, PageData } from "../types";
 import { FlashcardsManager } from "../views/flashcards-manager";
+import {
+  buildDeckTree,
+  collectDeckPageTitles,
+  flattenDeckRows,
+  getDeckSelectionState,
+  searchDeckTree,
+  visibleDeckRoots,
+  type DeckNode,
+} from "../views/flashcard-decks";
+import { DECK_SEPARATOR, normalizeDeckTitle } from "../deck-title";
 import { hideAppSplash } from "../splash";
 import { requestDesktopEditor, requestReviewMode } from "../app-mode";
 import {
@@ -209,13 +219,6 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function normalizeSearchText(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "");
-}
-
 function sameStringArray(left: string[] | null, right: string[] | null): boolean {
   if (left === null || right === null) return left === right;
   return left.length === right.length && left.every((value, index) => value === right[index]);
@@ -242,6 +245,7 @@ class MobileReviewApp {
   private accent: AccentColor = DEFAULT_ACCENT;
   private notesSearch = "";
   private notesDraft = new Map<string, boolean>();
+  private notesCollapsed = new Set<string>();
   private notesCurrentPage = 1;
   private notesTotalPages = 1;
   private notesRenderToken = 0;
@@ -488,23 +492,23 @@ class MobileReviewApp {
       <div class="mobile-editor-scrim" data-notes-sheet hidden>
         <section class="mobile-editor mobile-notes-editor" role="dialog" aria-modal="true" aria-labelledby="mobile-notes-title">
           <header class="mobile-editor-header">
-            <h2 id="mobile-notes-title">Notas del repaso</h2>
-            <button class="mobile-icon-button" type="button" data-action="close-notes" aria-label="Cerrar selector de notas">${MOBILE_ICONS.close}</button>
+            <h2 id="mobile-notes-title">Mazos del repaso</h2>
+            <button class="mobile-icon-button" type="button" data-action="close-notes" aria-label="Cerrar selector de mazos">${MOBILE_ICONS.close}</button>
           </header>
           <div class="mobile-notes-toolbar">
-            <input class="mobile-notes-search" type="search" data-notes-search placeholder="Filtrar notas…" autocomplete="off" spellcheck="false" aria-label="Filtrar notas">
+            <input class="mobile-notes-search" type="search" data-notes-search placeholder="Buscar mazo o nota…" autocomplete="off" spellcheck="false" aria-label="Filtrar mazos y notas">
             <div class="mobile-notes-bulk-actions">
-              <button class="mobile-link-button" type="button" data-action="notes-all">Todas</button>
-              <button class="mobile-link-button" type="button" data-action="notes-none">Ninguna</button>
+              <button class="mobile-link-button" type="button" data-action="notes-all">Todos</button>
+              <button class="mobile-link-button" type="button" data-action="notes-none">Ninguno</button>
             </div>
           </div>
-          <div class="mobile-notes-list" data-notes-list role="group" aria-label="Notas con tarjetas"></div>
+          <div class="mobile-notes-list" data-notes-list role="tree" aria-multiselectable="true" aria-label="Mazos y notas con tarjetas"></div>
           <div class="mobile-notes-pagination" data-notes-pagination hidden>
             <button class="mobile-link-button" type="button" data-action="notes-prev" disabled>← Anterior</button>
             <span class="mobile-notes-page-info" data-notes-page-info role="status" aria-live="polite">Página 1 de 1</span>
             <button class="mobile-link-button" type="button" data-action="notes-next" disabled>Siguiente →</button>
           </div>
-          <p class="mobile-editor-hint">Solo las notas marcadas aportan tarjetas al repaso. La búsqueda no cambia la selección.</p>
+          <p class="mobile-editor-hint">Usa <code>→</code> en el título para crear mazos y submazos (también acepta <code>::</code>). Marca un mazo para incluir todas sus notas hijas. La búsqueda no cambia la selección.</p>
           <footer class="mobile-editor-actions">
             <button class="mobile-secondary" type="button" data-action="close-notes">Cancelar</button>
             <button class="mobile-primary" type="button" data-action="apply-notes">Aplicar selección</button>
@@ -719,12 +723,12 @@ class MobileReviewApp {
       } else if (action === "notes-prev") {
         if (this.notesCurrentPage > 1) {
           this.notesCurrentPage--;
-          this.renderNotesList();
+          this.renderNotesList({ resetScroll: true });
         }
       } else if (action === "notes-next") {
         if (this.notesCurrentPage < this.notesTotalPages) {
           this.notesCurrentPage++;
-          this.renderNotesList();
+          this.renderNotesList({ resetScroll: true });
         }
       } else if (action === "apply-notes") {
         this.applyNotesSelection();
@@ -791,7 +795,7 @@ class MobileReviewApp {
       this.notesSearch = this.refs.notesSearchInput.value;
       // La búsqueda redefine la lista visible: volver a la primera página.
       this.notesCurrentPage = 1;
-      this.renderNotesList();
+      this.renderNotesList({ resetScroll: true });
     });
 
     this.refs.occlusionHandle.addEventListener("pointerdown", (event) => {
@@ -1030,12 +1034,25 @@ class MobileReviewApp {
     }
   }
 
-  /** Descarta del filtro notas que ya no existen o no tienen tarjetas. */
+  /** Descarta del filtro notas que ya no existen o no tienen tarjetas, y
+   * resuelve alias de separador (`::`) al título exacto que hay en la bóveda. */
   private reconcilePageFilter(): void {
     const current = this.manager.getPageFilter();
     if (current === null) return;
-    const available = new Set(this.manager.getPagesWithCards());
-    const valid = current.filter((title) => available.has(title));
+    const pageByNormalizedTitle = new Map(
+      this.manager
+        .getPagesWithCards()
+        .map((title) => [normalizeDeckTitle(title).toLowerCase(), title])
+    );
+    const valid = [
+      ...new Set(
+        current
+          .map((title) =>
+            pageByNormalizedTitle.get(normalizeDeckTitle(title).toLowerCase())
+          )
+          .filter((title): title is string => Boolean(title))
+      ),
+    ];
     if (sameStringArray(current, valid)) return;
     const next = current.length > 0 && valid.length === 0 ? null : valid;
     this.manager.setPageFilter(next);
@@ -1072,7 +1089,7 @@ class MobileReviewApp {
     this.notesSearch = "";
     this.notesCurrentPage = 1;
     this.refs.notesSearchInput.value = "";
-    this.renderNotesList();
+    this.renderNotesList({ resetScroll: true });
     this.refs.notesSheet.hidden = false;
     this.syncOverlayState();
   }
@@ -1091,16 +1108,30 @@ class MobileReviewApp {
     this.renderNotesList();
   }
 
-  private renderNotesList(): void {
+  /** Marca un mazo completo, incluidos todos sus mazos y notas hijas. */
+  private setDeckSelected(node: DeckNode, selected: boolean): void {
+    for (const title of collectDeckPageTitles(node)) {
+      this.notesDraft.set(title, selected);
+    }
+    this.renderNotesList();
+  }
+
+  private renderNotesList(options: { resetScroll?: boolean } = {}): void {
     // Cada render invalida los lotes del anterior. Con cientos de notas, añadir
     // todas las filas de golpe bloqueaba el WebView y el modal parecía colapsar.
     const renderToken = ++this.notesRenderToken;
-    const searchToken = normalizeSearchText(this.notesSearch.trim());
+    const previousScroll = this.refs.notesList.scrollTop;
     const pages = this.manager.getPagesWithCards();
-    const displayed = searchToken
-      ? pages.filter((title) => normalizeSearchText(title).includes(searchToken))
-      : pages;
-    const page = paginateNotes(displayed, this.notesCurrentPage);
+
+    const tree = buildDeckTree(pages, {
+      cardCount: (title) => this.manager.getCardCountForPage(title),
+    });
+    const search = searchDeckTree(tree, this.notesSearch);
+    const visibleRoots = visibleDeckRoots(tree, search);
+
+    // Se pagina por mazos raíz completos; al expandir uno, sus hijos bajan con
+    // él y nunca quedan separados entre dos páginas.
+    const page = paginateNotes(visibleRoots, this.notesCurrentPage);
     this.notesCurrentPage = page.currentPage;
     this.notesTotalPages = page.totalPages;
 
@@ -1110,7 +1141,7 @@ class MobileReviewApp {
     this.refs.notesPageInfo.textContent = `Página ${page.currentPage} de ${page.totalPages}`;
 
     this.refs.notesList.replaceChildren();
-    this.refs.notesList.scrollTop = 0;
+    if (options.resetScroll) this.refs.notesList.scrollTop = 0;
     if (pages.length === 0) {
       this.refs.notesPagination.hidden = true;
       const empty = document.createElement("p");
@@ -1119,51 +1150,98 @@ class MobileReviewApp {
       this.refs.notesList.appendChild(empty);
       return;
     }
-    if (displayed.length === 0) {
+    if (visibleRoots.length === 0) {
       this.refs.notesPagination.hidden = true;
       const empty = document.createElement("p");
       empty.className = "mobile-notes-empty";
-      empty.textContent = "Ninguna nota coincide con la búsqueda.";
+      empty.textContent = "Ningún mazo ni nota coincide con la búsqueda.";
       this.refs.notesList.appendChild(empty);
       return;
     }
 
+    const rows = flattenDeckRows(page.items, search, (nodeId) =>
+      this.notesCollapsed.has(nodeId)
+    );
+
     // Carga escalonada: la página se pinta en lotes pequeños por fotograma.
     const appendChunk = (startIndex: number): void => {
       if (renderToken !== this.notesRenderToken) return;
-      const end = Math.min(startIndex + NOTES_RENDER_CHUNK, page.items.length);
+      const end = Math.min(startIndex + NOTES_RENDER_CHUNK, rows.length);
       for (let index = startIndex; index < end; index++) {
-        this.appendNoteOption(page.items[index]);
+        const row = rows[index];
+        this.appendDeckRow(row.node, row.depth, search.matched.has(row.node.id));
       }
-      if (end < page.items.length) {
+      if (end < rows.length) {
         window.requestAnimationFrame(() => appendChunk(end));
+      } else if (!options.resetScroll) {
+        // Mantiene la posición al marcar una casilla o contraer un mazo.
+        this.refs.notesList.scrollTop = previousScroll;
       }
     };
     appendChunk(0);
   }
 
-  private appendNoteOption(title: string): void {
-    const row = document.createElement("label");
-    row.className = "mobile-note-option";
+  private appendDeckRow(node: DeckNode, depth: number, matchedBySearch: boolean): void {
+    const row = document.createElement("div");
+    row.className = "mobile-deck-row";
+    row.classList.toggle("is-search-match", matchedBySearch);
+    row.style.setProperty("--deck-depth", String(depth));
+    row.setAttribute("role", "treeitem");
+    row.setAttribute("aria-level", String(depth + 1));
+    row.title = node.path.join(DECK_SEPARATOR);
+
+    if (node.children.length > 0) {
+      const collapsed = this.notesCollapsed.has(node.id);
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "mobile-deck-toggle";
+      toggle.setAttribute("aria-label", collapsed ? "Expandir mazo" : "Contraer mazo");
+      toggle.setAttribute("aria-expanded", String(!collapsed));
+      toggle.textContent = collapsed ? "▸" : "▾";
+      toggle.addEventListener("click", () => {
+        if (this.notesCollapsed.has(node.id)) this.notesCollapsed.delete(node.id);
+        else this.notesCollapsed.add(node.id);
+        this.renderNotesList();
+      });
+      row.appendChild(toggle);
+    } else {
+      const spacer = document.createElement("span");
+      spacer.className = "mobile-deck-toggle is-placeholder";
+      spacer.setAttribute("aria-hidden", "true");
+      row.appendChild(spacer);
+    }
+
+    const label = document.createElement("label");
+    label.className = "mobile-deck-label";
 
     const checkbox = document.createElement("input");
     checkbox.type = "checkbox";
-    checkbox.checked = this.notesDraft.get(title) ?? false;
-    checkbox.value = title;
+    const state = getDeckSelectionState(
+      node,
+      (title) => this.notesDraft.get(title) ?? false
+    );
+    checkbox.checked = state === "checked";
+    checkbox.indeterminate = state === "indeterminate";
+    checkbox.setAttribute("aria-label", node.path.join(DECK_SEPARATOR));
     checkbox.addEventListener("change", () => {
-      this.notesDraft.set(title, checkbox.checked);
+      this.setDeckSelected(node, checkbox.checked);
     });
+    label.appendChild(checkbox);
 
     const name = document.createElement("span");
-    name.className = "mobile-note-title";
-    name.textContent = title;
+    name.className = "mobile-deck-name";
+    name.textContent = node.name;
+    label.appendChild(name);
+    row.appendChild(label);
 
-    const count = this.manager.getCardCountForPage(title);
     const detail = document.createElement("small");
-    detail.className = "mobile-note-count";
-    detail.textContent = `${count} ${count === 1 ? "tarjeta" : "tarjetas"}`;
+    detail.className = "mobile-deck-count";
+    detail.textContent =
+      node.totalPageCount > 1
+        ? `${node.totalCardCount} tarjetas · ${node.totalPageCount} notas`
+        : `${node.totalCardCount} ${node.totalCardCount === 1 ? "tarjeta" : "tarjetas"}`;
+    row.appendChild(detail);
 
-    row.append(checkbox, name, detail);
     this.refs.notesList.appendChild(row);
   }
 

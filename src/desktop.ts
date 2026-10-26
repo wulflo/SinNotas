@@ -46,6 +46,25 @@ import {
 } from "./editor/tree-engine";
 import { DocumentHistory } from "./editor/history";
 import { VaultStore } from "./store/vault";
+import {
+  DECK_SEPARATOR,
+  hasInvalidDeckTitleCharacters,
+  normalizeDeckTitle,
+  splitDeckTitle,
+} from "./deck-title";
+import {
+  buildDeckTree,
+  collectDeckPageTitles,
+  compareDeckNodesByName,
+  flattenDeckRows,
+  getDeckSelectionState,
+  normalizeDeckSearchText,
+  searchDeckTree,
+  sortDeckTree,
+  visibleDeckRoots,
+  type DeckNode,
+  type DeckTree,
+} from "./views/flashcard-decks";
 import { ReviewProgressStore, type ReviewProgressEvent } from "./store/review-progress";
 import { selectSidebarPages } from "./store/sidebar-selection";
 import {
@@ -328,18 +347,19 @@ let flashcardPagesSortMode: FlashcardPagesSortMode =
     ? (storedFlashcardPagesSort as FlashcardPagesSortMode)
     : "title-asc";
 
-/** Texto (sans acentos) con el que se filtran las notas en el selector. */
+/** Texto (sans acentos) con el que se filtran los mazos en el selector. */
 let flashcardPagesSearchText = "";
 
-/** Notas visibles en la página actual del selector (20 por página). */
-let flashcardPagesRenderedTitles: string[] = [];
-
 /** Página actual del paginado del selector. Se vuelve a 1 al cambiar de
- * búsqueda u orden clave. */
+ * búsqueda u orden clave. Cada página contiene mazos raíz completos. */
 let flashcardPagesCurrentPage = 1;
 /** Total de páginas de la lista visible (con búsqueda aplicada). */
 let flashcardPagesTotalPages = 1;
 const FLASHCARD_PAGES_PER_PAGE = 20;
+
+/** Mazos contraídos por el usuario. El estado vive mientras dure la app para
+ * que marcar una casilla no vuelva a desplegar todo el árbol. */
+const flashcardDeckCollapsed = new Set<string>();
 
 /** Borrador de casillas mientras el usuario navega entre páginas del
  * paginado. Sin este mapa, re-renderizar una página perdería los cambios
@@ -348,7 +368,35 @@ const flashcardPagesDraftSelection = new Map<string, boolean>();
 
 /** Estado predeterminado (sin tocar) de una nota según el filtro guardado. */
 function flashcardPageDefaultState(title: string): boolean {
-  return flashcardPageFilter === null || flashcardPageFilter.includes(title);
+  if (flashcardPageFilter === null) return true;
+  const normalized = normalizeDeckTitle(title).toLowerCase();
+  return flashcardPageFilter.some(
+    (stored) => normalizeDeckTitle(stored).toLowerCase() === normalized
+  );
+}
+
+/** Al renombrar una nota, traslada su selección y su filtro al título nuevo. */
+function renameFlashcardPageReferences(oldTitle: string, newTitle: string): void {
+  if (flashcardPageFilter !== null) {
+    const oldNormalized = normalizeDeckTitle(oldTitle).toLowerCase();
+    let changed = false;
+    const nextFilter = flashcardPageFilter.map((title) => {
+      if (normalizeDeckTitle(title).toLowerCase() !== oldNormalized) return title;
+      changed = true;
+      return newTitle;
+    });
+    if (changed) {
+      flashcardPageFilter = [...new Set(nextFilter)];
+      localStorage.setItem("sinnotas-flashcard-pages", JSON.stringify(flashcardPageFilter));
+      flashcardsManager.setPageFilter(flashcardPageFilter);
+    }
+  }
+
+  if (flashcardPagesDraftSelection.has(oldTitle)) {
+    const selected = flashcardPagesDraftSelection.get(oldTitle) as boolean;
+    flashcardPagesDraftSelection.delete(oldTitle);
+    flashcardPagesDraftSelection.set(newTitle, selected);
+  }
 }
 
 /** Fecha de creación consultada al backend (y pendientes), indexadas por
@@ -939,12 +987,18 @@ function showTextDialog(
 }
 
 function validatePageTitle(value: string, pageId: string): string | null {
-  const name = value.trim();
+  const name = normalizeDeckTitle(value);
   if (!name) return "El nombre no puede estar vacío.";
-  if (/[\\/:*?"<>|]/.test(name)) return 'El nombre no puede contener \\ / : * ? " < > |';
+  if (hasInvalidDeckTitleCharacters(splitDeckTitle(name))) {
+    return 'El nombre no puede contener \\ / : * ? " < > |. Para separar mazos usa →.';
+  }
   const duplicate = vault
     .getPages()
-    .some((page) => page.id !== pageId && page.title.toLowerCase() === name.toLowerCase());
+    .some(
+      (page) =>
+        page.id !== pageId &&
+        normalizeDeckTitle(page.title).toLowerCase() === name.toLowerCase()
+    );
   if (duplicate) return "Ya existe una nota con ese nombre. Elige otro.";
   return null;
 }
@@ -1431,56 +1485,158 @@ async function fillFlashcardPagesCreatedTimes(titles: string[]): Promise<boolean
   }
 }
 
-/** Normaliza para la búsqueda: minúsculas y sin acentos (#card → card). */
-function normalizeFlashcardSearchText(value: string): string {
-  return value
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "");
+/** Fecha más antigua de las notas que forman un mazo, incluidos sus hijos.
+ * Se usa para ordenar el árbol por creación sin romper la jerarquía. */
+function buildFlashcardDeckCreatedCache(tree: DeckTree): Map<string, number | null> {
+  const cache = new Map<string, number | null>();
+
+  const visit = (node: DeckNode): number | null => {
+    let earliest: number | null = null;
+    for (const title of node.pageTitles) {
+      const createdAt = flashcardPageCreatedMs(vault.getPageByTitle(title));
+      if (createdAt !== null && (earliest === null || createdAt < earliest)) {
+        earliest = createdAt;
+      }
+    }
+    for (const child of node.children) {
+      const childCreatedAt = visit(child);
+      if (childCreatedAt !== null && (earliest === null || childCreatedAt < earliest)) {
+        earliest = childCreatedAt;
+      }
+    }
+    cache.set(node.id, earliest);
+    return earliest;
+  };
+
+  tree.roots.forEach(visit);
+  return cache;
 }
 
-/** Ordena y filtra la lista de notas con flashcards según el modo elegido.
- * Las notas sin fecha conocida quedan al final (segundo criterio: título). */
-function sortFlashcardPageTitles(
-  pages: string[]
-): Array<{ title: string; createdAt: number | null }> {
-  const entries = pages.map((title) => ({
-    title,
-    createdAt: flashcardPageCreatedMs(vault.getPageByTitle(title)),
-  }));
-
-  const cmp = (left: number, right: number) => (left < right ? -1 : left > right ? 1 : 0);
-  const byTitle = (left: { title: string }, right: { title: string }) =>
-    left.title.localeCompare(right.title, "es");
-  // La fecha nula se colapsa a ±Infinity según el modo: siempre al final.
-  const keyForAsc = (value: number | null) => (value === null ? Number.POSITIVE_INFINITY : value);
-  const keyForDesc = (value: number | null) => (value === null ? Number.NEGATIVE_INFINITY : value);
-
-  if (flashcardPagesSortMode === "title-asc") {
-    return entries.sort(byTitle);
-  }
+/** Comparador del árbol según el orden elegido en Ajustes. */
+function createFlashcardDeckComparator(
+  tree: DeckTree
+): (left: DeckNode, right: DeckNode) => number {
+  if (flashcardPagesSortMode === "title-asc") return compareDeckNodesByName;
   if (flashcardPagesSortMode === "title-desc") {
-    return entries.sort((left, right) => byTitle(right, left));
+    return (left, right) => -compareDeckNodesByName(left, right);
   }
-  if (flashcardPagesSortMode === "created-desc") {
-    return entries.sort((left, right) =>
-      cmp(keyForDesc(right.createdAt), keyForDesc(left.createdAt)) || byTitle(left, right)
-    );
-  }
-  return entries.sort((left, right) =>
-    cmp(keyForAsc(left.createdAt), keyForAsc(right.createdAt)) || byTitle(left, right)
-  );
+
+  const createdCache = buildFlashcardDeckCreatedCache(tree);
+  return (left, right) => {
+    const leftCreated = createdCache.get(left.id) ?? null;
+    const rightCreated = createdCache.get(right.id) ?? null;
+    if (leftCreated === null && rightCreated === null) {
+      return compareDeckNodesByName(left, right);
+    }
+    if (leftCreated === null) return 1;
+    if (rightCreated === null) return -1;
+    const difference =
+      flashcardPagesSortMode === "created-desc"
+        ? rightCreated - leftCreated
+        : leftCreated - rightCreated;
+    return difference || compareDeckNodesByName(left, right);
+  };
 }
 
-/** Renderiza la lista de notas que contienen flashcards con una casilla cada una.
- * Cada nota funciona como un "pseudo mazo": solo las notas marcadas se incluyen en el repaso.
- * La lista siempre muestra todas las notas con tarjetas (la búsqueda solo recorta
- * la vista); los cambios solo se aplican al pulsar "Guardar selección". */
+/** Estado efectivo de una nota: borrador del usuario > filtro guardado. */
+function flashcardPageSelected(title: string): boolean {
+  return flashcardPagesDraftSelection.has(title)
+    ? (flashcardPagesDraftSelection.get(title) as boolean)
+    : flashcardPageDefaultState(title);
+}
+
+/** Vuelve a pintar el árbol conservando la posición del scroll. */
+function renderFlashcardDecksPreservingScroll(): void {
+  const scrollTop = flashcardPagesList.scrollTop;
+  renderFlashcardPagesFilter(false);
+  flashcardPagesList.scrollTop = scrollTop;
+}
+
+/** Marca o desmarca un mazo completo, incluidos todos sus descendientes. */
+function setFlashcardDeckSelection(node: DeckNode, selected: boolean): void {
+  for (const title of collectDeckPageTitles(node)) {
+    flashcardPagesDraftSelection.set(title, selected);
+  }
+  updateFlashcardPagesDirtyState();
+  renderFlashcardDecksPreservingScroll();
+}
+
+/** Añade una fila del árbol con su indentación y su casilla tri-estado. */
+function appendFlashcardDeckRow(
+  node: DeckNode,
+  depth: number,
+  matchedBySearch: boolean
+): void {
+  const row = document.createElement("div");
+  row.className = "flashcard-deck-row";
+  row.classList.toggle("is-search-match", matchedBySearch);
+  row.style.setProperty("--deck-depth", String(depth));
+  row.setAttribute("role", "treeitem");
+  row.setAttribute("aria-level", String(depth + 1));
+  row.title = node.path.join(DECK_SEPARATOR);
+
+  if (node.children.length > 0) {
+    const collapsed = flashcardDeckCollapsed.has(node.id);
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "flashcard-deck-toggle";
+    toggle.setAttribute("aria-label", collapsed ? "Expandir mazo" : "Contraer mazo");
+    toggle.setAttribute("aria-expanded", String(!collapsed));
+    toggle.textContent = collapsed ? "▸" : "▾";
+    toggle.addEventListener("click", () => {
+      if (flashcardDeckCollapsed.has(node.id)) flashcardDeckCollapsed.delete(node.id);
+      else flashcardDeckCollapsed.add(node.id);
+      renderFlashcardDecksPreservingScroll();
+    });
+    row.appendChild(toggle);
+  } else {
+    const spacer = document.createElement("span");
+    spacer.className = "flashcard-deck-toggle is-placeholder";
+    spacer.setAttribute("aria-hidden", "true");
+    row.appendChild(spacer);
+  }
+
+  const label = document.createElement("label");
+  label.className = "flashcard-deck-label";
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  const state = getDeckSelectionState(node, flashcardPageSelected);
+  checkbox.checked = state === "checked";
+  checkbox.indeterminate = state === "indeterminate";
+  checkbox.setAttribute("aria-label", node.path.join(DECK_SEPARATOR));
+  checkbox.addEventListener("change", () => {
+    setFlashcardDeckSelection(node, checkbox.checked);
+  });
+  label.appendChild(checkbox);
+
+  const name = document.createElement("span");
+  name.className = "flashcard-deck-name";
+  name.textContent = node.name;
+  label.appendChild(name);
+  row.appendChild(label);
+
+  const count = document.createElement("span");
+  count.className = "flashcard-deck-count";
+  const cardLabel = translate(node.totalCardCount === 1 ? "tarjeta" : "tarjetas");
+  const noteLabel = translate(node.totalPageCount === 1 ? "nota" : "notas");
+  count.textContent =
+    node.totalPageCount > 1
+      ? `${node.totalCardCount} ${cardLabel} · ${node.totalPageCount} ${noteLabel}`
+      : `${node.totalCardCount} ${cardLabel}`;
+  row.appendChild(count);
+
+  flashcardPagesList.appendChild(row);
+}
+
+/** Renderiza el árbol de mazos formado por los títulos de las notas.
+ * Cada nota es un mazo; `→` en el título separa mazos y submazos. La
+ * selección se guarda como títulos exactos de notas, así que el árbol es solo
+ * una capa de presentación sobre el mismo filtro de siempre. */
 function showFlashcardPagesLoading(message = "Escaneando notas…"): void {
   if (!flashcardPagesList || !flashcardPagesContainer) return;
   flashcardPagesContainer.hidden = false;
   flashcardPagesList.replaceChildren();
-  flashcardPagesRenderedTitles = [];
   flashcardPagesTotalPages = 1;
   const loading = document.createElement("div");
   loading.className = "settings-help";
@@ -1543,18 +1699,39 @@ function renderFlashcardPagesFilter(_scanVault = true): void {
   }
 
   const pages = flashcardsManager.getPagesWithCards();
+  const pageByNormalizedTitle = new Map(
+    pages.map((title) => [normalizeDeckTitle(title).toLowerCase(), title])
+  );
 
   // El borrador puede contener notas que ya no existen (borradas o renombradas).
-  // Se descartan para no conservar selecciones fantasma al guardar.
+  // Se descartan para no conservar selecciones fantasma; si solo cambió el
+  // separador (`::` → `→`), se traslada la selección al título actual.
   for (const title of [...flashcardPagesDraftSelection.keys()]) {
-    if (!pages.includes(title)) flashcardPagesDraftSelection.delete(title);
+    const actualTitle = pageByNormalizedTitle.get(normalizeDeckTitle(title).toLowerCase());
+    if (!actualTitle) {
+      flashcardPagesDraftSelection.delete(title);
+    } else if (actualTitle !== title) {
+      const selected = flashcardPagesDraftSelection.get(title) as boolean;
+      flashcardPagesDraftSelection.delete(title);
+      flashcardPagesDraftSelection.set(actualTitle, selected);
+    }
   }
 
   // Si el filtro guardado apunta a notas que ya no existen en este vault,
-  // descartar esas entradas (o volver a "todas" si no queda ninguna).
+  // descartar esas entradas (o volver a "todas" si no queda ninguna). También
+  // se resuelven alias antiguos (`::`) al título exacto que hay en el vault.
   if (flashcardPageFilter !== null) {
-    const validFilter = flashcardPageFilter.filter((title) => pages.includes(title));
-    if (validFilter.length !== flashcardPageFilter.length) {
+    const validFilter = [
+      ...new Set(
+        flashcardPageFilter
+          .map((title) => pageByNormalizedTitle.get(normalizeDeckTitle(title).toLowerCase()))
+          .filter((title): title is string => Boolean(title))
+      ),
+    ];
+    const filterChanged =
+      validFilter.length !== flashcardPageFilter.length ||
+      validFilter.some((title, index) => title !== flashcardPageFilter?.[index]);
+    if (filterChanged) {
       flashcardPageFilter = flashcardPageFilter.length > 0 && validFilter.length === 0
         ? null
         : validFilter;
@@ -1563,11 +1740,8 @@ function renderFlashcardPagesFilter(_scanVault = true): void {
     }
   }
 
-  const isFilterAll = flashcardPageFilter === null;
-
   if (pages.length === 0) {
     flashcardPagesList.replaceChildren();
-    flashcardPagesRenderedTitles = [];
     flashcardPagesTotalPages = 1;
     const empty = document.createElement("div");
     empty.className = "settings-help";
@@ -1583,23 +1757,31 @@ function renderFlashcardPagesFilter(_scanVault = true): void {
   }
   flashcardPagesContainer.hidden = false;
 
-  // Orden honorífico del selector; la búsqueda solo recorta lo que se muestra.
-  const sortedEntries = sortFlashcardPageTitles(pages);
-  const searchToken = normalizeFlashcardSearchText(flashcardPagesSearchText);
-  const displayedEntries = searchToken
-    ? sortedEntries.filter((entry) =>
-        normalizeFlashcardSearchText(entry.title).includes(searchToken)
-      )
-    : sortedEntries;
+  // Las fechas se piden en segundo plano; al llegar se reordena el árbol.
+  if (flashcardPagesSortMode.startsWith("created-")) {
+    void fillFlashcardPagesCreatedTimes(pages).then((changed) => {
+      if (changed) renderFlashcardDecksPreservingScroll();
+    });
+  }
 
-  // Paginado (20 notas por bloque, como "Todas las páginas"). La búsqueda y
-  // el orden se reevalúan al cambiar; el paginado reinicia desde la página 1.
-  const totalPages = Math.max(1, Math.ceil(displayedEntries.length / FLASHCARD_PAGES_PER_PAGE));
+  const tree = buildDeckTree(pages, {
+    cardCount: (title) => flashcardsManager.getCardCountForPage(title),
+  });
+  sortDeckTree(tree, createFlashcardDeckComparator(tree));
+  const search = searchDeckTree(tree, flashcardPagesSearchText);
+  const visibleRoots = visibleDeckRoots(tree, search);
+
+  // Se pagina por mazos raíz completos: así un mazo y sus hijos nunca quedan
+  // separados entre dos páginas. Lo contraído no ocupa espacio.
+  const totalPages = Math.max(1, Math.ceil(visibleRoots.length / FLASHCARD_PAGES_PER_PAGE));
   flashcardPagesTotalPages = totalPages;
   if (flashcardPagesCurrentPage > totalPages) flashcardPagesCurrentPage = totalPages;
   if (flashcardPagesCurrentPage < 1) flashcardPagesCurrentPage = 1;
   const start = (flashcardPagesCurrentPage - 1) * FLASHCARD_PAGES_PER_PAGE;
-  const pageEntries = displayedEntries.slice(start, start + FLASHCARD_PAGES_PER_PAGE);
+  const pageRoots = visibleRoots.slice(start, start + FLASHCARD_PAGES_PER_PAGE);
+  const rows = flattenDeckRows(pageRoots, search, (nodeId) =>
+    flashcardDeckCollapsed.has(nodeId)
+  );
 
   const paginationEl = document.getElementById("flashcard-pages-pagination");
   const prevBtn = document.getElementById("flashcard-pages-prev") as HTMLButtonElement | null;
@@ -1616,78 +1798,40 @@ function renderFlashcardPagesFilter(_scanVault = true): void {
   }
 
   flashcardPagesList.replaceChildren();
-  flashcardPagesRenderedTitles = pageEntries.map((entry) => entry.title);
 
-  if (searchToken && displayedEntries.length === 0) {
+  if (visibleRoots.length === 0) {
     flashcardPagesTotalPages = 1;
     if (paginationEl) paginationEl.hidden = true;
     const empty = document.createElement("div");
     empty.className = "settings-help";
     empty.style.margin = "0";
-    empty.innerText = "No hay notas cuyo título coincida con la búsqueda.";
+    empty.innerText = "No hay mazos ni notas que coincidan con la búsqueda.";
     flashcardPagesList.appendChild(empty);
     updateFlashcardPagesDirtyState();
     return;
   }
 
-  pageEntries.forEach((entry) => {
-    const pageTitle = entry.title;
-    const row = document.createElement("div");
-    row.className = "settings-row";
-    row.style.padding = "4px 0";
-
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.value = pageTitle;
-    // Estado: borrador del usuario > estado guardado (o "todas", si no hay filtro).
-    checkbox.checked = flashcardPagesDraftSelection.has(pageTitle)
-      ? (flashcardPagesDraftSelection.get(pageTitle) as boolean)
-      : (isFilterAll || (flashcardPageFilter?.includes(pageTitle) ?? false));
-    // Al marcar/desmarcar solo se anota en el borrador; se aplica con "Guardar selección".
-    checkbox.addEventListener("change", () => {
-      flashcardPagesDraftSelection.set(pageTitle, checkbox.checked);
-      updateFlashcardPagesDirtyState();
-    });
-
-    const label = document.createElement("label");
-    label.style.marginLeft = "6px";
-    label.style.cursor = "pointer";
-    label.title = pageTitle;
-    label.appendChild(checkbox);
-    const cardCount = flashcardsManager.getCardCountForPage(pageTitle);
-    const cardLabel = translate(cardCount === 1 ? "tarjeta" : "tarjetas");
-    label.append(` ${pageTitle} (${cardCount} ${cardLabel})`);
-
-    row.appendChild(label);
-    flashcardPagesList.appendChild(row);
+  rows.forEach(({ node, depth }) => {
+    appendFlashcardDeckRow(node, depth, search.matched.has(node.id));
   });
-
-  // Fechas de creación pendientes: pedir al backend y reordenar al responder.
-  if (flashcardPagesSortMode.startsWith("created-")) {
-    void fillFlashcardPagesCreatedTimes(flashcardPagesRenderedTitles).then((changed) => {
-      if (changed) renderFlashcardPagesFilter(false);
-    });
-  }
 
   updateFlashcardPagesDirtyState();
 }
 
 btnFlashcardPagesSelectAll.addEventListener("click", () => {
-  flashcardPagesList.querySelectorAll<HTMLInputElement>("input[type=checkbox]").forEach((input) => {
-    input.checked = true;
-    // Se anota en el borrador: la selección sobrevive al paginado.
-    flashcardPagesDraftSelection.set(input.value, true);
+  flashcardsManager.getPagesWithCards().forEach((title) => {
+    flashcardPagesDraftSelection.set(title, true);
   });
   updateFlashcardPagesDirtyState();
+  renderFlashcardDecksPreservingScroll();
 });
 
 btnFlashcardPagesSelectNone.addEventListener("click", () => {
-  flashcardPagesList.querySelectorAll<HTMLInputElement>("input[type=checkbox]").forEach((input) => {
-    input.checked = false;
-    // Se anota en el borrador: la selección sobrevive al paginado.
-    flashcardPagesDraftSelection.set(input.value, false);
+  flashcardsManager.getPagesWithCards().forEach((title) => {
+    flashcardPagesDraftSelection.set(title, false);
   });
   updateFlashcardPagesDirtyState();
+  renderFlashcardDecksPreservingScroll();
 });
 
 btnFlashcardPagesSave.addEventListener("click", saveFlashcardPagesSelection);
@@ -1703,6 +1847,7 @@ if (flashcardPagesSearch) {
     // La búsqueda redefine los resultados: volver a la primera página.
     flashcardPagesCurrentPage = 1;
     renderFlashcardPagesFilter(false);
+    flashcardPagesList.scrollTop = 0;
   });
 }
 
@@ -1718,6 +1863,7 @@ if (flashcardPagesSort) {
     // Cambiar la clasificación reinicia el paginado desde la primera página.
     flashcardPagesCurrentPage = 1;
     renderFlashcardPagesFilter(false);
+    flashcardPagesList.scrollTop = 0;
   });
 }
 
@@ -1725,6 +1871,7 @@ document.getElementById("flashcard-pages-prev")?.addEventListener("click", () =>
   if (flashcardPagesCurrentPage > 1) {
     flashcardPagesCurrentPage--;
     renderFlashcardPagesFilter(false);
+    flashcardPagesList.scrollTop = 0;
   }
 });
 
@@ -1734,6 +1881,7 @@ document.getElementById("flashcard-pages-next")?.addEventListener("click", () =>
   if (flashcardPagesCurrentPage < flashcardPagesTotalPages) {
     flashcardPagesCurrentPage++;
     renderFlashcardPagesFilter(false);
+    flashcardPagesList.scrollTop = 0;
   }
 });
 
@@ -6172,24 +6320,48 @@ function commitPageTitleRename(): void {
   // Si el usuario cambió de nota con el título a medio editar, el renombrado ya no aplica.
   if (pageTitleRenamePageId && pageTitleRenamePageId !== currentPage.id) return;
 
-  const newTitle = pageTitleHeading.innerText.trim();
-  if (!newTitle || newTitle === lastValidPageTitle) return;
+  const rawTitle = pageTitleHeading.innerText.trim();
+  const newTitle = normalizeDeckTitle(rawTitle);
 
-  if (!vault.renamePage(currentPage.id, newTitle)) {
-    showToast("No se pudo renombrar la nota.");
+  const restoreTitle = (): void => {
     pageTitleHeading.innerText = lastValidPageTitle;
     headbarBreadcrumb.innerText = lastValidPageTitle;
     currentPage.title = lastValidPageTitle;
-    vault.savePage(currentPage);
     renderSidebar();
+  };
+
+  if (!newTitle) {
+    restoreTitle();
     return;
   }
 
+  // Si el usuario escribe `::`, `->` o `>`, el título se normaliza antes de
+  // tocar el archivo: `:` y `>` no son válidos en Windows y `→` sí.
+  if (rawTitle === lastValidPageTitle) {
+    headbarBreadcrumb.innerText = lastValidPageTitle;
+    return;
+  }
+  if (newTitle === lastValidPageTitle) {
+    pageTitleHeading.innerText = newTitle;
+    headbarBreadcrumb.innerText = newTitle;
+    return;
+  }
+  if (newTitle !== rawTitle) pageTitleHeading.innerText = newTitle;
+
+  const oldTitle = currentPage.title;
+  const oldPath = currentPage.path;
+  if (!vault.renamePage(currentPage.id, newTitle)) {
+    showToast("No se pudo renombrar la nota.");
+    restoreTitle();
+    vault.savePage(currentPage);
+    return;
+  }
+
+  renameFlashcardPageReferences(oldTitle, newTitle);
   lastValidPageTitle = newTitle;
   currentPage.title = newTitle;
   // El registro de recientes se guarda por ruta: si la nota estaba en la
   // lista, hay que sustituir la ruta antigua por la nueva.
-  const oldPath = currentPage.path;
   currentPage.path = vault.getPageByTitle(newTitle)?.path ?? currentPage.path;
   replaceRecentPath(oldPath, currentPage.path);
   vault.savePage(currentPage);
@@ -8542,26 +8714,28 @@ document.getElementById("sctx-rename")?.addEventListener("click", async () => {
   const newName = await showTextDialog("Renombrar nota", "Nombre de la nota", oldTitle, {
     validate: (value) => validatePageTitle(value, pageId),
   });
-  if (newName && newName !== oldTitle) {
+  const newTitle = newName ? normalizeDeckTitle(newName) : "";
+  if (newTitle && newTitle !== oldTitle) {
     const oldPath = vault.getPageByTitle(oldTitle)?.path;
-    const renamed = vault.renamePage(pageId, newName);
+    const renamed = vault.renamePage(pageId, newTitle);
     if (!renamed) {
       showToast("No se pudo renombrar la nota.");
       return;
     }
-    const newPath = vault.getPageByTitle(newName.trim())?.path;
+    renameFlashcardPageReferences(oldTitle, newTitle);
+    const newPath = vault.getPageByTitle(newTitle)?.path;
     if (currentPage.id === pageId) {
-      currentPage.title = newName.trim();
+      currentPage.title = newTitle;
       currentPage.path = newPath ?? currentPage.path;
-      pageTitleHeading.innerText = newName.trim();
-      headbarBreadcrumb.innerText = newName.trim();
-      lastValidPageTitle = newName.trim();
+      pageTitleHeading.innerText = newTitle;
+      headbarBreadcrumb.innerText = newTitle;
+      lastValidPageTitle = newTitle;
     }
     // Si la nota estaba en Recientes, sustituir su ruta (por id o no).
     if (oldPath && newPath) replaceRecentPath(oldPath, newPath);
     renderSidebar();
     if (currentView === "all-pages") renderAllPagesView();
-    showToast(`Página renombrada a "${newName.trim()}"`);
+    showToast(`Página renombrada a "${newTitle}"`);
   }
 });
 
@@ -9528,7 +9702,7 @@ function createFlashcardExplorerItem(card: Flashcard): HTMLElement {
 
 function flashcardSearchHaystack(card: Flashcard): string {
   if (card.searchText) return card.searchText;
-  return normalizeFlashcardSearchText(
+  return normalizeDeckSearchText(
     `${card.pageTitle} ${card.question} ${card.answer}`.replace(/<[^>]*>/g, " ")
   );
 }
@@ -9543,7 +9717,7 @@ function renderFlashcardExplorer(): void {
   const willStartScan =
     desktopReady && !cached && !loading && !flashcardLoader.isFresh(pages, version);
   const sourceCards = cached ?? (loading ? flashcardLoader.getCardsForDisplay() : []);
-  const searchToken = normalizeFlashcardSearchText(flashcardExplorerSearchText);
+  const searchToken = normalizeDeckSearchText(flashcardExplorerSearchText);
   const filtered = searchToken
     ? sourceCards.filter((card) => flashcardSearchHaystack(card).includes(searchToken))
     : sourceCards;

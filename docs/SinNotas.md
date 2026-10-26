@@ -1,6 +1,6 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.2.8 · **Fecha:** 2026-10-26
+**Versión:** 0.2.9 · **Fecha:** 2026-10-26
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
@@ -80,19 +80,48 @@ Rutas principales:
   la imagen (`getBoundingClientRect`), que es la misma referencia usada por el
   cursor.
 
-## Selector de notas del repaso móvil
+## Mazos jerárquicos y selector de repaso
 
-El selector **Repasar notas** de la APK ahora usa el mismo criterio que la
-versión de escritorio:
+Los títulos de las notas también son nombres de archivo. Por eso el separador
+canónico de mazos es ` → ` (U+2192), válido en Windows, macOS y Linux; `::` no
+es válido en un nombre de archivo de Windows. Al crear o renombrar una nota se
+aceptan `::`, `->`, `=>`, `›`, `»` y `>` como alias, pero se guardan como ` → `.
+Los títulos antiguos con `::` se siguen interpretando como jerarquía y, al
+renombrarlos, se convierten al separador canónico.
 
-- **20 notas por página**.
-- Controles **Anterior / Siguiente** y contador `Página X de Y`.
+- `Salud mental` es un único mazo.
+- `Salud mental → Ansiedad → Tema 1` crea tres niveles.
+- Un título sin separador sigue siendo una nota y un mazo a la vez.
+- Seleccionar un mazo marca todas sus notas descendientes. La casilla muestra
+  estado marcado, desmarcado o parcial.
+- Los contadores de tarjetas y notas de cada mazo suman sus descendientes.
+- La búsqueda conserva los ancestros de las coincidencias y los expande; no
+  cambia la selección.
+- El paginado muestra **20 mazos raíz visibles por página**. Un mazo y sus hijos
+  nunca se separan entre páginas; los descendientes de un mazo contraído no
+  ocupan filas.
+- **Marcar todo** y **Ninguna** afectan a todas las notas, no solo a la página o
+  a los resultados de búsqueda visibles.
+- La selección persistida sigue siendo una lista de títulos exactos de notas;
+  el árbol es una capa de presentación. Al renombrar una nota se migran el
+  filtro y el borrador para no perder la selección.
+
+La lógica compartida está en `src/deck-title.ts` (separadores, normalización y
+saneado de nombres) y `src/views/flashcard-decks.ts` (árbol, búsqueda,
+selección y aplanado). Tiene pruebas en `src/deck-title.test.ts` y
+`src/views/flashcard-decks.test.ts`.
+
+El selector **Repasar notas** de la APK y la pestaña de Flashcards de escritorio
+usan el mismo criterio:
+
+- **Anterior / Siguiente** y contador `Página X de Y`.
 - La búsqueda reinicia el paginado a la página 1.
-- La selección en borrador se conserva al cambiar de página, buscar o marcar
-  todas/ninguna.
-- La página se pinta en **lotes de 8 filas por fotograma**; así cientos de notas
-  no bloquean el WebView ni hacen colapsar el modal.
-- Los cambios solo se aplican al pulsar **Aplicar selección**.
+- La selección en borrador se conserva al cambiar de página, buscar, expandir o
+  marcar mazos.
+- La página móvil se pinta en **lotes de 8 filas por fotograma**; así cientos de
+  notas no bloquean el WebView ni hacen colapsar el modal.
+- Los cambios solo se aplican al pulsar **Aplicar selección** en Android o
+  **Guardar selección** en escritorio.
 
 La lógica pura de paginado está en `src/mobile/notes-pagination.ts` y tiene
 pruebas de regresión en `src/mobile/notes-pagination.test.ts`.
@@ -293,7 +322,7 @@ la clave de release.
 ### Publicar una release sin errores
 
 El workflow de release se dispara **solo** con un tag que empiece por `v` y
-compara el número del tag con tres archivos. Para publicar la `0.2.8`:
+compara el número del tag con tres archivos. Para publicar la `0.2.9`:
 
 ```bash
 # 1. Las tres versiones deben ser idénticas
@@ -303,12 +332,12 @@ sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' src-tauri/Cargo.t
 
 # 2. Commit y tag anotado sobre ese commit
 git add -A
-git commit -m "chore(release): preparar 0.2.8"
-git tag -a v0.2.8 -m "Sin Notas 0.2.8"     # el tag SIEMPRE lleva la v
+git commit -m "chore(release): preparar 0.2.9"
+git tag -a v0.2.9 -m "Sin Notas 0.2.9"     # el tag SIEMPRE lleva la v
 
 # 3. Empujar y comprobar que arrancó el workflow
 git push origin master
-git push origin v0.2.8
+git push origin v0.2.9
 gh run list --workflow=release.yml --limit 1
 ```
 
@@ -340,7 +369,7 @@ sobre el commit correcto y se empuja de nuevo.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Versión actual: `0.2.8` (`versionCode 2008`)
+- Última release publicada: `0.2.8` (`versionCode 2008`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):
@@ -369,8 +398,8 @@ sobre el commit correcto y se empuja de nuevo.
 ## Verificación actual
 
 - `npx tsc --noEmit`: correcto.
-- `npm test`: **249 pruebas en 27 archivos**; incluye los pesos oficiales de
-  FSRS-4.5 y las regresiones de oclusión.
+- `npm test`: **270 pruebas en 29 archivos**; incluye los pesos oficiales de
+  FSRS-4.5, las regresiones de oclusión y las pruebas de mazos jerárquicos.
 - `cargo check --manifest-path src-tauri/Cargo.toml --lib`: correcto.
 - CI de `master`: lint/test, APK debug y APK release firmada.
 - Safe area del editor completo: estilos computados en navegador con inset

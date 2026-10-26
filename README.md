@@ -22,7 +22,7 @@ The current frontend uses neither React nor Tailwind CSS.
 - **Markdown:** renders inline formatting for bold, italics, underline, highlight and wikilinks. Wikilinks let you open pages and look up backlinks.
 - **Inline tags:** `#tag` labels are highlighted with a pill in the theme's accent color.
 - **Tables:** tables are stored as native Markdown; Cloze text `==...==` also works inside table cells. Includes full graphical editing with a context menu to add/remove rows and columns, plus drag-and-drop reordering of rows and columns.
-- **Flashcards:** basic, Cloze and image occlusion cards with FSRS-4.5 scheduling; includes focus mode, a Pomodoro timer, review statistics and a progress visualization that grows with your practice. New cards go through a learning phase (short fixed steps: 1 min, 10 min) before graduating to FSRS review, avoiding wide initial interval jumps that act as false positives; the learning state is persisted so a card does not jump back to Review after reloading. From the Flashcards settings, reviews can be filtered by note (each note acts as a deck with its own cards) so you don't review everything at once.
+- **Flashcards:** basic, Cloze and image occlusion cards with FSRS-4.5 scheduling; includes focus mode, a Pomodoro timer, review statistics and a progress visualization that grows with your practice. New cards go through a learning phase (short fixed steps: 1 min, 10 min) before graduating to FSRS review, avoiding wide initial interval jumps that act as false positives; the learning state is persisted so a card does not jump back to Review after reloading. From the Flashcards settings, reviews can be filtered by hierarchical deck: use `→` in note titles (for example `Salud mental → Ansiedad → Tema 1`) to nest decks, select a parent to include all its child notes, and keep the draft selection while searching or paging.
 - **Image occlusion:** draw rectangles, ellipses and polygons, move, resize and rotate areas, add hints, and keep those transformations in the block's Markdown metadata.
 - **Images:** supports PNG, JPG/JPEG, WebP, SVG, GIF and BMP. Inserted images are saved to the vault's `assets/` folder.
 - **Kanban tasks:** sort tasks as pending, in progress or completed; move them between columns and hide the completed ones.
@@ -146,10 +146,10 @@ temporary vault. See [docs/SinNotas.md#cache-de-metadatos-y-watcher](docs/SinNot
 
 All project documentation lives in the single technical guide
 [docs/SinNotas.md](docs/SinNotas.md). This README is the entry point. The guide
-covers the architecture, editor and vault, FSRS/Learning mode, the paginated
-mobile notes selector, Android safe area, desktop/Android updater, security,
-performance, build and CI/release steps, current 0.2.8 release data and known
-limitations.
+covers the architecture, editor and vault, FSRS/Learning mode, hierarchical
+decks and the paginated mobile notes selector, Android safe area,
+desktop/Android updater, security, performance, build and CI/release steps,
+latest published release data and known limitations.
 
 ## Tauri application
 
@@ -214,10 +214,13 @@ MediaStore in `Descargas/SinNotas/`, so any file manager can open the APK and
 hand it to the system installer. The app does not install the APK by itself.
 This flow was verified updating from 0.2.6 to 0.2.7.
 
-The **Repasar notas** selector paginates the vault notes at 20 per page and
-renders each page in small animation-frame batches. This matches desktop and
-keeps the modal responsive with thousands of notes; the draft selection is kept
-while moving between pages, and searching returns to page 1.
+The **Repasar notas** selector groups notes into a deck tree using `→` in their
+titles. It paginates the visible root decks at 20 per page, lets you
+expand/collapse and tri-state select parent decks, and renders each page in
+small animation-frame batches. This matches desktop and keeps the modal
+responsive with thousands of notes; the draft selection is kept while moving
+between pages, searching or selecting parent decks, and searching returns to
+page 1.
 
 ```bash
 # Local build (requires the Android SDK/NDK and the Rust targets)

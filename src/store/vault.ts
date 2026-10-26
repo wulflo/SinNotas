@@ -1,6 +1,12 @@
 import { PageData, Backlink, PageRevision, BlockNode, RestoredSnapshot, VaultCacheDelta } from "../types";
 import { getAllBlocksFlat, findNodeLocation, cloneTree } from "../editor/tree-engine";
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import {
+  hasInvalidDeckTitleCharacters,
+  normalizeDeckTitle,
+  sanitizeDeckTitle,
+  splitDeckTitle,
+} from "../deck-title";
 
 function normalizeBlockTypes(blocks: BlockNode[]): void {
   for (const block of blocks) {
@@ -449,7 +455,15 @@ export class VaultStore {
   }
 
   public getPageByTitle(title: string): PageData | undefined {
-    return this.pages.find((p) => p.title.toLowerCase() === title.toLowerCase());
+    const exact = this.pages.find((p) => p.title.toLowerCase() === title.toLowerCase());
+    if (exact) return exact;
+    // Los títulos antiguos con `::` y los nuevos con `→` representan el mismo
+    // mazo; permitir que enlaces o búsquedas usen cualquiera de las dos formas.
+    const normalized = normalizeDeckTitle(title).toLowerCase();
+    if (!normalized) return undefined;
+    return this.pages.find(
+      (p) => normalizeDeckTitle(p.title).toLowerCase() === normalized
+    );
   }
 
   public getActiveVaultName(): string {
@@ -671,11 +685,22 @@ export class VaultStore {
 
   public renamePage(pageId: string, newTitle: string): boolean {
     const page = this.pages.find((p) => p.id === pageId);
-    if (!page || !newTitle.trim()) return false;
+    if (!page) return false;
 
-    const trimmed = newTitle.trim();
-    if (/[\\/:*?"<>|]/.test(trimmed)) return false;
-    if (this.pages.some((p) => p.id !== pageId && p.title.toLowerCase() === trimmed.toLowerCase())) return false;
+    // Acepta `::`, `->`, `>` y otros alias, pero guarda siempre la flecha
+    // canónica para que el nombre de archivo sea válido en todas las plataformas.
+    const trimmed = normalizeDeckTitle(newTitle);
+    if (!trimmed) return false;
+    if (hasInvalidDeckTitleCharacters(splitDeckTitle(trimmed))) return false;
+    if (
+      this.pages.some(
+        (p) =>
+          p.id !== pageId &&
+          normalizeDeckTitle(p.title).toLowerCase() === trimmed.toLowerCase()
+      )
+    ) {
+      return false;
+    }
 
     const oldTitle = page.title;
     const oldPath = page.path;
@@ -776,10 +801,10 @@ export class VaultStore {
   }
 
   public createPage(title: string): PageData {
-    const existing = this.getPageByTitle(title);
+    const normalizedTitle = sanitizeDeckTitle(title) || "Nueva nota";
+    const existing = this.getPageByTitle(normalizedTitle);
     if (existing) return existing;
 
-    const normalizedTitle = title.trim().replace(/[\\/]/g, "-");
     const pagePath = this.activeRootPath
       ? `${this.activeRootPath.replace(/[\\/]+$/, "")}/pages/${normalizedTitle}.md`
       : `pages/${normalizedTitle}.md`;
