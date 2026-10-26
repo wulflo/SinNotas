@@ -4,6 +4,8 @@ import { stripCardTag, stripSystemProperties, stripTaskStatus } from "../editor/
 interface MapNode {
   id: string;
   label: string;
+  /** Contenido completo (sin truncar) del bloque, para expandir al hacer click. */
+  fullContent: string;
   depth: number;
   x: number;
   y: number;
@@ -26,6 +28,7 @@ const H_GAP = 74;
 const V_GAP = 12;
 const PAD_X = 12;
 const MAX_TEXT_WIDTH = 250;
+const CLICK_TOLERANCE = 4;
 
 /** Convierte el contenido visible de un bullet en una etiqueta corta y limpia. */
 function blockLabel(block: BlockNode): string {
@@ -79,6 +82,9 @@ export class ConceptMapView {
   private panning = false;
   private pointerId: number | null = null;
   private panStart = { x: 0, y: 0, offsetX: 0, offsetY: 0 };
+  private clickStart = { x: 0, y: 0 };
+
+  public onNodeClick?: (nodeId: string, fullContent: string) => void;
 
   constructor(canvasId: string, wrapId: string, emptyId: string) {
     this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -86,6 +92,22 @@ export class ConceptMapView {
     this.wrap = document.getElementById(wrapId) as HTMLElement;
     this.empty = document.getElementById(emptyId) as HTMLElement;
     this.setupEvents();
+  }
+
+  /** Devuelve el nodo (si lo hay) que contiene al punto dado en coordenadas
+   * del mundo (ya desescalado y desoffsetado del lienzo). */
+  private hitTestNode(worldX: number, worldY: number): MapNode | null {
+    for (const node of this.nodes) {
+      if (
+        worldX >= node.x &&
+        worldX <= node.x + node.width &&
+        worldY >= node.y &&
+        worldY <= node.y + node.height
+      ) {
+        return node;
+      }
+    }
+    return null;
   }
 
   /** Construye y dibuja el mapa correspondiente a la nota indicada. */
@@ -151,10 +173,18 @@ export class ConceptMapView {
     this.render();
   }
 
+  /** Recalcula el tamaño del lienzo (por ejemplo, al abrir un panel) sin perder el zoom. */
+  public refresh(): void {
+    if (this.canvas.hidden) return;
+    this.resize();
+    this.render();
+  }
+
   private buildTree(page: PageData): MapNode {
     const root: MapNode = {
       id: "root",
       label: page.title || "Sin título",
+      fullContent: page.title || "Sin título",
       depth: 0,
       x: 0,
       y: 0,
@@ -176,6 +206,7 @@ export class ConceptMapView {
         const node: MapNode = {
           id: block.id,
           label,
+          fullContent: block.content,
           depth,
           x: 0,
           y: 0,
@@ -366,9 +397,23 @@ export class ConceptMapView {
       );
     }, { passive: false });
 
+    let pointerDown = false;
+    let pointerMoved = false;
+    const endPan = (): void => {
+      if (!pointerDown) return;
+      pointerDown = false;
+      this.panning = false;
+      if (this.pointerId !== null && this.canvas.hasPointerCapture(this.pointerId)) {
+        this.canvas.releasePointerCapture(this.pointerId);
+      }
+      this.pointerId = null;
+      this.canvas.classList.remove("is-panning");
+      pointerMoved = false;
+    };
     this.canvas.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
-      this.panning = true;
+      pointerDown = true;
+      pointerMoved = false;
       this.pointerId = event.pointerId;
       this.canvas.setPointerCapture(event.pointerId);
       this.panStart = {
@@ -377,26 +422,42 @@ export class ConceptMapView {
         offsetX: this.offsetX,
         offsetY: this.offsetY,
       };
-      this.canvas.classList.add("is-panning");
+      this.clickStart = { x: event.clientX, y: event.clientY };
     });
 
     this.canvas.addEventListener("pointermove", (event) => {
-      if (!this.panning) return;
-      this.offsetX = this.panStart.offsetX + (event.clientX - this.panStart.x);
-      this.offsetY = this.panStart.offsetY + (event.clientY - this.panStart.y);
-      this.render();
-    });
-
-    const endPan = (): void => {
-      if (!this.panning) return;
-      this.panning = false;
-      if (this.pointerId !== null && this.canvas.hasPointerCapture(this.pointerId)) {
-        this.canvas.releasePointerCapture(this.pointerId);
+      if (!pointerDown) return;
+      const dx = Math.abs(event.clientX - this.panStart.x);
+      const dy = Math.abs(event.clientY - this.panStart.y);
+      if (dx > CLICK_TOLERANCE || dy > CLICK_TOLERANCE) {
+        pointerMoved = true;
+        this.panning = true;
+        this.canvas.classList.add("is-panning");
       }
-      this.pointerId = null;
-      this.canvas.classList.remove("is-panning");
-    };
-    this.canvas.addEventListener("pointerup", endPan);
+      if (this.panning) {
+        this.offsetX = this.panStart.offsetX + (event.clientX - this.panStart.x);
+        this.offsetY = this.panStart.offsetY + (event.clientY - this.panStart.y);
+        this.render();
+      }
+    });
+    this.canvas.addEventListener("pointerup", (event) => {
+      const wasPan = this.panning;
+      endPan();
+      // Un clic puro (sin arrastre) sobre un nodo expande su contenido completo.
+      if (!wasPan && !pointerMoved && this.onNodeClick) {
+        const dx = Math.abs(event.clientX - this.clickStart.x);
+        const dy = Math.abs(event.clientY - this.clickStart.y);
+        if (dx <= CLICK_TOLERANCE && dy <= CLICK_TOLERANCE) {
+          const rect = this.canvas.getBoundingClientRect();
+          const worldX = (event.clientX - rect.left - this.offsetX) / this.scale;
+          const worldY = (event.clientY - rect.top - this.offsetY) / this.scale;
+          const node = this.hitTestNode(worldX, worldY);
+          if (node && node.id !== "root") {
+            this.onNodeClick(node.id, node.fullContent);
+          }
+        }
+      }
+    });
     this.canvas.addEventListener("pointercancel", endPan);
 
     this.canvas.addEventListener("dblclick", () => this.fit());

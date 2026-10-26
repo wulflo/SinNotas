@@ -373,6 +373,97 @@ describe("FlashcardsManager - modo Aprendizaje", () => {
   });
 });
 
+describe("FlashcardsManager - respuestas con jerarquía", () => {
+  it("genera listas HTML anidadas para los bullets hijos de una tarjeta básica", () => {
+    const page: PageData = {
+      id: "p-nested",
+      title: "Nested",
+      path: "notes/Nested.md",
+      blocks: [
+        {
+          id: "root",
+          type: "text",
+          content: "Particularidad Humana #card",
+          children: [
+            {
+              id: "child-1",
+              type: "text",
+              content: "Concepto clave",
+              children: [
+                {
+                  id: "grandchild-1",
+                  type: "text",
+                  content: "Detalle",
+                  children: [],
+                },
+              ],
+            },
+            { id: "child-2", type: "text", content: "Otra idea", children: [] },
+          ],
+        },
+      ],
+    };
+
+    const manager = new FlashcardsManager();
+    const [card] = manager.scanVault([page], "new-first");
+
+    expect(card.cardType).toBe("basic");
+    expect(card.question).toBe("Particularidad Humana");
+    expect(card.answer).toBe(
+      '<ul class="flashcard-answer-list">' +
+        "<li>Concepto clave" +
+        '<ul class="flashcard-answer-list"><li>Detalle</li></ul>' +
+        "</li>" +
+        "<li>Otra idea</li>" +
+        "</ul>"
+    );
+  });
+
+  it("genera una lista anidada en las notas hijas de una tarjeta cloze", () => {
+    const page: PageData = {
+      id: "p-cloze-nested",
+      title: "Cloze anidada",
+      path: "notes/Cloze anidada.md",
+      blocks: [
+        {
+          id: "root",
+          type: "text",
+          content: "El algoritmo usa ==estabilidad==. #card",
+          children: [
+            {
+              id: "child-1",
+              type: "text",
+              content: "Nota hija",
+              children: [
+                {
+                  id: "grandchild-1",
+                  type: "text",
+                  content: "Nota nieta",
+                  children: [],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const manager = new FlashcardsManager();
+    const [card] = manager.scanVault([page], "new-first");
+
+    expect(card.cardType).toBe("cloze");
+    expect(card.answer).toContain(
+      '<div class="cloze-children-notes">' +
+        '<ul class="flashcard-answer-list">' +
+        "<li>Nota hija" +
+        '<ul class="flashcard-answer-list"><li>Nota nieta</li></ul>' +
+        "</li>" +
+        "</ul>" +
+        "</div>"
+    );
+  });
+});
+
 describe("FlashcardsManager - persistencia del estado FSRS", () => {
   const learningContent = [
     "Pregunta :: Respuesta #card",

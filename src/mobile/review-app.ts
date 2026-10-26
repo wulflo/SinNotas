@@ -2205,6 +2205,7 @@ class MobileReviewApp {
 
     this.refs.card.classList.toggle("is-revealed", revealed);
     this.refs.card.classList.toggle("is-cloze", card?.cardType === "cloze");
+    this.refs.card.classList.toggle("is-basic", card?.cardType === "basic");
     this.refs.question.replaceChildren();
     this.refs.question.hidden = false;
     this.refs.answer.replaceChildren();

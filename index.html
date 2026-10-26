@@ -365,7 +365,7 @@
                 </div>
 
                 <div class="settings-section-title">Tamaño de texto</div>
-                <p class="settings-help">Ajusta por separado la interfaz, el editor, los títulos y las tarjetas. Se guarda en este dispositivo y se comparte con la versión móvil.</p>
+                <p class="settings-help">Ajusta por separado la interfaz, el editor y los títulos. El tamaño de las tarjetas se configura en la pestaña Flashcards. Se guarda en este dispositivo y se comparte con la versión móvil.</p>
                 <div class="typography-controls" id="typography-controls"></div>
                 <div class="typography-controls-footer">
                   <button class="font-option-btn" id="btn-reset-typography" type="button">Restaurar tamaños</button>
@@ -413,6 +413,24 @@
                       <option value="reviews-first">Repasos primero</option>
                       <option value="mixed">Orden mezclado</option>
                     </select>
+                  </div>
+                </div>
+
+                <div class="settings-section-title">Tamaño de texto de la tarjeta</div>
+                <p class="settings-help">Tamaño del texto al repasar tarjetas, expresado como múltiplo de la fuente de interfaz. Por defecto es 1em; se puede reducir a 0.8em o aumentar hasta 3em. En las tarjetas básicas, el anverso se muestra un 20 % más grande que el reverso.</p>
+                <div class="sync-box">
+                  <div class="settings-row">
+                    <label for="flashcard-text-size">Texto de tarjeta</label>
+                    <input
+                      type="range"
+                      id="flashcard-text-size"
+                      min="0.8"
+                      max="3"
+                      step="0.1"
+                      value="1"
+                      aria-label="Tamaño de texto de tarjeta"
+                    />
+                    <output id="flashcard-text-size-value">1 em</output>
                   </div>
                 </div>
 
@@ -741,6 +759,13 @@
                   <button class="font-option-btn" id="btn-reload-app" type="button">Recargar aplicación</button>
                 </div>
                 <p class="settings-help" id="unused-attachments-status" role="status" aria-live="polite"></p>
+
+                <div class="settings-section-title">Flashcards</div>
+                <p class="settings-help">Quita los marcadores que generan tarjetas en todas las notas del vault (<code>#card</code>, resaltados <code>==…==</code>, cloze, separadores <code>::</code> y datos de repaso) sin borrar el contenido de los bullets.</p>
+                <div class="advanced-actions">
+                  <button class="font-option-btn snapshot-danger" id="btn-clear-all-flashcards" type="button">Quitar marcadores de flashcards</button>
+                </div>
+                <p class="settings-help" id="clear-all-flashcards-status" role="status" aria-live="polite"></p>
               </section>
             </div>
             </div>
@@ -1110,8 +1135,13 @@
           <canvas id="concept-map-canvas" aria-label="Mapa conceptual de la nota"></canvas>
           <div class="concept-map-empty" id="concept-map-empty" hidden>Esta nota no tiene bullets para convertir en mapa.</div>
         </div>
+        <div class="concept-map-node-detail" id="concept-map-node-detail" hidden>
+          <button class="btn-icon" id="btn-close-concept-map-node" type="button" title="Cerrar detalle" aria-label="Cerrar detalle">✕</button>
+          <div class="concept-map-node-detail-title" id="concept-map-node-detail-title"></div>
+          <div class="concept-map-node-detail-body" id="concept-map-node-detail-body"></div>
+        </div>
         <div class="concept-map-footer">
-          <span>Arrastra para mover · Rueda del ratón para hacer zoom · Doble clic para centrar</span>
+          <span>Arrastra para mover · Rueda del ratón para hacer zoom · Doble clic para centrar · Haz clic en un nodo para ver todo su contenido</span>
         </div>
       </div>
     </div>
@@ -1138,10 +1168,13 @@
             <div class="shortcut-row"><span>Sangrar bullet</span><kbd>Tab / Alt+→</kbd></div>
             <div class="shortcut-row"><span>Desangrar bullet</span><kbd>Shift+Tab / Alt+←</kbd></div>
             <div class="shortcut-row"><span>Seleccionar bullets contiguos</span><kbd>Shift+↑ / Shift+↓</kbd></div>
+            <div class="shortcut-row"><span>Seleccionar todos los bullets de la página</span><kbd>Ctrl/Cmd+Shift+A</kbd></div>
             <div class="shortcut-row"><span>Unir con el bullet anterior</span><kbd>Backspace</kbd></div>
             <div class="shortcut-row"><span>Copiar bullets seleccionados</span><kbd>Ctrl/Cmd+C</kbd></div>
             <div class="shortcut-row"><span>Cortar bullets seleccionados</span><kbd>Ctrl/Cmd+X</kbd></div>
             <div class="shortcut-row"><span>Borrar bullets seleccionados</span><kbd>Del / Backspace</kbd></div>
+            <div class="shortcut-row"><span>Crear tarjeta básica desde la selección</span><kbd>Ctrl/Cmd+Shift+C</kbd></div>
+            <div class="shortcut-row"><span>Quitar flashcards de la selección</span><kbd>Ctrl/Cmd+Shift+D</kbd></div>
             <div class="shortcut-row"><span>Deshacer</span><kbd>Ctrl/Cmd+Z</kbd></div>
             <div class="shortcut-row"><span>Rehacer</span><kbd>Ctrl/Cmd+Y / Ctrl/Cmd+Shift+Z</kbd></div>
             <div class="shortcut-row"><span>Pegar sin formato</span><kbd>Ctrl/Cmd+Shift+V</kbd></div>
@@ -1216,6 +1249,7 @@
         <div class="context-submenu-panel" role="menu">
           <button class="menu-item" id="ctx-cloze" type="button"><span><span class="menu-symbol" aria-hidden="true">&#x2702;&#xFE0E;</span> Hueco Cloze (==...==)</span></button>
           <button class="menu-item" id="ctx-flashcard" type="button"><span><span class="menu-symbol" aria-hidden="true">★</span> Crear Flashcard (#card)</span></button>
+          <button class="menu-item danger" id="ctx-remove-flashcard" type="button"><span><span class="menu-symbol" aria-hidden="true">✕</span> Quitar flashcard (conserva el contenido)</span></button>
           <button class="menu-item" id="ctx-image-occlusion" type="button" hidden><span><span class="menu-symbol" aria-hidden="true">▧</span> Oclusión de imagen</span></button>
         </div>
       </div>

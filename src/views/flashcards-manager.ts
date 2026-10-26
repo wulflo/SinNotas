@@ -319,17 +319,24 @@ export class FlashcardsManager {
       : [...reviewedCards, ...newCards];
   }
 
-  private formatChildAnswers(blocks: BlockNode[], depth = 0): string[] {
-    return blocks.flatMap((block) => {
+  /**
+   * Convierte los bullets hijos en una lista HTML anidada. Es importante
+   * devolver HTML real (`ul`/`li`) y no líneas con `•`: el renderizador de
+   * Markdown de SinNotas conserva los saltos de línea como texto plano, así
+   * que las viñetas literales se veían concatenadas y sin jerarquía.
+   */
+  private formatChildAnswerList(blocks: BlockNode[]): string {
+    const items: string[] = [];
+    for (const block of blocks) {
       const text = this.getCardText(block);
-      // Cuatro espacios por nivel: con el tamaño grande de las flashcards, dos
-      // espacios no bastan para distinguir un hijo de su padre en listas largas.
-      const line = text ? `${"    ".repeat(depth)}• ${text}` : "";
-      return [
-        ...(line ? [line] : []),
-        ...this.formatChildAnswers(block.children || [], depth + 1),
-      ];
-    });
+      const content = text ? renderMarkdownToHtml(text) : "";
+      const children = this.formatChildAnswerList(block.children || []);
+      if (!content && !children) continue;
+      items.push(`<li>${content}${children}</li>`);
+    }
+    return items.length > 0
+      ? `<ul class="flashcard-answer-list">${items.join("")}</ul>`
+      : "";
   }
 
   /**
@@ -621,13 +628,7 @@ export class FlashcardsManager {
           let answerHtml = renderMarkdownToHtml(cardContent, { cloze: "reveal" });
 
           if (block.children && block.children.length > 0) {
-            const childNotes = block.children
-              .map((child: BlockNode) => {
-                const childText = this.getCardText(child);
-                return childText ? `• ${renderMarkdownToHtml(childText)}` : "";
-              })
-              .filter(Boolean)
-              .join("\n");
+            const childNotes = this.formatChildAnswerList(block.children);
             if (childNotes) {
               answerHtml += `\n\n<div class="cloze-children-notes">${childNotes}</div>`;
             }
@@ -654,18 +655,21 @@ export class FlashcardsManager {
 
           if (hasCardTag) {
             question = cardContent.split("::", 1)[0].trim();
-            const childAnswers = this.formatChildAnswers(block.children || []);
-            if (childAnswers.length > 0) {
-              answer = childAnswers.join("\n");
+            const childAnswers = this.formatChildAnswerList(block.children || []);
+            if (childAnswers) {
+              // `answer` ya es HTML (lista anidada); no debe volver a renderizarse.
+              answer = childAnswers;
             } else if (hasDoubleColon) {
-              answer = cardContent.split("::").slice(1).join("::").trim();
+              answer = renderMarkdownToHtml(
+                cardContent.split("::").slice(1).join("::").trim()
+              );
             } else {
-              answer = `Consulta los detalles en la página [[${page.title}]].`;
+              answer = renderMarkdownToHtml(`Consulta los detalles en la página [[${page.title}]].`);
             }
           } else if (hasDoubleColon) {
             const parts = cardContent.split("::");
             question = parts[0].trim();
-            answer = parts.slice(1).join("::").trim();
+            answer = renderMarkdownToHtml(parts.slice(1).join("::").trim());
           }
 
           if (question) {
@@ -675,9 +679,7 @@ export class FlashcardsManager {
               blockId: block.id,
               cardType: "basic",
               question: renderMarkdownToHtml(question),
-              answer: answer
-                ? renderMarkdownToHtml(answer)
-                : renderMarkdownToHtml("Sin respuesta explícita."),
+              answer: answer || renderMarkdownToHtml("Sin respuesta explícita."),
               fsrs: this.parseBlockFSRS(block.content),
               lastIntervalDays: this.parseIntervalDays(block.content),
               easeFactor: this.parseEaseFactor(block.content),

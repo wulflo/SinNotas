@@ -106,7 +106,7 @@ import {
   GamepadListener,
   type ControllerType,
 } from "./gamepad";
-import { renderMarkdownToHtml, sanitizeHtml } from "./editor/markdown";
+import { renderMarkdownToHtml, sanitizeHtml, stripCardTag, stripSystemProperties } from "./editor/markdown";
 import { isAllowedRemoteImageUrl } from "./editor/url-safety";
 import { sanitizePastedHtmlToMarkdown } from "./editor/paste-sanitizer";
 import {
@@ -119,6 +119,8 @@ import {
 import {
   appendOcclusionMasks,
   clampImageOcclusionRegion,
+  normalizeImageOcclusionRegion,
+  occlusionRegionsMatch,
   parseImageOcclusions,
 } from "./editor/image-occlusion";
 import { renderMathToHtml } from "./editor/math";
@@ -135,6 +137,7 @@ import { formatBytes } from "./services/update-utils";
 import {
   FONT_SIZE_DEFINITIONS,
   applyFontSizes,
+  clampFontSize,
   fontSizeDefinition,
   readFontSizes,
   resetFontSizes,
@@ -186,6 +189,9 @@ const vault = new VaultStore();
 const documentHistory = new DocumentHistory();
 let currentPage: PageData = vault.getPageByTitle("Welcome to SinNotas") || vault.getPages()[0];
 let currentView: ViewType = "editor";
+/** Página actual del listado de diarios existentes. */
+let journalsPage = 1;
+const JOURNALS_PAGE_SIZE = 10;
 /** Temporizador de debounce para renombrar la nota al editar su título. */
 let pageTitleRenameTimer: number | null = null;
 /** Nota para la que se agendó el renombrado pendiente. */
@@ -216,7 +222,13 @@ let bulletSelectionAnchorId: string | null = null;
 let pointerSelectionActive = false;
 let boxSelectionStart: { x: number; y: number } | null = null;
 let boxSelectionRoot: HTMLElement | null = null;
+let boxSelectionScrollRoot: HTMLElement | null = null;
+let boxSelectionPointer: { x: number; y: number } | null = null;
+let boxSelectionScrollFrame: number | null = null;
 let pendingBoxSelection: { x: number; y: number; root: HTMLElement } | null = null;
+/** Arrastre vertical que empieza sobre el texto de un bullet: puede convertirse
+ * en selección por caja sin romper el clic normal ni la selección de texto. */
+let pendingTextDragSelection: { x: number; y: number; root: HTMLElement } | null = null;
 let boxSelectionOverlay: HTMLDivElement | null = null;
 let slashMenu: HTMLDivElement | null = null;
 let slashMenuState: {
@@ -618,6 +630,8 @@ const btnCleanUnusedAttachments = document.getElementById("btn-clean-unused-atta
 const unusedAttachmentsStatus = document.getElementById("unused-attachments-status") as HTMLParagraphElement;
 const btnClearCache = document.getElementById("btn-clear-cache") as HTMLButtonElement;
 const btnClearFlashcardStats = document.getElementById("btn-clear-flashcard-stats") as HTMLButtonElement;
+const btnClearAllFlashcards = document.getElementById("btn-clear-all-flashcards") as HTMLButtonElement;
+const clearAllFlashcardsStatus = document.getElementById("clear-all-flashcards-status") as HTMLParagraphElement;
 const btnDeleteAllSnapshots = document.getElementById("btn-delete-all-snapshots") as HTMLButtonElement;
 const btnReloadApp = document.getElementById("btn-reload-app") as HTMLButtonElement;
 const updateSettingsSection = document.getElementById("update-settings-section") as HTMLElement | null;
@@ -646,6 +660,8 @@ const btnFlashcardPagesSave = document.getElementById("btn-flashcard-pages-save"
 const flashcardPagesStatus = document.getElementById("flashcard-pages-status") as HTMLSpanElement;
 const flashcardPagesSearch = document.getElementById("flashcard-pages-search") as HTMLInputElement | null;
 const flashcardPagesSort = document.getElementById("flashcard-pages-sort") as HTMLSelectElement | null;
+const flashcardTextSizeInput = document.getElementById("flashcard-text-size") as HTMLInputElement | null;
+const flashcardTextSizeValue = document.getElementById("flashcard-text-size-value") as HTMLOutputElement | null;
 // Snapshots (activados por nota, con historial en .sinnotas/chronos/)
 const snapshotStatusText = document.getElementById("snapshot-status-text") as HTMLSpanElement;
 const snapshotStateDot = document.getElementById("snapshot-state-dot") as HTMLSpanElement;
@@ -758,6 +774,10 @@ const btnCloseConceptMap = document.getElementById("btn-close-concept-map") as H
 const btnConceptMapZoomIn = document.getElementById("btn-concept-map-zoom-in") as HTMLButtonElement;
 const btnConceptMapZoomOut = document.getElementById("btn-concept-map-zoom-out") as HTMLButtonElement;
 const btnConceptMapReset = document.getElementById("btn-concept-map-reset") as HTMLButtonElement;
+const conceptMapNodeDetail = document.getElementById("concept-map-node-detail") as HTMLDivElement | null;
+const conceptMapNodeDetailTitle = document.getElementById("concept-map-node-detail-title") as HTMLDivElement | null;
+const conceptMapNodeDetailBody = document.getElementById("concept-map-node-detail-body") as HTMLDivElement | null;
+const btnCloseConceptMapNode = document.getElementById("btn-close-concept-map-node") as HTMLButtonElement | null;
 const btnConceptMap = document.getElementById("btn-concept-map") as HTMLButtonElement;
 const btnShortcuts = document.getElementById("btn-shortcuts") as HTMLButtonElement | null;
 const shortcutsModalOverlay = document.getElementById("shortcuts-modal-overlay") as HTMLDivElement;
@@ -1309,6 +1329,9 @@ function renderFontSizeControls(): void {
   if (!typographyControls) return;
   const fragment = document.createDocumentFragment();
   FONT_SIZE_DEFINITIONS.forEach((definition) => {
+    // El tamaño del texto de las tarjetas se controla en la pestaña Flashcards;
+    // no se duplica en Apariencia.
+    if (definition.key === "flashcardText") return;
     const row = document.createElement("label");
     row.className = "typography-control";
     row.dataset.fontSizeRow = definition.key;
@@ -1364,6 +1387,11 @@ function refreshFontSizeControls(): void {
       if (output) output.value = `${value} ${unitLabel}`;
     });
   applyFontSizes(currentFontSizes);
+  if (flashcardTextSizeInput && flashcardTextSizeValue) {
+    const value = currentFontSizes.flashcardText;
+    flashcardTextSizeInput.value = String(value);
+    flashcardTextSizeValue.value = `${value} em`;
+  }
 }
 
 function initTypographySettings(): void {
@@ -1430,6 +1458,26 @@ flashcardReviewOrderSelect.addEventListener("change", () => {
   if (currentView === "flashcards") startFlashcardsSession();
   showToast(translate("Orden de repaso actualizado."));
 });
+
+// Tamaño de texto de la tarjeta: 0.8em (mínimo) a 3em (máximo), 1em por defecto.
+function applyFlashcardTextSize(value: number): void {
+  const clamped = writeFontSize("flashcardText", value);
+  currentFontSizes.flashcardText = clamped;
+  applyFontSizes(currentFontSizes);
+  if (flashcardTextSizeInput) flashcardTextSizeInput.value = String(clamped);
+  if (flashcardTextSizeValue) flashcardTextSizeValue.value = `${clamped} em`;
+}
+
+if (flashcardTextSizeInput && flashcardTextSizeValue) {
+  const initial = clampFontSize("flashcardText", currentFontSizes.flashcardText);
+  flashcardTextSizeInput.value = String(initial);
+  flashcardTextSizeValue.value = `${initial} em`;
+  document.documentElement.style.setProperty("--ls-flashcard-text-em", String(initial));
+  flashcardTextSizeInput.addEventListener("input", () => {
+    applyFlashcardTextSize(Number.parseFloat(flashcardTextSizeInput!.value));
+    if (currentView === "flashcards") updateFlashcardUI();
+  });
+}
 
 /** Fecha de creación (ms) de una nota: diarios usan su journalDate; el resto
  * la birthtime del archivo pedida al backend. `undefined` = aún desconocida. */
@@ -2415,6 +2463,53 @@ btnClearFlashcardStats.addEventListener("click", async () => {
   showToast("Estadísticas de repaso borradas.");
 });
 
+btnClearAllFlashcards.addEventListener("click", async () => {
+  const confirmed = await confirmAction(
+    "Se quitarán los marcadores de todas las flashcards del vault (#card, resaltados ==…==, cloze, separadores :: y datos de repaso). El contenido de los bullets se conservará. ¿Continuar?",
+    "Eliminar flashcards"
+  );
+  if (!confirmed) return;
+
+  const pages = vault.getPages();
+  let removed = 0;
+  pages.forEach((page) => {
+    getAllBlocksFlat(page.blocks).forEach((block) => {
+      if (!isFlashcardBlockContent(block.content)) return;
+      const next = removeFlashcardMarkers(block.content);
+      if (next === block.content) return;
+      block.content = next;
+      removed += 1;
+    });
+  });
+
+  if (removed === 0) {
+    clearAllFlashcardsStatus.textContent = "No se encontraron flashcards en el vault.";
+    showToast("No se encontraron flashcards en el vault.");
+    return;
+  }
+
+  btnClearAllFlashcards.disabled = true;
+  clearAllFlashcardsStatus.textContent = "Guardando notas…";
+  try {
+    await Promise.all(pages.map((page) => vault.savePage(page)));
+    if (currentPage) {
+      currentPage = vault.getPageByTitle(currentPage.title) || currentPage;
+      renderEditor();
+    }
+    flashcardLoader.invalidate();
+    renderSidebar();
+    if (flashcardExplorerActive) renderFlashcardExplorer();
+    clearAllFlashcardsStatus.textContent = `Se quitaron los marcadores de ${removed} flashcard(s).`;
+    showToast(`Flashcards eliminadas: ${removed}.`);
+  } catch (error) {
+    console.error("No se pudieron guardar las notas tras eliminar las flashcards:", error);
+    clearAllFlashcardsStatus.textContent = "No se pudieron guardar todos los cambios.";
+    showToast("No se pudieron guardar todos los cambios. Revisa la consola.");
+  } finally {
+    btnClearAllFlashcards.disabled = false;
+  }
+});
+
 btnReloadApp.addEventListener("click", async () => {
   const confirmed = await confirmAction(
     "La interfaz se recargará. Las notas guardadas no se modificarán.",
@@ -2603,14 +2698,36 @@ function openConceptMap(): void {
   conceptMapTitle.innerText = currentPage.title;
   const count = getAllBlocksFlat(currentPage.blocks).length;
   conceptMapSubtitle.innerText = count === 1 ? "1 bullet" : `${count} bullets`;
+  conceptMapView.onNodeClick = (nodeId, fullContent) => {
+    showConceptMapNodeDetail(nodeId, fullContent);
+  };
+  if (conceptMapNodeDetail) conceptMapNodeDetail.hidden = true;
   mountOverlay(conceptMapOverlay);
   conceptMapOverlay.classList.add("visible");
   requestAnimationFrame(() => conceptMapView.setPage(currentPage));
 }
 
+/** Muestra el contenido completo del bloque pulsado en el mapa conceptual. */
+function showConceptMapNodeDetail(nodeId: string, fullContent: string): void {
+  if (!conceptMapNodeDetail || !conceptMapNodeDetailBody) return;
+  const block = getAllBlocksFlat(currentPage.blocks).find((candidate) => candidate.id === nodeId);
+  if (conceptMapNodeDetailTitle) {
+    conceptMapNodeDetailTitle.textContent = block?.type === "image"
+      ? "Imagen"
+      : "Contenido del bullet";
+  }
+  const text = block?.type === "image"
+    ? block.imageAlt?.trim() || "Imagen sin descripción"
+    : stripCardTag(stripSystemProperties(fullContent || "")).trim();
+  conceptMapNodeDetailBody.textContent = text || "(Sin contenido de texto)";
+  conceptMapNodeDetail.hidden = false;
+  requestAnimationFrame(() => conceptMapView.refresh());
+}
+
 function closeConceptMap(): void {
   conceptMapOverlay.classList.remove("visible");
   unmountOverlay(conceptMapOverlay);
+  if (conceptMapNodeDetail) conceptMapNodeDetail.hidden = true;
 }
 
 btnConceptMap.addEventListener("click", openConceptMap);
@@ -2618,6 +2735,10 @@ btnCloseConceptMap.addEventListener("click", closeConceptMap);
 btnConceptMapZoomIn.addEventListener("click", () => conceptMapView.zoomIn());
 btnConceptMapZoomOut.addEventListener("click", () => conceptMapView.zoomOut());
 btnConceptMapReset.addEventListener("click", () => conceptMapView.fit());
+btnCloseConceptMapNode?.addEventListener("click", () => {
+  if (conceptMapNodeDetail) conceptMapNodeDetail.hidden = true;
+  requestAnimationFrame(() => conceptMapView.refresh());
+});
 conceptMapOverlay.addEventListener("click", (event) => {
   if (event.target === conceptMapOverlay) closeConceptMap();
 });
@@ -2818,6 +2939,37 @@ interface NavigationHistoryEntry {
 
 const navigationHistory: NavigationHistoryEntry[] = [];
 let navigationHistoryIndex = -1;
+
+/** Última vista y página abiertas, para volver a ellas tras recargar la app. */
+const LAST_VIEW_STORAGE_KEY = "sinnotas-last-view";
+const LAST_PAGE_STORAGE_KEY = "sinnotas-last-page-id";
+
+function persistLastNavigation(): void {
+  try {
+    localStorage.setItem(LAST_VIEW_STORAGE_KEY, currentView);
+    localStorage.setItem(LAST_PAGE_STORAGE_KEY, currentPage.id);
+  } catch {}
+}
+
+function readLastNavigation(): { view: ViewType; pageId: string } | null {
+  try {
+    const view = localStorage.getItem(LAST_VIEW_STORAGE_KEY);
+    const pageId = localStorage.getItem(LAST_PAGE_STORAGE_KEY);
+    if (!view || !pageId) return null;
+    const validViews: ViewType[] = [
+      "editor",
+      "journals",
+      "flashcards",
+      "graph",
+      "kanban",
+      "all-pages",
+    ];
+    if (!validViews.includes(view as ViewType)) return null;
+    return { view: view as ViewType, pageId };
+  } catch {
+    return null;
+  }
+}
 let restoringNavigationHistory = false;
 
 function updateHistoryButtons(): void {
@@ -2838,6 +2990,7 @@ function recordNavigationHistory(): void {
   navigationHistory.push(entry);
   navigationHistoryIndex = navigationHistory.length - 1;
   updateHistoryButtons();
+  persistLastNavigation();
 }
 
 function resetNavigationHistory(): void {
@@ -4834,6 +4987,131 @@ function outdentSelectedBullets(page: PageData = getSelectionPage()): boolean {
   return true;
 }
 
+/**
+ * Quita de un bullet los marcadores que lo convierten en flashcard (`#card`,
+ * resaltados/cloze y sus propiedades de programación) conservando el texto.
+ */
+function removeFlashcardMarkers(content: string): string {
+  const cardPropertyPattern =
+    /^(?:card-[a-z-]+|last-reviewed|interval-days|ease-factor|due-date|image-occlusions)::/i;
+  const keptLines = content
+    .split(/\r?\n/)
+    .filter((line) => !cardPropertyPattern.test(line.trim()));
+  // Separar propiedades del texto visible: solo se transforma el texto.
+  const { text, properties } = splitBlockProperties(keptLines.join("\n"));
+  let visible = text;
+  // Cloze estilo Anki: {{c1::texto}}, {{cloze texto}} o {{texto}} → texto.
+  visible = visible.replace(/\{\{(?:c\d+::|cloze\s+)?([^}\n]*)\}\}/gi, "$1");
+  // Resaltado usado como cloze: ==texto== → texto.
+  visible = visible.replace(/==([^=\n]+)==/g, "$1");
+  // Etiquetas de tarjeta.
+  visible = stripCardTag(visible).replace(/#flashcards?\b/gi, "");
+  // El separador `::` también genera una tarjeta básica; se conserva como
+  // puntuación normal para que el bullet siga siendo legible.
+  visible = visible.replace(/\s*::\s*/g, " : ");
+  const cleaned = visible
+    .split(/\r?\n/)
+    .map((line) => line.replace(/[ \t]+$/g, ""))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+  return [cleaned, ...properties].filter((part) => part.length > 0).join("\n");
+}
+
+/**
+ * Quita una única región de la propiedad `image-occlusions::` conservando el
+ * resto de oclusiones y el contenido del bloque.
+ */
+function removeImageOcclusionMarker(content: string, region: ImageOcclusionRegion): string {
+  const propertyMatch = content.match(
+    /(^|\n)([ \t]*)image-occlusions::\s*(\[[^\n]*\])/i
+  );
+  if (!propertyMatch || propertyMatch.index === undefined) return content;
+
+  let rawRegions: unknown;
+  try {
+    rawRegions = JSON.parse(propertyMatch[3]);
+  } catch {
+    return content;
+  }
+  if (!Array.isArray(rawRegions)) return content;
+
+  const index = rawRegions.findIndex((candidate) => {
+    const normalized = normalizeImageOcclusionRegion(candidate);
+    return normalized !== null && occlusionRegionsMatch(normalized, region);
+  });
+  if (index < 0) return content;
+
+  rawRegions.splice(index, 1);
+  const newline = propertyMatch[1] || "";
+  const indentation = propertyMatch[2] || "";
+  const replacement = rawRegions.length > 0
+    ? `${newline}${indentation}image-occlusions:: ${JSON.stringify(rawRegions)}`
+    : "";
+  const start = propertyMatch.index;
+  const next = content.slice(0, start) + replacement + content.slice(start + propertyMatch[0].length);
+  return rawRegions.length > 0 ? next : next.replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/** Selecciona todos los bullets visibles de una página. */
+function selectAllBullets(page: PageData = currentPage): void {
+  const visible = getFlatVisibleBlocks(page.blocks);
+  if (visible.length === 0) return;
+  selectedBulletIds = visible.map((block) => block.id);
+  bulletSelectionAnchorId = visible[0].id;
+  refreshBulletSelection();
+}
+
+/** Elimina las flashcards de los bullets seleccionados sin borrar su contenido. */
+function deleteFlashcardsInSelection(page: PageData = getSelectionPage()): boolean {
+  const ids = new Set(selectedBulletIds);
+  if (ids.size === 0) return false;
+  let changed = false;
+  getAllBlocksFlat(page.blocks).forEach((block) => {
+    if (!ids.has(block.id) || !isFlashcardBlockContent(block.content)) return;
+    const next = removeFlashcardMarkers(block.content);
+    if (next === block.content) return;
+    block.content = next;
+    changed = true;
+  });
+  if (!changed) {
+    showToast("La selección no contiene flashcards que eliminar.");
+    return false;
+  }
+  void vault.savePage(page);
+  renderBlocksTree();
+  refreshBulletSelection();
+  showToast("Flashcards eliminadas; el contenido se conservó.");
+  return true;
+}
+
+/** Convierte en tarjeta básica (#card) los bullets seleccionados. */
+function createBasicCardFromSelection(page: PageData = getSelectionPage()): boolean {
+  const ids = selectedBulletIds.length > 0
+    ? new Set(selectedBulletIds)
+    : cursorState
+      ? new Set([cursorState.blockId])
+      : new Set<string>();
+  if (ids.size === 0) return false;
+  let changed = false;
+  getAllBlocksFlat(page.blocks).forEach((block) => {
+    if (!ids.has(block.id) || block.type === "image") return;
+    const visible = getVisibleBlockContent(block.content);
+    if (!visible.trim() || isFlashcardBlockContent(block.content)) return;
+    setVisibleBlockContent(block, `${visible.trim()} #card`);
+    ensureBlockCreatedAt(block);
+    changed = true;
+  });
+  if (!changed) {
+    showToast("No hay bullets de texto para convertir en tarjeta.");
+    return false;
+  }
+  void vault.savePage(page);
+  renderBlocksTree();
+  showToast("Tarjeta básica creada.");
+  return true;
+}
+
 function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = currentPage) {
   const item = document.createElement("div");
   item.className = `block-item${selectedBulletIds.includes(node.id) ? " is-selected" : ""}`;
@@ -5338,6 +5616,7 @@ function beginBoxSelection(event: PointerEvent, root: HTMLElement): void {
   clearBulletSelection();
   window.getSelection()?.removeAllRanges();
   boxSelectionRoot = root;
+  boxSelectionScrollRoot = findScrollableAncestor(root);
   boxSelectionStart = { x: event.clientX, y: event.clientY };
   pendingBoxSelection = null;
   const overlay = getBoxSelectionOverlay();
@@ -5364,7 +5643,15 @@ function installBlockSelectionHandler(root: HTMLElement): void {
     if (!row || !id) return;
     if (event.target.closest(".collapse-toggle, .block-properties")) return;
     const targetIsEditorOrBullet = event.target.closest(".block-editor, .bullet-dot");
-    if (targetIsEditorOrBullet && !event.shiftKey) return;
+    if (targetIsEditorOrBullet && !event.shiftKey) {
+      // Un arrastre vertical sobre el texto se convertirá en selección por caja
+      // (con auto-scroll). Un clic o un arrastre horizontal conserva el caret y
+      // la selección de texto nativa.
+      if (event.target.closest(".block-editor")) {
+        pendingTextDragSelection = { x: event.clientX, y: event.clientY, root };
+      }
+      return;
+    }
     if (event.shiftKey) {
       selectBulletRange(bulletSelectionAnchorId || id, id);
     } else {
@@ -5418,7 +5705,137 @@ installBlockSelectionHandler(blocksContainer);
   });
 });
 
+/** Actualiza la caja y la selección con la posición actual del puntero. */
+function applyBoxSelection(x: number, y: number): void {
+  if (!boxSelectionStart) return;
+  const left = Math.min(boxSelectionStart.x, x);
+  const top = Math.min(boxSelectionStart.y, y);
+  const width = Math.abs(x - boxSelectionStart.x);
+  const height = Math.abs(y - boxSelectionStart.y);
+  const root = boxSelectionRoot ?? blocksContainer;
+  const scrollRoot = boxSelectionScrollRoot ?? findScrollableAncestor(root);
+  const overlay = getBoxSelectionOverlay();
+  // El rectángulo de selección puede anclarse arriba del área visible al
+  // hacer scroll. Para que la caja no tape el encabezado ni la barra lateral,
+  // se recorta solo su representación visual; la selección real conserva el
+  // rectángulo completo.
+  let overlayTop = top;
+  let overlayHeight = height;
+  if (scrollRoot) {
+    const bounds = scrollRoot.getBoundingClientRect();
+    const visibleTop = Math.max(top, bounds.top);
+    const visibleBottom = Math.min(top + height, bounds.bottom);
+    overlayTop = visibleTop;
+    overlayHeight = Math.max(0, visibleBottom - visibleTop);
+  }
+  overlay.style.left = `${left}px`;
+  overlay.style.top = `${overlayTop}px`;
+  overlay.style.width = `${width}px`;
+  overlay.style.height = `${overlayHeight}px`;
+
+  const selectionRect = new DOMRect(left, top, width, height);
+  const selected: string[] = [];
+  root.querySelectorAll<HTMLElement>(".block-item[data-id]").forEach((item) => {
+    if (!item.offsetParent) return;
+    const row = item.querySelector<HTMLElement>(":scope > .block-row");
+    const id = item.dataset.id;
+    if (!row || !id) return;
+    const rect = row.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    if (
+      rect.right >= selectionRect.left &&
+      rect.left <= selectionRect.right &&
+      rect.bottom >= selectionRect.top &&
+      rect.top <= selectionRect.bottom
+    ) selected.push(id);
+  });
+  selectedBulletIds = selected;
+  refreshBulletSelection();
+}
+
+/**
+ * Busca el contenedor que realmente desplaza el contenido. No siempre es
+ * `.content-scroll`: en algunas vistas el scroll lo hace el panel o una capa
+ * intermedia, y el auto-scroll debe funcionar igualmente.
+ */
+function findScrollableAncestor(root: HTMLElement | null): HTMLElement | null {
+  let current: HTMLElement | null = root;
+  while (current) {
+    const style = getComputedStyle(current);
+    if (
+      /(auto|scroll)/.test(style.overflowY) &&
+      current.scrollHeight > current.clientHeight + 1
+    ) {
+      return current;
+    }
+    current = current.parentElement;
+  }
+  return null;
+}
+
+/**
+ * Desplaza el lienzo cuando el puntero se acerca al borde durante una
+ * selección por caja, para poder abarcar bullets fuera de la vista.
+ */
+function scheduleBoxAutoScroll(): void {
+  if (boxSelectionScrollFrame !== null) return;
+  const step = () => {
+    boxSelectionScrollFrame = null;
+    if (!pointerSelectionActive || !boxSelectionStart || !boxSelectionPointer) return;
+    const root = boxSelectionRoot ?? blocksContainer;
+    const scrollRoot = boxSelectionScrollRoot ?? findScrollableAncestor(root);
+    if (!scrollRoot) return;
+    const rect = scrollRoot.getBoundingClientRect();
+    const edge = 48;
+    let delta = 0;
+    if (boxSelectionPointer.y > rect.bottom - edge) {
+      delta = Math.min(28, Math.ceil((boxSelectionPointer.y - (rect.bottom - edge)) / 2) + 4);
+    } else if (boxSelectionPointer.y < rect.top + edge) {
+      delta = -Math.min(28, Math.ceil(((rect.top + edge) - boxSelectionPointer.y) / 2) + 4);
+    }
+    if (delta === 0) return;
+    const previous = scrollRoot.scrollTop;
+    scrollRoot.scrollTop = previous + delta;
+    const scrolled = scrollRoot.scrollTop - previous;
+    if (scrolled === 0) return;
+    // El ancla de la selección vive en el contenido, no en la pantalla: al
+    // desplazar el lienzo, la caja sigue cubriendo los bullets que ya han
+    // pasado por el puntero en lugar de quedarse solo con los visibles.
+    boxSelectionStart.y -= scrolled;
+    applyBoxSelection(boxSelectionPointer.x, boxSelectionPointer.y);
+    boxSelectionScrollFrame = requestAnimationFrame(step);
+  };
+  boxSelectionScrollFrame = requestAnimationFrame(step);
+}
+
 window.addEventListener("pointermove", (event: PointerEvent) => {
+  if (pendingTextDragSelection) {
+    const dx = event.clientX - pendingTextDragSelection.x;
+    const dy = event.clientY - pendingTextDragSelection.y;
+    if (Math.hypot(dx, dy) < 8) return;
+    // Solo los arrastres claramente verticales seleccionan bullets. Los
+    // horizontales siguen sirviendo para seleccionar texto dentro del bullet.
+    if (Math.abs(dy) < Math.abs(dx) * 1.15) {
+      pendingTextDragSelection = null;
+      return;
+    }
+    const pending = pendingTextDragSelection;
+    pendingTextDragSelection = null;
+    clearBulletSelection();
+    window.getSelection()?.removeAllRanges();
+    boxSelectionRoot = pending.root;
+    boxSelectionScrollRoot = findScrollableAncestor(pending.root);
+    boxSelectionStart = { x: pending.x, y: pending.y };
+    boxSelectionPointer = { x: event.clientX, y: event.clientY };
+    pendingBoxSelection = null;
+    pointerSelectionActive = true;
+    document.body.classList.add("is-bullet-selecting");
+    getBoxSelectionOverlay().hidden = false;
+    applyBoxSelection(event.clientX, event.clientY);
+    scheduleBoxAutoScroll();
+    return;
+  }
+
   if (!pointerSelectionActive) return;
   if (pendingBoxSelection) {
     const dx = event.clientX - pendingBoxSelection.x;
@@ -5427,41 +5844,16 @@ window.addEventListener("pointermove", (event: PointerEvent) => {
     const pending = pendingBoxSelection;
     pendingBoxSelection = null;
     boxSelectionRoot = pending.root;
+    boxSelectionScrollRoot = findScrollableAncestor(pending.root);
     boxSelectionStart = { x: pending.x, y: pending.y };
     window.getSelection()?.removeAllRanges();
     document.body.classList.add("is-bullet-selecting");
     getBoxSelectionOverlay().hidden = false;
   }
   if (boxSelectionStart) {
-    const left = Math.min(boxSelectionStart.x, event.clientX);
-    const top = Math.min(boxSelectionStart.y, event.clientY);
-    const width = Math.abs(event.clientX - boxSelectionStart.x);
-    const height = Math.abs(event.clientY - boxSelectionStart.y);
-    const overlay = getBoxSelectionOverlay();
-    overlay.style.left = `${left}px`;
-    overlay.style.top = `${top}px`;
-    overlay.style.width = `${width}px`;
-    overlay.style.height = `${height}px`;
-
-    const selectionRect = new DOMRect(left, top, width, height);
-    const selected: string[] = [];
-    const root = boxSelectionRoot ?? blocksContainer;
-    root.querySelectorAll<HTMLElement>(".block-item[data-id]").forEach((item) => {
-      if (!item.offsetParent) return;
-      const row = item.querySelector<HTMLElement>(":scope > .block-row");
-      const id = item.dataset.id;
-      if (!row || !id) return;
-      const rect = row.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return;
-      if (
-        rect.right >= selectionRect.left &&
-        rect.left <= selectionRect.right &&
-        rect.bottom >= selectionRect.top &&
-        rect.top <= selectionRect.bottom
-      ) selected.push(id);
-    });
-    selectedBulletIds = selected;
-    refreshBulletSelection();
+    boxSelectionPointer = { x: event.clientX, y: event.clientY };
+    applyBoxSelection(event.clientX, event.clientY);
+    scheduleBoxAutoScroll();
     return;
   }
   const item = document.elementFromPoint(event.clientX, event.clientY)
@@ -5475,14 +5867,27 @@ window.addEventListener("pointermove", (event: PointerEvent) => {
 function finishPointerSelection(): void {
   pointerSelectionActive = false;
   pendingBoxSelection = null;
+  pendingTextDragSelection = null;
   boxSelectionStart = null;
   boxSelectionRoot = null;
+  boxSelectionScrollRoot = null;
+  boxSelectionPointer = null;
+  if (boxSelectionScrollFrame !== null) {
+    cancelAnimationFrame(boxSelectionScrollFrame);
+    boxSelectionScrollFrame = null;
+  }
   document.body.classList.remove("is-bullet-selecting");
   if (boxSelectionOverlay) boxSelectionOverlay.hidden = true;
 }
 
 window.addEventListener("pointerup", finishPointerSelection);
 window.addEventListener("pointercancel", finishPointerSelection);
+
+// Mientras se seleccionan bullets, no permitir que el navegador reinicie una
+// selección de texto nativa (por ejemplo, al arrastrar desde el texto).
+document.addEventListener("selectstart", (event) => {
+  if (pointerSelectionActive || boxSelectionStart) event.preventDefault();
+});
 
 document.addEventListener("keydown", (event: KeyboardEvent) => {
   if (selectedBulletIds.length === 0) return;
@@ -5493,6 +5898,27 @@ document.addEventListener("keydown", (event: KeyboardEvent) => {
   )) return;
 
   const hasTextSelection = Boolean(window.getSelection() && !window.getSelection()?.isCollapsed);
+
+  // Atajos de tarjetas y selección masiva cuando el foco no está en un editor
+  // de bloque (por ejemplo, tras una selección por caja).
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey) {
+    const key = event.key.toLowerCase();
+    if (key === "a") {
+      event.preventDefault();
+      selectAllBullets();
+      return;
+    }
+    if (key === "c") {
+      event.preventDefault();
+      createBasicCardFromSelection();
+      return;
+    }
+    if (key === "d") {
+      event.preventDefault();
+      deleteFlashcardsInSelection();
+      return;
+    }
+  }
 
   // Selección múltiple: indentar/desindentar/borrar con foco fuera del editor.
   // El arrastre de ratón puede dejar una selección de texto nativa residual,
@@ -6104,6 +6530,31 @@ function handleEditorKeyDown(e: KeyboardEvent, blockId: string, page: PageData =
   if (hasBulletSelection && !hasTextSelection && (e.key === "Delete" || e.key === "Backspace")) {
     e.preventDefault();
     void deleteSelectedBullets(page);
+    return;
+  }
+
+  // Atajos de selección masiva y tarjetas.
+  // Ctrl/Cmd+Shift+A selecciona todos los bullets de la página; Ctrl/Cmd+A
+  // amplía la selección actual a toda la página.
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "a") {
+    if (e.shiftKey || selectedBulletIds.length > 0) {
+      e.preventDefault();
+      selectAllBullets(page);
+      return;
+    }
+  }
+
+  // Ctrl/Cmd+Shift+C crea una tarjeta básica desde la selección (o el bullet actual).
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === "c") {
+    e.preventDefault();
+    createBasicCardFromSelection(page);
+    return;
+  }
+
+  // Ctrl/Cmd+Shift+D elimina los marcadores de flashcard de la selección.
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === "d") {
+    e.preventDefault();
+    deleteFlashcardsInSelection(page);
     return;
   }
 
@@ -7973,6 +8424,37 @@ document.getElementById("ctx-flashcard")?.addEventListener("click", () => {
   hideAllContextMenus();
 });
 
+// Quita los marcadores de flashcard conservando el contenido del bullet.
+document.getElementById("ctx-remove-flashcard")?.addEventListener("click", () => {
+  if (
+    selectedBulletIds.length > 1 &&
+    contextTargetBlockId &&
+    selectedBulletIds.includes(contextTargetBlockId)
+  ) {
+    deleteFlashcardsInSelection();
+    hideAllContextMenus();
+    return;
+  }
+  if (!contextTargetBlockId) return;
+  const page = getContextPage();
+  const loc = findNodeLocation(page.blocks, contextTargetBlockId);
+  if (loc) {
+    const node = loc.parentList[loc.index];
+    const next = isFlashcardBlockContent(node.content)
+      ? removeFlashcardMarkers(node.content)
+      : node.content;
+    if (next === node.content) {
+      showToast("Este bullet no es una flashcard.");
+    } else {
+      node.content = next;
+      void vault.savePage(page);
+      renderBlocksTree();
+      showToast("Flashcard eliminada; el contenido se conservó.");
+    }
+  }
+  hideAllContextMenus();
+});
+
 // Toggle Task
 document.getElementById("ctx-task")?.addEventListener("click", () => {
   if (!contextTargetBlockId) return;
@@ -8870,6 +9352,9 @@ function syncClozeRevealLayout(card: Flashcard | null, revealed: boolean): void 
   const clozeOnly = card?.cardType === "cloze" && revealed;
   cardQuestionEl.classList.toggle("cloze-hidden", clozeOnly);
   cardAnswerEl.classList.toggle("cloze-only", clozeOnly);
+  // El anverso de las tarjetas básicas se muestra un 20 % más grande que el
+  // reverso; las cloze mantienen el mismo tamaño en ambos lados.
+  flashcardReviewPane.classList.toggle("is-basic", card?.cardType === "basic");
 }
 const fsrsActions = document.getElementById("fsrs-actions") as HTMLDivElement;
 const flashcardReviewTab = document.getElementById("tab-flashcard-review") as HTMLButtonElement;
@@ -9709,6 +10194,40 @@ function flashcardExplorerSortTime(card: Flashcard): number {
   return Number.isFinite(time) ? time : Number.POSITIVE_INFINITY;
 }
 
+/** Elimina una tarjeta desde el explorador quitando sus marcadores, sin borrar el texto. */
+async function deleteFlashcardFromExplorer(card: Flashcard): Promise<void> {
+  const page = vault.getPages().find((candidate) => candidate.title === card.pageTitle);
+  if (!page) {
+    showToast("No se encontró la nota de la tarjeta.");
+    return;
+  }
+  const location = findNodeLocation(page.blocks, card.blockId);
+  if (!location) {
+    showToast("No se encontró el bullet de la tarjeta.");
+    return;
+  }
+  const node = location.parentList[location.index];
+  const next = card.cardType === "image-occlusion" && card.imageOcclusion
+    ? removeImageOcclusionMarker(node.content, card.imageOcclusion)
+    : isFlashcardBlockContent(node.content)
+      ? removeFlashcardMarkers(node.content)
+      : node.content;
+  if (next === node.content) {
+    showToast("No se pudieron quitar los marcadores de la tarjeta.");
+    return;
+  }
+  node.content = next;
+  try {
+    await vault.savePage(page, true);
+    flashcardLoader.invalidate();
+    renderFlashcardExplorer();
+    showToast("Tarjeta eliminada; el contenido se conservó.");
+  } catch (error) {
+    console.error("No se pudo eliminar la tarjeta:", error);
+    showToast("No se pudo guardar el cambio en el vault.");
+  }
+}
+
 function createFlashcardExplorerItem(card: Flashcard): HTMLElement {
   const item = document.createElement("article");
   item.className = "flashcard-explorer-item";
@@ -9726,7 +10245,19 @@ function createFlashcardExplorerItem(card: Flashcard): HTMLElement {
   source.innerText = card.pageTitle;
   source.title = `Abrir la nota ${card.pageTitle}`;
   source.addEventListener("click", () => loadPage(card.pageTitle));
-  header.append(kind, source);
+
+  const remove = document.createElement("button");
+  remove.className = "flashcard-explorer-remove";
+  remove.type = "button";
+  remove.title = "Eliminar la flashcard conservando el contenido";
+  remove.setAttribute("aria-label", "Eliminar flashcard");
+  remove.textContent = "✕";
+  remove.addEventListener("click", (event) => {
+    event.stopPropagation();
+    void deleteFlashcardFromExplorer(card);
+  });
+
+  header.append(kind, source, remove);
 
   const question = document.createElement("div");
   question.className = "flashcard-explorer-question markdown-rendered";
@@ -10893,11 +11424,8 @@ function renderJournalsView() {
   container.innerHTML = "";
 
   const journalPages = vault.getPages()
-    .filter((page) => page.isJournal || page.title === "Diarios" || page.title === "Journals")
+    .filter((page) => page.isJournal)
     .sort((left, right) => (right.journalDate || "").localeCompare(left.journalDate || ""));
-
-  const MAX_VISIBLE_JOURNALS = 5;
-  const visibleJournalPages = journalPages.slice(0, MAX_VISIBLE_JOURNALS);
 
   const layoutWrapper = document.createElement("div");
   layoutWrapper.className = "journals-layout-wrapper";
@@ -10918,38 +11446,74 @@ function renderJournalsView() {
     return;
   }
 
-  visibleJournalPages.forEach((j) => {
-    const wrap = document.createElement("div");
-    wrap.className = "journal-entry-wrapper";
+  // Solo se listan los diarios existentes; su contenido se abre al pulsarlos.
+  const listHeader = document.createElement("div");
+  listHeader.className = "journals-list-header";
+  const listTitle = document.createElement("h2");
+  listTitle.textContent = translate("Diarios existentes");
+  const listCount = document.createElement("span");
+  listCount.className = "journals-list-count";
+  listCount.textContent = `${journalPages.length} ${journalPages.length === 1 ? "diario" : "diarios"}`;
+  listHeader.append(listTitle, listCount);
+  entriesContainer.appendChild(listHeader);
 
-    const badge = document.createElement("div");
-    badge.className = "journal-date-badge";
-    badge.innerText = j.journalDate
-      ? new Date(`${j.journalDate}T00:00:00`).toLocaleDateString(currentLanguage(), {
+  const totalPages = Math.max(1, Math.ceil(journalPages.length / JOURNALS_PAGE_SIZE));
+  journalsPage = Math.min(Math.max(1, journalsPage), totalPages);
+  const start = (journalsPage - 1) * JOURNALS_PAGE_SIZE;
+
+  const list = document.createElement("ul");
+  list.className = "journals-list";
+  journalPages.slice(start, start + JOURNALS_PAGE_SIZE).forEach((journal) => {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "journals-list-item";
+    button.title = `Abrir ${journal.title}`;
+    const label = document.createElement("span");
+    label.className = "journals-list-label";
+    label.textContent = journal.journalDate
+      ? new Date(`${journal.journalDate}T00:00:00`).toLocaleDateString(currentLanguage(), {
         dateStyle: "full",
       })
-      : j.title;
-    badge.addEventListener("click", () => {
-      loadPage(j.title);
+      : journal.title;
+    const meta = document.createElement("span");
+    meta.className = "journals-list-meta";
+    meta.textContent = `${journal.blocks.length} ${journal.blocks.length === 1 ? "bullet" : "bullets"}`;
+    button.append(label, meta);
+    button.addEventListener("click", () => {
+      loadPage(journal.title);
     });
-
-    const blocksList = document.createElement("div");
-    blocksList.className = "blocks-tree";
-
-    for (const block of j.blocks) {
-      renderBlockNode(block, blocksList, j);
-    }
-
-    wrap.appendChild(badge);
-    wrap.appendChild(blocksList);
-    entriesContainer.appendChild(wrap);
+    item.appendChild(button);
+    list.appendChild(item);
   });
+  entriesContainer.appendChild(list);
 
-  if (journalPages.length > MAX_VISIBLE_JOURNALS) {
-    const hint = document.createElement("p");
-    hint.className = "journals-calendar-hint";
-    hint.textContent = translate("Mostrando los últimos 5 diarios. Abre los anteriores desde el calendario.");
-    entriesContainer.appendChild(hint);
+  if (totalPages > 1) {
+    const pagination = document.createElement("div");
+    pagination.className = "journals-pagination";
+    const previous = document.createElement("button");
+    previous.type = "button";
+    previous.className = "font-option-btn";
+    previous.textContent = translate("Anterior");
+    previous.disabled = journalsPage === 1;
+    previous.addEventListener("click", () => {
+      journalsPage = Math.max(1, journalsPage - 1);
+      renderJournalsView();
+    });
+    const info = document.createElement("span");
+    info.className = "journals-pagination-info";
+    info.textContent = `${translate("Página")} ${journalsPage} / ${totalPages}`;
+    const next = document.createElement("button");
+    next.type = "button";
+    next.className = "font-option-btn";
+    next.textContent = translate("Siguiente");
+    next.disabled = journalsPage === totalPages;
+    next.addEventListener("click", () => {
+      journalsPage = Math.min(totalPages, journalsPage + 1);
+      renderJournalsView();
+    });
+    pagination.append(previous, info, next);
+    entriesContainer.appendChild(pagination);
   }
 
   if (scrollRoot) scrollRoot.scrollTop = previousScrollTop;
@@ -11992,11 +12556,25 @@ async function initializeDesktopApp(): Promise<void> {
   });
   vault.createJournal(localDateKey(new Date()));
   renderSidebar();
-  renderEditor();
+
+  // Tras recargar la app, volver a la última nota y vista abierta en lugar de
+  // abrir siempre la primera página (o un diario que no estaba en uso).
+  const lastNavigation = readLastNavigation();
+  let restored = false;
+  if (lastNavigation) {
+    const page = vault.getPages().find((candidate) => candidate.id === lastNavigation.pageId);
+    if (page) {
+      currentPage = page;
+      restored = true;
+      if (lastNavigation.view === "editor") renderEditor();
+      else switchView(lastNavigation.view);
+    }
+  }
+  if (!restored) renderEditor();
   recordNavigationHistory();
 
   const first = blocksContainer.querySelector<HTMLElement>(".block-editor");
-  first?.focus();
+  if (currentView === "editor") first?.focus();
 
   scheduleAfterFirstPaint(() => {
     // Precarga de flashcards en segundo plano. Si el usuario entra antes en la

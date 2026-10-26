@@ -136,9 +136,10 @@ export const FONT_SIZE_DEFINITIONS: readonly FontSizeDefinition[] = [
     storageKey: "sinnotas-font-size-flashcard-question",
     cssVariable: "--ls-flashcard-text-em",
     label: "Texto de tarjeta",
-    // 2.4 em de la interfaz (36 px con la interfaz en 15 px).
-    defaultValue: 2.4,
-    min: 1.5,
+    // 1 em de la interfaz por defecto; se puede reducir a 0.8em o aumentar
+    // hasta 3em desde los ajustes de Flashcards.
+    defaultValue: 1,
+    min: 0.8,
     max: 3,
     step: 0.1,
     unit: "em",

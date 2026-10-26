@@ -426,11 +426,17 @@ body.mobile-review-body {
 
 .mobile-question,
 .mobile-answer {
-  /* Pregunta y respuesta comparten tamaño: 2.4em de la interfaz por defecto. */
-  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 2.4));
+  /* Tamaño base: 1em de la interfaz por defecto, configurable de 0.8em a 3em
+   * desde los ajustes de Flashcards. */
+  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 1));
   line-height: 1.55;
-  text-align: center;
+  text-align: left;
   overflow-wrap: break-word;
+}
+
+/* El anverso de las tarjetas básicas es un 20 % mayor que el reverso. */
+.mobile-card.is-basic .mobile-question {
+  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 1) * 1.2);
 }
 
 .mobile-answer {
@@ -475,19 +481,30 @@ body.mobile-review-body {
 .mobile-question ol,
 .mobile-answer ul,
 .mobile-answer ol {
-  margin: 0.4em 0;
-  padding-left: 1.5em;
+  margin: 0.5em 0;
+  padding-left: 1.8em;
+  text-align: left;
+}
+
+.mobile-question ul,
+.mobile-answer ul {
+  list-style-type: disc;
+}
+.mobile-question ol,
+.mobile-answer ol {
+  list-style-type: decimal;
 }
 
 .mobile-question :is(ul, ol) :is(ul, ol),
 .mobile-answer :is(ul, ol) :is(ul, ol) {
-  margin: 0.2em 0;
-  padding-left: 1.75em;
+  margin: 0.3em 0 0.3em 1em;
+  padding-left: 1.8em;
+  list-style-type: inherit;
 }
 
 .mobile-question li,
 .mobile-answer li {
-  margin: 0.18em 0;
+  margin: 0.25em 0;
 }
 
 .mobile-question code,
@@ -1357,8 +1374,8 @@ body.mobile-review-body {
   font-size: calc(11px * var(--mobile-font-scale, 1));
 }
 
-/* El texto se centra, pero tablas y listas se centran como bloque para no
- * perder la alineación interna de sus celdas o viñetas. */
+/* Las tablas y listas conservan la alineación interna de sus celdas o viñetas
+ * sin centrar el bloque, para mantener la jerarquía de los bullets. */
 .mobile-question .markdown-table,
 .mobile-answer .markdown-table {
   margin-left: auto;
@@ -1369,10 +1386,8 @@ body.mobile-review-body {
 .mobile-question ol,
 .mobile-answer ul,
 .mobile-answer ol {
-  width: fit-content;
   max-width: 100%;
-  margin-left: auto;
-  margin-right: auto;
+  margin: 0.5em 0;
   text-align: left;
 }
 

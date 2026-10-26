@@ -59,7 +59,7 @@
   --ls-font-size-h5: 16px;
   --ls-font-size-h6: 14px;
   /* Multiplicador de la interfaz para el texto de las tarjetas. */
-  --ls-flashcard-text-em: 2.4;
+  --ls-flashcard-text-em: 1;
   --ls-accent-bold: color-mix(in srgb, var(--ls-accent) 72%, var(--ls-text-title));
   --ls-accent-highlight: color-mix(in srgb, var(--ls-accent) 26%, transparent);
   --ls-accent-highlight-text: color-mix(in srgb, var(--ls-accent) 68%, var(--ls-text-title));
@@ -4146,6 +4146,45 @@ body.is-bullet-selecting {
   display: none !important;
 }
 
+/* Panel con el contenido completo del nodo pulsado en el mapa conceptual. */
+.concept-map-node-detail {
+  position: relative;
+  flex: none;
+  max-height: 32%;
+  overflow-y: auto;
+  padding: 14px 44px 14px 18px;
+  border-top: 1px solid var(--ls-border-color);
+  background: color-mix(in srgb, var(--ls-accent) 6%, var(--ls-bg-secondary));
+  animation: context-menu-fade 0.15s ease-out;
+}
+
+.concept-map-node-detail[hidden] {
+  display: none !important;
+}
+
+.concept-map-node-detail .btn-icon {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.concept-map-node-detail-title {
+  margin-bottom: 6px;
+  font-size: calc(12px * var(--ls-font-scale, 1));
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ls-accent);
+}
+
+.concept-map-node-detail-body {
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  font-size: calc(14px * var(--ls-font-scale, 1));
+  line-height: 1.5;
+  color: var(--ls-text-primary);
+}
+
 .concept-map-footer {
   padding: 10px 18px;
   border-top: 1px solid var(--ls-border-color);
@@ -4992,7 +5031,28 @@ body.is-bullet-selecting {
   gap: 20px;
   min-height: 0;
   overflow-y: auto;
-  padding-right: 4px;
+  /* Deja aire entre los atajos y la barra de desplazamiento, que antes
+   * quedaba pegada a los `kbd`. */
+  padding-right: 16px;
+  scrollbar-gutter: stable;
+}
+
+.shortcuts-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.shortcuts-modal-body::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 6px 0;
+}
+
+.shortcuts-modal-body::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--ls-text-muted) 60%, transparent);
+  border-radius: 999px;
+}
+
+.shortcuts-modal-body::-webkit-scrollbar-thumb:hover {
+  background-color: var(--ls-accent);
 }
 
 .shortcuts-group {
@@ -5422,15 +5482,41 @@ body.is-bullet-selecting {
 .flashcard-source-link {
   padding: 0;
   border: 0;
+  min-width: 0;
+  overflow: hidden;
   background: transparent;
   color: var(--ls-text-muted);
   font: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   cursor: pointer;
 }
 
 .flashcard-source-link:hover {
   color: var(--ls-accent);
   text-decoration: underline;
+}
+
+.flashcard-explorer-remove {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ls-text-muted);
+  font-size: calc(13px * var(--ls-font-scale, 1));
+  line-height: 1;
+  cursor: pointer;
+}
+
+.flashcard-explorer-remove:hover {
+  border-color: #e06c75;
+  color: #e06c75;
+  background: rgba(224, 108, 117, 0.15);
 }
 
 .flashcard-explorer-question {
@@ -5839,22 +5925,27 @@ body.is-bullet-selecting {
 }
 
 .card-question {
-  /* 2.4 em de la interfaz por defecto: grande para leer, sin tocar la escala global. */
-  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 2.4));
+  /* El texto de la tarjeta usa la fuente de repaso configurable (por defecto 1em
+   * de la interfaz, puede bajar a 0.8em o subir hasta 3em desde los ajustes). */
+  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 1));
   font-weight: 600;
   line-height: 1.55;
   color: var(--ls-text-title);
-  margin-bottom: 24px;
-  text-align: center;
+  margin: 14px 0 18px 0;
+  text-align: left;
   white-space: pre-wrap;
   /* Con fuentes grandes una palabra larga puede superar el ancho de la caja y
    * dibujarse sobre la columna de herramientas. Solo se parte si no cabe. */
   overflow-wrap: break-word;
 }
 
-/* La tarjeta centra el texto, pero los bloques estructurados conservan una
- * lectura natural: la tabla o la lista se centran como bloque y su contenido
- * sigue alineado a la izquierda. */
+/* El anverso de las tarjetas básicas es un 20 % mayor que el reverso. */
+.flashcard-box.is-basic .card-question {
+  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 1) * 1.2);
+}
+
+/* Las listas y tablas conservan una lectura natural alineadas a la izquierda,
+ * con su propia sangría dentro de la tarjeta. */
 .card-question .markdown-table,
 .card-answer .markdown-table {
   margin-left: auto;
@@ -5865,26 +5956,36 @@ body.is-bullet-selecting {
 .card-question ol,
 .card-answer ul,
 .card-answer ol {
-  width: fit-content;
   max-width: 100%;
-  margin-left: auto;
-  margin-right: auto;
-  padding-left: 1.5em;
+  margin: 0.5em 0;
+  padding-left: 1.8em;
   text-align: left;
+}
+
+/* Se asegura de que el marcador de la lista (bullet o número) siempre se
+ * dibuje, incluso cuando el texto de la tarjeta se escala mucho. */
+.card-question ul,
+.card-answer ul {
+  list-style-type: disc;
+}
+.card-question ol,
+.card-answer ol {
+  list-style-type: decimal;
 }
 
 .card-question li,
 .card-answer li {
-  margin: 0.18em 0;
+  margin: 0.25em 0;
 }
 
 /* Cada nivel anidado necesita una sangría claramente visible incluso con el
- * tamaño grande de las flashcards; el valor por defecto del navegador es
- * demasiado pequeño para listas profundas. */
+ * tamaño grande de las flashcards. El marcador se conserva en cada nivel para
+ * no perder la jerarquía. */
 .card-question :is(ul, ol) :is(ul, ol),
 .card-answer :is(ul, ol) :is(ul, ol) {
-  margin: 0.2em 0;
-  padding-left: 1.75em;
+  margin: 0.3em 0 0.3em 1em;
+  padding-left: 1.8em;
+  list-style-type: inherit;
 }
 
 .card-question pre,
@@ -5929,15 +6030,34 @@ body.is-bullet-selecting {
   white-space: pre-wrap;
 }
 
+.cloze-children-notes ul,
+.flashcard-explorer-answer ul {
+  margin: 0.4em 0;
+  padding-left: 1.5em;
+  list-style-type: disc;
+}
+
+.cloze-children-notes li,
+.flashcard-explorer-answer li {
+  margin: 0.2em 0;
+}
+
+.cloze-children-notes :is(ul, ol) :is(ul, ol),
+.flashcard-explorer-answer :is(ul, ol) :is(ul, ol) {
+  margin: 0.25em 0 0.25em 0.9em;
+  padding-left: 1.5em;
+  list-style-type: inherit;
+}
+
 .card-answer {
   margin-top: 24px;
   padding-top: 24px;
   border-top: 4px solid var(--ls-accent);
-  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 2.4));
+  font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 1));
   line-height: 1.55;
   color: var(--ls-text-primary);
   display: none;
-  text-align: center;
+  text-align: left;
   white-space: pre-wrap;
   overflow-wrap: break-word;
   animation: context-menu-fade 0.2s ease-out;
@@ -6492,6 +6612,84 @@ body.is-bullet-selecting {
   color: var(--ls-text-muted);
   font-size: calc(12px * var(--ls-font-scale, 1));
   text-align: center;
+}
+
+.journals-list-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ls-border-subtle);
+}
+
+.journals-list-header h2 {
+  margin: 0;
+  font-size: calc(15px * var(--ls-font-scale, 1));
+  font-weight: 650;
+  color: var(--ls-text-title);
+}
+
+.journals-list-count {
+  color: var(--ls-text-muted);
+  font-size: calc(12px * var(--ls-font-scale, 1));
+}
+
+.journals-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.journals-list-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--ls-border-subtle);
+  border-radius: 8px;
+  background: var(--ls-bg-secondary);
+  color: var(--ls-text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.journals-list-item:hover {
+  border-color: var(--ls-accent);
+  background: var(--ls-accent-subtle);
+}
+
+.journals-list-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.journals-list-meta {
+  flex: none;
+  color: var(--ls-text-muted);
+  font-size: calc(12px * var(--ls-font-scale, 1));
+}
+
+.journals-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.journals-pagination-info {
+  color: var(--ls-text-muted);
+  font-size: calc(12px * var(--ls-font-scale, 1));
 }
 
 .journal-calendar-header {

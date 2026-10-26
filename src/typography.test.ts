@@ -35,8 +35,8 @@ describe("typography", () => {
     expect(DEFAULT_FONT_SIZES.editor).toBe(15);
     expect(DEFAULT_FONT_SIZES.pageTitle).toBe(32);
     expect(DEFAULT_FONT_SIZES.h1).toBeGreaterThan(DEFAULT_FONT_SIZES.editor);
-    // El texto de las tarjetas se expresa como múltiplo de la interfaz (2.4em).
-    expect(DEFAULT_FONT_SIZES.flashcardText).toBe(2.4);
+    // El texto de las tarjetas se expresa como múltiplo de la interfaz (1em por defecto).
+    expect(DEFAULT_FONT_SIZES.flashcardText).toBe(1);
     expect(fontSizeDefinition("flashcardText").unit).toBe("em");
     expect(fontSizeDefinition("ui").unit).toBeUndefined();
     expect(new Set(FONT_SIZE_DEFINITIONS.map((definition) => definition.cssVariable)).size).toBe(
