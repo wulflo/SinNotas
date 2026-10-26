@@ -148,7 +148,7 @@ All project documentation lives in the single technical guide
 [docs/SinNotas.md](docs/SinNotas.md). This README is the entry point. The guide
 covers the architecture, editor and vault, FSRS/Learning mode, the paginated
 mobile notes selector, Android safe area, desktop/Android updater, security,
-performance, build and CI/release steps, current 0.2.4 release data and known
+performance, build and CI/release steps, current 0.2.5 release data and known
 limitations.
 
 ## Tauri application
@@ -173,7 +173,7 @@ can download and install the new `.deb` with `pkexec`/`sudo`. An existing
 0.2.0/0.2.1 `.deb` install must install 0.2.2 manually once; later releases
 update from the app. See [docs/SinNotas.md#actualizador](docs/SinNotas.md#actualizador).
 
-Las releases 0.2.4 y 0.2.5 se publican como una prueba consecutiva del
+Las releases 0.2.4 y 0.2.5 se publicaron como una prueba consecutiva del
 actualizador de escritorio: instalar 0.2.4 y actualizar a 0.2.5 desde la app.
 
 ## Build on Windows
