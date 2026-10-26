@@ -148,7 +148,7 @@ All project documentation lives in the single technical guide
 [docs/SinNotas.md](docs/SinNotas.md). This README is the entry point. The guide
 covers the architecture, editor and vault, FSRS/Learning mode, the paginated
 mobile notes selector, Android safe area, desktop/Android updater, security,
-performance, build and CI/release steps, current 0.2.2 release data and known
+performance, build and CI/release steps, current 0.2.3 release data and known
 limitations.
 
 ## Tauri application
@@ -198,9 +198,9 @@ npm run tauri dev
 
 Desktop file operations are validated in the backend and limited to the active vault. The folder picker uses the Tauri permission `dialog:allow-open`; no global filesystem access is granted.
 
-## Android application (review only)
+## Android application (review + full editor)
 
-The APK for Android 13 or newer (`minSdkVersion` 33) mounts only the review experience: question, answer, image occlusions, editing the active block and FSRS rating. It does not initialize the editor, journals, Kanban, concept map or graph view.
+The APK for Android 13 or newer (`minSdkVersion` 33) opens in the review experience: question, answer, image occlusions, editing the active block and FSRS rating. From **Abrir páginas y editor** it can load the full desktop editor, including journals, Kanban, concept map and graph view. Both surfaces respect the Android status and navigation bars through the native safe-area bridge.
 
 The **Repasar notas** selector paginates the vault notes at 20 per page and
 renders each page in small animation-frame batches. This matches desktop and
@@ -212,7 +212,7 @@ while moving between pages, and searching returns to page 1.
 npm ci
 npm run tauri android init -- --ci
 # `android init` regenerates gen/android, so reapply the native safe-area
-# bridge that keeps the status/navigation bars from covering the review UI.
+# bridge that keeps the status/navigation bars from covering the app UI.
 npm run android:patch
 # `android init` creates the project with Tauri's default icons. Regenerate
 # them so gen/android gets the real logo instead of a generic launcher icon.
@@ -240,7 +240,7 @@ Launch modes:
 - `VITE_APP_MODE=desktop`: forces the full application.
 - No variable: Tauri detects `TAURI_ENV_PLATFORM=android|ios` (or a mobile user agent) and opens the review view; on desktop it opens the full application.
 
-In the review build, Vite strips the desktop branch from the bundle. On first run, the APK seeds sample notes into the app's internal vault so FSRS, Cloze and occlusions can be tried without depending on the desktop app.
+The review build mounts the review app first; the desktop editor is a separate dynamic chunk that loads only when the user opens **Abrir páginas y editor**. On first run, the APK seeds sample notes into the app's internal vault so FSRS, Cloze and occlusions can be tried without depending on the desktop app.
 
 ### Paths and Scoped Storage
 

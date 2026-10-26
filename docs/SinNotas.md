@@ -1,6 +1,6 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.2.2 · **Fecha:** 2026-10-25
+**Versión:** 0.2.3 · **Fecha:** 2026-10-25
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
@@ -77,6 +77,14 @@ La APK usa un puente nativo `SinNotasSafeArea` que combina `WindowInsets` con
 variables CSS `--sinnotas-safe-area-*`, de modo que la barra de estado y la barra
 de navegación no tapen el contenido.
 
+La v0.2.3 corrige también el editor completo que se abre con **Abrir páginas y
+editor**. Al montar esa superficie, `src/main.ts` vuelve a instalar el puente y
+el CSS de `body.mobile-full-editor` aplica `--mobile-full-safe-*` a `.headbar`,
+`.sidebar-left` y `.content-scroll`. La cabecera reserva la inset superior, el
+cajón lateral respeta las cuatro insets y el contenido reserva la inferior; el
+layout usa `100dvh` y deja que `.view-panel` crezca con flex. El modo repaso
+conserva sus propias reglas en `src/mobile/mobile.css`.
+
 El puente se inyecta con:
 
 ```bash
@@ -101,8 +109,8 @@ y relanza la app. En Linux el manifiesto publica dos destinos:
 
 La v0.2.2 es la primera release que anuncia `linux-x86_64-deb`. Por eso, una
 instalación `.deb` de 0.2.0/0.2.1 debe instalar 0.2.2 manualmente una vez; a
-partir de ahí las releases siguientes se actualizan desde la app. La firma que
-valida el updater es minisign, no una firma de paquete Debian.
+partir de ahí las releases siguientes, como 0.2.3, se actualizan desde la app.
+La firma que valida el updater es minisign, no una firma de paquete Debian.
 
 ### Android
 
@@ -225,7 +233,7 @@ la clave de release.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Versión actual: `0.2.2` (`versionCode 2002`)
+- Versión actual: `0.2.3` (`versionCode 2003`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):
@@ -246,16 +254,22 @@ la clave de release.
   hardware real: requiere `pkexec`/`sudo` y una instalación 0.2.2 previa.
 - Las bóvedas externas en Android dependen del acceso SAF autorizado por el
   usuario; no se interpretan URIs como rutas locales.
-- La APK Android es solo de repaso: no incluye editor completo, diarios, Kanban,
-  grafo ni mapa conceptual.
+- La APK abre en modo repaso. El editor completo, con diarios, Kanban, grafo y
+  mapa conceptual, se abre desde **Abrir páginas y editor**.
+- El fix de safe area del editor completo se validó con estilos computados en el
+  navegador; falta confirmarlo en un dispositivo Android real.
 
 ## Verificación actual
 
 - `npx tsc --noEmit`: correcto.
 - `npm test`: **248 pruebas en 27 archivos**.
 - CI de `master`: lint/test, APK debug y APK release firmada.
-- Firma, paquete, `versionCode`, safe area y manifiesto Android verificados con
-  `apksigner` y `aapt`.
+- Safe area del editor completo: estilos computados en navegador con inset
+  superior 24 px e inferior 16 px; `.headbar` mide 72 px, el cajón lateral y el
+  contenido reservan sus insets y el layout encaja en el viewport.
+- Release v0.2.2: APK `versionCode 2002`, `.deb.sig` y `latest.json` con
+  `linux-x86_64-deb` verificados; la firma, el paquete y el manifiesto Android
+  se comprobaron con `apksigner` y `aapt`.
 
 ## Política de documentación
 
