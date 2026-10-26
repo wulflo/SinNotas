@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -64,6 +64,30 @@ describe("prepare-release-assets", () => {
       "sig-Sin.Notas_0.2.2_amd64.deb"
     );
     expect(manifest.platforms["android-aarch64"]?.sha256).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("normaliza espacios como GitHub y publica URLs que existen", () => {
+    const dir = makeReleaseDir();
+    writeSignedAsset(dir, "Sin Notas_0.2.2_amd64.AppImage");
+    writeSignedAsset(dir, "Sin Notas_0.2.2_amd64.deb");
+    writeSignedAsset(dir, "Sin Notas_0.2.2_x64-setup.exe");
+    writeSignedAsset(dir, "Sin Notas_0.2.2_universal.app.tar.gz");
+    writeAsset(dir, "signed.apk", "apk\n");
+
+    const result = run(dir);
+
+    expect(result.status, result.stderr).toBe(0);
+    const manifest = JSON.parse(readFileSync(join(dir, "latest.json"), "utf8")) as {
+      platforms: Record<string, { url: string }>;
+    };
+    const linuxUrl = manifest.platforms["linux-x86_64"]?.url ?? "";
+    const debUrl = manifest.platforms["linux-x86_64-deb"]?.url ?? "";
+    expect(linuxUrl).toContain("Sin.Notas_0.2.2_amd64.AppImage");
+    expect(debUrl).toContain("Sin.Notas_0.2.2_amd64.deb");
+    expect(linuxUrl).not.toContain("%20");
+    expect(debUrl).not.toContain("%20");
+    expect(existsSync(join(dir, "Sin.Notas_0.2.2_amd64.AppImage.sig"))).toBe(true);
+    expect(existsSync(join(dir, "Sin Notas_0.2.2_amd64.AppImage"))).toBe(false);
   });
 
   it("falla si el .deb no tiene firma para el actualizador", () => {

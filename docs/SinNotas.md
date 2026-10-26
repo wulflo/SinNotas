@@ -262,7 +262,7 @@ la clave de release.
 ## Verificación actual
 
 - `npx tsc --noEmit`: correcto.
-- `npm test`: **248 pruebas en 27 archivos**.
+- `npm test`: **249 pruebas en 27 archivos**.
 - CI de `master`: lint/test, APK debug y APK release firmada.
 - Safe area del editor completo: estilos computados en navegador con inset
   superior 24 px e inferior 16 px; `.headbar` mide 72 px, el cajón lateral y el

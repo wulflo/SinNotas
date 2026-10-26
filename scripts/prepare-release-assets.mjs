@@ -91,6 +91,22 @@ let files = (await readdir(assetsDir)).filter((name) => {
   return !name.startsWith(".") && existsSync(path.join(assetsDir, name));
 });
 
+// GitHub reemplaza los espacios de los nombres de assets por puntos al
+// publicarlos. Normalizamos antes de generar `latest.json` para que las URLs
+// apunten al nombre que realmente queda en la release. También renombramos las
+// firmas `.sig` para que sigan acompañando a su asset.
+for (const fileName of [...files]) {
+  const normalized = fileName.replace(/\s+/g, ".");
+  if (normalized === fileName) continue;
+  const source = path.join(assetsDir, fileName);
+  const target = path.join(assetsDir, normalized);
+  if (existsSync(target)) {
+    fail(`Los assets "${fileName}" y "${normalized}" colisionan al normalizar espacios.`);
+  }
+  await rename(source, target);
+  files = files.map((name) => (name === fileName ? normalized : name));
+}
+
 // La APK firmada se publica siempre con un nombre estable.
 const apks = files.filter((name) => name.toLowerCase().endsWith(".apk"));
 if (apks.length !== 1) {
