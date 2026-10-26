@@ -330,11 +330,12 @@ Puntos que causan el error de “número de release distinto” o `already_exist
   empujarlo con `--force`. Nunca se edita una release a mano para “arreglar”
   el número.
 
-En la v0.2.8 el tag se empujó junto con `master` y GitHub no inició el workflow
-de Release; no se pudo confirmar la causa. La comprobación con
-`gh run list --workflow=release.yml` es obligatoria después de cada push: si no
-aparece el run, se borra el tag remoto, se vuelve a crear sobre el commit
-correcto y se empuja de nuevo.
+En la primera publicación de la v0.2.8 el tag se empujó junto con `master` y
+GitHub no inició el workflow de Release; no se pudo confirmar la causa. Se
+resolvió borrando el tag remoto y volviéndolo a crear sobre el commit correcto.
+La comprobación con `gh run list --workflow=release.yml` es obligatoria después
+de cada push: si no aparece el run, se borra el tag remoto, se vuelve a crear
+sobre el commit correcto y se empuja de nuevo.
 
 ## Datos de la release Android
 
@@ -386,9 +387,16 @@ correcto y se empuja de nuevo.
   APK coincide con `latest.json`, las URLs devuelven 200, las firmas minisign
   del AppImage y del `.deb` se validaron y el certificado Android es el mismo
   que el de 0.2.6.
-- v0.2.8 (local): pesos oficiales de FSRS-4.5 aplicados, 249 pruebas y
-  `tsc --noEmit` correctos; la respuesta de oclusión ya no dibuja máscaras y la
-  vista previa ajusta su caja al tamaño real de la imagen.
+- Release v0.2.8: publicada como *latest*; APK `versionName 0.2.8` /
+  `versionCode 2008`, paquete `com.sinnotas.desktop`, `minSdk 33` y
+  `targetSdk 37`. El SHA-256 del APK
+  (`54e47dfe23d9151a3a65941ba279e948281f416aa62bf00fa66de8f72f5c3a35`)
+  coincide con `latest.json`; `latest.json` declara `version: "0.2.8"` e incluye
+  Linux (`AppImage` y `.deb`), Windows, macOS universal y Android. Las descargas
+  de `latest.json` y del APK devuelven 200. En local, los pesos oficiales de
+  FSRS-4.5 están aplicados, las 249 pruebas y `tsc --noEmit` pasan, la respuesta
+  de oclusión ya no dibuja máscaras y la vista previa ajusta su caja al tamaño
+  real de la imagen.
 - Oclusión de imagen, medición en navegador: con el CSS anterior una imagen
   vertical 400×1200 dejaba la caja de la máscara un **72,1 %** más ancha que la
   imagen visible; con `width: fit-content` y la imagen en `width: auto` la caja,
