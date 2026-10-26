@@ -1,6 +1,6 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.2.6 · **Fecha:** 2026-10-26
+**Versión:** 0.2.7 · **Fecha:** 2026-10-26
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
@@ -238,7 +238,7 @@ la clave de release.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Versión actual: `0.2.6` (`versionCode 2006`)
+- Versión actual: `0.2.7` (`versionCode 2007`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):
@@ -278,6 +278,9 @@ la clave de release.
   `.deb.sig` y `latest.json` verificados; las URLs de AppImage, `.deb`, Windows,
   macOS y Android devuelven 200. Las firmas minisign del AppImage y del `.deb`
   se validaron contra la clave pública del updater.
+- Release v0.2.6: APK `versionName 0.2.6` / `versionCode 2006`; el SHA-256 del
+  APK coincide con `latest.json`, las URLs devuelven 200 y las firmas minisign
+  del AppImage y del `.deb` se validaron contra la clave pública del updater.
 - El generador de `latest.json` normaliza los espacios de los assets a puntos,
   igual que GitHub, para que las URLs publicadas coincidan con los nombres
   reales de los archivos.
