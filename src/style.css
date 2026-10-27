@@ -5895,7 +5895,7 @@ body.is-bullet-selecting {
 #app.flashcard-focus-mode .flashcard-box {
   min-height: 0;
   height: 100%;
-  padding: clamp(24px, 5vw, 64px);
+  padding: 3%;
 }
 
 #app.flashcard-focus-mode .flashcard-review-tools {
@@ -5904,6 +5904,15 @@ body.is-bullet-selecting {
 
 #app.flashcard-focus-mode .flashcard-image-preview > img {
   max-height: 58vh;
+}
+
+.flashcard-content {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  justify-content: safe center;
+  min-height: 0;
 }
 
 .card-source-tag {
@@ -5931,7 +5940,7 @@ body.is-bullet-selecting {
   font-weight: 600;
   line-height: 1.55;
   color: var(--ls-text-title);
-  margin: 2% 0 3% 0;
+  margin: 2% 0 0 0;
   text-align: left;
   white-space: pre-wrap;
   /* Con fuentes grandes una palabra larga puede superar el ancho de la caja y

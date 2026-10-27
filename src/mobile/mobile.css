@@ -419,7 +419,7 @@ body.mobile-review-body {
   flex-direction: column;
   /* Si el alto queda limitado, alinear al inicio en vez de desbordar arriba. */
   justify-content: safe center;
-  gap: 3%;
+  gap: 0;
   min-height: 0;
   padding: clamp(16px, 3vh, 32px) 0;
 }
@@ -439,8 +439,13 @@ body.mobile-review-body {
   font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 1) * 1.2);
 }
 
+/* Separación de 2 % entre pregunta y la línea que abre la respuesta. */
+.mobile-card.is-revealed .mobile-question {
+  margin-bottom: 2%;
+}
+
 .mobile-answer {
-  padding-top: 3%;
+  padding-top: 2%;
   border-top: 4px solid var(--mobile-accent);
   color: color-mix(in srgb, var(--mobile-text), var(--mobile-accent) 22%);
 }
@@ -1812,7 +1817,7 @@ body.mobile-review-body {
   to { transform: translateY(0); opacity: 1; }
 }
 
-/* Horizontal: aprovecha el ancho para pregunta y respuesta lado a lado. */
+/* Horizontal: ajusta padding y acciones; pregunta y respuesta siguen apiladas. */
 @media (orientation: landscape) and (min-width: 640px) {
   .mobile-review {
     padding-top: max(8px, var(--mobile-safe-area-top));
@@ -1820,37 +1825,6 @@ body.mobile-review-body {
 
   .mobile-card {
     padding: 18px 24px;
-  }
-
-  .mobile-card.is-revealed .mobile-card-body {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-content: center;
-    align-content: safe center;
-    align-items: center;
-    gap: 24px;
-  }
-
-  /* Cloze revelado: una sola columna porque la pregunta se oculta. Se repone
-   * `align-items: stretch` porque el grid de arriba lo cambia a `center` y,
-   * al pasar a flex, centraría el bloque de respuesta en lugar de dejar que
-   * ocupe todo el ancho como la pregunta. */
-  .mobile-card.is-cloze.is-revealed .mobile-card-body {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .mobile-card.is-revealed .mobile-answer {
-    padding-top: 0;
-    padding-left: 24px;
-    border-top: 0;
-    border-left: 4px solid var(--mobile-accent);
-  }
-
-  .mobile-card.is-cloze.is-revealed .mobile-answer {
-    padding-left: 0;
-    border-left: 0;
   }
 
   .mobile-actions {
