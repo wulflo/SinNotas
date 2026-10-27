@@ -167,6 +167,7 @@ export class GamepadListener {
 
   constructor(
     private readonly onPress: (buttonIndex: number, gamepad: Gamepad) => void,
+    private readonly onPoll?: (gamepad: Gamepad) => void,
     private readonly pollMs = 60
   ) {}
 
@@ -198,12 +199,24 @@ export class GamepadListener {
     const currentlyPressed = new Set<number>();
     gamepad.buttons.forEach((button, index) => {
       // `pressed` cubre botones digitales; los analógicos (gatillos) usan value.
-      if (button.pressed || button.value > 0.5) currentlyPressed.add(index);
+      // Umbral bajo para que los gatillos (RT/LT) se reconozcan aunque no se
+      // pulsen a fondo.
+      if (button.pressed || button.value > 0.1) currentlyPressed.add(index);
     });
+
+    // Algunos mandos genéricos exponen los gatillos como ejes en lugar de
+    // botones. Se mapean a los índices estándar 6 (LT) y 7 (RT).
+    const axes = gamepad.axes || [];
+    if (axes.length >= 3 && (axes[2] ?? 0) > 0.5) currentlyPressed.add(6);
+    if (axes.length >= 4 && (axes[3] ?? 0) > 0.5) currentlyPressed.add(7);
+    if (axes.length >= 5 && (axes[4] ?? 0) > 0.5) currentlyPressed.add(6);
+    if (axes.length >= 6 && (axes[5] ?? 0) > 0.5) currentlyPressed.add(7);
 
     currentlyPressed.forEach((index) => {
       if (!this.previousPressed.has(index)) this.onPress(index, gamepad);
     });
     this.previousPressed = currentlyPressed;
+
+    this.onPoll?.(gamepad);
   }
 }

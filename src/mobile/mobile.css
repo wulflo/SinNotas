@@ -419,7 +419,7 @@ body.mobile-review-body {
   flex-direction: column;
   /* Si el alto queda limitado, alinear al inicio en vez de desbordar arriba. */
   justify-content: safe center;
-  gap: 18px;
+  gap: 3%;
   min-height: 0;
   padding: clamp(16px, 3vh, 32px) 0;
 }
@@ -440,7 +440,7 @@ body.mobile-review-body {
 }
 
 .mobile-answer {
-  padding-top: 16px;
+  padding-top: 3%;
   border-top: 4px solid var(--mobile-accent);
   color: color-mix(in srgb, var(--mobile-text), var(--mobile-accent) 22%);
 }

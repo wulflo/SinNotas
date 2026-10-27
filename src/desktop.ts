@@ -139,6 +139,7 @@ import {
   applyFontSizes,
   clampFontSize,
   fontSizeDefinition,
+  mobileFontScale,
   readFontSizes,
   resetFontSizes,
   writeFontSize,
@@ -324,9 +325,11 @@ const reviewProgress = new ReviewProgressStore();
 let reviewHistoryActionInFlight = false;
 const storedFlashcardReviewOrder = localStorage.getItem("sinnotas-flashcard-review-order");
 let flashcardReviewOrder: FlashcardReviewOrder =
-  storedFlashcardReviewOrder === "reviews-first" || storedFlashcardReviewOrder === "mixed"
+  storedFlashcardReviewOrder === "new-first" ||
+  storedFlashcardReviewOrder === "reviews-first" ||
+  storedFlashcardReviewOrder === "mixed"
     ? storedFlashcardReviewOrder
-    : "new-first";
+    : "mixed";
 
 const storedFlashcardPages = localStorage.getItem("sinnotas-flashcard-pages");
 let flashcardPageFilter: string[] | null = null;
@@ -1329,9 +1332,6 @@ function renderFontSizeControls(): void {
   if (!typographyControls) return;
   const fragment = document.createDocumentFragment();
   FONT_SIZE_DEFINITIONS.forEach((definition) => {
-    // El tamaño del texto de las tarjetas se controla en la pestaña Flashcards;
-    // no se duplica en Apariencia.
-    if (definition.key === "flashcardText") return;
     const row = document.createElement("label");
     row.className = "typography-control";
     row.dataset.fontSizeRow = definition.key;
@@ -1358,7 +1358,20 @@ function renderFontSizeControls(): void {
         definition.key,
         Number(input.value)
       );
-      applyFontSizes(currentFontSizes);
+      // Actualizar solo la variable afectada evita reescribir las otras 10
+      // en cada movimiento del slider, lo que provocaba bloqueos.
+      const def = fontSizeDefinition(definition.key);
+      document.documentElement.style.setProperty(
+        def.cssVariable,
+        def.unit === "em"
+          ? String(currentFontSizes[definition.key])
+          : `${currentFontSizes[definition.key]}px`
+      );
+      if (definition.key === "ui") {
+        const scale = mobileFontScale(currentFontSizes.ui);
+        document.documentElement.style.setProperty("--ls-font-scale", String(scale));
+        document.documentElement.style.setProperty("--mobile-font-scale", String(scale));
+      }
       output.value = `${currentFontSizes[definition.key]} ${unitLabel}`;
     });
 
@@ -2175,11 +2188,28 @@ function handleGamepadButton(index: number): void {
   else if (idx === gamepadBtnEasy.value) applyFSRSRating(4);
 }
 
+/** Desplaza la vista de Flashcards con el joystick (eje vertical). */
+function handleGamepadAxes(gamepad: Gamepad): void {
+  if (currentView !== "flashcards" || flashcardExplorerActive) return;
+  const axes = gamepad.axes || [];
+  let value = axes.length >= 2 ? axes[1] ?? 0 : 0;
+  if (Math.abs(value) < 0.25 && axes.length >= 4) value = axes[3] ?? 0;
+  if (Math.abs(value) < 0.25) return;
+  const view = document.getElementById("view-flashcards");
+  const scrollRoot = view ? findScrollableAncestor(view) : null;
+  if (!scrollRoot) return;
+  const speed = Math.sign(value) * Math.min(24, Math.ceil((Math.abs(value) - 0.25) * 40));
+  scrollRoot.scrollTop += speed;
+}
+
 function startGamepadPolling(): void {
   if (gamepadListener) return;
   // El listener usa detección de flanco: cada pulsación se dispara una sola
   // vez, aunque se mantenga el botón mantenido (evita el ráfago de toggles).
-  gamepadListener = new GamepadListener((buttonIndex) => handleGamepadButton(buttonIndex));
+  gamepadListener = new GamepadListener(
+    (buttonIndex) => handleGamepadButton(buttonIndex),
+    (gamepad) => handleGamepadAxes(gamepad)
+  );
   gamepadListener.start();
   updateGamepadStatus();
 }
@@ -2229,7 +2259,15 @@ btnGamepadDetect.addEventListener("click", () => {
   }, 250);
 });
 
-window.addEventListener("gamepadconnected", updateGamepadStatus);
+window.addEventListener("gamepadconnected", () => {
+  if (!gamepadEnabledCheckbox.checked) {
+    gamepadEnabledCheckbox.checked = true;
+    localStorage.setItem("sinnotas-gamepad-enabled", "true");
+    startGamepadPolling();
+  } else {
+    updateGamepadStatus();
+  }
+});
 window.addEventListener("gamepaddisconnected", updateGamepadStatus);
 
 if (gamepadEnabledCheckbox.checked) startGamepadPolling();
@@ -10291,7 +10329,14 @@ function createFlashcardExplorerItem(card: Flashcard): HTMLElement {
     dates.appendChild(entry);
   });
 
-  item.append(header, dates, question, answer);
+  // En el explorador se muestra solo la parte útil para identificar la tarjeta:
+  // las básicas enseñan solo el campo base (pregunta) y las cloze/oclusión
+  // solo la parte revelada (respuesta), para no ocupar espacio.
+  if (card.cardType === "basic") {
+    item.append(header, dates, question);
+  } else {
+    item.append(header, dates, answer);
+  }
   return item;
 }
 

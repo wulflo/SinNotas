@@ -5566,7 +5566,7 @@ body.is-bullet-selecting {
     var(--ls-card-bg);
   border: 1px solid color-mix(in srgb, var(--ls-accent) 24%, var(--ls-card-border));
   border-radius: 12px;
-  padding: 32px;
+  padding: 3%;
   min-height: 280px;
   display: flex;
   flex-direction: column;
@@ -5931,7 +5931,7 @@ body.is-bullet-selecting {
   font-weight: 600;
   line-height: 1.55;
   color: var(--ls-text-title);
-  margin: 14px 0 18px 0;
+  margin: 2% 0 3% 0;
   text-align: left;
   white-space: pre-wrap;
   /* Con fuentes grandes una palabra larga puede superar el ancho de la caja y
@@ -6050,8 +6050,8 @@ body.is-bullet-selecting {
 }
 
 .card-answer {
-  margin-top: 24px;
-  padding-top: 24px;
+  margin-top: 2%;
+  padding-top: 2%;
   border-top: 4px solid var(--ls-accent);
   font-size: calc(var(--ls-font-size-ui, 15px) * var(--ls-flashcard-text-em, 1));
   line-height: 1.55;
@@ -6651,26 +6651,40 @@ body.is-bullet-selecting {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border: 1px solid var(--ls-border-subtle);
-  border-radius: 8px;
-  background: var(--ls-bg-secondary);
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--ls-bg-secondary), color-mix(in srgb, var(--ls-bg-secondary), var(--ls-bg-tertiary) 35%));
   color: var(--ls-text-primary);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--ls-text-title) 6%, transparent);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
 .journals-list-item:hover {
   border-color: var(--ls-accent);
   background: var(--ls-accent-subtle);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--ls-accent) 14%, transparent);
 }
 
 .journals-list-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-transform: capitalize;
+}
+
+.journals-list-label::before {
+  content: "📅";
+  flex: 0 0 auto;
+  font-size: 0.95em;
+  line-height: 1;
 }
 
 .journals-list-meta {
