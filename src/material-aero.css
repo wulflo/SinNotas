@@ -1,0 +1,1297 @@
+/*
+ * Material Aero — tema de escritorio de SinNotas.
+ *
+ * Material 3 (Material You) genera la paleta tonal a partir de `--ls-accent`,
+ * así que todos los roles de color cambian al elegir otro acento. La capa
+ * "aero" añade superficies translúcidas, desenfoque y luces suaves en lugar
+ * de los antiguos degradados neón. Se importa después de `style.css` para
+ * reemplazar sus tokens y superficies sin duplicar toda la hoja base.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Roles tonales de Material 3 derivados del acento activo. */
+  --md-surface-dim: color-mix(in srgb, var(--ls-accent) 4%, #06080c);
+  --md-surface: color-mix(in srgb, var(--ls-accent) 5%, #0a0c12);
+  --md-surface-bright: color-mix(in srgb, var(--ls-accent) 8%, #171b24);
+  --md-surface-container-lowest: color-mix(in srgb, var(--ls-accent) 3%, #07090e);
+  --md-surface-container-low: color-mix(in srgb, var(--ls-accent) 6%, #0c0f16);
+  --md-surface-container: color-mix(in srgb, var(--ls-accent) 9%, #10141d);
+  --md-surface-container-high: color-mix(in srgb, var(--ls-accent) 12%, #151a25);
+  --md-surface-container-highest: color-mix(in srgb, var(--ls-accent) 15%, #1a202e);
+  --md-on-surface: color-mix(in srgb, var(--ls-accent) 6%, #eef2fa);
+  --md-on-surface-variant: color-mix(in srgb, var(--ls-accent) 12%, #aeb8c9);
+  --md-outline: color-mix(in srgb, var(--ls-accent) 28%, #465063);
+  --md-outline-variant: color-mix(in srgb, var(--ls-accent) 18%, #2a3140);
+  --md-primary: var(--ls-accent);
+  --md-on-primary: color-mix(in srgb, var(--ls-accent) 12%, #061018);
+  --md-primary-container: color-mix(in srgb, var(--ls-accent) 26%, #0c1017);
+  --md-on-primary-container: color-mix(in srgb, var(--ls-accent) 55%, #f5f9ff);
+  --md-secondary-container: color-mix(in srgb, var(--ls-accent) 14%, #121620);
+  --md-on-secondary-container: color-mix(in srgb, var(--ls-accent) 34%, #dfe6f2);
+  --md-tertiary: color-mix(in srgb, var(--ls-accent) 62%, #ff8fd8);
+  --md-tertiary-container: color-mix(in srgb, var(--md-tertiary) 22%, #10141d);
+  --md-shadow: rgba(0, 0, 0, 0.58);
+  --md-scrim: rgba(2, 4, 8, 0.62);
+  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 14%, transparent);
+  --md-elevation-1: 0 1px 2px var(--md-shadow), 0 2px 8px -4px var(--md-shadow);
+  --md-elevation-2: 0 2px 6px -2px var(--md-shadow), 0 12px 32px -18px var(--md-shadow);
+  --md-elevation-3: 0 8px 20px -10px var(--md-shadow), 0 28px 64px -30px var(--md-shadow);
+
+  /* Mapa de compatibilidad: toda la hoja base sigue usando --ls-*. */
+  --ls-bg: var(--md-surface);
+  --ls-bg-primary: var(--md-surface);
+  --ls-bg-secondary: var(--md-surface-container-low);
+  --ls-bg-tertiary: var(--md-surface-container);
+  --ls-bg-hover: var(--md-surface-container-high);
+  --ls-border-color: var(--md-outline-variant);
+  --ls-border-subtle: color-mix(in srgb, var(--md-outline-variant) 70%, transparent);
+  --ls-text-primary: var(--md-on-surface);
+  --ls-text-title: var(--md-on-surface);
+  --ls-text-muted: var(--md-on-surface-variant);
+  --ls-text-secondary: var(--md-on-surface-variant);
+  --ls-text-link: var(--md-primary);
+  --ls-accent-foreground: var(--md-on-primary);
+  --ls-menu-bg: color-mix(in srgb, var(--md-surface-container-high) 76%, transparent);
+  --ls-menu-shadow: var(--md-elevation-3);
+  --ls-card-bg: color-mix(in srgb, var(--md-surface-container-high) 78%, transparent);
+  --ls-card-border: var(--md-outline-variant);
+  --ls-kanban-card-bg: color-mix(in srgb, var(--md-surface-container-highest) 86%, transparent);
+  --ls-kanban-card-shadow: var(--md-elevation-1);
+  --ls-kanban-column-shadow: inset 0 0 0 1px var(--md-outline-variant);
+  --ls-table-bg: color-mix(in srgb, var(--md-primary) 8%, var(--md-surface-container-low));
+  --ls-table-header-bg: color-mix(in srgb, var(--md-primary) 16%, var(--md-surface-container));
+  --ls-table-border: color-mix(in srgb, var(--md-primary) 42%, var(--md-outline));
+  --ls-todo-bg: color-mix(in srgb, #fbbf24 15%, var(--md-surface-container));
+  --ls-todo-color: color-mix(in srgb, #fbbf24 72%, var(--md-on-surface));
+  --ls-doing-bg: color-mix(in srgb, #38bdf8 15%, var(--md-surface-container));
+  --ls-doing-color: color-mix(in srgb, #38bdf8 72%, var(--md-on-surface));
+  --ls-done-bg: color-mix(in srgb, #4ade80 15%, var(--md-surface-container));
+  --ls-done-color: color-mix(in srgb, #4ade80 68%, var(--md-on-surface));
+  --ls-cloze-gap-bg: var(--md-primary-container);
+  --ls-cloze-gap-color: var(--md-on-primary-container);
+  --ls-cloze-revealed-bg: color-mix(in srgb, #4ade80 24%, transparent);
+  --ls-cloze-revealed-color: color-mix(in srgb, #4ade80 72%, var(--md-on-surface));
+  --ls-accent-bold: color-mix(in srgb, var(--md-primary) 72%, var(--md-on-surface));
+  --ls-accent-highlight: color-mix(in srgb, var(--md-primary) 26%, transparent);
+  --ls-accent-highlight-text: color-mix(in srgb, var(--md-primary) 68%, var(--md-on-surface));
+  --ls-bullet-color: var(--md-primary);
+  --ls-bullet-border: color-mix(in srgb, var(--md-primary) 30%, transparent);
+  --ls-bullet-hover: color-mix(in srgb, var(--md-primary) 82%, #ffffff);
+  --ls-guideline-color: color-mix(in srgb, var(--md-on-surface) 9%, transparent);
+  --ls-guideline-hover: color-mix(in srgb, var(--md-primary) 45%, transparent);
+  --ls-glow-theme-scale: 1;
+
+  /* Aero: radio y desenfoque compartidos. */
+  --ma-blur: 26px;
+  --ma-glass: color-mix(in srgb, var(--md-surface-container-high) 72%, transparent);
+  --ma-glass-strong: color-mix(in srgb, var(--md-surface-container-high) 86%, transparent);
+  --ma-glass-border: color-mix(in srgb, var(--md-outline-variant) 78%, transparent);
+  --ma-sheen: linear-gradient(
+    135deg,
+    color-mix(in srgb, #ffffff 12%, transparent) 0%,
+    transparent 34%,
+    transparent 72%,
+    color-mix(in srgb, var(--md-primary) 8%, transparent) 100%
+  );
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  --md-surface-dim: color-mix(in srgb, var(--ls-accent) 6%, #eef1f7);
+  --md-surface: color-mix(in srgb, var(--ls-accent) 4%, #fbfcff);
+  --md-surface-bright: #ffffff;
+  --md-surface-container-lowest: color-mix(in srgb, var(--ls-accent) 3%, #f7f9fd);
+  --md-surface-container-low: color-mix(in srgb, var(--ls-accent) 5%, #f2f5fb);
+  --md-surface-container: color-mix(in srgb, var(--ls-accent) 7%, #edf1f8);
+  --md-surface-container-high: color-mix(in srgb, var(--ls-accent) 9%, #e8edf6);
+  --md-surface-container-highest: color-mix(in srgb, var(--ls-accent) 12%, #e2e8f3);
+  --md-on-surface: color-mix(in srgb, var(--ls-accent) 8%, #11151c);
+  --md-on-surface-variant: color-mix(in srgb, var(--ls-accent) 12%, #4a5262);
+  --md-outline: color-mix(in srgb, var(--ls-accent) 30%, #8a93a3);
+  --md-outline-variant: color-mix(in srgb, var(--ls-accent) 16%, #d8dee8);
+  --md-primary: var(--ls-accent);
+  --md-on-primary: #ffffff;
+  --md-primary-container: color-mix(in srgb, var(--md-primary) 15%, #ffffff);
+  --md-on-primary-container: color-mix(in srgb, var(--md-primary) 48%, #0b1220);
+  --md-secondary-container: color-mix(in srgb, var(--md-primary) 10%, #ffffff);
+  --md-on-secondary-container: color-mix(in srgb, var(--md-primary) 38%, #18202c);
+  --md-tertiary: color-mix(in srgb, var(--ls-accent) 55%, #b01e86);
+  --md-tertiary-container: color-mix(in srgb, var(--md-tertiary) 12%, #ffffff);
+  --md-shadow: rgba(16, 24, 40, 0.18);
+  --md-scrim: rgba(20, 28, 42, 0.32);
+  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 6%, transparent);
+  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 10%, transparent);
+  --md-elevation-1: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 8px -4px rgba(16, 24, 40, 0.08);
+  --md-elevation-2: 0 2px 6px -2px rgba(16, 24, 40, 0.08), 0 14px 34px -18px rgba(16, 24, 40, 0.18);
+  --md-elevation-3: 0 10px 24px -12px rgba(16, 24, 40, 0.16), 0 32px 72px -34px rgba(16, 24, 40, 0.24);
+
+  --ls-menu-bg: color-mix(in srgb, var(--md-surface-container-high) 82%, transparent);
+  --ls-card-bg: color-mix(in srgb, var(--md-surface-container-high) 84%, transparent);
+  --ls-kanban-card-bg: color-mix(in srgb, var(--md-surface-container-highest) 88%, transparent);
+  --ls-todo-bg: color-mix(in srgb, #d97706 11%, var(--md-surface-container));
+  --ls-todo-color: color-mix(in srgb, #b45309 72%, var(--md-on-surface));
+  --ls-doing-bg: color-mix(in srgb, #0284c7 11%, var(--md-surface-container));
+  --ls-doing-color: color-mix(in srgb, #0369a1 72%, var(--md-on-surface));
+  --ls-done-bg: color-mix(in srgb, #16a34a 11%, var(--md-surface-container));
+  --ls-done-color: color-mix(in srgb, #15803d 72%, var(--md-on-surface));
+  --ls-cloze-gap-bg: var(--md-primary-container);
+  --ls-cloze-gap-color: var(--md-on-primary-container);
+  --ls-cloze-revealed-bg: color-mix(in srgb, #16a34a 16%, transparent);
+  --ls-cloze-revealed-color: color-mix(in srgb, #15803d 80%, var(--md-on-surface));
+  --ls-glow-theme-scale: 0.85;
+  --ma-glass: color-mix(in srgb, var(--md-surface-container-high) 68%, transparent);
+  --ma-glass-strong: color-mix(in srgb, var(--md-surface-container-high) 84%, transparent);
+  --ma-sheen: linear-gradient(
+    135deg,
+    color-mix(in srgb, #ffffff 52%, transparent) 0%,
+    transparent 38%,
+    transparent 74%,
+    color-mix(in srgb, var(--md-primary) 6%, transparent) 100%
+  );
+}
+
+/* Los selectores de acento de la hoja base fijan rgba; los unificamos con
+   color-mix para que cualquier acento nuevo funcione sin añadir reglas. */
+:root[data-accent] {
+  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 15%, transparent);
+  --ls-text-link: var(--ls-accent);
+  --ls-guideline-hover: color-mix(in srgb, var(--ls-accent) 42%, transparent);
+}
+
+:root[data-theme="light"][data-accent] {
+  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 11%, transparent);
+  --ls-text-link: var(--ls-accent);
+  --ls-guideline-hover: color-mix(in srgb, var(--ls-accent) 38%, transparent);
+}
+
+/* ==================== BASE AERO ==================== */
+
+html,
+body {
+  background-color: var(--md-surface);
+}
+
+body {
+  background:
+    radial-gradient(
+      1200px 820px at 6% -8%,
+      color-mix(in srgb, var(--md-primary) calc(28% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 64%
+    ),
+    radial-gradient(
+      980px 720px at 104% 2%,
+      color-mix(in srgb, var(--md-tertiary) calc(20% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 66%
+    ),
+    radial-gradient(
+      1100px 760px at 50% 118%,
+      color-mix(in srgb, var(--md-primary) calc(16% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 70%
+    ),
+    linear-gradient(155deg, var(--md-surface-container-lowest), var(--md-surface) 52%, var(--md-surface-container-low));
+  background-attachment: fixed;
+}
+
+#app {
+  background: transparent;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--md-primary) 32%, transparent);
+  color: var(--md-on-surface);
+}
+
+* {
+  scrollbar-color: color-mix(in srgb, var(--md-primary) 62%, transparent) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--md-primary) 52%, transparent);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--md-primary);
+}
+
+/* ==================== SUPERFICIES PRINCIPALES ==================== */
+
+.main-container {
+  background:
+    radial-gradient(
+      1000px 720px at 112% -12%,
+      color-mix(in srgb, var(--md-primary) calc(18% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 66%
+    ),
+    radial-gradient(
+      860px 620px at -12% 106%,
+      color-mix(in srgb, var(--md-tertiary) calc(12% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 68%
+    ),
+    color-mix(in srgb, var(--md-surface) 74%, transparent);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+}
+
+.main-container::before {
+  background: var(--ma-sheen);
+  filter: none;
+  opacity: calc(0.55 * var(--ls-glow-intensity, 1));
+}
+
+.main-container::after {
+  background:
+    radial-gradient(
+      680px 420px at 78% 12%,
+      color-mix(in srgb, var(--md-primary) calc(10% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 72%
+    ),
+    radial-gradient(
+      560px 380px at 16% 92%,
+      color-mix(in srgb, var(--md-tertiary) calc(8% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 74%
+    );
+  filter: none;
+  opacity: calc(0.7 * var(--ls-glow-intensity, 1));
+}
+
+.sidebar-left {
+  background:
+    var(--ma-sheen),
+    color-mix(in srgb, var(--md-surface-container-low) 70%, transparent);
+  border-right: 1px solid var(--ma-glass-border);
+  box-shadow:
+    inset -1px 0 0 color-mix(in srgb, #ffffff 6%, transparent),
+    18px 0 52px -40px var(--md-shadow);
+  backdrop-filter: blur(var(--ma-blur)) saturate(150%);
+  -webkit-backdrop-filter: blur(var(--ma-blur)) saturate(150%);
+}
+
+:root:not([data-theme="light"]) .sidebar-left {
+  background:
+    var(--ma-sheen),
+    color-mix(in srgb, var(--md-surface-container-low) 68%, transparent);
+  box-shadow:
+    inset -1px 0 0 color-mix(in srgb, #ffffff 5%, transparent),
+    18px 0 52px -40px var(--md-shadow);
+}
+
+.sidebar-left::before {
+  background:
+    radial-gradient(
+      320px 320px at 4% 2%,
+      color-mix(in srgb, var(--md-primary) calc(22% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      280px 300px at 100% 100%,
+      color-mix(in srgb, var(--md-tertiary) calc(14% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 72%
+    );
+  filter: none;
+  opacity: calc(0.8 * var(--ls-glow-intensity, 1) * var(--ls-glow-theme-scale, 1));
+}
+
+.sidebar-left::after {
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent 6%,
+    color-mix(in srgb, var(--md-primary) 46%, transparent) 44%,
+    color-mix(in srgb, var(--md-primary) 62%, transparent) 68%,
+    transparent 94%
+  );
+  filter: none;
+  opacity: calc(0.7 * var(--ls-glow-intensity, 1) * var(--ls-glow-theme-scale, 1));
+}
+
+.headbar,
+.sidebar-header {
+  background:
+    var(--ma-sheen),
+    color-mix(in srgb, var(--md-surface) 66%, transparent);
+  border-bottom: 1px solid var(--ma-glass-border);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #ffffff 5%, transparent),
+    0 16px 34px -30px var(--md-shadow);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
+:root:not([data-theme="light"]) .headbar,
+:root:not([data-theme="light"]) .sidebar-header {
+  background:
+    var(--ma-sheen),
+    color-mix(in srgb, var(--md-surface) 64%, transparent);
+  box-shadow:
+    0 1px 0 color-mix(in srgb, #ffffff 4%, transparent),
+    0 16px 34px -30px var(--md-shadow);
+}
+
+.headbar::before,
+.sidebar-header::before {
+  background:
+    radial-gradient(
+      360px 80px at 8% 0%,
+      color-mix(in srgb, var(--md-primary) calc(14% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 76%
+    ),
+    radial-gradient(
+      300px 80px at 96% 0%,
+      color-mix(in srgb, var(--md-tertiary) calc(10% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 78%
+    );
+  filter: none;
+  opacity: calc(0.85 * var(--ls-glow-intensity, 1) * var(--ls-glow-theme-scale, 1));
+}
+
+.headbar::after,
+.sidebar-header::after {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--md-primary) 45%, transparent) 22%,
+    color-mix(in srgb, var(--md-primary) 62%, transparent) 52%,
+    transparent
+  );
+  filter: none;
+  opacity: 0.7;
+}
+
+/* ==================== NAVEGACIÓN MATERIAL 3 ==================== */
+
+.sidebar-nav {
+  gap: 4px;
+  padding: 8px 10px;
+}
+
+.sidebar-nav .nav-item {
+  min-height: 44px;
+  padding: 9px 16px;
+  gap: 12px;
+  border-radius: 999px;
+  color: var(--md-on-surface-variant);
+  font-weight: 550;
+  letter-spacing: 0.01em;
+  transform: none;
+}
+
+.sidebar-nav .nav-item > svg {
+  color: currentColor;
+  transition: color 0.18s ease;
+}
+
+.nav-item:hover {
+  background: var(--md-state-hover);
+  color: var(--md-on-surface);
+  transform: none;
+}
+
+.nav-item:active {
+  background: var(--md-state-pressed);
+  transform: none;
+}
+
+.nav-item.active {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+  font-weight: 650;
+  transform: none;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-primary) 16%, transparent);
+}
+
+.nav-item.active > svg {
+  color: var(--md-primary);
+}
+
+.sidebar-review-button {
+  border-radius: 20px;
+  border: 1px solid color-mix(in srgb, var(--md-primary) 26%, var(--ma-glass-border));
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--md-primary) 20%, var(--ma-glass)),
+      color-mix(in srgb, var(--md-primary) 8%, var(--ma-glass))
+    );
+  box-shadow:
+    var(--md-elevation-1),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 12%, transparent);
+  color: var(--md-on-surface);
+}
+
+.sidebar-review-button:hover {
+  border-color: color-mix(in srgb, var(--md-primary) 52%, var(--ma-glass-border));
+  box-shadow:
+    var(--md-elevation-2),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 16%, transparent);
+}
+
+.sidebar-review-icon {
+  border-radius: 12px;
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  box-shadow: none;
+}
+
+.sidebar-review-arrow {
+  color: var(--md-primary);
+}
+
+.sidebar-search-input {
+  min-height: 42px;
+  border-radius: 999px;
+  border: 1px solid var(--ma-glass-border);
+  background: color-mix(in srgb, var(--md-surface-container-highest) 62%, transparent);
+  color: var(--md-on-surface);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, #ffffff 6%, transparent);
+}
+
+.sidebar-search-input:hover {
+  border-color: color-mix(in srgb, var(--md-primary) 40%, var(--ma-glass-border));
+}
+
+.sidebar-search-input:focus {
+  border-color: var(--md-primary);
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--md-primary) 18%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 8%, transparent);
+}
+
+.sidebar-search-icon {
+  font-size: 0;
+}
+
+.sidebar-search-icon::before {
+  content: "";
+  display: block;
+  width: 15px;
+  height: 15px;
+  background: currentColor;
+  color: var(--md-on-surface-variant);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.2-3.2'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.2-3.2'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+.sidebar-search-shortcut {
+  border-radius: 999px;
+  border-color: var(--md-outline-variant);
+  background: color-mix(in srgb, var(--md-surface-container-highest) 70%, transparent);
+  color: var(--md-on-surface-variant);
+}
+
+.vault-tree-page,
+.vault-tree-folder > summary {
+  border-radius: 999px;
+  color: var(--md-on-surface-variant);
+}
+
+.vault-tree-page:hover,
+.vault-tree-folder > summary:hover {
+  background: var(--md-state-hover);
+  color: var(--md-on-surface);
+}
+
+.vault-tree-page.active {
+  background: var(--md-secondary-container);
+  color: var(--md-on-secondary-container);
+}
+
+.vault-tree-page-icon {
+  color: var(--md-primary);
+}
+
+.sidebar-section-title {
+  color: var(--md-on-surface-variant);
+  letter-spacing: 0.02em;
+}
+
+.vault-switch-button {
+  min-height: 44px;
+  border-radius: 999px;
+  border: 1px solid var(--ma-glass-border);
+  background: color-mix(in srgb, var(--md-surface-container-high) 58%, transparent);
+  color: var(--md-on-surface);
+}
+
+.vault-switch-button:hover {
+  border-color: color-mix(in srgb, var(--md-primary) 48%, var(--ma-glass-border));
+  background: var(--md-state-hover);
+}
+
+/* ==================== BOTONES, CHIPS E INPUTS ==================== */
+
+.btn-icon {
+  border-radius: 999px;
+  color: var(--md-on-surface-variant);
+  transition:
+    background-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.btn-icon:hover {
+  background: var(--md-state-hover);
+  border-color: transparent;
+  color: var(--md-on-surface);
+  transform: none;
+}
+
+.btn-icon:active {
+  background: var(--md-state-pressed);
+  transform: scale(0.96);
+}
+
+.btn-icon.active {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  border-color: transparent;
+  transform: none;
+}
+
+.font-option-btn,
+.btn-pagination,
+.btn-fsrs,
+.flashcard-tab,
+.settings-tab {
+  border-radius: 999px;
+  border: 1px solid var(--ma-glass-border);
+  background: color-mix(in srgb, var(--md-surface-container-high) 54%, transparent);
+  color: var(--md-on-surface-variant);
+  box-shadow: none;
+}
+
+.font-option-btn:hover,
+.btn-pagination:hover:not(:disabled),
+.btn-fsrs:hover,
+.flashcard-tab:hover,
+.settings-tab:hover {
+  background: var(--md-state-hover);
+  border-color: color-mix(in srgb, var(--md-primary) 28%, var(--ma-glass-border));
+  color: var(--md-on-surface);
+}
+
+.font-option-btn.active,
+.btn-pagination.active,
+.flashcard-tab.active,
+.settings-tab.active {
+  background: var(--md-primary-container);
+  border-color: transparent;
+  color: var(--md-on-primary-container);
+  font-weight: 650;
+  box-shadow: none;
+}
+
+.btn-primary {
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+  box-shadow: var(--md-elevation-1);
+}
+
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--md-primary) 88%, var(--md-on-primary));
+  color: var(--md-on-primary);
+  box-shadow: var(--md-elevation-2);
+}
+
+.btn-primary:active {
+  box-shadow: none;
+}
+
+select {
+  background-color: color-mix(in srgb, var(--md-surface-container-high) 76%, transparent) !important;
+  color: var(--md-on-surface) !important;
+  border: 1px solid var(--ma-glass-border) !important;
+  border-radius: 12px !important;
+}
+
+[data-theme="light"] select {
+  background-color: color-mix(in srgb, var(--md-surface-container-high) 82%, transparent) !important;
+  color: var(--md-on-surface) !important;
+  border: 1px solid var(--ma-glass-border) !important;
+}
+
+.settings-row input[type="number"],
+.settings-row input[type="text"],
+.sync-input-field,
+.flashcard-explorer-search,
+.flashcard-explorer-sort,
+.flashcard-pages-controls input,
+.flashcard-pages-controls select,
+.graph-color-rule input[type="text"] {
+  border-radius: 12px;
+  border: 1px solid var(--ma-glass-border);
+  background: color-mix(in srgb, var(--md-surface-container-highest) 64%, transparent);
+  color: var(--md-on-surface);
+}
+
+input[type="range"] {
+  accent-color: var(--md-primary);
+}
+
+input[type="checkbox"] {
+  accent-color: var(--md-primary);
+}
+
+/* ==================== SUPERFICIES FLOTANTES Y TARJETAS ==================== */
+
+.settings-dropdown-menu.m3-surface,
+.custom-context-menu,
+.search-results-dropdown,
+.page-export-dropdown,
+.wikilink-autocomplete,
+.slash-command-menu,
+.table-context-menu,
+.app-dialog,
+.image-occlusion-dialog,
+.shortcuts-modal,
+.vault-manager,
+.concept-map-modal,
+.history-modal,
+.flashcard-box,
+.flashcard-review-tools,
+.flashcard-explorer,
+.references-panel,
+.journal-calendar,
+.journal-entry-wrapper,
+.sync-box,
+.update-box {
+  background:
+    var(--ma-sheen),
+    var(--ma-glass);
+  border: 1px solid var(--ma-glass-border);
+  box-shadow: var(--md-elevation-3);
+  backdrop-filter: blur(var(--ma-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--ma-blur)) saturate(160%);
+}
+
+:root[data-theme="light"] .settings-dropdown-menu.m3-surface,
+:root[data-theme="light"] .custom-context-menu,
+:root[data-theme="light"] .search-results-dropdown,
+:root[data-theme="light"] .page-export-dropdown,
+:root[data-theme="light"] .app-dialog,
+:root[data-theme="light"] .image-occlusion-dialog,
+:root[data-theme="light"] .shortcuts-modal,
+:root[data-theme="light"] .vault-manager,
+:root[data-theme="light"] .concept-map-modal,
+:root[data-theme="light"] .history-modal,
+:root[data-theme="light"] .flashcard-box,
+:root[data-theme="light"] .flashcard-review-tools,
+:root[data-theme="light"] .flashcard-explorer,
+:root[data-theme="light"] .references-panel,
+:root[data-theme="light"] .journal-calendar,
+:root[data-theme="light"] .journal-entry-wrapper,
+:root[data-theme="light"] .sync-box,
+:root[data-theme="light"] .update-box {
+  background:
+    var(--ma-sheen),
+    var(--ma-glass-strong);
+}
+
+:root:not([data-theme="light"]) .settings-dropdown-menu.m3-surface {
+  background:
+    var(--ma-sheen),
+    var(--ma-glass);
+  border-color: var(--ma-glass-border);
+  box-shadow: var(--md-elevation-3);
+}
+
+.settings-dropdown-menu.m3-surface {
+  border-radius: 28px;
+  padding: 24px 6px 24px 28px;
+}
+
+.settings-dropdown-menu::before,
+.flashcard-box::before,
+.history-modal::before,
+.journal-calendar::before,
+.journal-entry-wrapper::before {
+  height: 1px;
+  left: 28px;
+  right: 28px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--md-primary) 60%, transparent),
+    transparent
+  );
+  opacity: 0.7;
+}
+
+.settings-dropdown-menu::after {
+  background:
+    radial-gradient(
+      420px 280px at 10% 0%,
+      color-mix(in srgb, var(--md-primary) calc(12% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 74%
+    ),
+    radial-gradient(
+      380px 260px at 96% 100%,
+      color-mix(in srgb, var(--md-tertiary) calc(9% * var(--ls-glow-intensity, 1)), transparent),
+      transparent 76%
+    );
+  filter: none;
+  opacity: calc(0.8 * var(--ls-glow-intensity, 1));
+}
+
+.custom-context-menu,
+.search-results-dropdown,
+.page-export-dropdown,
+.table-context-menu,
+.slash-command-menu,
+.wikilink-autocomplete {
+  border-radius: 20px;
+}
+
+.app-dialog,
+.image-occlusion-dialog,
+.shortcuts-modal,
+.vault-manager,
+.concept-map-modal,
+.history-modal {
+  border-radius: 28px;
+}
+
+.flashcard-box,
+.flashcard-review-tools,
+.flashcard-explorer,
+.references-panel,
+.journal-calendar,
+.journal-entry-wrapper,
+.sync-box,
+.update-box {
+  border-radius: 20px;
+}
+
+.search-dropdown-item,
+.query-result-item,
+.page-export-option,
+.menu-item,
+.slash-command-option,
+.wikilink-autocomplete-option,
+.vault-manager-item,
+.flashcard-explorer-item,
+.backlink-card,
+.journals-list-item,
+.kanban-card,
+.revision-item,
+.snapshot-note-row {
+  border-radius: 14px;
+}
+
+.search-dropdown-item:hover,
+.search-dropdown-item.selected,
+.query-result-item:hover,
+.page-export-option:hover,
+.menu-item:hover,
+.slash-command-option:hover,
+.vault-manager-item:hover,
+.flashcard-explorer-item:hover,
+.backlink-card:hover,
+.journals-list-item:hover {
+  background: var(--md-state-hover);
+  border-color: color-mix(in srgb, var(--md-primary) 24%, var(--ma-glass-border));
+  transform: none;
+}
+
+.search-dropdown-item.selected {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.search-dropdown-item.create-new {
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--md-primary) 18%, transparent),
+    transparent
+  );
+  border: 1px solid color-mix(in srgb, var(--md-primary) 30%, transparent);
+}
+
+/* ==================== TABLAS, DIARIOS Y TARJETAS ==================== */
+
+.table-view-container {
+  max-width: 1120px;
+}
+
+.all-pages-table {
+  border-spacing: 0 6px;
+  table-layout: auto;
+}
+
+.all-pages-table th {
+  padding: 0 12px 10px;
+  border-bottom: 1px solid var(--md-outline-variant);
+  color: var(--md-on-surface-variant);
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.all-pages-table th:first-child {
+  width: 42%;
+}
+
+.all-pages-table .page-link-cell {
+  min-width: 180px;
+  white-space: nowrap;
+}
+
+.all-pages-table .page-link-cell > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.all-pages-table td {
+  border-bottom: 0;
+  background: color-mix(in srgb, var(--md-surface-container-low) 54%, transparent);
+  padding: 15px 12px;
+}
+
+.all-pages-table tbody tr td:first-child {
+  border-radius: 16px 0 0 16px;
+}
+
+.all-pages-table tbody tr td:last-child {
+  border-radius: 0 16px 16px 0;
+}
+
+.all-pages-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--md-primary) 10%, var(--md-surface-container-low));
+}
+
+/* En ventanas medianas la barra lateral deja menos ancho útil: recortar el
+   margen evita que la columna de acciones quede fuera de la tabla. */
+@media (max-width: 1100px) {
+  .table-view-container {
+    padding: 0 24px;
+  }
+}
+
+.blocks-count,
+.badge-tag,
+.badge-kind {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--md-primary) 22%, transparent);
+  background: color-mix(in srgb, var(--md-primary) 12%, transparent);
+  color: var(--md-on-surface);
+}
+
+.badge-kind {
+  color: var(--md-on-primary-container);
+  background: var(--md-primary-container);
+  border-color: transparent;
+}
+
+.btn-table-delete {
+  border-radius: 999px;
+}
+
+.btn-table-delete:hover {
+  background: color-mix(in srgb, #e06c75 18%, transparent);
+}
+
+.journal-calendar {
+  width: 250px;
+  max-width: 250px;
+  margin-left: 16px;
+  border-color: var(--ma-glass-border);
+  box-shadow: var(--md-elevation-2);
+}
+
+.journals-layout-wrapper {
+  gap: 16px;
+}
+
+.journal-calendar-day {
+  border-radius: 999px;
+}
+
+.journal-calendar-day:hover:not(:disabled) {
+  background: var(--md-state-hover);
+}
+
+.journal-calendar-day.is-today {
+  outline: 1px solid var(--md-primary);
+}
+
+.journal-calendar-day.has-journal {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+.journal-calendar-day.is-today.has-journal {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.journals-list-item {
+  gap: 10px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--md-surface-container-high) 52%, transparent);
+  border: 1px solid var(--ma-glass-border);
+  box-shadow: none;
+}
+
+/* La lista de diarios heredaba el tamaño grande del cuerpo; se iguala al
+   resto de listas del panel para que la fecha no domine la vista. */
+.journals-list-label {
+  font-size: calc(13px * var(--ls-font-scale, 1));
+  font-weight: 500;
+}
+
+.journals-list-item:hover {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+  border-color: transparent;
+  box-shadow: var(--md-elevation-1);
+}
+
+.journal-date-badge {
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
+}
+
+/* ==================== EDITOR / OUTLINER ==================== */
+
+.page-title {
+  letter-spacing: -0.03em;
+  color: var(--md-on-surface);
+}
+
+.block-row {
+  border-radius: 12px;
+  transition: background-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.block-row:hover {
+  background: color-mix(in srgb, var(--md-on-surface) 4%, transparent);
+}
+
+.block-item.is-selected > .block-row,
+.block-row.is-selected {
+  background: color-mix(in srgb, var(--md-primary) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--md-primary) 22%, transparent);
+}
+
+[data-theme="dark"] .block-item.is-selected > .block-row,
+[data-theme="dark"] .block-row.is-selected {
+  background: color-mix(in srgb, var(--md-primary) 18%, transparent);
+}
+
+.bullet-dot {
+  background: var(--md-primary);
+}
+
+.add-bullet-btn {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--md-surface-container-high) 62%, transparent);
+  color: var(--md-on-surface-variant);
+}
+
+.add-bullet-btn:hover {
+  background: var(--md-primary);
+  color: var(--md-on-primary);
+}
+
+.block-row > .block-image-node {
+  border-radius: 16px;
+  box-shadow: var(--md-elevation-1);
+}
+
+.page-properties-values {
+  border-left-color: var(--md-primary);
+  border-radius: 0 12px 12px 0;
+  background: color-mix(in srgb, var(--md-surface-container-high) 62%, transparent);
+}
+
+.backlink-card {
+  background: color-mix(in srgb, var(--md-surface-container-low) 58%, transparent);
+  border: 1px solid var(--ma-glass-border);
+}
+
+/* ==================== FLASHCARDS, KANBAN Y GRAFO ==================== */
+
+.flashcard-tab,
+.flashcard-header,
+.flashcard-review-tools {
+  border-color: var(--ma-glass-border);
+}
+
+.flashcard-progress,
+.fsrs-stats-badge {
+  border-radius: 999px;
+}
+
+.flashcard-explorer-item {
+  background: color-mix(in srgb, var(--md-surface-container-high) 52%, transparent);
+  border: 1px solid var(--ma-glass-border);
+}
+
+.kanban-column {
+  border-radius: 22px;
+  background: color-mix(in srgb, var(--md-surface-container-low) 58%, transparent);
+  box-shadow: inset 0 0 0 1px var(--ma-glass-border);
+}
+
+.kanban-card {
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--md-surface-container-high) 74%, transparent);
+  border: 1px solid color-mix(in srgb, var(--md-outline-variant) 58%, transparent);
+  box-shadow: var(--md-elevation-1);
+}
+
+.kanban-card:hover {
+  background: color-mix(in srgb, var(--md-primary) 10%, var(--md-surface-container-high));
+  box-shadow: var(--md-elevation-2);
+}
+
+.kanban-column-header .badge-tag {
+  border-radius: 999px;
+}
+
+.graph-container,
+.graph-legend,
+.graph-preview {
+  border-radius: 20px;
+}
+
+.graph-preview,
+.graph-legend {
+  background: var(--ma-glass);
+  border: 1px solid var(--ma-glass-border);
+  box-shadow: var(--md-elevation-3);
+  backdrop-filter: blur(var(--ma-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--ma-blur)) saturate(160%);
+}
+
+/* ==================== MENÚS Y MODALES ==================== */
+
+.settings-tabs {
+  background: color-mix(in srgb, var(--md-surface-container-high) 56%, transparent);
+  border-bottom: 1px solid var(--ma-glass-border);
+  border-radius: 999px;
+  margin: 0 20px 0 0;
+  padding: 8px;
+}
+
+.settings-tab {
+  padding: 8px 12px;
+}
+
+.settings-tab-panel {
+  padding-right: 22px;
+}
+
+/* En escritorio las secciones van en una barra lateral vertical, como en
+   Obsidian/Logseq: se gana altura útil y el contenido respira mejor. */
+@media (min-width: 721px) {
+  .settings-dropdown-menu.m3-surface {
+    display: grid;
+    grid-template-columns: 178px minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    column-gap: 22px;
+    row-gap: 18px;
+    width: min(900px, calc(100vw - 40px));
+    padding: 24px 24px 24px 22px;
+  }
+
+  .settings-dialog-header {
+    grid-column: 1 / -1;
+  }
+
+  .settings-tabs {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    margin: 0;
+    padding: 8px;
+    position: static;
+    overflow-x: hidden;
+    overflow-y: auto;
+    border: 1px solid var(--ma-glass-border);
+    border-radius: 20px;
+    background: color-mix(in srgb, var(--md-surface-container-high) 48%, transparent);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .settings-tab {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 14px;
+    border: 1px solid color-mix(in srgb, var(--md-outline-variant) 68%, transparent);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--md-surface-container-high) 58%, transparent);
+    color: var(--md-on-surface-variant);
+    text-align: left;
+  }
+
+  /* Punto de color por sección: diferencia las opciones de un vistazo. */
+  .settings-tab::before {
+    content: "";
+    flex: 0 0 auto;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--settings-dot, var(--md-primary));
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--settings-dot, var(--md-primary)) 18%, transparent);
+  }
+
+  .settings-tab:nth-child(2) { --settings-dot: #22c55e; }
+  .settings-tab:nth-child(3) { --settings-dot: #a855f7; }
+  .settings-tab:nth-child(4) { --settings-dot: #f59e0b; }
+  .settings-tab:nth-child(5) { --settings-dot: #ef4444; }
+  .settings-tab:nth-child(6) { --settings-dot: #f97316; }
+  .settings-tab:nth-child(7) { --settings-dot: #14b8a6; }
+
+  .settings-tab:hover {
+    background: color-mix(in srgb, var(--settings-dot, var(--md-primary)) 12%, var(--md-surface-container-low));
+    border-color: color-mix(in srgb, var(--settings-dot, var(--md-primary)) 38%, transparent);
+    color: var(--md-on-surface);
+  }
+
+  .settings-tab.active {
+    background: color-mix(in srgb, var(--settings-dot, var(--md-primary)) 17%, var(--md-surface-container-high));
+    border-color: color-mix(in srgb, var(--settings-dot, var(--md-primary)) 46%, transparent);
+    color: var(--md-on-surface);
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 var(--settings-dot, var(--md-primary));
+  }
+
+  .settings-tab-panel {
+    grid-column: 2;
+    grid-row: 2;
+    padding: 2px 8px 20px 0;
+  }
+}
+
+.settings-section-title {
+  color: var(--md-primary);
+  letter-spacing: 0.04em;
+}
+
+.settings-help {
+  color: var(--md-on-surface-variant);
+}
+
+.sync-box {
+  border-radius: 20px;
+  padding: 16px;
+}
+
+.app-dialog-actions .font-option-btn,
+.app-dialog-actions .btn-primary {
+  min-height: 42px;
+  padding: 8px 20px;
+}
+
+.m3-scrim,
+.app-dialog-overlay,
+.history-modal-overlay,
+.image-occlusion-overlay,
+.concept-map-overlay,
+.vault-manager-overlay {
+  background: var(--md-scrim);
+  backdrop-filter: blur(10px) saturate(120%);
+  -webkit-backdrop-filter: blur(10px) saturate(120%);
+}
+
+.toast-notification {
+  border-radius: 999px;
+  border: 1px solid var(--ma-glass-border);
+  background: var(--ma-glass-strong);
+  color: var(--md-on-surface);
+  box-shadow: var(--md-elevation-3);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+}
+
+.menu-divider {
+  background: var(--md-outline-variant);
+}
+
+.menu-symbol {
+  color: var(--md-on-surface-variant);
+}
+
+/* ==================== DETALLES DE MOVIMIENTO ==================== */
+
+@keyframes material-aero-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.settings-dropdown-menu.is-opening,
+.custom-context-menu,
+.search-results-dropdown,
+.page-export-dropdown,
+.app-dialog,
+.history-modal,
+.shortcuts-modal,
+.vault-manager,
+.concept-map-modal,
+.image-occlusion-dialog {
+  animation: material-aero-fade 0.18s cubic-bezier(0.2, 0, 0, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-dropdown-menu.is-opening,
+  .custom-context-menu,
+  .search-results-dropdown,
+  .page-export-dropdown,
+  .app-dialog,
+  .history-modal,
+  .shortcuts-modal,
+  .vault-manager,
+  .concept-map-modal,
+  .image-occlusion-dialog {
+    animation: none;
+  }
+}
+
+/* ==================== RESPONSIVE ==================== */
+
+@media (max-width: 720px) {
+  .settings-dropdown-menu.m3-surface {
+    border-radius: 24px;
+    padding: 20px 4px 20px 18px;
+  }
+
+  .table-view-container {
+    padding: 0 16px;
+  }
+
+  .all-pages-table td {
+    padding: 12px;
+  }
+
+  .journals-list-item,
+  .kanban-column,
+  .sync-box {
+    border-radius: 16px;
+  }
+}

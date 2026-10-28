@@ -15,6 +15,7 @@ import {
 } from "./types";
 import "katex/dist/katex.min.css";
 import "./style.css";
+import "./material-aero.css";
 import { hideAppSplash } from "./splash";
 import { requestReviewMode } from "./app-mode";
 import {
@@ -11276,7 +11277,7 @@ function renderAllPagesView() {
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13h8M8 17h8"></path></svg>';
 
     const title = document.createElement("span");
-    title.textContent = p.title;
+    title.textContent = pageDisplayTitle(p);
     linkCell.append(iconWrap, title);
     nameCell.appendChild(linkCell);
 
@@ -11347,6 +11348,20 @@ function localDateKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+/**
+ * Título visible de una nota. Los diarios se identifican por su fecha (el
+ * archivo es `journals/YYYY_MM_DD.md`), así que la lista muestra siempre
+ * "Diario <fecha>" aunque el stem interno use guiones bajos.
+ */
+function pageDisplayTitle(page: PageData): string {
+  if (!page.isJournal || !page.journalDate) return page.title;
+  const date = new Date(`${page.journalDate}T00:00:00`);
+  const label = Number.isNaN(date.getTime())
+    ? page.journalDate
+    : date.toLocaleDateString(currentLanguage(), { dateStyle: "medium" });
+  return `${translate("Diario")} ${label}`;
 }
 
 function renderJournalCalendar(container: HTMLElement, journalPages: PageData[]): void {
@@ -11516,11 +11531,7 @@ function renderJournalsView() {
     button.title = `Abrir ${journal.title}`;
     const label = document.createElement("span");
     label.className = "journals-list-label";
-    label.textContent = journal.journalDate
-      ? new Date(`${journal.journalDate}T00:00:00`).toLocaleDateString(currentLanguage(), {
-        dateStyle: "full",
-      })
-      : journal.title;
+    label.textContent = pageDisplayTitle(journal);
     const meta = document.createElement("span");
     meta.className = "journals-list-meta";
     meta.textContent = `${journal.blocks.length} ${journal.blocks.length === 1 ? "bullet" : "bullets"}`;
@@ -11645,7 +11656,7 @@ function buildSidebarItem(page: PageData): HTMLElement {
   const item = document.createElement("div");
   item.className = `nav-item vault-tree-page ${currentView === "editor" && page.id === currentPage.id ? "active" : ""
     }${page.pinned ? " sidebar-pinned" : ""}`;
-  const pageLabel = page.title.replace(/^(?:diario|journal)\s+/i, "");
+  const pageLabel = pageDisplayTitle(page);
   const icon = document.createElement("span");
   icon.className = "vault-tree-page-icon";
   icon.innerHTML = page.isJournal ? SIDEBAR_JOURNAL_ICON : SIDEBAR_PAGE_ICON;
@@ -12058,7 +12069,7 @@ function updateOmnibarDropdown() {
   matches.forEach((m) => {
     const item = document.createElement("div");
     item.className = "search-dropdown-item";
-    const pageLabel = m.title.replace(/^(?:diario|journal)\s+/i, "");
+    const pageLabel = pageDisplayTitle(m);
     const pageIcon = m.isJournal
       ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M16 2v4M8 2v4M3 9h18"></path><path d="M8 13h3M8 17h6"></path></svg>'
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13h8M8 17h8"></path></svg>';
@@ -12599,7 +12610,9 @@ async function initializeDesktopApp(): Promise<void> {
       void synchronizeVaultFromDisk({ notify: false });
     }
   });
-  vault.createJournal(localDateKey(new Date()));
+  // Los diarios se crean únicamente cuando el usuario pulsa una fecha en el
+  // calendario. Antes se creaba el diario de hoy en cada arranque, lo que
+  // ensuciaba el vault y la lista de páginas sin intervención del usuario.
   renderSidebar();
 
   // Tras recargar la app, volver a la última nota y vista abierta en lugar de

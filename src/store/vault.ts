@@ -263,6 +263,23 @@ function normalizePathForCompare(value: string): string {
   return value.replace(/\\/g, "/").replace(/\/+$/, "");
 }
 
+/**
+ * Convierte una ruta del delta nativo (normalmente absoluta) a la ruta
+ * relativa que usa el vault en memoria. Sin esto, el watcher añadía una copia
+ * de cada nota al guardarla porque `root/nota.md` y `nota.md` no coincidían.
+ */
+function relativeDeltaPath(path: string, rootPath: string | null): string {
+  const normalizedPath = normalizePathForCompare(path);
+  const normalizedRoot = rootPath ? normalizePathForCompare(rootPath) : "";
+  if (normalizedRoot) {
+    if (normalizedPath === normalizedRoot) return "";
+    if (normalizedPath.startsWith(`${normalizedRoot}/`)) {
+      return normalizedPath.slice(normalizedRoot.length + 1);
+    }
+  }
+  return normalizedPath.replace(/^\/+/, "");
+}
+
 export interface ExternalDeltaResult {
   changed: string[];
   added: string[];
@@ -544,18 +561,29 @@ export class VaultStore {
     const normalizedDeltaRoot = normalizePathForCompare(delta.rootPath);
     if (normalizedRoot !== normalizedDeltaRoot) return result;
 
-    const skip = new Set([...(options.skipPaths || [])].map(normalizePathForCompare));
-    const pendingPaths = new Set(
-      [...this.pendingSaves.values()].map((entry) => normalizePathForCompare(entry.page.path))
+    const skip = new Set(
+      [...(options.skipPaths || [])].map((path) =>
+        normalizePathForCompare(relativeDeltaPath(path, activeRoot))
+      )
     );
-    const removedPaths = new Set(delta.removed.map(normalizePathForCompare));
+    const pendingPaths = new Set(
+      [...this.pendingSaves.values()].map((entry) =>
+        normalizePathForCompare(relativeDeltaPath(entry.page.path, activeRoot))
+      )
+    );
+    const removedPaths = new Set(
+      delta.removed.map((path) =>
+        normalizePathForCompare(relativeDeltaPath(path, activeRoot))
+      )
+    );
 
-    const incoming = new Map<string, PageData>();
+    const incoming = new Map<string, { page: PageData; relativePath: string }>();
     for (const page of delta.changed) {
       if (!page?.path || !page.title) continue;
-      const key = normalizePathForCompare(page.path);
-      if (!key.startsWith(`${normalizedRoot}/`)) continue;
-      incoming.set(key, page);
+      const relativePath = relativeDeltaPath(page.path, activeRoot);
+      const key = normalizePathForCompare(relativePath);
+      if (!key) continue;
+      incoming.set(key, { page, relativePath });
     }
 
     const nextPages: PageData[] = [];
@@ -575,7 +603,8 @@ export class VaultStore {
 
       incoming.delete(key);
       const updated: PageData = {
-        ...update,
+        ...update.page,
+        path: page.path,
         id: page.id,
         pinned: page.pinned,
         pinnedAt: page.pinnedAt,
@@ -586,9 +615,13 @@ export class VaultStore {
       result.changed.push(page.path);
     }
 
-    for (const [key, page] of incoming) {
+    for (const [key, entry] of incoming) {
       if (skip.has(key) || pendingPaths.has(key) || removedPaths.has(key)) continue;
-      const added: PageData = { ...page, blocks: page.blocks || [] };
+      const added: PageData = {
+        ...entry.page,
+        path: entry.relativePath,
+        blocks: entry.page.blocks || [],
+      };
       normalizeBlockTypes(added.blocks);
       nextPages.push(added);
       result.added.push(added.path);
@@ -874,13 +907,10 @@ export class VaultStore {
     }
 
     const compactDate = date.replace(/-/g, "_");
-    const baseTitle = `Diario ${date}`;
-    let title = baseTitle;
-    let suffix = 2;
-    while (this.getPageByTitle(title)) {
-      title = `${baseTitle} (${suffix})`;
-      suffix += 1;
-    }
+    // El título de una nota es su nombre de archivo. Usar exactamente el mismo
+    // valor que el stem evita que, tras recargar, el diario aparezca con otro
+    // título (antes: "Diario 2026-10-28" en memoria y "2026_10_28" en disco).
+    const title = compactDate;
     const page: PageData = {
       id: "p-" + Math.random().toString(36).substring(2, 9),
       title,
