@@ -16,7 +16,14 @@ src-tauri/gen/
 *.b64
 *.p12
 *.pfx
+*.gpg
+*.tar.gz.gpg
 keystore-secrets.txt
+keystore.properties
+key.properties
+# Backups locales de firma (nunca en el repo)
+descargas/
+backups/
 # Clave privada del actualizador (generada con `tauri signer generate`).
 # La pública vive en tauri.conf.json; la privada solo en GitHub Secrets.
 .tauri/

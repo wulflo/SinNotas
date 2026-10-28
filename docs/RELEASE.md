@@ -52,4 +52,4 @@ El workflow `release.yml` se ejecuta al empujar el tag y compila/publica la rele
 
 ## Seguridad
 
-No incluir secretos, keystores ni claves privadas en el repositorio. Usar únicamente los secretos configurados en GitHub Actions (`ANDROID_KEYSTORE_BASE64`, `TAURI_SIGNING_PRIVATE_KEY`, etc.).
+No incluir secretos, keystores ni claves privadas en el repositorio. Usar únicamente los secretos configurados en GitHub Actions (`ANDROID_KEYSTORE_BASE64`, `TAURI_SIGNING_PRIVATE_KEY`, etc.). Para el backup completo, la verificación y las contraseñas pendientes de Sin Notas, ver [`KEYSTORES.md`](./KEYSTORES.md).
