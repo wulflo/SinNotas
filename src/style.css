@@ -5023,6 +5023,8 @@ body.is-bullet-selecting {
   height: auto;
   max-height: min(88vh, 760px);
   padding: 20px;
+  display: flex;
+  flex-direction: column;
 }
 
 .shortcuts-modal-body {
@@ -5030,10 +5032,11 @@ body.is-bullet-selecting {
   flex-direction: column;
   gap: 20px;
   min-height: 0;
+  overflow-x: hidden;
   overflow-y: auto;
-  /* Deja aire entre los atajos y la barra de desplazamiento, que antes
-   * quedaba pegada a los `kbd`. */
-  padding-right: 16px;
+  /* La barra de desplazamiento ocupa su propio carril: no hace falta sumar
+   * 16px extra a la derecha (era la causa del padding asimétrico). */
+  padding-right: 4px;
   scrollbar-gutter: stable;
 }
 
@@ -6416,7 +6419,88 @@ body.is-bullet-selecting {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
   margin-bottom: 25px;
+}
+
+.table-view-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.table-view-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.all-pages-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.all-pages-search > svg {
+  position: absolute;
+  left: 11px;
+  color: var(--ls-text-muted);
+  pointer-events: none;
+}
+
+.all-pages-search input {
+  width: 220px;
+  max-width: 100%;
+  height: 34px;
+  padding: 0 12px 0 32px;
+  border: 1px solid var(--ls-border-color);
+  border-radius: 999px;
+  background: var(--ls-bg-secondary);
+  color: var(--ls-text-primary);
+  font-size: calc(13px * var(--ls-font-scale, 1));
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.all-pages-search input::placeholder {
+  color: var(--ls-text-muted);
+}
+
+.all-pages-search input:focus {
+  border-color: var(--ls-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ls-accent) 22%, transparent);
+}
+
+#all-pages-sort {
+  height: 34px;
+  max-width: 100%;
+  padding: 0 10px;
+  border-radius: 999px !important;
+  font-size: calc(13px * var(--ls-font-scale, 1));
+}
+
+.all-pages-empty {
+  padding: 28px 16px !important;
+  color: var(--ls-text-muted) !important;
+  text-align: center;
+}
+
+@media (max-width: 720px) {
+  .table-view-toolbar {
+    width: 100%;
+  }
+
+  .all-pages-search {
+    flex: 1 1 180px;
+  }
+
+  .all-pages-search input {
+    width: 100%;
+  }
 }
 
 .all-pages-table {

@@ -1013,8 +1013,34 @@
         <section class="view-panel" id="view-all-pages">
           <div class="table-view-container">
             <div class="table-view-header">
-              <h2 style="font-size: calc(22px * var(--ls-font-scale, 1)); font-weight: 700; color: var(--ls-text-title);">Todas las Páginas</h2>
-              <span class="badge-tag" id="all-pages-count">0 páginas</span>
+              <div class="table-view-heading">
+                <h2 style="font-size: calc(22px * var(--ls-font-scale, 1)); font-weight: 700; color: var(--ls-text-title);">Todas las Páginas</h2>
+                <span class="badge-tag" id="all-pages-count">0 páginas</span>
+              </div>
+              <div class="table-view-toolbar">
+                <div class="all-pages-search">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                  </svg>
+                  <input
+                    id="all-pages-search"
+                    type="search"
+                    placeholder="Buscar en el título..."
+                    aria-label="Buscar en el título..."
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                </div>
+                <select id="all-pages-sort" aria-label="Ordenar por:">
+                  <option value="updated-desc">Última modificación (más reciente)</option>
+                  <option value="updated-asc">Última modificación (más antigua)</option>
+                  <option value="title-asc">Nombre A-Z</option>
+                  <option value="title-desc">Nombre Z-A</option>
+                  <option value="created-desc">Creación (más reciente)</option>
+                  <option value="created-asc">Creación (más antigua)</option>
+                </select>
+              </div>
             </div>
             <table class="all-pages-table">
               <thead>

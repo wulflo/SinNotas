@@ -1099,7 +1099,7 @@ input[type="checkbox"] {
 /* En escritorio las secciones van en una barra lateral vertical, como en
    Obsidian/Logseq: se gana altura útil y el contenido respira mejor. */
 @media (min-width: 721px) {
-  .settings-dropdown-menu.m3-surface {
+  .settings-dropdown-menu.m3-surface:not(.shortcuts-modal) {
     display: grid;
     grid-template-columns: 178px minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
@@ -1276,7 +1276,7 @@ input[type="checkbox"] {
 /* ==================== RESPONSIVE ==================== */
 
 @media (max-width: 720px) {
-  .settings-dropdown-menu.m3-surface {
+  .settings-dropdown-menu.m3-surface:not(.shortcuts-modal) {
     border-radius: 24px;
     padding: 20px 4px 20px 18px;
   }

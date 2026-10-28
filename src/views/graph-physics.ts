@@ -444,6 +444,9 @@ export function computeRevealOrder(allNodes: GraphNode[], allLinks: GraphLink[])
     degree.set(link.target, (degree.get(link.target) || 0) + 1);
   }
 
+  const nodeByTitle = new Map<string, GraphNode>();
+  for (const node of allNodes) nodeByTitle.set(node.title, node);
+
   const nodesWithDegree = allNodes.map(node => ({
     node,
     degree: degree.get(node.title) || 0,
@@ -479,7 +482,9 @@ export function computeRevealOrder(allNodes: GraphNode[], allLinks: GraphLink[])
       for (const nbTitle of neighbors) {
         if (!visited.has(nbTitle)) {
           visited.add(nbTitle);
-          const nbNode = allNodes.find(n => n.title === nbTitle);
+          // Antes se buscaba con `allNodes.find` dentro del BFS: O(n²) en
+          // grafos grandes. El mapa mantiene la búsqueda en O(1).
+          const nbNode = nodeByTitle.get(nbTitle);
           if (nbNode) queue.push(nbNode);
         }
       }

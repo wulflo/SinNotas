@@ -632,6 +632,26 @@ const englishBySpanish: Record<string, string> = {
   "Selecciona la carpeta donde están tus notas. Sin Notas recordará el permiso para las próximas veces.": "Select the folder where your notes are. Sin Notas will remember the permission for next time.",
   "Elegir carpeta": "Choose folder",
   "No se pudo abrir la bóveda guardada. Elige la carpeta de nuevo para renovar el permiso.": "The saved vault could not be opened. Choose the folder again to renew the permission.",
+  "Última modificación (más reciente)": "Last modified (newest first)",
+  "Última modificación (más antigua)": "Last modified (oldest first)",
+  "Todavía no hay páginas en esta bóveda.": "There are no pages in this vault yet.",
+  "Bóvedas": "Vaults",
+  "Gestionar bóvedas": "Manage vaults",
+  "Cambia entre tus bóvedas o añade una carpeta. Si eliges una carpeta vacía, se preparará como bóveda nueva. Tus notas no se mueven.": "Switch between your vaults or add a folder. If you choose an empty folder, it will be prepared as a new vault. Your pages are not moved.",
+  "Cerrar gestor de bóvedas": "Close vault manager",
+  "Añadir bóveda…": "Add vault…",
+  "Todavía no hay bóvedas registradas. Añade una carpeta para empezar.": "No vaults registered yet. Add a folder to get started.",
+  "La gestión de varias bóvedas está disponible en la aplicación de escritorio.": "Managing multiple vaults is available in the desktop app.",
+  "La gestión de varias bóvedas requiere la aplicación de escritorio.": "Managing multiple vaults requires the desktop app.",
+  "Activa": "Active",
+  "Añade una carpeta existente como bóveda.": "Add an existing folder as a vault.",
+  "Haz clic en una bóveda para abrirla.": "Click a vault to open it.",
+  "No puedes quitar la bóveda que está activa.": "You cannot remove the active vault.",
+  "Quitar": "Remove",
+  "Abriendo bóveda…": "Opening vault…",
+  "No se pudo abrir la bóveda. Revisa que la carpeta siga existiendo.": "The vault could not be opened. Check that the folder still exists.",
+  "La selección de bóvedas requiere la aplicación de escritorio.": "Vault selection requires the desktop app.",
+  "No se pudo abrir la carpeta seleccionada. Revisa los permisos e inténtalo de nuevo.": "The selected folder could not be opened. Check permissions and try again.",
 };
 
 /**
@@ -1268,6 +1288,26 @@ const chineseBySpanish: Record<string, string> = {
   "Selecciona la carpeta donde están tus notas. Sin Notas recordará el permiso para las próximas veces.": "选择存放笔记的文件夹。Sin Notas 会记住权限，下次无需重新选择。",
   "Elegir carpeta": "选择文件夹",
   "No se pudo abrir la bóveda guardada. Elige la carpeta de nuevo para renovar el permiso.": "无法打开已保存的知识库。请重新选择文件夹以更新权限。",
+  "Última modificación (más reciente)": "最后修改（最新）",
+  "Última modificación (más antigua)": "最后修改（最早）",
+  "Todavía no hay páginas en esta bóveda.": "此知识库中还没有页面。",
+  "Bóvedas": "知识库",
+  "Gestionar bóvedas": "管理知识库",
+  "Cambia entre tus bóvedas o añade una carpeta. Si eliges una carpeta vacía, se preparará como bóveda nueva. Tus notas no se mueven.": "在知识库之间切换或添加文件夹。如果选择空文件夹，会将其准备为新的知识库。页面不会被移动。",
+  "Cerrar gestor de bóvedas": "关闭知识库管理",
+  "Añadir bóveda…": "添加知识库…",
+  "Todavía no hay bóvedas registradas. Añade una carpeta para empezar.": "尚未注册知识库。添加文件夹即可开始。",
+  "La gestión de varias bóvedas está disponible en la aplicación de escritorio.": "多知识库管理仅在桌面应用中可用。",
+  "La gestión de varias bóvedas requiere la aplicación de escritorio.": "管理多个知识库需要桌面应用。",
+  "Activa": "当前",
+  "Añade una carpeta existente como bóveda.": "添加现有文件夹作为知识库。",
+  "Haz clic en una bóveda para abrirla.": "点击知识库即可打开。",
+  "No puedes quitar la bóveda que está activa.": "无法移除当前知识库。",
+  "Quitar": "移除",
+  "Abriendo bóveda…": "正在打开知识库…",
+  "No se pudo abrir la bóveda. Revisa que la carpeta siga existiendo.": "无法打开知识库。请检查文件夹是否仍然存在。",
+  "La selección de bóvedas requiere la aplicación de escritorio.": "选择知识库需要桌面应用。",
+  "No se pudo abrir la carpeta seleccionada. Revisa los permisos e inténtalo de nuevo.": "无法打开所选文件夹。请检查权限后重试。",
 };
 
 const spanishByEnglish = Object.fromEntries(
@@ -1387,6 +1427,24 @@ function localizedText(value: string): string {
     }
     const vaultMatch = canonical.match(/^Vault activo: (.+)$/);
     if (vaultMatch) return `Active vault: ${vaultMatch[1]}`;
+    const vaultActiveToastMatch = canonical.match(/^Bóveda activa: (.+)$/);
+    if (vaultActiveToastMatch) return `Active vault: ${vaultActiveToastMatch[1]}`;
+    const activeVaultEntryMatch = canonical.match(/^(.+) \(bóveda activa\)$/);
+    if (activeVaultEntryMatch) return `${activeVaultEntryMatch[1]} (active vault)`;
+    const openVaultMatch = canonical.match(/^Abrir (.+)$/);
+    if (openVaultMatch) return `Open ${openVaultMatch[1]}`;
+    const removeVaultMatch = canonical.match(/^Quitar (.+) de la lista$/);
+    if (removeVaultMatch) return `Remove ${removeVaultMatch[1]} from the list`;
+    const removeVaultConfirmMatch = canonical.match(/^¿Quitar "(.+)" de la lista de bóvedas\? La carpeta y sus notas no se eliminarán\.$/);
+    if (removeVaultConfirmMatch) {
+      return `Remove "${removeVaultConfirmMatch[1]}" from the vault list? The folder and its pages will not be deleted.`;
+    }
+    const vaultRemovedMatch = canonical.match(/^"(.+)" se quitó de la lista de bóvedas\.$/);
+    if (vaultRemovedMatch) return `"${vaultRemovedMatch[1]}" was removed from the vault list.`;
+    const skippedNotesMatch = canonical.match(/^Se omitieron (\d+) notas \(errores de lectura\/permisos\/tamaño\)\.$/);
+    if (skippedNotesMatch) {
+      return `${skippedNotesMatch[1]} page${skippedNotesMatch[1] === "1" ? "" : "s"} skipped (read/permission/size errors).`;
+    }
     const createdMatch = canonical.match(/^Nota "(.+)" creada$/);
     if (createdMatch) return `Page "${createdMatch[1]}" created`;
     const areaMatch = canonical.match(/^Área (\d+)$/);
@@ -1468,6 +1526,24 @@ function localizedText(value: string): string {
     }
     const vaultMatch = canonical.match(/^Vault activo: (.+)$/);
     if (vaultMatch) return `当前库：${vaultMatch[1]}`;
+    const vaultActiveToastMatch = canonical.match(/^Bóveda activa: (.+)$/);
+    if (vaultActiveToastMatch) return `当前知识库：${vaultActiveToastMatch[1]}`;
+    const activeVaultEntryMatch = canonical.match(/^(.+) \(bóveda activa\)$/);
+    if (activeVaultEntryMatch) return `${activeVaultEntryMatch[1]}（当前知识库）`;
+    const openVaultMatch = canonical.match(/^Abrir (.+)$/);
+    if (openVaultMatch) return `打开 ${openVaultMatch[1]}`;
+    const removeVaultMatch = canonical.match(/^Quitar (.+) de la lista$/);
+    if (removeVaultMatch) return `从列表中移除 ${removeVaultMatch[1]}`;
+    const removeVaultConfirmMatch = canonical.match(/^¿Quitar "(.+)" de la lista de bóvedas\? La carpeta y sus notas no se eliminarán\.$/);
+    if (removeVaultConfirmMatch) {
+      return `要从知识库列表中移除「${removeVaultConfirmMatch[1]}」吗？文件夹及其页面不会被删除。`;
+    }
+    const vaultRemovedMatch = canonical.match(/^"(.+)" se quitó de la lista de bóvedas\.$/);
+    if (vaultRemovedMatch) return `已将「${vaultRemovedMatch[1]}」从知识库列表中移除。`;
+    const skippedNotesMatch = canonical.match(/^Se omitieron (\d+) notas \(errores de lectura\/permisos\/tamaño\)\.$/);
+    if (skippedNotesMatch) {
+      return `已跳过 ${skippedNotesMatch[1]} 个页面（读取/权限/大小错误）。`;
+    }
     const createdMatch = canonical.match(/^Nota "(.+)" creada$/);
     if (createdMatch) return `页面「${createdMatch[1]}」已创建`;
     const areaMatch = canonical.match(/^Área (\d+)$/);

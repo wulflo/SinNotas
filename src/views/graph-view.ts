@@ -3,7 +3,6 @@ import {
   physicsStep,
   shouldStopSimulation,
   computeRevealOrder,
-  computeInitialPosition,
   PhysicsConfig,
 } from "./graph-physics";
 import {
@@ -22,6 +21,30 @@ export { GRAPH_COLOR_PALETTE };
 
 /** La física corre a 30 Hz; el render sigue el ritmo de las interacciones. */
 const PHYSICS_INTERVAL_MS = 1000 / 30;
+
+/**
+ * Extrae los títulos de wikilink directamente del texto de los bloques.
+ * Antes se serializaba la página entera con `JSON.stringify` y se aplicaba una
+ * expresión regular al JSON; con 60.000 bloques eso bloqueaba el hilo principal
+ * al abrir la vista de grafo. Recorrer solo el contenido es mucho más barato y
+ * no depende del tamaño de las propiedades ni de los metadatos.
+ */
+function collectWikiLinkTitles(blocks: PageData["blocks"]): string[] {
+  const titles: string[] = [];
+  const visit = (nodes: PageData["blocks"]): void => {
+    for (const block of nodes) {
+      if (block.content) {
+        const matches = block.content.match(/\[\[(.*?)\]\]/g);
+        if (matches) {
+          for (const match of matches) titles.push(match.slice(2, -2));
+        }
+      }
+      if (block.children.length > 0) visit(block.children);
+    }
+  };
+  visit(blocks);
+  return titles;
+}
 
 interface RevealBatch {
   nodes: GraphNode[];
@@ -229,25 +252,19 @@ export class GraphView {
     const pageTitles = new Set(pages.map(p => p.title));
 
     pages.forEach((p) => {
-      const content = JSON.stringify(p.blocks);
-      const matches = content.match(/\[\[(.*?)\]\]/g);
-      if (matches) {
-        matches.forEach((m) => {
-          const targetTitle = m.slice(2, -2);
-          if (pageTitles.has(targetTitle)) {
-            const link = { source: p.title, target: targetTitle };
-            this.allLinks.push(link);
-            // Build adjacency indexes
-            let srcArr = this.linksBySource.get(p.title);
-            if (!srcArr) { srcArr = []; this.linksBySource.set(p.title, srcArr); }
-            srcArr.push(link);
-            let tgtArr = this.linksByTarget.get(targetTitle);
-            if (!tgtArr) { tgtArr = []; this.linksByTarget.set(targetTitle, tgtArr); }
-            tgtArr.push(link);
-            linkMap.set(p.title, (linkMap.get(p.title) || 0) + 1);
-            linkMap.set(targetTitle, (linkMap.get(targetTitle) || 0) + 1);
-          }
-        });
+      for (const targetTitle of collectWikiLinkTitles(p.blocks)) {
+        if (!pageTitles.has(targetTitle)) continue;
+        const link = { source: p.title, target: targetTitle };
+        this.allLinks.push(link);
+        // Build adjacency indexes
+        let srcArr = this.linksBySource.get(p.title);
+        if (!srcArr) { srcArr = []; this.linksBySource.set(p.title, srcArr); }
+        srcArr.push(link);
+        let tgtArr = this.linksByTarget.get(targetTitle);
+        if (!tgtArr) { tgtArr = []; this.linksByTarget.set(targetTitle, tgtArr); }
+        tgtArr.push(link);
+        linkMap.set(p.title, (linkMap.get(p.title) || 0) + 1);
+        linkMap.set(targetTitle, (linkMap.get(targetTitle) || 0) + 1);
       }
     });
 
@@ -300,7 +317,7 @@ export class GraphView {
     this.revealOrder = computeRevealOrder(this.allNodes, this.allLinks);
 
     // Preparar batches de revelación gradual
-    this.prepareRevealBatches(width, height);
+    this.prepareRevealBatches();
 
     // Reset estado
     this.nodes = [];
@@ -322,27 +339,43 @@ export class GraphView {
     }
   }
 
-  private prepareRevealBatches(width: number, height: number) {
+  private prepareRevealBatches() {
     this.revealBatches = [];
     const totalNodes = this.revealOrder.length;
     const batchCount = Math.max(1, Math.ceil(totalNodes / this.revealBatchSize));
     const batchDuration = this.revealDuration / batchCount;
 
     for (let i = 0; i < totalNodes; i += this.revealBatchSize) {
-      const batchNodes = this.revealOrder.slice(i, i + this.revealBatchSize);
-      // Calcular posición inicial para cada nodo del batch
-      batchNodes.forEach(node => {
-        const pos = computeInitialPosition(node, this.nodes, this.allLinks, width, height);
-        node.x = pos.x;
-        node.y = pos.y;
-        node.vx = (Math.random() - 0.5) * 0.5;
-        node.vy = (Math.random() - 0.5) * 0.5;
-      });
       this.revealBatches.push({
-        nodes: batchNodes,
+        nodes: this.revealOrder.slice(i, i + this.revealBatchSize),
         startTime: performance.now() + (this.revealBatches.length * batchDuration),
       });
     }
+  }
+
+  /**
+   * Coloca un nodo junto a un vecino ya revelado. Usa los índices de enlaces
+   * para no recorrer todos los enlaces del grafo por cada nodo: con 2.000
+   * nodos y 60.000 enlaces el cálculo previo bloqueaba ~0,6 s al abrir.
+   */
+  private positionRevealedNode(node: GraphNode): { x: number; y: number } {
+    const neighbors: GraphNode[] = [];
+    const consider = (title: string): void => {
+      if (!this.loadedTitles.has(title)) return;
+      const candidate = this.nodesByTitle.get(title);
+      if (candidate && candidate !== node) neighbors.push(candidate);
+    };
+    this.linksBySource.get(node.title)?.forEach((link) => consider(link.target));
+    this.linksByTarget.get(node.title)?.forEach((link) => consider(link.source));
+
+    if (neighbors.length === 0) return { x: node.x, y: node.y };
+    const neighbor = neighbors[Math.floor(Math.random() * neighbors.length)];
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 80 + Math.random() * 40;
+    return {
+      x: neighbor.x + Math.cos(angle) * radius,
+      y: neighbor.y + Math.sin(angle) * radius,
+    };
   }
 
   private scheduleNextRevealBatch() {
@@ -369,6 +402,11 @@ export class GraphView {
 
     const batch = this.revealBatches[this.currentBatchIndex];
     batch.nodes.forEach((n) => {
+      const position = this.positionRevealedNode(n);
+      n.x = position.x;
+      n.y = position.y;
+      n.vx = (Math.random() - 0.5) * 0.5;
+      n.vy = (Math.random() - 0.5) * 0.5;
       this.nodes.push(n);
       this.loadedTitles.add(n.title);
     });

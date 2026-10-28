@@ -97,6 +97,12 @@ import {
 import { FlashcardsManager, type FlashcardReviewOrder } from "./views/flashcards-manager";
 import { FlashcardLoader, type FlashcardLoadProgress } from "./views/flashcard-loader";
 import { KanbanManager } from "./views/kanban-view";
+import {
+  filterAllPages,
+  isAllPagesSort,
+  sortAllPages,
+  type AllPagesSort,
+} from "./views/all-pages";
 import { VirtualList } from "./views/virtual-list";
 import { ConceptMapView } from "./views/concept-map-view";
 import { FSRSRating } from "./editor/fsrs";
@@ -424,6 +430,7 @@ let flashcardPagesCreatedTimesInFlight = false;
 
 const kanbanManager = new KanbanManager();
 let graphView: GraphView | null = null;
+let graphDataVersion = -1;
 let graphPreviewPageTitle: string | null = null;
 let graphPreviewTransitionTimer: number | null = null;
 let journalCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -3163,6 +3170,37 @@ document.getElementById("all-pages-next")?.addEventListener("click", () => {
     allPagesCurrentPage++;
     renderAllPagesView();
   }
+});
+
+const allPagesSearchInput = document.getElementById(
+  "all-pages-search"
+) as HTMLInputElement | null;
+const allPagesSortSelect = document.getElementById(
+  "all-pages-sort"
+) as HTMLSelectElement | null;
+
+allPagesSearchInput?.addEventListener("input", () => {
+  if (allPagesSearchTimer !== null) window.clearTimeout(allPagesSearchTimer);
+  // Pequeño debounce para que un vault grande no reordene en cada pulsación.
+  allPagesSearchTimer = window.setTimeout(() => {
+    allPagesSearchTimer = null;
+    allPagesSearchQuery = allPagesSearchInput.value;
+    allPagesCurrentPage = 1;
+    renderAllPagesView();
+    allPagesSearchInput.focus({ preventScroll: true });
+  }, 160);
+});
+
+allPagesSortSelect?.addEventListener("change", () => {
+  const selected = allPagesSortSelect.value;
+  allPagesSort = isAllPagesSort(selected) ? selected : "updated-desc";
+  try {
+    localStorage.setItem(ALL_PAGES_SORT_STORAGE_KEY, allPagesSort);
+  } catch {
+    // La ordenación sigue activa aunque no se pueda persistir.
+  }
+  allPagesCurrentPage = 1;
+  renderAllPagesView();
 });
 
 /* ==================== OUTLINER EDITOR ==================== */
@@ -10928,7 +10966,14 @@ function renderGraphView() {
     (window as any).__graphClickBackground = () => closeGraphPreview();
   }
   graphView.resize();
-  graphView.updateData(vault.getPages());
+  // Repintar solo cuando la bóveda cambió. Volver a la pestaña del grafo ya no
+  // reconstruye nodos, enlaces y lotes de revelado desde cero (con vaults
+  // grandes eso congelaba la interfaz un instante en cada visita).
+  const version = vault.getMutationVersion();
+  if (version !== graphDataVersion) {
+    graphView.updateData(vault.getPages());
+    graphDataVersion = version;
+  }
 }
 
 /* ==================== GRAPH SETTINGS UI ==================== */
@@ -11221,8 +11266,22 @@ graphSettingsUiReady = true;
 
 /* ==================== ALL PAGES VIEW ==================== */
 const ALL_PAGES_PER_PAGE = 20;
+const ALL_PAGES_SORT_STORAGE_KEY = "sinnotas-all-pages-sort";
 let allPagesCurrentPage = 1;
 let allPagesFiltered: PageData[] = [];
+let allPagesSearchQuery = "";
+let allPagesSearchTimer: number | null = null;
+
+function readAllPagesSort(): AllPagesSort {
+  try {
+    const stored = localStorage.getItem(ALL_PAGES_SORT_STORAGE_KEY);
+    return isAllPagesSort(stored) ? stored : "updated-desc";
+  } catch {
+    return "updated-desc";
+  }
+}
+
+let allPagesSort: AllPagesSort = readAllPagesSort();
 
 function renderAllPagesView() {
   const tbody = document.getElementById("all-pages-tbody") as HTMLTableSectionElement;
@@ -11231,15 +11290,27 @@ function renderAllPagesView() {
   const prevBtn = document.getElementById("all-pages-prev") as HTMLButtonElement;
   const nextBtn = document.getElementById("all-pages-next") as HTMLButtonElement;
   const pageInfoEl = document.getElementById("all-pages-page-info") as HTMLSpanElement;
+  const sortSelect = document.getElementById("all-pages-sort") as HTMLSelectElement | null;
+  if (sortSelect && sortSelect.value !== allPagesSort) sortSelect.value = allPagesSort;
   tbody.innerHTML = "";
 
   const allPages = vault.getPages();
-  // Sort: pinned first, then by updatedAt desc
-  allPagesFiltered = [...allPages].sort((a, b) => {
-    if (a.pinned && !b.pinned) return -1;
-    if (!a.pinned && b.pinned) return 1;
-    return (b.updatedAt || "").localeCompare(a.updatedAt || "");
-  });
+  const visiblePages = filterAllPages(allPages, allPagesSearchQuery, pageDisplayTitle);
+  allPagesFiltered = sortAllPages(
+    visiblePages,
+    allPagesSort,
+    pageDisplayTitle,
+    flashcardPageCreatedMs
+  );
+
+  // Las fechas de creación viven en el sistema de archivos: se piden solo
+  // cuando el usuario ordena por creación (y no durante el precalentamiento
+  // de vistas ocultas) para no retrasar el arranque.
+  if (allPagesSort.startsWith("created-") && currentView === "all-pages") {
+    void fillFlashcardPagesCreatedTimes(allPages.map((page) => page.title)).then((changed) => {
+      if (changed && currentView === "all-pages") renderAllPagesView();
+    });
+  }
 
   countEl.innerText = `${allPagesFiltered.length} páginas`;
 
@@ -11258,6 +11329,18 @@ function renderAllPagesView() {
     pageInfoEl.textContent = `Página ${allPagesCurrentPage} de ${totalPages}`;
   } else {
     paginationEl.hidden = true;
+  }
+
+  if (pageSlice.length === 0) {
+    const row = document.createElement("tr");
+    const emptyCell = document.createElement("td");
+    emptyCell.colSpan = 5;
+    emptyCell.className = "all-pages-empty";
+    emptyCell.textContent = allPages.length === 0
+      ? translate("Todavía no hay páginas en esta bóveda.")
+      : translate("No hay notas cuyo título coincida con la búsqueda.");
+    row.appendChild(emptyCell);
+    tbody.appendChild(row);
   }
 
   pageSlice.forEach((p) => {
