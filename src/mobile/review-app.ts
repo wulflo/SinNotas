@@ -35,6 +35,8 @@ import {
 } from "../i18n";
 import {
   applyFontSizes,
+  applyStoredFontFamily,
+  clampFontSize,
   fontSizeDefinition,
   readFontSize,
   readFontSizes,
@@ -109,6 +111,7 @@ const ACCENT_COLORS = [
   { id: "indigo", label: "Índigo" },
   { id: "orange", label: "Naranja" },
   { id: "fuchsia", label: "Fucsia" },
+  { id: "gray", label: "Gris" },
 ] as const;
 type AccentColor = (typeof ACCENT_COLORS)[number]["id"];
 
@@ -272,6 +275,10 @@ class MobileReviewApp {
     type: HTMLElement;
     source: HTMLElement;
     fsrs: HTMLElement;
+    parent: HTMLElement;
+    cardFontDecrease: HTMLButtonElement;
+    cardFontIncrease: HTMLButtonElement;
+    cardFontValue: HTMLOutputElement;
     counter: HTMLElement;
     progress: HTMLElement;
     reveal: HTMLButtonElement;
@@ -358,8 +365,14 @@ class MobileReviewApp {
             <span class="mobile-pill" data-card-type>FSRS</span>
             <span class="mobile-card-source" data-card-source></span>
             <span class="mobile-card-fsrs" data-card-fsrs></span>
+            <div class="mobile-size-controls" role="group" aria-label="Tamaño del texto de la tarjeta">
+              <button class="mobile-size-button" type="button" data-action="card-font-decrease" aria-label="Reducir texto de la tarjeta">−</button>
+              <output class="mobile-size-value" data-card-font-size aria-live="polite">1 em</output>
+              <button class="mobile-size-button" type="button" data-action="card-font-increase" aria-label="Aumentar texto de la tarjeta">+</button>
+            </div>
           </div>
           <div class="mobile-card-body">
+            <div class="mobile-parent-context" data-parent hidden></div>
             <div class="mobile-question markdown-rendered" data-question></div>
             <div class="mobile-answer markdown-rendered" data-answer hidden></div>
           </div>
@@ -600,6 +613,10 @@ class MobileReviewApp {
       type: requireElement(this.root, "[data-card-type]"),
       source: requireElement(this.root, "[data-card-source]"),
       fsrs: requireElement(this.root, "[data-card-fsrs]"),
+      parent: requireElement(this.root, "[data-parent]"),
+      cardFontDecrease: requireElement(this.root, "[data-action='card-font-decrease']"),
+      cardFontIncrease: requireElement(this.root, "[data-action='card-font-increase']"),
+      cardFontValue: requireElement(this.root, "[data-card-font-size]"),
       counter: requireElement(this.root, "[data-counter]"),
       progress: requireElement(this.root, ".mobile-progress"),
       reveal: requireElement(this.root, "[data-action='reveal']"),
@@ -742,6 +759,10 @@ class MobileReviewApp {
       } else if (action === "rate") {
         const rating = Number(target.dataset.rating) as FSRSRating;
         void this.rate(rating);
+      } else if (action === "card-font-decrease") {
+        this.nudgeCardTextSize(-0.1);
+      } else if (action === "card-font-increase") {
+        this.nudgeCardTextSize(0.1);
       } else if (action === "refresh") {
         this.closeSettings();
         void this.loadAndApply(this.vault.getActiveRootPath(), "Tarjetas actualizadas");
@@ -1821,10 +1842,29 @@ class MobileReviewApp {
   }
 
   private applyStoredFontSizes(): void {
+    // La APK comparte las preferencias de tipografía con el escritorio.
+    applyStoredFontFamily();
     const sizes = readFontSizes();
     applyFontSizes(sizes);
     this.refs.fontSizeInput.value = String(sizes.ui);
     this.refs.fontSizeValue.value = `${sizes.ui} px`;
+    this.syncCardTextSizeControls(sizes.flashcardText);
+  }
+
+  /** Refleja el tamaño de tarjeta en el indicador y los límites de − / +. */
+  private syncCardTextSizeControls(value: number): void {
+    this.refs.cardFontValue.value = `${value} em`;
+    this.refs.cardFontDecrease.disabled = value <= 0.8;
+    this.refs.cardFontIncrease.disabled = value >= 3;
+  }
+
+  /** Ajusta el tamaño del texto de la tarjeta desde el propio repaso (T13). */
+  private nudgeCardTextSize(delta: number): void {
+    const current = readFontSize("flashcardText");
+    const next = clampFontSize("flashcardText", current + delta);
+    if (next === current) return;
+    writeFontSize("flashcardText", next);
+    this.applyStoredFontSizes();
   }
 
   private readStoredLearningMode(): boolean {
@@ -2217,6 +2257,8 @@ class MobileReviewApp {
     this.refs.type.hidden = false;
     this.refs.source.hidden = false;
     this.refs.fsrs.hidden = false;
+    this.refs.parent.hidden = true;
+    this.refs.parent.textContent = "";
     const historyPage = this.currentHistoryPage();
     const currentCard = this.manager.getCurrentCard();
     if (historyPage) {
@@ -2233,6 +2275,13 @@ class MobileReviewApp {
     this.updateHistoryButtons();
 
     if (!card) {
+      // T23: si la cola terminó pero ya venció alguna tarjeta programada, se
+      // reconstruye y se sigue repasando sin pulsar "Actualizar".
+      if (this.manager.countDueCards() > 0) {
+        this.manager.refreshDueQueue("new-first");
+        this.render();
+        return;
+      }
       const filter = this.manager.getPageFilter();
       if (filter && filter.length === 0) {
         this.showEmpty(
@@ -2263,6 +2312,9 @@ class MobileReviewApp {
     this.refs.fsrs.textContent = this.learningMode
       ? translate("Aprendizaje · sin guardar")
       : `S ${card.fsrs.stability}d · D ${card.fsrs.difficulty} · ${card.fsrs.reps} reps`;
+    const parentContent = card.parentContent?.trim() || "";
+    this.refs.parent.textContent = parentContent;
+    this.refs.parent.hidden = parentContent.length === 0;
 
     if (card.cardType === "image-occlusion") {
       this.refs.question.appendChild(this.createImagePreview(card, revealed));
@@ -2303,6 +2355,8 @@ class MobileReviewApp {
     this.refs.type.hidden = true;
     this.refs.source.hidden = true;
     this.refs.fsrs.hidden = true;
+    this.refs.parent.hidden = true;
+    this.refs.parent.textContent = "";
     this.refs.reveal.hidden = true;
     this.refs.ratings.hidden = true;
     this.refs.edit.hidden = true;

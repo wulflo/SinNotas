@@ -37,7 +37,9 @@ use walkdir::WalkDir;
 /// Binary cache file stored at the vault root.
 pub const CACHE_FILE_NAME: &str = ".sinnotas_cache.bin";
 const CACHE_MAGIC: &[u8; 4] = b"SNC1";
-const CACHE_FORMAT_VERSION: u32 = 1;
+// 2: añade `created_ns`. Bump obligatorio porque bincode no es
+// auto-descriptivo y una caché con el layout anterior no se puede decodificar.
+const CACHE_FORMAT_VERSION: u32 = 2;
 /// Defensive bound for the on-disk cache (a 20 MB note limit makes larger
 /// caches implausible).
 const MAX_CACHE_BYTES: u64 = 256 * 1024 * 1024;
@@ -83,6 +85,11 @@ pub struct CachedNote {
     /// Modification time in nanoseconds since the Unix epoch (ext4 keeps ns
     /// resolution, so same-second edits are not silently skipped).
     pub modified_ns: i64,
+    /// Creation time in nanoseconds since the Unix epoch. `0` means the
+    /// filesystem did not expose birthtime (the modification time is used as
+    /// an approximation when converting to `PageData`).
+    #[serde(default)]
+    pub created_ns: i64,
     pub size: u64,
     pub content_hash: String,
     pub title: String,
@@ -111,6 +118,14 @@ impl CachedNote {
             blocks: self.blocks.clone(),
             is_journal: self.is_journal,
             journal_date: self.journal_date.clone(),
+            updated_at_ms: (self.modified_ns > 0).then_some(self.modified_ns / 1_000_000),
+            created_at_ms: Some(
+                if self.created_ns > 0 {
+                    self.created_ns
+                } else {
+                    self.modified_ns
+                } / 1_000_000,
+            ),
         }
     }
 }
@@ -312,6 +327,9 @@ pub fn sanitize_cached_note(root: &Path, note: &CachedNote) -> Result<(), String
     if note.modified_ns < 0 {
         return Err("mtime inválido en la caché.".to_string());
     }
+    if note.created_ns < 0 {
+        return Err("ctime inválido en la caché.".to_string());
+    }
     if note.size > NOTE_MAX_BYTES {
         return Err("La nota en caché supera el límite de tamaño.".to_string());
     }
@@ -386,6 +404,16 @@ fn validate_blocks(blocks: &[BlockNode], depth: usize, count: &mut usize) -> Res
 fn modified_ns(metadata: &fs::Metadata) -> i64 {
     metadata
         .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .and_then(|duration| i64::try_from(duration.as_nanos()).ok())
+        .unwrap_or(0)
+}
+
+fn created_ns(metadata: &fs::Metadata) -> i64 {
+    metadata
+        .created()
+        .or_else(|_| metadata.modified())
         .ok()
         .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
         .and_then(|duration| i64::try_from(duration.as_nanos()).ok())
@@ -524,6 +552,7 @@ fn flashcard_state(blocks: &[BlockNode]) -> CachedFlashcardState {
 pub fn cached_note_from_content(
     relative_path: &str,
     modified_ns: i64,
+    created_ns: i64,
     size: u64,
     content: &str,
 ) -> Result<CachedNote, String> {
@@ -539,6 +568,7 @@ pub fn cached_note_from_content(
     let note = CachedNote {
         relative_path: relative_path.to_string(),
         modified_ns,
+        created_ns,
         size,
         content_hash: stable_content_hash(content.as_bytes()),
         title,
@@ -574,7 +604,14 @@ pub fn read_cached_note(root: &Path, relative: &str) -> Result<Option<CachedNote
         ));
     }
     let content = fs::read_to_string(&path).map_err(|error| error.to_string())?;
-    cached_note_from_content(&relative, modified_ns(&metadata), metadata.len(), &content).map(Some)
+    cached_note_from_content(
+        &relative,
+        modified_ns(&metadata),
+        created_ns(&metadata),
+        metadata.len(),
+        &content,
+    )
+    .map(Some)
 }
 
 /// Loads the cache (if any), sweeps the vault with `std::fs::metadata` and
@@ -689,7 +726,8 @@ pub fn load_or_scan_vault(root: &Path) -> Result<CacheScanOutput, String> {
                     continue;
                 }
             };
-            match cached_note_from_content(&relative, mtime, size, &content) {
+            match cached_note_from_content(&relative, mtime, created_ns(&metadata), size, &content)
+            {
                 Ok(note) => {
                     stats.parsed_notes += 1;
                     note
@@ -789,7 +827,8 @@ mod tests {
     #[test]
     fn cache_round_trips_through_bincode_and_disk() {
         let root = test_root("roundtrip");
-        let note = cached_note_from_content("pages/nota.md", 123, 456, sample_content()).unwrap();
+        let note =
+            cached_note_from_content("pages/nota.md", 123, 100, 456, sample_content()).unwrap();
         let mut cache = VaultMetadataCache::default();
         cache
             .entries
@@ -828,7 +867,8 @@ mod tests {
     #[test]
     fn cache_entries_cannot_escape_the_vault_or_spoof_titles() {
         let root = test_root("scope");
-        let mut note = cached_note_from_content("pages/nota.md", 1, 10, "- contenido\n").unwrap();
+        let mut note =
+            cached_note_from_content("pages/nota.md", 1, 1, 10, "- contenido\n").unwrap();
         note.relative_path = "../outside.md".to_string();
         assert!(sanitize_cached_note(&root, &note).is_err());
 

@@ -727,6 +727,11 @@ export class VaultStore {
   public savePage(updatedPage: PageData, propagateError = false): Promise<void> {
     // Un guardado inmediato reemplaza al diferido pendiente de la misma nota.
     this.cancelPendingSave(updatedPage.id);
+    // "Todas las páginas" y los diarios ordenan por esta marca: sin
+    // actualizarla en memoria la tabla mostraría la fecha anterior al guardar.
+    const savedAt = Date.now();
+    updatedPage.updatedAtMs = savedAt;
+    updatedPage.updatedAt = new Date(savedAt).toISOString().replace("T", " ").substring(0, 16);
     this.rememberPage(updatedPage);
     this.bumpMutationVersion();
     return this.persistPage(updatedPage, propagateError);
@@ -876,11 +881,14 @@ export class VaultStore {
     if (existing) return existing;
 
     const pagePath = `pages/${normalizedTitle}.md`;
+    const createdAt = Date.now();
     const newPage: PageData = {
       id: "p-" + Math.random().toString(36).substring(2, 9),
       title: normalizedTitle,
       path: pagePath,
-      updatedAt: new Date().toISOString().replace("T", " ").substring(0, 16),
+      updatedAt: new Date(createdAt).toISOString().replace("T", " ").substring(0, 16),
+      updatedAtMs: createdAt,
+      createdAtMs: createdAt,
       revisions: [],
       blocks: [
         {
@@ -911,13 +919,18 @@ export class VaultStore {
     // valor que el stem evita que, tras recargar, el diario aparezca con otro
     // título (antes: "Diario 2026-10-28" en memoria y "2026_10_28" en disco).
     const title = compactDate;
+    const createdAt = Date.now();
     const page: PageData = {
       id: "p-" + Math.random().toString(36).substring(2, 9),
       title,
       path: `journals/${compactDate}.md`,
       isJournal: true,
       journalDate: date,
-      updatedAt: new Date().toISOString().replace("T", " ").substring(0, 16),
+      updatedAt: new Date(createdAt).toISOString().replace("T", " ").substring(0, 16),
+      updatedAtMs: createdAt,
+      // La fecha "real" de un diario es su journalDate; este valor solo cubre
+      // notas creadas en memoria (modo web/demo).
+      createdAtMs: createdAt,
       revisions: [],
       blocks: [
         {

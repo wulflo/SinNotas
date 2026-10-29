@@ -5,6 +5,8 @@
  * raíz del documento, ambos inyectables para poder probarlo sin DOM.
  */
 
+import type { TypographyType } from "./types";
+
 export type FontSizeKey =
   | "ui"
   | "editor"
@@ -329,6 +331,68 @@ export function applyFontSizes(
  * Las tarjetas de repaso no usan esta escala para su texto: su tamaño se
  * expresa en `em` de `--ls-font-size-ui` (por defecto 2.4em).
  */
+/**
+ * Familia activa para los canvas. `CanvasRenderingContext2D.font` no entiende
+ * variables CSS, así que hay que resolver el valor computado del documento.
+ * Se acepta una fuente inyectable para poder probarlo sin DOM.
+ */
+export function activeFontFamily(
+  source: { fontFamily?: string } | null = typeof document !== "undefined"
+    ? getComputedStyle(document.body)
+    : null
+): string {
+  return source?.fontFamily?.trim() || "system-ui, sans-serif";
+}
+
+const VALID_TYPOGRAPHY = new Set<TypographyType>([
+  "sans",
+  "serif",
+  "mono",
+  "dyslexic",
+  "system",
+]);
+
+/**
+ * Aplica la tipografía guardada al documento. La vista móvil no carga
+ * `style.css`, pero comparte `localStorage` con el escritorio: esto replica la
+ * lectura de `sinnotas-font` y `sinnotas-system-font` para que la APK use la
+ * misma familia que el editor.
+ */
+export function applyStoredFontFamily(
+  root: FontFamilyTarget | null = typeof document !== "undefined"
+    ? document.documentElement
+    : null,
+  storage: FontSizeStorage | null = defaultStorage()
+): TypographyType {
+  const saved = storage?.getItem("sinnotas-font");
+  const font: TypographyType =
+    saved && VALID_TYPOGRAPHY.has(saved as TypographyType)
+      ? (saved as TypographyType)
+      : "sans";
+
+  if (font === "system") {
+    const system = storage?.getItem("sinnotas-system-font")?.trim();
+    if (system) {
+      root?.style.setProperty(
+        "--ls-system-font",
+        `"${system}", system-ui, -apple-system, BlinkMacSystemFont, sans-serif`
+      );
+    } else {
+      root?.style.removeProperty("--ls-system-font");
+    }
+  }
+  root?.setAttribute("data-font", font);
+  return font;
+}
+
+export interface FontFamilyTarget {
+  setAttribute(name: string, value: string): void;
+  style: {
+    setProperty(property: string, value: string): void;
+    removeProperty(property: string): string;
+  };
+}
+
 export function mobileFontScale(uiSize: number): number {
   const ratio = clampFontSize("ui", uiSize) / 13;
   return Math.min(3, Math.max(0.85, ratio));

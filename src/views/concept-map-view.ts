@@ -1,9 +1,12 @@
 import { BlockNode, PageData } from "../types";
 import { stripCardTag, stripSystemProperties, stripTaskStatus } from "../editor/markdown";
+import { activeFontFamily } from "../typography";
 
 interface MapNode {
   id: string;
   label: string;
+  /** Etiqueta completa; `label` se trunca al medir y debe poder recalcularse. */
+  fullLabel: string;
   /** Contenido completo (sin truncar) del bloque, para expandir al hacer click. */
   fullContent: string;
   depth: number;
@@ -19,9 +22,13 @@ interface MapLink {
   target: MapNode;
 }
 
-const ROOT_FONT = "700 14px Inter, system-ui, sans-serif";
-const BRANCH_FONT = "600 12px Inter, system-ui, sans-serif";
-const LEAF_FONT = "11px Inter, system-ui, sans-serif";
+const ROOT_FONT_SIZE = 14;
+const BRANCH_FONT_SIZE = 12;
+const LEAF_FONT_SIZE = 11;
+
+function mapFont(weight: number, size: number, family: string): string {
+  return `${weight} ${size}px ${family}`;
+}
 const ROOT_HEIGHT = 38;
 const NODE_HEIGHT = 30;
 const H_GAP = 74;
@@ -83,8 +90,13 @@ export class ConceptMapView {
   private pointerId: number | null = null;
   private panStart = { x: 0, y: 0, offsetX: 0, offsetY: 0 };
   private clickStart = { x: 0, y: 0 };
+  private hoverFrame: number | null = null;
+  private hoverPoint: { x: number; y: number } | null = null;
+  private hoveredId: string | null = null;
 
   public onNodeClick?: (nodeId: string, fullContent: string) => void;
+  /** Hover: null al salir del nodo/canvas; se llama solo cuando cambia el id. */
+  public onNodeHover?: (nodeId: string | null, fullContent: string) => void;
 
   constructor(canvasId: string, wrapId: string, emptyId: string) {
     this.canvas = document.getElementById(canvasId) as HTMLCanvasElement;
@@ -110,16 +122,50 @@ export class ConceptMapView {
     return null;
   }
 
+  /**
+   * Calcula el nodo bajo el puntero como máximo una vez por fotograma. El
+   * detalle solo se actualiza cuando cambia el id, no en cada píxel (T8).
+   */
+  private scheduleHoverUpdate(): void {
+    if (this.hoverFrame !== null) return;
+    this.hoverFrame = requestAnimationFrame(() => {
+      this.hoverFrame = null;
+      const point = this.hoverPoint;
+      if (!point) return;
+      const rect = this.canvas.getBoundingClientRect();
+      const worldX = (point.x - rect.left - this.offsetX) / this.scale;
+      const worldY = (point.y - rect.top - this.offsetY) / this.scale;
+      const node = this.hitTestNode(worldX, worldY);
+      const nextId = node && node.id !== "root" ? node.id : null;
+      this.canvas.classList.toggle("is-hovering-node", nextId !== null);
+      if (nextId === this.hoveredId) return;
+      this.hoveredId = nextId;
+      this.onNodeHover?.(nextId, node?.fullContent || "");
+    });
+  }
+
+  private clearHover(): void {
+    this.hoverPoint = null;
+    if (this.hoverFrame !== null) {
+      cancelAnimationFrame(this.hoverFrame);
+      this.hoverFrame = null;
+    }
+    this.canvas.classList.remove("is-hovering-node");
+    if (this.hoveredId === null) return;
+    this.hoveredId = null;
+    this.onNodeHover?.(null, "");
+  }
+
   /** Construye y dibuja el mapa correspondiente a la nota indicada. */
   public setPage(page: PageData): void {
+    this.clearHover();
     this.root = this.buildTree(page);
     this.nodes = [];
     this.links = [];
 
     if (this.root) {
       this.collect(this.root);
-      this.nodes.forEach((node) => this.measure(node));
-      this.layout(this.root);
+      this.remeasureAndLayout();
     }
 
     const hasContent = !!this.root && this.root.children.length > 0;
@@ -184,6 +230,7 @@ export class ConceptMapView {
     const root: MapNode = {
       id: "root",
       label: page.title || "Sin título",
+      fullLabel: page.title || "Sin título",
       fullContent: page.title || "Sin título",
       depth: 0,
       x: 0,
@@ -206,6 +253,7 @@ export class ConceptMapView {
         const node: MapNode = {
           id: block.id,
           label,
+          fullLabel: label,
           fullContent: block.content,
           depth,
           x: 0,
@@ -231,12 +279,16 @@ export class ConceptMapView {
     });
   }
 
-  private measure(node: MapNode): void {
+  private measure(node: MapNode, family: string): void {
     const isRoot = node.depth === 0;
     const isLeaf = node.children.length === 0;
-    this.ctx.font = isRoot ? ROOT_FONT : isLeaf ? LEAF_FONT : BRANCH_FONT;
+    this.ctx.font = isRoot
+      ? mapFont(700, ROOT_FONT_SIZE, family)
+      : isLeaf
+        ? mapFont(400, LEAF_FONT_SIZE, family)
+        : mapFont(600, BRANCH_FONT_SIZE, family);
 
-    let label = node.label;
+    let label = node.fullLabel;
     const measured = this.ctx.measureText(label).width;
     if (measured > MAX_TEXT_WIDTH) {
       const ratio = MAX_TEXT_WIDTH / measured;
@@ -295,6 +347,24 @@ export class ConceptMapView {
     });
   }
 
+  /** Recalcula anchos y posiciones con la familia tipográfica activa. */
+  private remeasureAndLayout(): void {
+    if (!this.root) return;
+    const family = activeFontFamily();
+    this.nodes.forEach((node) => this.measure(node, family));
+    this.layout(this.root);
+  }
+
+  /**
+   * Repinta el mapa si el usuario cambia la tipografía mientras está abierto.
+   * No toca el zoom ni el desplazamiento, pero recoloca para evitar solapes.
+   */
+  public refreshTypography(): void {
+    if (!this.root || this.canvas.hidden) return;
+    this.remeasureAndLayout();
+    this.fit();
+  }
+
   private resize(): void {
     const dpr = window.devicePixelRatio || 1;
     const width = Math.max(1, this.wrap.clientWidth);
@@ -326,6 +396,7 @@ export class ConceptMapView {
     ctx.setTransform(dpr * this.scale, 0, 0, dpr * this.scale, dpr * this.offsetX, dpr * this.offsetY);
 
     const styles = getComputedStyle(document.documentElement);
+    const fontFamily = activeFontFamily();
     const accent = styles.getPropertyValue("--ls-accent").trim() || "#61afef";
     const accentForeground = styles.getPropertyValue("--ls-accent-foreground").trim() || "#17202a";
     const textColor = styles.getPropertyValue("--ls-text-primary").trim() || "#abb2bf";
@@ -366,7 +437,11 @@ export class ConceptMapView {
         ctx.stroke();
       }
 
-      ctx.font = isRoot ? ROOT_FONT : node.children.length === 0 ? LEAF_FONT : BRANCH_FONT;
+      ctx.font = isRoot
+        ? mapFont(700, ROOT_FONT_SIZE, fontFamily)
+        : node.children.length === 0
+          ? mapFont(400, LEAF_FONT_SIZE, fontFamily)
+          : mapFont(600, BRANCH_FONT_SIZE, fontFamily);
       ctx.fillStyle = isRoot ? accentForeground : textColor;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
@@ -412,6 +487,7 @@ export class ConceptMapView {
     };
     this.canvas.addEventListener("pointerdown", (event) => {
       if (event.button !== 0) return;
+      this.clearHover();
       pointerDown = true;
       pointerMoved = false;
       this.pointerId = event.pointerId;
@@ -426,7 +502,12 @@ export class ConceptMapView {
     });
 
     this.canvas.addEventListener("pointermove", (event) => {
-      if (!pointerDown) return;
+      if (!pointerDown) {
+        if (event.pointerType === "touch") return;
+        this.hoverPoint = { x: event.clientX, y: event.clientY };
+        this.scheduleHoverUpdate();
+        return;
+      }
       const dx = Math.abs(event.clientX - this.panStart.x);
       const dy = Math.abs(event.clientY - this.panStart.y);
       if (dx > CLICK_TOLERANCE || dy > CLICK_TOLERANCE) {
@@ -459,6 +540,7 @@ export class ConceptMapView {
       }
     });
     this.canvas.addEventListener("pointercancel", endPan);
+    this.canvas.addEventListener("pointerleave", () => this.clearHover());
 
     this.canvas.addEventListener("dblclick", () => this.fit());
 

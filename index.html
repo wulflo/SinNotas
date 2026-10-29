@@ -246,12 +246,7 @@
 
           <div class="headbar-actions">
             <div class="pomodoro-mini" id="headbar-pomodoro" hidden>
-              <span id="headbar-pomodoro-clock">25:00</span>
-              <button class="btn-icon" id="headbar-pomodoro-toggle" type="button" title="Pomodoro">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>
-              </button>
+              <button class="pomodoro-time-pill" id="headbar-pomodoro-clock" type="button" title="Iniciar Pomodoro" aria-label="Iniciar Pomodoro">25:00</button>
             </div>
             <div class="page-export-menu">
               <button class="btn-icon" id="btn-open-page-export" type="button" title="Exportar página actual" aria-label="Exportar página actual" aria-expanded="false">
@@ -312,14 +307,28 @@
               <div class="settings-tabs" role="tablist" aria-label="Secciones de ajustes">
                 <button class="settings-tab active" type="button" role="tab" aria-selected="true" data-settings-tab="appearance">Apariencia</button>
                 <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="flashcards">Flashcards</button>
-                <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="graph">Grafo</button>
                 <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="saved">Guardado</button>
-                <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="review">Repaso</button>
-                <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="pomodoro">Pomodoro</button>
                 <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="advanced">Avanzado</button>
               </div>
 
               <section class="settings-tab-panel active" role="tabpanel" data-settings-panel="appearance">
+                <div class="settings-section-title">Ancho de página</div>
+                <label class="page-width-control" for="page-width-slider">
+                  <input id="page-width-slider" type="range" min="600" max="1200" step="20" value="820" />
+                  <output id="page-width-value" for="page-width-slider">820 px</output>
+                </label>
+
+                <div class="settings-section-title">Idioma de la interfaz</div>
+                <label class="settings-language-control" for="interface-language">
+                  <span>Idioma de la interfaz</span>
+                  <select id="interface-language">
+                    <option value="auto">Automático (Sistema)</option>
+                    <option value="es">Español</option>
+                    <option value="en">English</option>
+                    <option value="zh">中文</option>
+                  </select>
+                </label>
+
                 <div class="settings-section-title">Tema Visual</div>
                 <div class="settings-row">
                   <span>Modo Oscuro / Claro</span>
@@ -338,6 +347,7 @@
                   <button class="accent-option" type="button" data-accent-option="indigo" aria-label="Índigo" title="Índigo"></button>
                   <button class="accent-option" type="button" data-accent-option="orange" aria-label="Naranja" title="Naranja"></button>
                   <button class="accent-option" type="button" data-accent-option="fuchsia" aria-label="Fucsia" title="Fucsia"></button>
+                  <button class="accent-option" type="button" data-accent-option="gray" aria-label="Gris" title="Gris"></button>
                 </div>
 
                 <div class="settings-section-title">Intensidad Aero</div>
@@ -371,23 +381,6 @@
                   <button class="font-option-btn" id="btn-reset-typography" type="button">Restaurar tamaños</button>
                 </div>
 
-                <div class="settings-section-title">Ancho de página</div>
-                <label class="page-width-control" for="page-width-slider">
-                  <input id="page-width-slider" type="range" min="600" max="1200" step="20" value="820" />
-                  <output id="page-width-value" for="page-width-slider">820 px</output>
-                </label>
-
-                <div class="settings-section-title">Idioma de la interfaz</div>
-                <label class="settings-language-control" for="interface-language">
-                  <span>Idioma de la interfaz</span>
-                  <select id="interface-language">
-                    <option value="auto">Automático (Sistema)</option>
-                    <option value="es">Español</option>
-                    <option value="en">English</option>
-                    <option value="zh">中文</option>
-                  </select>
-                </label>
-
                 <a
                   class="settings-support-link"
                   id="btn-support"
@@ -403,6 +396,13 @@
               </section>
 
               <section class="settings-tab-panel" role="tabpanel" data-settings-panel="flashcards" hidden>
+                <div class="settings-subtabs" role="tablist" aria-label="Subsecciones de Flashcards">
+                  <button class="settings-subtab active" type="button" role="tab" aria-selected="true" data-flashcard-settings-section="general">General</button>
+                  <button class="settings-subtab" type="button" role="tab" aria-selected="false" data-flashcard-settings-section="review">Repaso</button>
+                  <button class="settings-subtab" type="button" role="tab" aria-selected="false" data-flashcard-settings-section="pomodoro">Pomodoro</button>
+                </div>
+
+                <div class="settings-subpanel active" data-flashcard-settings-content="general">
                 <div class="settings-section-title">Orden de repaso</div>
                 <p class="settings-help">Elige qué tarjetas quieres ver primero al iniciar una sesión de repaso.</p>
                 <div class="sync-box">
@@ -459,116 +459,126 @@
                     <button class="btn-pagination" id="flashcard-pages-next" type="button" disabled>Siguiente →</button>
                   </div>
                 </div>
-              </section>
+                </div>
 
-              <section class="settings-tab-panel" role="tabpanel" data-settings-panel="graph" hidden>
-                <div class="settings-section-title">Grupos de color por nombre</div>
-                <p class="settings-help">
-                  Pinta los nodos cuyo título contenga el texto indicado. La regla más
-                  específica (texto más largo) tiene prioridad y los colores manuales
-                  de cada nota siguen por encima de los grupos.
-                </p>
-                <div class="sync-box">
-                  <div class="graph-color-rules" id="graph-color-rules"></div>
-                  <div class="graph-color-rule-add">
-                    <input
-                      id="graph-rule-name"
-                      type="text"
-                      placeholder="Texto del nombre (ej. Diario, Proyecto…)"
-                      aria-label="Texto del nombre para el grupo de color"
-                    />
-                    <input
-                      id="graph-rule-color"
-                      type="color"
-                      value="#3b82f6"
-                      aria-label="Color del grupo"
-                    />
-                    <button class="font-option-btn" id="btn-add-graph-color-rule" type="button">
-                      Añadir grupo
-                    </button>
+                <div class="settings-subpanel" data-flashcard-settings-content="review" hidden>
+                  <div class="settings-section-title">Gamepad (Mando)</div>
+                  <p class="settings-help">Configura un mando Bluetooth o USB para controlar Flashcards y otras funciones.</p>
+                  <div class="sync-box">
+                    <div class="settings-row">
+                      <label for="gamepad-enabled-checkbox">Activar soporte de gamepad</label>
+                      <input type="checkbox" id="gamepad-enabled-checkbox" />
+                    </div>
+                    <div class="settings-row">
+                      <label for="gamepad-controller-type">Tipo de mando</label>
+                      <select id="gamepad-controller-type" class="sync-input-field"></select>
+                    </div>
+                    <div class="settings-row">
+                      <button type="button" class="font-option-btn" id="btn-gamepad-detect">Detectar mando</button>
+                      <span class="sync-status-badge" id="gamepad-status-indicator">Mando desactivado</span>
+                    </div>
+                  </div>
+
+                  <div class="settings-section-title">Mapeo de botones para Flashcards</div>
+                  <p class="settings-help">Asigna los botones del mando a las respuestas de FSRS (Otra vez, Difícil, Bien, Fácil).</p>
+                  <div class="sync-box">
+                    <div class="settings-row">
+                      <label for="gamepad-btn-again">Botón para "Otra vez":</label>
+                      <select id="gamepad-btn-again" class="sync-input-field">
+                      </select>
+                    </div>
+                    <div class="settings-row">
+                      <label for="gamepad-btn-hard">Botón para "Difícil":</label>
+                      <select id="gamepad-btn-hard" class="sync-input-field">
+                      </select>
+                    </div>
+                    <div class="settings-row">
+                      <label for="gamepad-btn-good">Botón para "Bien":</label>
+                      <select id="gamepad-btn-good" class="sync-input-field">
+                      </select>
+                    </div>
+                    <div class="settings-row">
+                      <label for="gamepad-btn-easy">Botón para "Fácil":</label>
+                      <select id="gamepad-btn-easy" class="sync-input-field">
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="settings-section-title">Mapeo de botones adicionales</div>
+                  <div class="sync-box">
+                    <div class="settings-row">
+                      <label for="gamepad-btn-show-answer">Botón para "Mostrar respuesta":</label>
+                      <select id="gamepad-btn-show-answer" class="sync-input-field">
+                      </select>
+                    </div>
+                    <div class="settings-row">
+                      <label for="gamepad-btn-focus-mode">Botón para "Modo focus":</label>
+                      <select id="gamepad-btn-focus-mode" class="sync-input-field">
+                      </select>
+                    </div>
+                    <div class="settings-row">
+                      <label for="gamepad-btn-undo-review">Botón para "Deshacer repaso":</label>
+                      <select id="gamepad-btn-undo-review" class="sync-input-field">
+                      </select>
+                    </div>
+                    <div class="settings-row">
+                      <label for="gamepad-btn-redo-review">Botón para "Rehacer repaso":</label>
+                      <select id="gamepad-btn-redo-review" class="sync-input-field">
+                      </select>
+                    </div>
+                  </div>
+
+                  <div class="settings-section-title">Atajos de teclado para Flashcards</div>
+                  <p class="settings-help">Elige la tecla que califica cada tarjeta durante el repaso.</p>
+                  <div class="sync-box">
+                    <div class="settings-row">
+                      <label for="flashcard-key-again">Tecla para "Otra vez"</label>
+                      <input type="text" id="flashcard-key-again" maxlength="1" value="1" />
+                    </div>
+                    <div class="settings-row">
+                      <label for="flashcard-key-hard">Tecla para "Difícil"</label>
+                      <input type="text" id="flashcard-key-hard" maxlength="1" value="2" />
+                    </div>
+                    <div class="settings-row">
+                      <label for="flashcard-key-good">Tecla para "Bien"</label>
+                      <input type="text" id="flashcard-key-good" maxlength="1" value="3" />
+                    </div>
+                    <div class="settings-row">
+                      <label for="flashcard-key-easy">Tecla para "Fácil"</label>
+                      <input type="text" id="flashcard-key-easy" maxlength="1" value="4" />
+                    </div>
                   </div>
                 </div>
 
-                <div class="settings-section-title">Fuerzas de la simulación</div>
-                <div class="sync-box graph-settings-box">
-                  <label class="graph-range-control" for="graph-repulsion">
-                    <span>Repulsión</span>
-                    <input id="graph-repulsion" type="range" min="100" max="1500" step="50" value="600" />
-                    <output id="graph-repulsion-value" for="graph-repulsion">600</output>
-                  </label>
-                  <label class="graph-range-control" for="graph-link-strength">
-                    <span>Fuerza de enlaces</span>
-                    <input id="graph-link-strength" type="range" min="0.05" max="1.5" step="0.05" value="0.55" />
-                    <output id="graph-link-strength-value" for="graph-link-strength">0.55</output>
-                  </label>
-                  <label class="graph-range-control" for="graph-link-distance">
-                    <span>Distancia de enlaces</span>
-                    <input id="graph-link-distance" type="range" min="40" max="220" step="5" value="100" />
-                    <output id="graph-link-distance-value" for="graph-link-distance">100 px</output>
-                  </label>
-                  <label class="graph-range-control" for="graph-center-strength">
-                    <span>Atracción al centro</span>
-                    <input id="graph-center-strength" type="range" min="0" max="0.05" step="0.001" value="0.006" />
-                    <output id="graph-center-strength-value" for="graph-center-strength">0.006</output>
-                  </label>
-                  <label class="graph-range-control" for="graph-collision-strength">
-                    <span>Fuerza de colisión</span>
-                    <input id="graph-collision-strength" type="range" min="0" max="2" step="0.1" value="1" />
-                    <output id="graph-collision-strength-value" for="graph-collision-strength">1.0</output>
-                  </label>
-                  <label class="graph-range-control" for="graph-velocity-decay">
-                    <span>Amortiguación</span>
-                    <input id="graph-velocity-decay" type="range" min="0.1" max="0.9" step="0.05" value="0.5" />
-                    <output id="graph-velocity-decay-value" for="graph-velocity-decay">0.50</output>
-                  </label>
-                </div>
-
-                <div class="settings-section-title">Tamaño de los nodos</div>
-                <div class="sync-box graph-settings-box">
-                  <label class="graph-range-control" for="graph-node-base">
-                    <span>Radio base</span>
-                    <input id="graph-node-base" type="range" min="2" max="12" step="0.5" value="5" />
-                    <output id="graph-node-base-value" for="graph-node-base">5.0 px</output>
-                  </label>
-                  <label class="graph-range-control" for="graph-node-connections">
-                    <span>Radio por conexión</span>
-                    <input id="graph-node-connections" type="range" min="0" max="3" step="0.1" value="0" />
-                    <output id="graph-node-connections-value" for="graph-node-connections">0.0 px</output>
-                  </label>
-                  <label class="graph-range-control" for="graph-node-max">
-                    <span>Radio máximo</span>
-                    <input id="graph-node-max" type="range" min="6" max="30" step="1" value="14" />
-                    <output id="graph-node-max-value" for="graph-node-max">14 px</output>
-                  </label>
-                </div>
-
-                <div class="settings-section-title">Líneas y títulos</div>
-                <div class="sync-box graph-settings-box">
-                  <label class="graph-range-control" for="graph-link-width">
-                    <span>Grosor de enlaces</span>
-                    <input id="graph-link-width" type="range" min="0.5" max="4" step="0.1" value="1" />
-                    <output id="graph-link-width-value" for="graph-link-width">1.0 px</output>
-                  </label>
-                  <label class="graph-range-control" for="graph-link-highlight-width">
-                    <span>Grosor resaltado</span>
-                    <input id="graph-link-highlight-width" type="range" min="1" max="8" step="0.5" value="2" />
-                    <output id="graph-link-highlight-width-value" for="graph-link-highlight-width">2.0 px</output>
-                  </label>
-                  <label class="graph-range-control" for="graph-label-zoom">
-                    <span>Zoom para mostrar títulos</span>
-                    <input id="graph-label-zoom" type="range" min="1" max="4" step="0.1" value="2" />
-                    <output id="graph-label-zoom-value" for="graph-label-zoom">2.00×</output>
-                  </label>
-                  <p class="settings-help" style="margin: 0;">
-                    Los títulos aparecen con fundido al acercar hasta este zoom;
-                    al pasar el cursor o seleccionar un nodo se muestran siempre.
-                  </p>
-                </div>
-
-                <div class="advanced-actions">
-                  <button class="font-option-btn" id="btn-reset-graph-settings" type="button">
-                    Restablecer valores del grafo
-                  </button>
+                <div class="settings-subpanel" data-flashcard-settings-content="pomodoro" hidden>
+                  <div class="settings-section-title">Pomodoro</div>
+                  <p class="settings-help">Configura los tiempos de enfoque y descanso, y cuántas sesiones completar antes de un descanso largo.</p>
+                  <div class="sync-box">
+                    <div class="settings-row">
+                      <label for="pomodoro-focus-duration">Tiempo de enfoque (minutos)</label>
+                      <select id="pomodoro-focus-duration"></select>
+                    </div>
+                    <div class="settings-row">
+                      <label for="pomodoro-break-duration">Descanso corto (minutos)</label>
+                      <select id="pomodoro-break-duration"></select>
+                    </div>
+                    <div class="settings-row">
+                      <label for="pomodoro-long-break-duration">Descanso largo (minutos)</label>
+                      <select id="pomodoro-long-break-duration"></select>
+                    </div>
+                    <div class="settings-row">
+                      <label for="pomodoro-sessions-before-long-break">Sesiones antes del descanso largo</label>
+                      <select id="pomodoro-sessions-before-long-break"></select>
+                    </div>
+                    <div class="settings-row">
+                      <label for="pomodoro-show-headbar">Mostrar en la barra superior</label>
+                      <input type="checkbox" id="pomodoro-show-headbar" checked />
+                    </div>
+                    <div class="settings-row">
+                      <label for="pomodoro-sound">Sonido al terminar cada bloque</label>
+                      <input type="checkbox" id="pomodoro-sound" checked />
+                    </div>
+                  </div>
                 </div>
               </section>
 
@@ -582,122 +592,6 @@
                   </div>
                   <div class="snapshot-notes-list" id="snapshot-active-notes-list">
                     <!-- Se renderiza con las notas que tienen snapshots activos -->
-                  </div>
-                </div>
-              </section>
-
-              <section class="settings-tab-panel" role="tabpanel" data-settings-panel="review" hidden>
-                <div class="settings-section-title">Gamepad (Mando)</div>
-                <p class="settings-help">Configura un mando Bluetooth o USB para controlar Flashcards y otras funciones.</p>
-                <div class="sync-box">
-                  <div class="settings-row">
-                    <label for="gamepad-enabled-checkbox">Activar soporte de gamepad</label>
-                    <input type="checkbox" id="gamepad-enabled-checkbox" />
-                  </div>
-                  <div class="settings-row">
-                    <label for="gamepad-controller-type">Tipo de mando</label>
-                    <select id="gamepad-controller-type" class="sync-input-field"></select>
-                  </div>
-                  <div class="settings-row">
-                    <button type="button" class="font-option-btn" id="btn-gamepad-detect">Detectar mando</button>
-                    <span class="sync-status-badge" id="gamepad-status-indicator">Mando desactivado</span>
-                  </div>
-                </div>
-
-                <div class="settings-section-title">Mapeo de botones para Flashcards</div>
-                <p class="settings-help">Asigna los botones del mando a las respuestas de FSRS (Otra vez, Difícil, Bien, Fácil).</p>
-                <div class="sync-box">
-                  <div class="settings-row">
-                    <label for="gamepad-btn-again">Botón para "Otra vez":</label>
-                    <select id="gamepad-btn-again" class="sync-input-field">
-                    </select>
-                  </div>
-                  <div class="settings-row">
-                    <label for="gamepad-btn-hard">Botón para "Difícil":</label>
-                    <select id="gamepad-btn-hard" class="sync-input-field">
-                    </select>
-                  </div>
-                  <div class="settings-row">
-                    <label for="gamepad-btn-good">Botón para "Bien":</label>
-                    <select id="gamepad-btn-good" class="sync-input-field">
-                    </select>
-                  </div>
-                  <div class="settings-row">
-                    <label for="gamepad-btn-easy">Botón para "Fácil":</label>
-                    <select id="gamepad-btn-easy" class="sync-input-field">
-                    </select>
-                  </div>
-                </div>
-
-                <div class="settings-section-title">Mapeo de botones adicionales</div>
-                <div class="sync-box">
-                  <div class="settings-row">
-                    <label for="gamepad-btn-show-answer">Botón para "Mostrar respuesta":</label>
-                    <select id="gamepad-btn-show-answer" class="sync-input-field">
-                    </select>
-                  </div>
-                  <div class="settings-row">
-                    <label for="gamepad-btn-focus-mode">Botón para "Modo focus":</label>
-                    <select id="gamepad-btn-focus-mode" class="sync-input-field">
-                    </select>
-                  </div>
-                  <div class="settings-row">
-                    <label for="gamepad-btn-undo-review">Botón para "Deshacer repaso":</label>
-                    <select id="gamepad-btn-undo-review" class="sync-input-field">
-                    </select>
-                  </div>
-                  <div class="settings-row">
-                    <label for="gamepad-btn-redo-review">Botón para "Rehacer repaso":</label>
-                    <select id="gamepad-btn-redo-review" class="sync-input-field">
-                    </select>
-                  </div>
-                </div>
-
-                <div class="settings-section-title">Atajos de teclado para Flashcards</div>
-                <p class="settings-help">Elige la tecla que califica cada tarjeta durante el repaso.</p>
-                <div class="sync-box">
-                  <div class="settings-row">
-                    <label for="flashcard-key-again">Tecla para "Otra vez"</label>
-                    <input type="text" id="flashcard-key-again" maxlength="1" value="1" />
-                  </div>
-                  <div class="settings-row">
-                    <label for="flashcard-key-hard">Tecla para "Difícil"</label>
-                    <input type="text" id="flashcard-key-hard" maxlength="1" value="2" />
-                  </div>
-                  <div class="settings-row">
-                    <label for="flashcard-key-good">Tecla para "Bien"</label>
-                    <input type="text" id="flashcard-key-good" maxlength="1" value="3" />
-                  </div>
-                  <div class="settings-row">
-                    <label for="flashcard-key-easy">Tecla para "Fácil"</label>
-                    <input type="text" id="flashcard-key-easy" maxlength="1" value="4" />
-                  </div>
-                </div>
-              </section>
-
-              <section class="settings-tab-panel" role="tabpanel" data-settings-panel="pomodoro" hidden>
-                <div class="settings-section-title">Pomodoro</div>
-                <p class="settings-help">Configura los tiempos de enfoque y descanso, y cuántas sesiones completar antes de un descanso largo.</p>
-                <div class="sync-box">
-                  <div class="settings-row">
-                    <label for="pomodoro-focus-duration">Tiempo de enfoque (minutos)</label>
-                    <select id="pomodoro-focus-duration"></select>
-                  </div>
-                  <div class="settings-row">
-                    <label for="pomodoro-break-duration">Descanso corto (minutos)</label>
-                    <select id="pomodoro-break-duration"></select>
-                  </div>
-                  <div class="settings-row">
-                    <label for="pomodoro-long-break-duration">Descanso largo (minutos)</label>
-                    <select id="pomodoro-long-break-duration"></select>
-                  </div>
-                  <div class="settings-row">
-                    <label for="pomodoro-sessions-before-long-break">Sesiones antes del descanso largo</label>
-                    <select id="pomodoro-sessions-before-long-break"></select>
-                  </div>
-                  <div class="settings-row">
-                    <label for="pomodoro-show-headbar">Mostrar en la barra superior</label>
-                    <input type="checkbox" id="pomodoro-show-headbar" checked />
                   </div>
                 </div>
               </section>
@@ -778,6 +672,36 @@
                     <path d="M5.5 16.5v-5h13v5"></path>
                   </svg>
                 </button>
+                <button class="btn-icon page-title-action" id="btn-graph-neighborhood" type="button" title="Ver notas conectadas en el grafo" aria-label="Ver notas conectadas en el grafo">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="6" cy="6" r="2.5"></circle>
+                    <circle cx="18" cy="6" r="2.5"></circle>
+                    <circle cx="12" cy="18" r="2.5"></circle>
+                    <path d="M8.2 7.2 10.8 16M15.8 7.2 13.2 16M8.5 6h7"></path>
+                  </svg>
+                </button>
+                <button class="btn-icon page-title-action" id="btn-split-view" type="button" title="Abrir una nota de referencia al lado" aria-label="Abrir una nota de referencia al lado">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2"></rect>
+                    <path d="M12 4v16"></path>
+                  </svg>
+                </button>
+              </div>
+
+              <div class="note-find-bar" id="note-find-bar" role="search" aria-label="Buscar en esta nota" hidden>
+                <input
+                  class="note-find-input"
+                  id="note-find-input"
+                  type="search"
+                  placeholder="Buscar en esta nota…"
+                  autocomplete="off"
+                  spellcheck="false"
+                  aria-label="Buscar en esta nota"
+                />
+                <span class="note-find-count" id="note-find-count" aria-live="polite">0/0</span>
+                <button class="btn-icon note-find-button" id="btn-note-find-prev" type="button" title="Coincidencia anterior (Mayús+Enter)" aria-label="Coincidencia anterior">↑</button>
+                <button class="btn-icon note-find-button" id="btn-note-find-next" type="button" title="Siguiente coincidencia (Enter)" aria-label="Siguiente coincidencia">↓</button>
+                <button class="btn-icon note-find-button" id="btn-note-find-close" type="button" title="Cerrar búsqueda (Esc)" aria-label="Cerrar búsqueda">×</button>
               </div>
 
               <div class="page-properties-container" id="page-properties-container"></div>
@@ -798,8 +722,24 @@
                 <div id="backlinks-list">
                   <!-- Backlinks -->
                 </div>
+                <div class="references-group">
+                  <div class="references-title">
+                    <span>Enlaces salientes</span>
+                    <span class="ref-count-badge" id="outgoing-count">0</span>
+                  </div>
+                  <div id="outgoing-links-list"></div>
+                </div>
               </section>
             </div>
+            <aside class="reference-pane" id="reference-pane" aria-label="Notas de referencia" hidden>
+              <header class="reference-pane-header">
+                <div class="reference-pane-title" id="reference-pane-title">Notas de referencia</div>
+                <span class="reference-pane-count" id="reference-pane-count">1/2</span>
+                <button class="btn-icon reference-pane-add" id="btn-add-reference-pane" type="button" title="Añadir otra nota de referencia" aria-label="Añadir otra nota de referencia">+</button>
+                <button class="btn-icon" id="btn-close-reference-pane" type="button" title="Cerrar panel de referencia" aria-label="Cerrar panel de referencia">×</button>
+              </header>
+              <div class="reference-slots" id="reference-slots"></div>
+            </aside>
           </div>
         </section>
 
@@ -836,12 +776,42 @@
               <div class="flashcard-box" id="flashcard-review-pane">
                 <div class="flashcard-card-header">
                   <span class="flashcard-type-pill" id="card-type-pill">BÁSICA</span>
+                  <div class="flashcard-card-tools">
+                    <div class="flashcard-size-controls" role="group" aria-label="Tamaño del texto de la tarjeta">
+                      <button class="btn-icon flashcard-size-button" id="btn-card-font-decrease" type="button" aria-label="Reducir texto de la tarjeta" title="Reducir texto de la tarjeta">−</button>
+                      <output class="flashcard-size-value" id="card-font-size-value" aria-live="polite">1 em</output>
+                      <button class="btn-icon flashcard-size-button" id="btn-card-font-increase" type="button" aria-label="Aumentar texto de la tarjeta" title="Aumentar texto de la tarjeta">+</button>
+                    </div>
+                    <div class="flashcard-settings-shortcuts" role="group" aria-label="Ajustes de Flashcards">
+                      <button class="btn-icon flashcard-settings-shortcut" id="btn-open-flashcard-settings" type="button" title="Ajustes de Flashcards" aria-label="Abrir ajustes de Flashcards">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <rect x="3" y="3" width="7" height="7" rx="1.5"></rect>
+                          <rect x="14" y="3" width="7" height="7" rx="1.5"></rect>
+                          <rect x="3" y="14" width="7" height="7" rx="1.5"></rect>
+                          <rect x="14" y="14" width="7" height="7" rx="1.5"></rect>
+                        </svg>
+                      </button>
+                      <button class="btn-icon flashcard-settings-shortcut" id="btn-open-review-settings" type="button" title="Ajustes de repaso" aria-label="Abrir ajustes de repaso">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <rect x="2.5" y="7" width="19" height="10" rx="4"></rect>
+                          <path d="M7 12h4M9 10v4M15.5 11h.01M18 13h.01"></path>
+                        </svg>
+                      </button>
+                      <button class="btn-icon flashcard-settings-shortcut" id="btn-open-pomodoro-settings" type="button" title="Ajustes de Pomodoro" aria-label="Abrir ajustes de Pomodoro">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                          <circle cx="12" cy="13" r="8"></circle>
+                          <path d="M12 9v4l2.5 2.5M9 2h6"></path>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 </div>
                 <div class="card-source-tag">
                   <span id="card-source">Origen: General</span>
                   <span class="fsrs-stats-badge" id="card-fsrs-badge">S: 0.4d • D: 5.0</span>
                 </div>
                 <div class="flashcard-content">
+                  <div class="flashcard-parent-context" id="card-parent-context" hidden></div>
                   <div class="card-question markdown-rendered" id="card-question">Cargando preguntas de tus notas...</div>
 
                   <div class="card-answer markdown-rendered" id="card-answer">
@@ -882,6 +852,10 @@
                   <div class="pomodoro-actions">
                     <button class="btn-primary" id="btn-pomodoro-toggle" type="button">Iniciar</button>
                     <button class="font-option-btn" id="btn-pomodoro-reset" type="button">Reiniciar</button>
+                  </div>
+                  <div class="pomodoro-mode-actions" role="group" aria-label="Cambiar el modo del Pomodoro">
+                    <button class="font-option-btn" id="btn-pomodoro-short-break" type="button">Descanso corto</button>
+                    <button class="font-option-btn" id="btn-pomodoro-long-break" type="button">Descanso largo</button>
                   </div>
                 </section>
                 <section class="focus-panel focus-stats">
@@ -941,6 +915,164 @@
         <section class="view-panel" id="view-graph">
           <div class="graph-container">
             <canvas id="graph-canvas"></canvas>
+            <div class="graph-top-actions">
+            <button
+              class="graph-settings-toggle"
+              id="btn-toggle-graph-settings"
+              type="button"
+              aria-expanded="false"
+              aria-controls="graph-settings-panel"
+              title="Ajustes del grafo"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              <span>Ajustes</span>
+            </button>
+            <button
+              class="graph-settings-toggle"
+              id="btn-graph-show-all"
+              type="button"
+              title="Mostrar todas las notas del grafo"
+              aria-label="Mostrar todas las notas del grafo"
+              hidden
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="6" cy="6" r="2.5"></circle>
+                <circle cx="18" cy="6" r="2.5"></circle>
+                <circle cx="12" cy="18" r="2.5"></circle>
+                <path d="M8.2 7.2 10.8 16M15.8 7.2 13.2 16M8.5 6h7"></path>
+              </svg>
+              <span id="graph-neighborhood-label">Ver todo el grafo</span>
+            </button>
+            </div>
+            <aside
+              class="graph-toolbar"
+              id="graph-settings-panel"
+              aria-label="Ajustes del grafo"
+              hidden
+            >
+              <header class="graph-toolbar-header">
+                <h3>Ajustes del grafo</h3>
+                <button
+                  class="graph-toolbar-close"
+                  id="btn-close-graph-settings"
+                  type="button"
+                  aria-label="Cerrar ajustes del grafo"
+                >×</button>
+              </header>
+              <div class="graph-toolbar-body">
+              <div class="settings-section-title">Grupos de color por nombre</div>
+              <p class="settings-help">
+                Pinta los nodos cuyo título contenga el texto indicado. La regla más
+                específica (texto más largo) tiene prioridad y los colores manuales
+                de cada nota siguen por encima de los grupos.
+              </p>
+              <div class="sync-box">
+                <div class="graph-color-rules" id="graph-color-rules"></div>
+                <div class="graph-color-rule-add">
+                  <input
+                    id="graph-rule-name"
+                    type="text"
+                    placeholder="Texto del nombre (ej. Diario, Proyecto…)"
+                    aria-label="Texto del nombre para el grupo de color"
+                  />
+                  <input
+                    id="graph-rule-color"
+                    type="color"
+                    value="#3b82f6"
+                    aria-label="Color del grupo"
+                  />
+                  <button class="font-option-btn" id="btn-add-graph-color-rule" type="button">
+                    Añadir grupo
+                  </button>
+                </div>
+              </div>
+
+              <div class="settings-section-title">Fuerzas de la simulación</div>
+              <div class="sync-box graph-settings-box">
+                <label class="graph-range-control" for="graph-repulsion">
+                  <span>Repulsión</span>
+                  <input id="graph-repulsion" type="range" min="100" max="1500" step="50" value="600" />
+                  <output id="graph-repulsion-value" for="graph-repulsion">600</output>
+                </label>
+                <label class="graph-range-control" for="graph-link-strength">
+                  <span>Fuerza de enlaces</span>
+                  <input id="graph-link-strength" type="range" min="0.05" max="1.5" step="0.05" value="0.55" />
+                  <output id="graph-link-strength-value" for="graph-link-strength">0.55</output>
+                </label>
+                <label class="graph-range-control" for="graph-link-distance">
+                  <span>Distancia de enlaces</span>
+                  <input id="graph-link-distance" type="range" min="40" max="220" step="5" value="100" />
+                  <output id="graph-link-distance-value" for="graph-link-distance">100 px</output>
+                </label>
+                <label class="graph-range-control" for="graph-center-strength">
+                  <span>Atracción al centro</span>
+                  <input id="graph-center-strength" type="range" min="0" max="0.05" step="0.001" value="0.006" />
+                  <output id="graph-center-strength-value" for="graph-center-strength">0.006</output>
+                </label>
+                <label class="graph-range-control" for="graph-collision-strength">
+                  <span>Fuerza de colisión</span>
+                  <input id="graph-collision-strength" type="range" min="0" max="2" step="0.1" value="1" />
+                  <output id="graph-collision-strength-value" for="graph-collision-strength">1.0</output>
+                </label>
+                <label class="graph-range-control" for="graph-velocity-decay">
+                  <span>Amortiguación</span>
+                  <input id="graph-velocity-decay" type="range" min="0.1" max="0.9" step="0.05" value="0.5" />
+                  <output id="graph-velocity-decay-value" for="graph-velocity-decay">0.50</output>
+                </label>
+              </div>
+
+              <div class="settings-section-title">Tamaño de los nodos</div>
+              <div class="sync-box graph-settings-box">
+                <label class="graph-range-control" for="graph-node-base">
+                  <span>Radio base</span>
+                  <input id="graph-node-base" type="range" min="2" max="12" step="0.5" value="5" />
+                  <output id="graph-node-base-value" for="graph-node-base">5.0 px</output>
+                </label>
+                <label class="graph-range-control" for="graph-node-connections">
+                  <span>Radio por conexión</span>
+                  <input id="graph-node-connections" type="range" min="0" max="3" step="0.1" value="0" />
+                  <output id="graph-node-connections-value" for="graph-node-connections">0.0 px</output>
+                </label>
+                <label class="graph-range-control" for="graph-node-max">
+                  <span>Radio máximo</span>
+                  <input id="graph-node-max" type="range" min="6" max="30" step="1" value="14" />
+                  <output id="graph-node-max-value" for="graph-node-max">14 px</output>
+                </label>
+              </div>
+
+              <div class="settings-section-title">Líneas y títulos</div>
+              <div class="sync-box graph-settings-box">
+                <label class="graph-range-control" for="graph-link-width">
+                  <span>Grosor de enlaces</span>
+                  <input id="graph-link-width" type="range" min="0.5" max="4" step="0.1" value="1" />
+                  <output id="graph-link-width-value" for="graph-link-width">1.0 px</output>
+                </label>
+                <label class="graph-range-control" for="graph-link-highlight-width">
+                  <span>Grosor resaltado</span>
+                  <input id="graph-link-highlight-width" type="range" min="1" max="8" step="0.5" value="2" />
+                  <output id="graph-link-highlight-width-value" for="graph-link-highlight-width">2.0 px</output>
+                </label>
+                <label class="graph-range-control" for="graph-label-zoom">
+                  <span>Zoom para mostrar títulos</span>
+                  <input id="graph-label-zoom" type="range" min="1" max="4" step="0.1" value="2" />
+                  <output id="graph-label-zoom-value" for="graph-label-zoom">2.00×</output>
+                </label>
+                <p class="settings-help" style="margin: 0;">
+                  Los títulos aparecen con fundido al acercar hasta este zoom;
+                  al pasar el cursor o seleccionar un nodo se muestran siempre.
+                </p>
+              </div>
+
+              <div class="advanced-actions">
+                <button class="font-option-btn" id="btn-reset-graph-settings" type="button">
+                  Restablecer valores del grafo
+                </button>
+              </div>
+              </div>
+            </aside>
             <div class="graph-legend">
               Haz clic en un nodo para ver su contenido · Arrastra para mover · Doble clic para restablecer
             </div>
@@ -1042,14 +1174,47 @@
                 </select>
               </div>
             </div>
-            <table class="all-pages-table">
+            <table class="all-pages-table" id="all-pages-table">
+              <colgroup>
+                <col data-col="title" />
+                <col data-col="blocks" />
+                <col data-col="kind" />
+                <col data-col="created" />
+                <col data-col="updated" />
+                <col data-col="actions" />
+              </colgroup>
               <thead>
                 <tr>
-                  <th>Título de Página</th>
-                  <th>Bloques</th>
-                  <th>Tipo</th>
-                  <th>Última Actualización</th>
-                  <th style="text-align: right;">Acciones</th>
+                  <th data-col="title" data-sort-key="title" aria-sort="none">
+                    <button class="all-pages-sort-button" type="button" data-sort-key="title">
+                      <span class="all-pages-sort-label">Título de Página</span> <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                    <span class="col-resizer" data-col="title" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Redimensionar columna Título"></span>
+                  </th>
+                  <th data-col="blocks">
+                    Bloques
+                    <span class="col-resizer" data-col="blocks" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Redimensionar columna Bloques"></span>
+                  </th>
+                  <th data-col="kind">
+                    Tipo
+                    <span class="col-resizer" data-col="kind" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Redimensionar columna Tipo"></span>
+                  </th>
+                  <th data-col="created" data-sort-key="created" aria-sort="none">
+                    <button class="all-pages-sort-button" type="button" data-sort-key="created">
+                      <span class="all-pages-sort-label">Creación</span> <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                    <span class="col-resizer" data-col="created" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Redimensionar columna Creación"></span>
+                  </th>
+                  <th data-col="updated" data-sort-key="updated" aria-sort="none">
+                    <button class="all-pages-sort-button" type="button" data-sort-key="updated">
+                      <span class="all-pages-sort-label">Última Actualización</span> <span class="sort-indicator" aria-hidden="true"></span>
+                    </button>
+                    <span class="col-resizer" data-col="updated" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Redimensionar columna Última actualización"></span>
+                  </th>
+                  <th data-col="actions" style="text-align: right;">
+                    Acciones
+                    <span class="col-resizer" data-col="actions" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Redimensionar columna Acciones"></span>
+                  </th>
                 </tr>
               </thead>
               <tbody id="all-pages-tbody">
@@ -1482,6 +1647,8 @@
     <!-- TOAST NOTIFICATION -->
     <div class="toast-notification" id="toast-notification">¡Mensaje del sistema!</div>
 
+    <!-- Capa de partículas para la recompensa de "Fácil" (T4). -->
+    <canvas id="celebration-canvas" aria-hidden="true"></canvas>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

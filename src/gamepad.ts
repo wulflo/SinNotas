@@ -158,6 +158,39 @@ export function firstConnectedGamepad(): Gamepad | null {
 }
 
 /**
+ * Índices de botón pulsados en un instante.
+ *
+ * En el estándar W3C los ejes 2 y 3 son el stick derecho (X/Y), no los
+ * gatillos: interpretarlos como LT/RT hacía que mover el stick derecho hacia
+ * la derecha o abajo calificara tarjetas. Los gatillos viven en `buttons[6]`
+ * y `buttons[7]`; solo en mandos no estándar se aceptan además como ejes 4/5.
+ */
+export function pressedButtonIndexes(
+  buttons: readonly GamepadButton[],
+  axes: readonly number[],
+  mapping: GamepadMappingType
+): Set<number> {
+  const pressed = new Set<number>();
+  buttons.forEach((button, index) => {
+    // `pressed` cubre botones digitales; los analógicos (gatillos) usan value.
+    if (button.pressed || button.value > 0.1) pressed.add(index);
+  });
+
+  if (mapping !== "standard") {
+    // Algunos mandos genéricos exponen los gatillos como ejes, normalmente
+    // con recorrido 0..1 (o -1..1 en reposo/pulsado).
+    const triggerValue = (axis: number | undefined): number => {
+      if (typeof axis !== "number" || !Number.isFinite(axis)) return 0;
+      return axis < 0 ? (axis + 1) / 2 : axis;
+    };
+    if (triggerValue(axes[4]) > 0.5) pressed.add(6);
+    if (triggerValue(axes[5]) > 0.5) pressed.add(7);
+  }
+
+  return pressed;
+}
+
+/**
  * Listener de pulsaciones con detección de flanco de subida:
  * cada botón se reporta una sola vez por pulsación, aunque se mantenga.
  */
@@ -196,21 +229,11 @@ export class GamepadListener {
       return;
     }
 
-    const currentlyPressed = new Set<number>();
-    gamepad.buttons.forEach((button, index) => {
-      // `pressed` cubre botones digitales; los analógicos (gatillos) usan value.
-      // Umbral bajo para que los gatillos (RT/LT) se reconozcan aunque no se
-      // pulsen a fondo.
-      if (button.pressed || button.value > 0.1) currentlyPressed.add(index);
-    });
-
-    // Algunos mandos genéricos exponen los gatillos como ejes en lugar de
-    // botones. Se mapean a los índices estándar 6 (LT) y 7 (RT).
-    const axes = gamepad.axes || [];
-    if (axes.length >= 3 && (axes[2] ?? 0) > 0.5) currentlyPressed.add(6);
-    if (axes.length >= 4 && (axes[3] ?? 0) > 0.5) currentlyPressed.add(7);
-    if (axes.length >= 5 && (axes[4] ?? 0) > 0.5) currentlyPressed.add(6);
-    if (axes.length >= 6 && (axes[5] ?? 0) > 0.5) currentlyPressed.add(7);
+    const currentlyPressed = pressedButtonIndexes(
+      gamepad.buttons,
+      gamepad.axes || [],
+      gamepad.mapping
+    );
 
     currentlyPressed.forEach((index) => {
       if (!this.previousPressed.has(index)) this.onPress(index, gamepad);

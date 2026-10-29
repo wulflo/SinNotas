@@ -14,6 +14,7 @@ import {
   type GraphSettings,
 } from "./graph-settings";
 import { labelAlphaForZoom } from "./graph-labels";
+import { activeFontFamily } from "../typography";
 
 const GRAPH_COLOR_PALETTE = ["#ef4444", "#22c55e", "#eab308", "#a855f7", "#f97316", "#ec4899", "#06b6d4", "#64748b"];
 
@@ -492,6 +493,11 @@ export class GraphView {
     }
   }
 
+  /** Fuerza un repintado (por ejemplo, tras cambiar la tipografía). */
+  public refresh(): void {
+    this.requestRender();
+  }
+
   public startSimulation() {
     if (this.simulationRunning) return;
     this.simulationRunning = true;
@@ -813,6 +819,7 @@ export class GraphView {
     ctx.setTransform(this.scale * this.dpr, 0, 0, this.scale * this.dpr, this.offsetX * this.dpr, this.offsetY * this.dpr);
 
     const isLight = document.documentElement.getAttribute("data-theme") === "light";
+    const fontFamily = activeFontFamily();
     const lineColor = isLight ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)";
     const lineHighlight = isLight ? "#2563eb" : "#61afef";
     const textColor = isLight ? "#1f2937" : "#e5e9f0";
@@ -906,8 +913,8 @@ export class GraphView {
       if (emphasized || labelAlpha > 0) {
         ctx.fillStyle = textColor;
         ctx.font = emphasized
-          ? `bold ${12 / this.scale}px Inter, sans-serif`
-          : `${11 / this.scale}px Inter, sans-serif`;
+          ? `bold ${12 / this.scale}px ${fontFamily}`
+          : `${11 / this.scale}px ${fontFamily}`;
         if (!emphasized) ctx.globalAlpha = labelAlpha;
         ctx.fillText(node.title, node.x, node.y + node.radius + 10 / this.scale);
         if (!emphasized) ctx.globalAlpha = 1;

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_FONT_SIZES,
   FONT_SIZE_DEFINITIONS,
+  activeFontFamily,
   applyFontSizes,
+  applyStoredFontFamily,
   clampFontSize,
   fontSizeDefinition,
   mobileFontScale,
@@ -127,6 +129,41 @@ describe("typography", () => {
     expect(fontSizeDefinition("flashcardText").cssVariable).toBe(
       "--ls-flashcard-text-em"
     );
+  });
+
+  it("resuelve la familia activa y aplica la tipografía guardada", () => {
+    expect(activeFontFamily({ fontFamily: '  Georgia, serif  ' })).toBe("Georgia, serif");
+    expect(activeFontFamily({ fontFamily: "" })).toBe("system-ui, sans-serif");
+    expect(activeFontFamily(null)).toBe("system-ui, sans-serif");
+
+    const attributes = new Map<string, string>();
+    const properties = new Map<string, string>();
+    const target = {
+      setAttribute: (name: string, value: string) => attributes.set(name, value),
+      style: {
+        setProperty: (property: string, value: string) => properties.set(property, value),
+        removeProperty: (property: string) => {
+          properties.delete(property);
+          return "";
+        },
+      },
+    };
+
+    const storage = memoryStorage({ "sinnotas-font": "serif" });
+    expect(applyStoredFontFamily(target, storage)).toBe("serif");
+    expect(attributes.get("data-font")).toBe("serif");
+
+    storage.setItem("sinnotas-font", "system");
+    storage.setItem("sinnotas-system-font", "Atkinson Hyperlegible");
+    expect(applyStoredFontFamily(target, storage)).toBe("system");
+    expect(properties.get("--ls-system-font")).toContain("Atkinson Hyperlegible");
+
+    storage.removeItem("sinnotas-system-font");
+    applyStoredFontFamily(target, storage);
+    expect(properties.has("--ls-system-font")).toBe(false);
+
+    storage.setItem("sinnotas-font", "desconocida");
+    expect(applyStoredFontFamily(target, storage)).toBe("sans");
   });
 
   it("derives a bounded mobile scale from the interface size", () => {

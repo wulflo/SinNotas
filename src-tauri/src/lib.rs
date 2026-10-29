@@ -732,6 +732,14 @@ pub struct PageData {
     pub is_journal: bool,
     #[serde(default)]
     pub journal_date: Option<String>,
+    /// Última modificación en milisegundos Unix. Se expone para que "Todas
+    /// las páginas" muestre la fecha real sin depender del reloj del frontend.
+    #[serde(default)]
+    pub updated_at_ms: Option<i64>,
+    /// Creación en milisegundos Unix (birthtime; si el FS no lo soporta se
+    /// usa la modificación como aproximación).
+    #[serde(default)]
+    pub created_at_ms: Option<i64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1704,6 +1712,7 @@ fn scan_vault(root: &Path) -> Result<(Vec<PageData>, Vec<SkippedEntry>), String>
         path.hash(&mut hasher);
         let (frontmatter, blocks) = parse_markdown_with_frontmatter(&content);
         let journal_date = journal_date_from_path(path);
+        let (updated_at_ms, created_at_ms) = metadata_times(&metadata);
         pages.push(PageData {
             id: format!("p-{:x}", hasher.finish()),
             title,
@@ -1712,9 +1721,26 @@ fn scan_vault(root: &Path) -> Result<(Vec<PageData>, Vec<SkippedEntry>), String>
             blocks,
             is_journal: journal_date.is_some(),
             journal_date,
+            updated_at_ms,
+            created_at_ms,
         });
     }
     Ok((pages, skipped))
+}
+
+/// Convierte un `SystemTime` (de `modified()`/`created()`) a milisegundos Unix.
+fn system_time_ms(time: std::io::Result<SystemTime>) -> Option<i64> {
+    time.ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as i64)
+}
+
+/// Fechas de un archivo: modificación real y creación con fallback a la
+/// modificación cuando el sistema de archivos no expone birthtime.
+fn metadata_times(metadata: &fs::Metadata) -> (Option<i64>, Option<i64>) {
+    let updated = system_time_ms(metadata.modified());
+    let created = system_time_ms(metadata.created()).or(updated);
+    (updated, created)
 }
 
 fn now_millis() -> Result<i64, String> {
@@ -3092,7 +3118,11 @@ async fn load_vault(
         let mut skipped = Vec::new();
 
         for note in notes {
-            let NoteEntry { relative_path, .. } = note;
+            let NoteEntry {
+                relative_path,
+                modified: note_modified_ms,
+                ..
+            } = note;
             let content = match storage.read_note(&relative_path).await {
                 Ok(content) => content,
                 Err(error) => {
@@ -3135,6 +3165,10 @@ async fn load_vault(
                 blocks,
                 is_journal: journal_date.is_some(),
                 journal_date,
+                // SAF solo garantiza la modificación; sin birthtime la
+                // creación queda como aproximación a la modificación.
+                updated_at_ms: (note_modified_ms > 0).then_some(note_modified_ms),
+                created_at_ms: None,
             });
         }
 
@@ -3383,6 +3417,12 @@ async fn read_page(
         .unwrap_or("Untitled")
         .to_string();
     let journal_date = journal_date_from_relative_path(&file_path);
+    let updated_at_ms = storage
+        .note_metadata(&file_path)
+        .await
+        .ok()
+        .map(|metadata| metadata.modified)
+        .filter(|modified| *modified > 0);
 
     Ok(PageData {
         id: format!("p-{}", title),
@@ -3392,6 +3432,10 @@ async fn read_page(
         blocks,
         is_journal: journal_date.is_some(),
         journal_date,
+        updated_at_ms,
+        // El storage (incluido SAF) no expone birthtime en esta ruta; la UI
+        // usa la fecha del diario o la aproximación de modificación.
+        created_at_ms: None,
     })
 }
 

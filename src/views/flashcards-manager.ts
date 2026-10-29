@@ -1,5 +1,4 @@
 import { Flashcard, PageData, BlockNode, FlashcardType, ImageOcclusionRegion } from "../types";
-import { getAllBlocksFlat } from "../editor/tree-engine";
 import { CardState, FSRSEngine, FSRSItem, FSRSRating } from "../editor/fsrs";
 import {
   isSystemPropertyLine,
@@ -587,9 +586,19 @@ export class FlashcardsManager {
     const detected: Flashcard[] = [];
 
     pages.forEach((page) => {
-      const allBlocks = getAllBlocksFlat(page.blocks);
+      // Se recorre el árbol con el padre inmediato a mano para poder mostrar
+      // el bullet que da contexto a la tarjeta (T16). `getAllBlocksFlat` no
+      // conserva esa relación y por eso no sirve aquí.
+      const allBlocks: Array<{ block: BlockNode; parent: BlockNode | null }> = [];
+      const walk = (nodes: BlockNode[], parent: BlockNode | null): void => {
+        nodes.forEach((node) => {
+          allBlocks.push({ block: node, parent });
+          if (node.children.length > 0) walk(node.children, node);
+        });
+      };
+      walk(page.blocks, null);
 
-      allBlocks.forEach((block) => {
+      allBlocks.forEach(({ block, parent }) => {
         const rawContent = stripSystemProperties(block.content).trim();
 
         const imageOcclusions = this.parseImageOcclusions(block.content);
@@ -598,6 +607,7 @@ export class FlashcardsManager {
         const hasAnkiCloze = /\{\{(?:c\d+::|cloze\s+)?(.*?)\}\}/i.test(rawContent);
         const hasMdCloze = /==(.*?)==/.test(rawContent);
         const createdAt = this.parseCreatedAt(block.content);
+        const parentContent = this.describeParentBlock(parent);
 
         imageOcclusions.forEach((region, index) => {
           detected.push({
@@ -615,6 +625,7 @@ export class FlashcardsManager {
             imageSource: region.source,
             imageOcclusion: region,
             imageOcclusions,
+            parentContent,
           });
         });
 
@@ -646,6 +657,7 @@ export class FlashcardsManager {
             easeFactor: this.parseEaseFactor(block.content),
             createdAt,
             dueDate: this.parseDueDate(block.content),
+            parentContent,
           });
         }
         // B. BASIC CARD (:: or #card)
@@ -685,6 +697,7 @@ export class FlashcardsManager {
               easeFactor: this.parseEaseFactor(block.content),
               createdAt,
               dueDate: this.parseDueDate(block.content),
+              parentContent,
             });
           }
         }
@@ -720,6 +733,51 @@ export class FlashcardsManager {
         this.isAnswerRevealed = preserve.revealed;
       }
     }
+  }
+
+  /**
+   * Texto breve del bullet padre para dar contexto a una tarjeta. Se ignoran
+   * imágenes (no aportan texto legible), las propiedades del sistema y la
+   * respuesta de una tarjeta padre (`::`). Devuelve undefined si no queda nada
+   * útil, para que la interfaz no muestre una línea vacía.
+   */
+  private describeParentBlock(parent: BlockNode | null): string | undefined {
+    if (!parent || parent.type === "image") return undefined;
+    const raw = stripSystemProperties(parent.content).trim();
+    if (!raw) return undefined;
+    const prompt = stripCardTag(stripTaskStatus(raw)).split("::", 1)[0].trim();
+    if (!prompt) return undefined;
+    // Markdown básico a texto plano: la interfaz lo pinta con textContent.
+    const plain = prompt
+      .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .replace(/[`*_~>#]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!plain) return undefined;
+    return plain.length > 180 ? `${plain.slice(0, 177).trimEnd()}…` : plain;
+  }
+
+  /**
+   * Reconstruye la cola con las tarjetas que vencen ahora mismo, respetando el
+   * filtro de notas y el modo Aprendizaje. La usa la vista al terminar una
+   * sesión: si alguna tarjeta programada ya venció (por ejemplo, un "Otra vez"
+   * con paso corto), se continúa sin reiniciar a mano (T23).
+   */
+  public refreshDueQueue(order: FlashcardReviewOrder = "new-first"): number {
+    this.applyPageFilter(order);
+    return this.reviewCards.length;
+  }
+
+  /** Número de tarjetas que entrarían en la cola si se reconstruyera ahora. */
+  public countDueCards(): number {
+    const filtered = this.allowedPages
+      ? this.allCards.filter((card) => this.allowedPages!.has(card.pageTitle))
+      : this.allCards;
+    const sessionCards = this.includeAllCards
+      ? filtered
+      : filtered.filter((card) => this.isDue(card, new Date()));
+    return sessionCards.length;
   }
 
   public scanVault(

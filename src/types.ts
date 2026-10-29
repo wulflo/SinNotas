@@ -64,6 +64,10 @@ export interface PageData {
   isJournal?: boolean;
   journalDate?: string; // YYYY-MM-DD
   updatedAt?: string;
+  /** Última modificación en ms Unix (enviada por Rust; más fiable que el string). */
+  updatedAtMs?: number;
+  /** Creación en ms Unix (birthtime o aproximación por modificación). */
+  createdAtMs?: number;
   revisions?: PageRevision[];
   pinned?: boolean;
   pinnedAt?: string;
@@ -110,6 +114,8 @@ export interface Flashcard {
   imageSource?: string;
   imageOcclusion?: ImageOcclusionRegion;
   imageOcclusions?: ImageOcclusionRegion[];
+  /** Texto del bullet padre, solo como contexto visual de la tarjeta. */
+  parentContent?: string;
   /** Texto plano normalizado para la búsqueda del explorador (no se persiste). */
   searchText?: string;
 }

@@ -65,6 +65,58 @@ export function fold(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
 }
 
+/**
+ * Convierte una coincidencia del texto plegado de nuevo a un rango del texto
+ * original. `fold` puede cambiar longitudes (NFD separa acentos), así que se
+ * construye un mapa carácter a carácter. Cuando hay consulta se prefiere la
+ * aparición más cercana al índice plegado: eso resuelve también diferencias
+ * por prefijos TODO o formato Markdown que el editor no muestra.
+ */
+export function locateMatch(
+  text: string,
+  query: string,
+  foldedIndex: number,
+  foldedLength: number
+): { start: number; end: number } | null {
+  const foldedQuery = query ? fold(query) : "";
+
+  if (foldedQuery) {
+    let folded = "";
+    const positions: number[] = [];
+    for (let index = 0; index < text.length; index += 1) {
+      const piece = fold(text[index]);
+      for (const char of piece) {
+        folded += char;
+        positions.push(index);
+      }
+    }
+
+    let best = folded.indexOf(foldedQuery);
+    let bestDistance = Number.POSITIVE_INFINITY;
+    let candidate = best;
+    while (candidate !== -1) {
+      const distance = Math.abs(candidate - foldedIndex);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = candidate;
+      }
+      candidate = folded.indexOf(foldedQuery, candidate + foldedQuery.length);
+    }
+
+    if (best >= 0) {
+      const start = positions[best];
+      const end = positions[best + foldedQuery.length - 1] + 1;
+      if (start !== undefined && end > start) return { start, end };
+    }
+  }
+
+  // Sin consulta fiable, el índice plegado solo sirve si mapea 1:1.
+  if (fold(text).length !== text.length) return null;
+  const start = Math.max(0, Math.min(foldedIndex, text.length));
+  const end = Math.max(start, Math.min(foldedIndex + foldedLength, text.length));
+  return end > start ? { start, end } : null;
+}
+
 interface BlockEntry {
   page: PageData;
   block: BlockNode;

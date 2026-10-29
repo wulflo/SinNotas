@@ -5,6 +5,7 @@ import {
   buildSnippet,
   collectTextBlocks,
   fold,
+  locateMatch,
   visibleBlockText,
 } from "./content-search";
 
@@ -200,5 +201,39 @@ describe("content-search - rendimiento (sin umbral, solo registro)", () => {
     console.info(
       `[content-search] 2000 páginas × 30 bloques (60000 bloques): update ${buildMs.toFixed(0)}ms, search ${searchMs.toFixed(1)}ms`
     );
+  });
+});
+
+
+describe("content-search - rango de la coincidencia (T15)", () => {
+  it("devuelve el índice directo cuando el plegado conserva la longitud", () => {
+    const text = "La estabilidad del algoritmo";
+    const folded = fold(text);
+    const index = folded.indexOf("estabilidad");
+    expect(locateMatch(text, "estabilidad", index, "estabilidad".length)).toEqual({
+      start: index,
+      end: index + "estabilidad".length,
+    });
+  });
+
+  it("mapea acentos aunque NFD cambie la longitud", () => {
+    const text = "Una página con acentos";
+    const folded = fold(text);
+    const index = folded.indexOf("pagina");
+    const range = locateMatch(text, "pagina", index, "pagina".length);
+    expect(range).not.toBeNull();
+    expect(text.slice(range!.start, range!.end)).toBe("página");
+  });
+
+  it("elige la aparición más cercana al índice original", () => {
+    const text = "gato perro gato";
+    const folded = fold(text);
+    const second = folded.lastIndexOf("gato");
+    const range = locateMatch(text, "gato", second, 4);
+    expect(range).toEqual({ start: second, end: second + 4 });
+  });
+
+  it("devuelve null si no puede mapear sin consulta", () => {
+    expect(locateMatch("a\u0301bc", "", 1, 2)).toBeNull();
   });
 });

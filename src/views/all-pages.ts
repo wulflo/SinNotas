@@ -38,6 +38,40 @@ export function parseAllPagesSort(value: unknown): {
 export type AllPagesTitleResolver = (page: PageData) => string;
 
 /**
+ * Ciclo de ordenación al pulsar una cabecera: la misma columna alterna
+ * asc/desc; una columna nueva empieza en ascendente. Así el clic es
+ * predecible y no depende del `<select>`.
+ */
+export function nextAllPagesSort(
+  current: AllPagesSort,
+  key: AllPagesSortKey
+): AllPagesSort {
+  const { key: currentKey, direction } = parseAllPagesSort(current);
+  const nextDirection: AllPagesSortDirection =
+    currentKey === key && direction === "asc" ? "desc" : "asc";
+  return `${key}-${nextDirection}` as AllPagesSort;
+}
+
+/**
+ * Formatea una marca Unix en ms con el idioma activo. `—` cuando no hay dato
+ * (nunca se inventa una fecha: antes se mostraba "Reciente" para todo).
+ */
+export function formatPageDate(
+  ms: number | null | undefined,
+  locale?: string
+): string {
+  if (typeof ms !== "number" || !Number.isFinite(ms)) return "—";
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(ms));
+  } catch {
+    return "—";
+  }
+}
+
+/**
  * Filtra por título visible. El plegado ignora mayúsculas y acentos, así que
  * "pagina" encuentra "Página". Cada palabra de la consulta debe aparecer en el
  * título visible, el título interno o la ruta (útil para diarios). El orden de
@@ -63,6 +97,32 @@ function timestampOf(value: string | undefined): number | null {
   const withTimeSeparator = value.includes("T") ? value : value.replace(" ", "T");
   const parsed = Date.parse(withTimeSeparator);
   return Number.isNaN(parsed) ? null : parsed;
+}
+
+/**
+ * Fecha de última modificación en ms. Prefiere la marca que envía Rust
+ * (`updatedAtMs`, con resolución de milisegundos) y cae al string ISO del modo
+ * web/demo. Devuelve `null` cuando no hay dato.
+ */
+export function pageUpdatedMs(page: PageData): number | null {
+  if (typeof page.updatedAtMs === "number" && Number.isFinite(page.updatedAtMs)) {
+    return page.updatedAtMs;
+  }
+  return timestampOf(page.updatedAt);
+}
+
+/**
+ * Fecha de creación en ms. Prefiere `createdAtMs` del backend; si falta usa el
+ * resolutor inyectado (que conoce los diarios y la caché de `read_note_created_times`).
+ */
+export function pageCreatedMs(
+  page: PageData,
+  createdAtOf: (page: PageData) => number | null
+): number | null {
+  if (typeof page.createdAtMs === "number" && Number.isFinite(page.createdAtMs)) {
+    return page.createdAtMs;
+  }
+  return createdAtOf(page);
 }
 
 /** Compara dos valores donde `null` significa "dato desconocido" y va al final. */
@@ -100,14 +160,14 @@ export function sortAllPages(
       if (direction === "desc") result = -result;
     } else if (key === "created") {
       result = compareOptionalNumbers(
-        createdAtOf(left),
-        createdAtOf(right),
+        pageCreatedMs(left, createdAtOf),
+        pageCreatedMs(right, createdAtOf),
         direction
       );
     } else {
       result = compareOptionalNumbers(
-        timestampOf(left.updatedAt),
-        timestampOf(right.updatedAt),
+        pageUpdatedMs(left),
+        pageUpdatedMs(right),
         direction
       );
     }

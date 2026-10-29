@@ -828,7 +828,9 @@ input[type="checkbox"] {
 
 .all-pages-table {
   border-spacing: 0 6px;
-  table-layout: auto;
+  /* El título se recorta dentro del ancho disponible; los anchos de columna
+     los controla el `<colgroup>` (ver `style.css`). */
+  table-layout: fixed;
 }
 
 .all-pages-table th {
@@ -840,12 +842,8 @@ input[type="checkbox"] {
   white-space: nowrap;
 }
 
-.all-pages-table th:first-child {
-  width: 42%;
-}
-
 .all-pages-table .page-link-cell {
-  min-width: 180px;
+  min-width: 0;
   white-space: nowrap;
 }
 

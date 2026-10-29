@@ -67,12 +67,15 @@ import {
   type DeckTree,
 } from "./views/flashcard-decks";
 import { ReviewProgressStore, type ReviewProgressEvent } from "./store/review-progress";
+import { collectOutgoingLinks } from "./store/wikilinks";
+import { connectedPageTitles } from "./views/graph-neighborhood";
 import { selectSidebarPages } from "./store/sidebar-selection";
 import {
   ContentSearchIndex,
   buildSnippet,
   visibleBlockText,
   fold,
+  locateMatch,
   type ContentHit,
 } from "./store/content-search";
 import { readImage as readClipboardImage, readText as readClipboardText } from "@tauri-apps/plugin-clipboard-manager";
@@ -99,9 +102,14 @@ import { FlashcardLoader, type FlashcardLoadProgress } from "./views/flashcard-l
 import { KanbanManager } from "./views/kanban-view";
 import {
   filterAllPages,
+  formatPageDate,
   isAllPagesSort,
+  nextAllPagesSort,
+  pageCreatedMs,
+  pageUpdatedMs,
   sortAllPages,
   type AllPagesSort,
+  type AllPagesSortKey,
 } from "./views/all-pages";
 import { VirtualList } from "./views/virtual-list";
 import { ConceptMapView } from "./views/concept-map-view";
@@ -116,6 +124,7 @@ import {
 import { renderMarkdownToHtml, sanitizeHtml, stripCardTag, stripSystemProperties } from "./editor/markdown";
 import { isAllowedRemoteImageUrl } from "./editor/url-safety";
 import { sanitizePastedHtmlToMarkdown } from "./editor/paste-sanitizer";
+import { findMatchesInBlocks, type NoteMatch } from "./editor/note-search";
 import {
   editMarkdownTable,
   escapeTableCell,
@@ -327,6 +336,9 @@ const flashcardsManager = new FlashcardsManager();
 const flashcardLoader = new FlashcardLoader(flashcardsManager);
 let desktopReady = false;
 let flashcardLoading = false;
+/** Evita re-renderizar la pantalla de "completado" en cada tick. */
+let flashcardDueRecheckTimer: number | null = null;
+const FLASHCARD_DUE_RECHECK_MS = 30_000;
 /** Diario compartido en .sinnotas/progress/reviews.json para deshacer repasos. */
 const reviewProgress = new ReviewProgressStore();
 let reviewHistoryActionInFlight = false;
@@ -431,6 +443,17 @@ let flashcardPagesCreatedTimesInFlight = false;
 const kanbanManager = new KanbanManager();
 let graphView: GraphView | null = null;
 let graphDataVersion = -1;
+/** Título cuya vecindad se está mostrando; null = grafo completo. */
+let graphNeighborhoodOrigin: string | null = null;
+let graphRenderedNeighborhood: string | null = null;
+const btnGraphNeighborhood = document.getElementById(
+  "btn-graph-neighborhood"
+) as HTMLButtonElement | null;
+const btnGraphShowAll = document.getElementById("btn-graph-show-all") as HTMLButtonElement | null;
+const graphNeighborhoodLabel = document.getElementById(
+  "graph-neighborhood-label"
+) as HTMLSpanElement | null;
+
 let graphPreviewPageTitle: string | null = null;
 let graphPreviewTransitionTimer: number | null = null;
 let journalCalendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -461,6 +484,7 @@ const accentColors = [
   "indigo",
   "orange",
   "fuchsia",
+  "gray",
 ] as const;
 type AccentColor = (typeof accentColors)[number];
 let selectedImageOcclusionIndex: number | null = null;
@@ -473,7 +497,11 @@ let pomodoroLongBreakMinutes = 15;
 let pomodoroSessionsBeforeLongBreak = 4;
 let pomodoroCompletedFocusSessions = 0;
 let pomodoroIsLongBreak = false;
+// Distingue una pausa real del estado inicial/detenido para pintar la píldora.
+let pomodoroPaused = false;
 let pomodoroHeadbarVisible = true;
+let pomodoroSoundEnabled = true;
+let pomodoroAudioContextRef: AudioContext | null = null;
 interface FlashcardProgressStats {
   date: string;
   reviewsToday: number;
@@ -526,13 +554,40 @@ let sidebarContextPageTitle: string | null = null;
 const blocksContainer = document.getElementById("blocks-container") as HTMLDivElement;
 const backlinksContainer = document.getElementById("backlinks-list") as HTMLDivElement;
 const refCountBadge = document.getElementById("ref-count") as HTMLSpanElement;
+const outgoingLinksContainer = document.getElementById("outgoing-links-list") as HTMLDivElement | null;
+const outgoingCountBadge = document.getElementById("outgoing-count") as HTMLSpanElement | null;
 const sidebarLeft = document.getElementById("sidebar-left") as HTMLElement;
 const sidebarPagesList = document.getElementById("sidebar-pages-list") as HTMLDivElement;
 const sidebarSearchInput = document.getElementById("sidebar-search-input") as HTMLInputElement;
 const searchResultsDropdown = document.getElementById("search-results-dropdown") as HTMLDivElement;
 const pageTitleHeading = document.getElementById("page-title-heading") as HTMLHeadingElement;
+const noteFindBar = document.getElementById("note-find-bar") as HTMLDivElement | null;
+const noteFindInput = document.getElementById("note-find-input") as HTMLInputElement | null;
+const noteFindCount = document.getElementById("note-find-count") as HTMLSpanElement | null;
+const btnNoteFindPrev = document.getElementById("btn-note-find-prev") as HTMLButtonElement | null;
+const btnNoteFindNext = document.getElementById("btn-note-find-next") as HTMLButtonElement | null;
+const btnNoteFindClose = document.getElementById("btn-note-find-close") as HTMLButtonElement | null;
+const btnSplitView = document.getElementById("btn-split-view") as HTMLButtonElement | null;
+const referencePane = document.getElementById("reference-pane") as HTMLElement | null;
+const referencePaneCount = document.getElementById("reference-pane-count") as HTMLSpanElement | null;
+const referenceSlots = document.getElementById("reference-slots") as HTMLDivElement | null;
+const btnAddReferencePane = document.getElementById("btn-add-reference-pane") as HTMLButtonElement | null;
+const btnCloseReferencePane = document.getElementById(
+  "btn-close-reference-pane"
+) as HTMLButtonElement | null;
 const pagePropertiesContainer = document.getElementById("page-properties-container") as HTMLDivElement;
 const headbarBreadcrumb = document.getElementById("headbar-breadcrumb") as HTMLDivElement;
+
+/**
+ * La barra superior solo tiene una línea: si el título es largo se recorta con
+ * puntos suspensivos (ver `.headbar-page-breadcrumb` en `style.css`) y el texto
+ * completo queda disponible en el tooltip.
+ */
+function setHeadbarTitle(title: string): void {
+  headbarBreadcrumb.innerText = title;
+  if (title) headbarBreadcrumb.title = title;
+  else headbarBreadcrumb.removeAttribute("title");
+}
 const completionProgress = document.getElementById("completion-progress") as HTMLDivElement;
 const btnAddBullet = document.getElementById("btn-add-bullet") as HTMLButtonElement;
 const contextMenu = document.getElementById("custom-context-menu") as HTMLDivElement;
@@ -594,14 +649,17 @@ const pomodoroClock = document.getElementById("pomodoro-clock") as HTMLDivElemen
 const pomodoroModeLabel = document.getElementById("pomodoro-mode") as HTMLSpanElement;
 const pomodoroToggle = document.getElementById("btn-pomodoro-toggle") as HTMLButtonElement;
 const pomodoroReset = document.getElementById("btn-pomodoro-reset") as HTMLButtonElement;
+const pomodoroShortBreak = document.getElementById("btn-pomodoro-short-break") as HTMLButtonElement | null;
+const pomodoroLongBreak = document.getElementById("btn-pomodoro-long-break") as HTMLButtonElement | null;
 const pomodoroFocusDurationInput = document.getElementById("pomodoro-focus-duration") as HTMLSelectElement;
 const pomodoroBreakDurationInput = document.getElementById("pomodoro-break-duration") as HTMLSelectElement;
 const pomodoroLongBreakDurationInput = document.getElementById("pomodoro-long-break-duration") as HTMLSelectElement;
 const pomodoroSessionsBeforeLongBreakInput = document.getElementById("pomodoro-sessions-before-long-break") as HTMLSelectElement;
 const pomodoroShowHeadbarInput = document.getElementById("pomodoro-show-headbar") as HTMLInputElement;
+const pomodoroSoundInput = document.getElementById("pomodoro-sound") as HTMLInputElement;
 const headbarPomodoro = document.getElementById("headbar-pomodoro") as HTMLDivElement;
-const headbarPomodoroClock = document.getElementById("headbar-pomodoro-clock") as HTMLSpanElement;
-const headbarPomodoroToggle = document.getElementById("headbar-pomodoro-toggle") as HTMLButtonElement;
+// El propio reloj es el botón de iniciar/pausar.
+const headbarPomodoroClock = document.getElementById("headbar-pomodoro-clock") as HTMLButtonElement;
 const flashcardKeyAgain = document.getElementById("flashcard-key-again") as HTMLInputElement;
 const flashcardKeyHard = document.getElementById("flashcard-key-hard") as HTMLInputElement;
 const flashcardKeyGood = document.getElementById("flashcard-key-good") as HTMLInputElement;
@@ -673,6 +731,12 @@ const flashcardPagesSearch = document.getElementById("flashcard-pages-search") a
 const flashcardPagesSort = document.getElementById("flashcard-pages-sort") as HTMLSelectElement | null;
 const flashcardTextSizeInput = document.getElementById("flashcard-text-size") as HTMLInputElement | null;
 const flashcardTextSizeValue = document.getElementById("flashcard-text-size-value") as HTMLOutputElement | null;
+const cardFontDecreaseButton = document.getElementById("btn-card-font-decrease") as HTMLButtonElement | null;
+const cardFontIncreaseButton = document.getElementById("btn-card-font-increase") as HTMLButtonElement | null;
+const cardFontSizeValue = document.getElementById("card-font-size-value") as HTMLOutputElement | null;
+const btnOpenFlashcardSettings = document.getElementById("btn-open-flashcard-settings") as HTMLButtonElement | null;
+const btnOpenReviewSettings = document.getElementById("btn-open-review-settings") as HTMLButtonElement | null;
+const btnOpenPomodoroSettings = document.getElementById("btn-open-pomodoro-settings") as HTMLButtonElement | null;
 // Snapshots (activados por nota, con historial en .sinnotas/chronos/)
 const snapshotStatusText = document.getElementById("snapshot-status-text") as HTMLSpanElement;
 const snapshotStateDot = document.getElementById("snapshot-state-dot") as HTMLSpanElement;
@@ -1145,11 +1209,13 @@ function initThemeAndTypography() {
   pomodoroLongBreakMinutes = Math.max(1, Math.min(120, savedLongBreakMinutes));
   pomodoroSessionsBeforeLongBreak = Math.max(1, Math.min(12, savedSessionsBeforeLongBreak));
   pomodoroHeadbarVisible = localStorage.getItem("sinnotas-pomodoro-headbar") !== "false";
+  pomodoroSoundEnabled = localStorage.getItem("sinnotas-pomodoro-sound") !== "false";
   setupPomodoroSelect(pomodoroFocusDurationInput, [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 90, 120], " min", pomodoroFocusMinutes);
   setupPomodoroSelect(pomodoroBreakDurationInput, [1, 3, 5, 10, 15, 20, 30, 45, 60], " min", pomodoroBreakMinutes);
   setupPomodoroSelect(pomodoroLongBreakDurationInput, [5, 10, 15, 20, 25, 30, 45, 60, 90, 120], " min", pomodoroLongBreakMinutes);
   setupPomodoroSelect(pomodoroSessionsBeforeLongBreakInput, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "", pomodoroSessionsBeforeLongBreak);
   pomodoroShowHeadbarInput.checked = pomodoroHeadbarVisible;
+  pomodoroSoundInput.checked = pomodoroSoundEnabled;
   pomodoroRemainingSeconds = pomodoroFocusMinutes * 60;
 
   flashcardKeyAgain.value = localStorage.getItem("sinnotas-flashcard-key-again") || "1";
@@ -1277,6 +1343,8 @@ function applySystemFont(fontFamily: string): void {
   settingsDropdownMenu.querySelectorAll<HTMLButtonElement>(".font-option-btn[data-font]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.font === "system");
   });
+  conceptMapView.refreshTypography();
+  graphView?.refresh();
 }
 
 function setTheme(isLight: boolean) {
@@ -1314,6 +1382,8 @@ function setFont(font: TypographyType) {
   settingsDropdownMenu.querySelectorAll<HTMLButtonElement>(".font-option-btn[data-font]").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.font === font);
   });
+  conceptMapView.refreshTypography();
+  graphView?.refresh();
 }
 
 function setPageWidth(value: number): void {
@@ -1427,6 +1497,57 @@ function initTypographySettings(): void {
 
 let graphSettingsUiReady = false;
 
+type FlashcardSettingsSection = "general" | "review" | "pomodoro";
+const FLASHCARD_SETTINGS_SECTION_KEY = "sinnotas-flashcard-settings-section";
+
+function isFlashcardSettingsSection(value: unknown): value is FlashcardSettingsSection {
+  return value === "general" || value === "review" || value === "pomodoro";
+}
+
+function readFlashcardSettingsSection(): FlashcardSettingsSection {
+  const stored = localStorage.getItem(FLASHCARD_SETTINGS_SECTION_KEY);
+  return isFlashcardSettingsSection(stored) ? stored : "general";
+}
+
+function switchFlashcardSettingsSection(
+  section: FlashcardSettingsSection,
+  persist = true
+): void {
+  settingsDropdownMenu
+    .querySelectorAll<HTMLButtonElement>("[data-flashcard-settings-section]")
+    .forEach((tab) => {
+      const selected = tab.dataset.flashcardSettingsSection === section;
+      tab.classList.toggle("active", selected);
+      tab.setAttribute("aria-selected", String(selected));
+    });
+  settingsDropdownMenu
+    .querySelectorAll<HTMLElement>("[data-flashcard-settings-content]")
+    .forEach((panel) => {
+      const selected = panel.dataset.flashcardSettingsContent === section;
+      panel.hidden = !selected;
+      panel.classList.toggle("active", selected);
+    });
+  if (persist) localStorage.setItem(FLASHCARD_SETTINGS_SECTION_KEY, section);
+}
+
+settingsDropdownMenu
+  .querySelectorAll<HTMLButtonElement>("[data-flashcard-settings-section]")
+  .forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const section = tab.dataset.flashcardSettingsSection;
+      if (isFlashcardSettingsSection(section)) switchFlashcardSettingsSection(section);
+    });
+  });
+
+switchFlashcardSettingsSection(readFlashcardSettingsSection(), false);
+
+/** Abre Ajustes directamente en la subsección de Flashcards indicada. */
+function openFlashcardSettings(section: FlashcardSettingsSection = "general"): void {
+  switchSettingsTab("flashcards");
+  switchFlashcardSettingsSection(section);
+  openSettingsOverlay();
+}
+
 function switchSettingsTab(tabName: string): void {
   settingsDropdownMenu.querySelectorAll<HTMLButtonElement>("[data-settings-tab]").forEach((tab) => {
     const selected = tab.dataset.settingsTab === tabName;
@@ -1450,9 +1571,6 @@ function switchSettingsTab(tabName: string): void {
   if (tabName === "appearance" && settingsOverlay.isConnected) {
     ensureSystemFontsLoaded();
   }
-  if (tabName === "graph" && graphSettingsUiReady) {
-    syncGraphSettingsUi();
-  }
 }
 
 settingsDropdownMenu.querySelectorAll<HTMLButtonElement>("[data-settings-tab]").forEach((tab) => {
@@ -1461,11 +1579,22 @@ settingsDropdownMenu.querySelectorAll<HTMLButtonElement>("[data-settings-tab]").
   });
 });
 
-const settingsTabNames = ["appearance", "flashcards", "graph", "saved", "review", "pomodoro", "advanced"];
+const settingsTabNames = ["appearance", "flashcards", "saved", "advanced"];
+// Las pestañas "Repaso" y "Pomodoro" ahora viven dentro de Flashcards, y
+// "Grafo" se movió a la propia vista de grafo. Si el usuario tenía una de
+// ellas seleccionada, se abre Flashcards en la subsección correspondiente.
 const storedSettingsTab = localStorage.getItem("sinnotas-settings-tab");
+if (storedSettingsTab === "graph") {
+  localStorage.setItem("sinnotas-settings-tab", "appearance");
+} else if (storedSettingsTab === "review" || storedSettingsTab === "pomodoro") {
+  localStorage.setItem("sinnotas-settings-tab", "flashcards");
+  localStorage.setItem(FLASHCARD_SETTINGS_SECTION_KEY, storedSettingsTab);
+  switchFlashcardSettingsSection(storedSettingsTab, false);
+}
+const initialSettingsTab = localStorage.getItem("sinnotas-settings-tab");
 switchSettingsTab(
-  storedSettingsTab && settingsTabNames.includes(storedSettingsTab)
-    ? storedSettingsTab
+  initialSettingsTab && settingsTabNames.includes(initialSettingsTab)
+    ? initialSettingsTab
     : "appearance"
 );
 
@@ -1481,12 +1610,31 @@ flashcardReviewOrderSelect.addEventListener("change", () => {
 });
 
 // Tamaño de texto de la tarjeta: 0.8em (mínimo) a 3em (máximo), 1em por defecto.
+function syncFlashcardSizeControls(): void {
+  const value = clampFontSize("flashcardText", currentFontSizes.flashcardText);
+  if (cardFontSizeValue) cardFontSizeValue.value = `${value} em`;
+  if (cardFontDecreaseButton) cardFontDecreaseButton.disabled = value <= 0.8;
+  if (cardFontIncreaseButton) cardFontIncreaseButton.disabled = value >= 3;
+}
+
+/** Ajusta el texto de la tarjeta con los botones − / + sin abrir Ajustes. */
+function nudgeFlashcardTextSize(delta: number): void {
+  const next = clampFontSize("flashcardText", currentFontSizes.flashcardText + delta);
+  if (next === currentFontSizes.flashcardText) return;
+  applyFlashcardTextSize(next);
+  if (currentView === "flashcards") updateFlashcardUI();
+}
+
 function applyFlashcardTextSize(value: number): void {
   const clamped = writeFontSize("flashcardText", value);
   currentFontSizes.flashcardText = clamped;
   applyFontSizes(currentFontSizes);
   if (flashcardTextSizeInput) flashcardTextSizeInput.value = String(clamped);
   if (flashcardTextSizeValue) flashcardTextSizeValue.value = `${clamped} em`;
+  syncFlashcardSizeControls();
+  // Mantiene el control de Apariencia en sintonía cuando el cambio viene de
+  // los botones − / + de la tarjeta (T13).
+  refreshFontSizeControls();
 }
 
 if (flashcardTextSizeInput && flashcardTextSizeValue) {
@@ -1499,6 +1647,14 @@ if (flashcardTextSizeInput && flashcardTextSizeValue) {
     if (currentView === "flashcards") updateFlashcardUI();
   });
 }
+syncFlashcardSizeControls();
+
+cardFontDecreaseButton?.addEventListener("click", () => nudgeFlashcardTextSize(-0.1));
+cardFontIncreaseButton?.addEventListener("click", () => nudgeFlashcardTextSize(0.1));
+
+btnOpenFlashcardSettings?.addEventListener("click", () => openFlashcardSettings("general"));
+btnOpenReviewSettings?.addEventListener("click", () => openFlashcardSettings("review"));
+btnOpenPomodoroSettings?.addEventListener("click", () => openFlashcardSettings("pomodoro"));
 
 /** Fecha de creación (ms) de una nota: diarios usan su journalDate; el resto
  * la birthtime del archivo pedida al backend. `undefined` = aún desconocida. */
@@ -1508,6 +1664,10 @@ function flashcardPageCreatedMs(page: PageData | undefined): number | null {
     return Number.isNaN(parsed) ? null : parsed;
   }
   if (!page) return null;
+  // El snapshot de Rust ya trae la creación: evita una invocación extra.
+  if (typeof page.createdAtMs === "number" && Number.isFinite(page.createdAtMs)) {
+    return page.createdAtMs;
+  }
   const root = vault.getActiveRootPath() ?? "";
   const cached = flashcardPagesCreatedTimes.get(`${root}\u0000${page.path}`);
   return cached === null || cached === undefined ? null : cached;
@@ -2327,6 +2487,14 @@ pomodoroShowHeadbarInput.addEventListener("change", () => {
   renderPomodoro();
 });
 
+pomodoroSoundInput.addEventListener("change", () => {
+  pomodoroSoundEnabled = pomodoroSoundInput.checked;
+  localStorage.setItem("sinnotas-pomodoro-sound", String(pomodoroSoundEnabled));
+  // Crear/reanudar el contexto dentro del gesto del usuario evita que el
+  // primer aviso quede bloqueado por la política de autoplay del WebView.
+  if (pomodoroSoundEnabled) void pomodoroAudio();
+});
+
 function clearBlockProperties(blocks: BlockNode[]): number {
   let removed = 0;
   blocks.forEach((block) => {
@@ -2740,12 +2908,40 @@ historyModalOverlay.addEventListener("click", (event) => {
 });
 
 /* ==================== CONCEPT MAP ==================== */
+let conceptMapHoverHideTimer: number | null = null;
+
+function cancelConceptMapDetailHide(): void {
+  if (conceptMapHoverHideTimer !== null) {
+    window.clearTimeout(conceptMapHoverHideTimer);
+    conceptMapHoverHideTimer = null;
+  }
+}
+
+/** Oculta el detalle con una pequeña tolerancia para poder mover el ratón al panel. */
+function scheduleConceptMapDetailHide(): void {
+  cancelConceptMapDetailHide();
+  conceptMapHoverHideTimer = window.setTimeout(() => {
+    conceptMapHoverHideTimer = null;
+    if (conceptMapNodeDetail) conceptMapNodeDetail.hidden = true;
+    requestAnimationFrame(() => conceptMapView.refresh());
+  }, 350);
+}
+
 function openConceptMap(): void {
   conceptMapTitle.innerText = currentPage.title;
   const count = getAllBlocksFlat(currentPage.blocks).length;
   conceptMapSubtitle.innerText = count === 1 ? "1 bullet" : `${count} bullets`;
   conceptMapView.onNodeClick = (nodeId, fullContent) => {
+    cancelConceptMapDetailHide();
     showConceptMapNodeDetail(nodeId, fullContent);
+  };
+  conceptMapView.onNodeHover = (nodeId, fullContent) => {
+    if (nodeId) {
+      cancelConceptMapDetailHide();
+      showConceptMapNodeDetail(nodeId, fullContent);
+    } else {
+      scheduleConceptMapDetailHide();
+    }
   };
   if (conceptMapNodeDetail) conceptMapNodeDetail.hidden = true;
   mountOverlay(conceptMapOverlay);
@@ -2771,10 +2967,14 @@ function showConceptMapNodeDetail(nodeId: string, fullContent: string): void {
 }
 
 function closeConceptMap(): void {
+  cancelConceptMapDetailHide();
   conceptMapOverlay.classList.remove("visible");
   unmountOverlay(conceptMapOverlay);
   if (conceptMapNodeDetail) conceptMapNodeDetail.hidden = true;
 }
+
+conceptMapNodeDetail?.addEventListener("mouseenter", cancelConceptMapDetailHide);
+conceptMapNodeDetail?.addEventListener("mouseleave", scheduleConceptMapDetailHide);
 
 btnConceptMap.addEventListener("click", openConceptMap);
 btnCloseConceptMap.addEventListener("click", closeConceptMap);
@@ -3087,6 +3287,8 @@ function switchView(view: ViewType) {
   // Antes de cambiar de vista/nota, persistir las ediciones de texto pendientes.
   void vault.flushPendingSaves();
   if (view !== "flashcards") setFlashcardFocusMode(false);
+  if (view !== "flashcards") clearFlashcardDueRecheck();
+  if (view !== "editor") closeNoteFind(false);
   if (view !== "graph") closeGraphPreview();
   currentView = view;
 
@@ -3094,7 +3296,7 @@ function switchView(view: ViewType) {
   // breadcrumb y ocultamos las acciones de página para no arrastrar la última
   // nota visitada.
   const hasOpenPage = view === "editor";
-  if (!hasOpenPage) headbarBreadcrumb.innerText = "";
+  if (!hasOpenPage) setHeadbarTitle("");
   document.body.classList.toggle("no-active-page", !hasOpenPage);
 
   const navItems = [navEditor, navJournals, navFlashcards, navGraph, navKanban, navAllPages];
@@ -6796,56 +6998,100 @@ function scheduleRenderBacklinks(): void {
 
 function renderBacklinks() {
   const backlinks = vault.findBacklinksFor(currentPage.title);
+  const outgoing = collectOutgoingLinks(currentPage);
   refCountBadge.innerText = backlinks.length.toString();
+  if (outgoingCountBadge) outgoingCountBadge.innerText = outgoing.length.toString();
   backlinksContainer.innerHTML = "";
+  if (outgoingLinksContainer) outgoingLinksContainer.innerHTML = "";
 
   if (backlinks.length === 0) {
     backlinksContainer.innerHTML =
       '<div class="empty-backlinks">No hay retroenlaces vinculados a esta página.</div>';
+  } else {
+    for (const ref of backlinks) {
+      const card = document.createElement("div");
+      card.className = "backlink-card";
+
+      const source = document.createElement("div");
+      source.className = "backlink-source";
+      source.append(`📄 ${ref.source_page} `);
+      const lineInfo = document.createElement("span");
+      lineInfo.style.color = "var(--ls-text-muted)";
+      lineInfo.style.fontSize = scaledFontSize(11);
+      lineInfo.textContent = `(línea ${ref.line_number})`;
+      source.append(lineInfo);
+      source.addEventListener("click", () => {
+        loadPage(ref.source_page);
+      });
+
+      const snippet = document.createElement("div");
+      snippet.className = "backlink-snippet";
+
+      const escaped = ref.snippet
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+      snippet.innerHTML = escaped.replace(
+        /\[\[(.*?)\]\]/g,
+        '<span class="wikilink-pill" data-page="$1">[[$1]]</span>'
+      );
+
+      snippet.querySelectorAll(".wikilink-pill").forEach((pill) => {
+        pill.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const target = (pill as HTMLElement).dataset.page;
+          if (target) loadPage(target);
+        });
+      });
+
+      card.appendChild(source);
+      card.appendChild(snippet);
+      backlinksContainer.appendChild(card);
+    }
+  }
+
+  if (!outgoingLinksContainer) return;
+  if (outgoing.length === 0) {
+    outgoingLinksContainer.innerHTML =
+      '<div class="empty-backlinks">Esta página no enlaza a ninguna otra nota.</div>';
     return;
   }
 
-  for (const ref of backlinks) {
+  for (const ref of outgoing) {
+    const exists = Boolean(vault.getPageByTitle(ref.targetTitle));
     const card = document.createElement("div");
-    card.className = "backlink-card";
+    card.className = `backlink-card outgoing-link-card${exists ? "" : " is-broken"}`;
 
-    const source = document.createElement("div");
-    source.className = "backlink-source";
-    source.append(`📄 ${ref.source_page} `);
+    const target = document.createElement("div");
+    target.className = "backlink-source";
+    target.append(`→ ${ref.targetTitle}`);
+    if (!exists) {
+      const broken = document.createElement("span");
+      broken.className = "outgoing-broken-badge";
+      broken.textContent = translate("enlace roto");
+      target.append(" ", broken);
+    }
     const lineInfo = document.createElement("span");
     lineInfo.style.color = "var(--ls-text-muted)";
     lineInfo.style.fontSize = scaledFontSize(11);
-    lineInfo.textContent = `(línea ${ref.line_number})`;
-    source.append(lineInfo);
-    source.addEventListener("click", () => {
-      loadPage(ref.source_page);
+    lineInfo.textContent = ` (${translate("línea")} ${ref.lineNumber})`;
+    target.append(lineInfo);
+    target.addEventListener("click", () => {
+      if (!exists) showToast(`${translate("Creando la nota")} "${ref.targetTitle}"…`);
+      loadPage(ref.targetTitle);
     });
 
     const snippet = document.createElement("div");
     snippet.className = "backlink-snippet";
+    snippet.textContent = ref.alias
+      ? `${translate("Alias")}: ${ref.alias}`
+      : ref.snippet.trim();
 
-    const escaped = ref.snippet
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-    snippet.innerHTML = escaped.replace(
-      /\[\[(.*?)\]\]/g,
-      '<span class="wikilink-pill" data-page="$1">[[$1]]</span>'
-    );
-
-    snippet.querySelectorAll(".wikilink-pill").forEach((pill) => {
-      pill.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const target = (pill as HTMLElement).dataset.page;
-        if (target) loadPage(target);
-      });
-    });
-
-    card.appendChild(source);
+    card.appendChild(target);
     card.appendChild(snippet);
-    backlinksContainer.appendChild(card);
+    outgoingLinksContainer.appendChild(card);
   }
 }
 
@@ -6857,7 +7103,7 @@ function renderEditor() {
     pageTitleHeading.innerText = currentPage.title;
     lastValidPageTitle = currentPage.title;
   }
-  headbarBreadcrumb.innerText = currentPage.title;
+  setHeadbarTitle(currentPage.title);
   pagePropertiesContainer.replaceChildren();
   const frontmatter = currentPage.frontmatter || [];
   if (frontmatter.length > 0) {
@@ -6873,6 +7119,9 @@ function renderEditor() {
   }
   renderBlocksTree();
   scheduleRenderBacklinks();
+  // Si la barra de búsqueda interna está abierta, sus coincidencias dependen
+  // del contenido de la nota: recalcularlas al abrir otra página (T20).
+  if (noteFindBar && !noteFindBar.hidden) runNoteFind(true);
 }
 
 function loadPage(title: string) {
@@ -6917,7 +7166,7 @@ function commitPageTitleRename(): void {
 
   const restoreTitle = (): void => {
     pageTitleHeading.innerText = lastValidPageTitle;
-    headbarBreadcrumb.innerText = lastValidPageTitle;
+    setHeadbarTitle(lastValidPageTitle);
     currentPage.title = lastValidPageTitle;
     renderSidebar();
   };
@@ -6930,12 +7179,12 @@ function commitPageTitleRename(): void {
   // Si el usuario escribe `::`, `->` o `>`, el título se normaliza antes de
   // tocar el archivo: `:` y `>` no son válidos en Windows y `→` sí.
   if (rawTitle === lastValidPageTitle) {
-    headbarBreadcrumb.innerText = lastValidPageTitle;
+    setHeadbarTitle(lastValidPageTitle);
     return;
   }
   if (newTitle === lastValidPageTitle) {
     pageTitleHeading.innerText = newTitle;
-    headbarBreadcrumb.innerText = newTitle;
+    setHeadbarTitle(newTitle);
     return;
   }
   if (newTitle !== rawTitle) pageTitleHeading.innerText = newTitle;
@@ -6957,12 +7206,12 @@ function commitPageTitleRename(): void {
   currentPage.path = vault.getPageByTitle(newTitle)?.path ?? currentPage.path;
   replaceRecentPath(oldPath, currentPage.path);
   vault.savePage(currentPage);
-  headbarBreadcrumb.innerText = newTitle;
+  setHeadbarTitle(newTitle);
   renderSidebar();
 }
 
 pageTitleHeading.addEventListener("input", () => {
-  headbarBreadcrumb.innerText = pageTitleHeading.innerText.trim();
+  setHeadbarTitle(pageTitleHeading.innerText.trim());
   renderSidebar();
   // Renombrar el archivo físico al nuevo título (con debounce para no saturar en cada tecla)
   if (pageTitleRenameTimer) clearTimeout(pageTitleRenameTimer);
@@ -9351,7 +9600,7 @@ document.getElementById("sctx-rename")?.addEventListener("click", async () => {
       currentPage.title = newTitle;
       currentPage.path = newPath ?? currentPage.path;
       pageTitleHeading.innerText = newTitle;
-      headbarBreadcrumb.innerText = newTitle;
+      setHeadbarTitle(newTitle);
       lastValidPageTitle = newTitle;
     }
     // Si la nota estaba en Recientes, sustituir su ruta (por id o no).
@@ -9418,6 +9667,7 @@ const cardSourceEl = document.getElementById("card-source") as HTMLSpanElement;
 const cardFsrsBadge = document.getElementById("card-fsrs-badge") as HTMLSpanElement;
 const cardQuestionEl = document.getElementById("card-question") as HTMLDivElement;
 const cardAnswerEl = document.getElementById("card-answer") as HTMLDivElement;
+const cardParentContextEl = document.getElementById("card-parent-context") as HTMLDivElement | null;
 const btnShowAnswer = document.getElementById("btn-show-answer") as HTMLButtonElement;
 
 /**
@@ -9918,6 +10168,51 @@ function updateFlashcardProgressPanel(): void {
   updateFlashcardProgressTree();
 }
 
+/**
+ * Un único AudioContext, creado de forma perezosa. Crear uno por pitido agota
+ * recursos en WebView y, además, la política de autoplay exige que el primero
+ * se cree dentro de un gesto del usuario (Iniciar, Pausar o el propio ajuste).
+ */
+function pomodoroAudio(): AudioContext | null {
+  try {
+    if (!pomodoroAudioContextRef) {
+      const AudioCtx =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtx) return null;
+      pomodoroAudioContextRef = new AudioCtx();
+    }
+    if (pomodoroAudioContextRef.state === "suspended") {
+      void pomodoroAudioContextRef.resume();
+    }
+    return pomodoroAudioContextRef;
+  } catch {
+    return null;
+  }
+}
+
+/** Aviso corto: dos notas ascendentes al terminar enfoque, descendentes al descanso. */
+function playPomodoroChime(kind: "focus-end" | "break-end"): void {
+  if (!pomodoroSoundEnabled) return;
+  const ctx = pomodoroAudio();
+  if (!ctx) return;
+  const now = ctx.currentTime;
+  const frequencies = kind === "focus-end" ? [660, 880] : [520, 392];
+  frequencies.forEach((frequency, index) => {
+    const oscillator = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const start = now + index * 0.18;
+    oscillator.type = "sine";
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.18, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.35);
+    oscillator.connect(gain).connect(ctx.destination);
+    oscillator.start(start);
+    oscillator.stop(start + 0.4);
+  });
+}
+
 function renderPomodoro(): void {
   const minutes = Math.floor(pomodoroRemainingSeconds / 60);
   const seconds = pomodoroRemainingSeconds % 60;
@@ -9928,15 +10223,32 @@ function renderPomodoro(): void {
     : pomodoroIsLongBreak ? "Descanso largo" : "Descanso corto";
   pomodoroToggle.textContent = pomodoroInterval === null ? "Iniciar" : "Pausar";
 
+  const isShortBreak = pomodoroMode === "break" && !pomodoroIsLongBreak;
+  const isLongBreak = pomodoroMode === "break" && pomodoroIsLongBreak;
+  pomodoroShortBreak?.classList.toggle("active", isShortBreak);
+  pomodoroShortBreak?.setAttribute("aria-pressed", String(isShortBreak));
+  pomodoroLongBreak?.classList.toggle("active", isLongBreak);
+  pomodoroLongBreak?.setAttribute("aria-pressed", String(isLongBreak));
+
   headbarPomodoroClock.textContent = timeString;
   headbarPomodoro.hidden = !pomodoroHeadbarVisible;
 
-  // Update headbar pomodoro toggle icon (play/pause)
   const isRunning = pomodoroInterval !== null;
-  headbarPomodoroToggle.innerHTML = isRunning
-    ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>'
-    : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
-  headbarPomodoroToggle.title = isRunning ? "Pausar Pomodoro" : "Iniciar Pomodoro";
+  const actionLabel = isRunning ? "Pausar Pomodoro" : "Iniciar Pomodoro";
+  headbarPomodoroClock.title = actionLabel;
+  headbarPomodoroClock.setAttribute("aria-label", `${timeString} · ${actionLabel}`);
+  headbarPomodoroClock.classList.toggle("is-running", isRunning);
+  headbarPomodoroClock.classList.toggle("is-paused", !isRunning && pomodoroPaused);
+}
+
+/** Salta directamente a un descanso corto o largo y lo inicia. */
+function startPomodoroBreak(isLong: boolean): void {
+  stopPomodoro();
+  pomodoroMode = "break";
+  pomodoroIsLongBreak = isLong;
+  pomodoroRemainingSeconds =
+    (isLong ? pomodoroLongBreakMinutes : pomodoroBreakMinutes) * 60;
+  startPomodoro();
 }
 
 function stopPomodoro(): void {
@@ -9945,11 +10257,16 @@ function stopPomodoro(): void {
     pomodoroInterval = null;
     saveFlashcardProgressStats();
   }
+  pomodoroPaused = true;
   renderPomodoro();
 }
 
 function startPomodoro(): void {
+  pomodoroPaused = false;
   if (pomodoroInterval !== null) return;
+  // Crear el contexto aquí (gesto del usuario) evita que el primer aviso
+  // quede silenciado por la política de autoplay.
+  if (pomodoroSoundEnabled) void pomodoroAudio();
   pomodoroInterval = window.setInterval(() => {
     if (pomodoroMode === "focus") {
       resetFlashcardDailyProgress();
@@ -9964,6 +10281,7 @@ function startPomodoro(): void {
         pomodoroIsLongBreak = pomodoroCompletedFocusSessions % pomodoroSessionsBeforeLongBreak === 0;
         pomodoroMode = "break";
         pomodoroRemainingSeconds = (pomodoroIsLongBreak ? pomodoroLongBreakMinutes : pomodoroBreakMinutes) * 60;
+        playPomodoroChime("focus-end");
         showToast(
           pomodoroIsLongBreak
             ? "Ciclo completado. Disfruta de un descanso largo."
@@ -9973,6 +10291,7 @@ function startPomodoro(): void {
         pomodoroMode = "focus";
         pomodoroIsLongBreak = false;
         pomodoroRemainingSeconds = pomodoroFocusMinutes * 60;
+        playPomodoroChime("break-end");
         showToast("Descanso completado. ¡A seguir repasando!");
       }
       saveFlashcardProgressStats();
@@ -9987,7 +10306,7 @@ pomodoroToggle.addEventListener("click", () => {
   else stopPomodoro();
 });
 
-headbarPomodoroToggle.addEventListener("click", () => {
+headbarPomodoroClock.addEventListener("click", () => {
   if (pomodoroInterval === null) startPomodoro();
   else stopPomodoro();
 });
@@ -9997,8 +10316,12 @@ pomodoroReset.addEventListener("click", () => {
   pomodoroIsLongBreak = false;
   pomodoroCompletedFocusSessions = 0;
   pomodoroRemainingSeconds = pomodoroFocusMinutes * 60;
+  pomodoroPaused = false;
   renderPomodoro();
 });
+
+pomodoroShortBreak?.addEventListener("click", () => startPomodoroBreak(false));
+pomodoroLongBreak?.addEventListener("click", () => startPomodoroBreak(true));
 
 function setFlashcardFocusMode(enabled: boolean): void {
   if (flashcardExplorerActive && enabled) return;
@@ -10038,7 +10361,11 @@ function ensureFlashcardScan(options: EnsureFlashcardScanOptions = {}): void {
   const pages = vault.getPages();
   const version = vault.getMutationVersion();
   const cached = flashcardLoader.getCachedCards(pages, version);
-  if (!cached) flashcardLoading = true;
+  // Si ya hay una sesión visible (aunque sea la pantalla de completado) no se
+  // pinta "Escaneando": al volver de otra ventana la tarjeta debe quedarse
+  // quieta hasta que el nuevo escaneo termine (T18).
+  const sessionActive = flashcardsManager.getCardsCount() > 0;
+  if (!cached && !sessionActive) flashcardLoading = true;
 
   flashcardLoader.load(pages, version, {
     order: options.order ?? flashcardReviewOrder,
@@ -10050,7 +10377,7 @@ function ensureFlashcardScan(options: EnsureFlashcardScanOptions = {}): void {
       if (currentView === "flashcards") {
         if (flashcardExplorerActive) {
           scheduleFlashcardExplorerProgressRender();
-        } else if (!progress.done) {
+        } else if (!progress.done && !sessionActive) {
           updateFlashcardLoadingState(progress);
         }
       }
@@ -10071,6 +10398,7 @@ function updateFlashcardLoadingState(progress: FlashcardLoadProgress): void {
   cardTypePill.innerText = "CARGANDO";
   cardSourceEl.innerText = "Leyendo tus notas…";
   cardFsrsBadge.innerText = `${progress.cards} tarjetas encontradas`;
+  syncCardParentContext(null);
   cardQuestionEl.replaceChildren();
   cardQuestionEl.innerText = `Preparando flashcards… ${percent}%`;
   cardAnswerEl.replaceChildren();
@@ -10097,6 +10425,7 @@ function renderFlashcardSessionResult(): void {
           ? "Sin tarjetas pendientes en las notas seleccionadas"
           : "Sin tarjetas pendientes";
     cardFsrsBadge.innerText = "";
+    syncCardParentContext(null);
     cardQuestionEl.innerText =
       allCardCount === 0
         ? "No se encontraron flashcards con #card, :: o huecos Cloze (==...==) en tus notas."
@@ -10109,6 +10438,7 @@ function renderFlashcardSessionResult(): void {
     syncClozeRevealLayout(null, false);
     btnShowAnswer.style.display = "none";
     fsrsActions.classList.remove("visible");
+    if (allCardCount > 0) scheduleFlashcardDueRecheck();
     return;
   }
 
@@ -10122,7 +10452,7 @@ function startFlashcardsSession(preserve?: { cardId: string; revealed: boolean }
   const pages = vault.getPages();
   const version = vault.getMutationVersion();
   const cached = flashcardLoader.getCachedCards(pages, version);
-  if (!cached) {
+  if (!cached && flashcardsManager.getCardsCount() === 0) {
     updateFlashcardLoadingState(
       flashcardLoader.isLoading()
         ? flashcardLoader.getProgress()
@@ -10464,6 +10794,52 @@ function renderFlashcardExplorer(): void {
   }
 }
 
+/**
+ * Muestra el bullet padre como contexto de la tarjeta. Es solo texto: se pinta
+ * con `textContent` para no interpretar markdown ajeno a la tarjeta.
+ */
+function syncCardParentContext(card: Flashcard | null): void {
+  if (!cardParentContextEl) return;
+  const content = card?.parentContent?.trim() || "";
+  cardParentContextEl.textContent = content;
+  cardParentContextEl.hidden = content.length === 0;
+}
+
+/** Cancela el rechequeo periódico de tarjetas vencidas. */
+function clearFlashcardDueRecheck(): void {
+  if (flashcardDueRecheckTimer !== null) {
+    window.clearTimeout(flashcardDueRecheckTimer);
+    flashcardDueRecheckTimer = null;
+  }
+}
+
+/**
+ * Si la cola terminó pero alguna tarjeta ya venció (p. ej. un "Otra vez" con
+ * paso corto), la reconstruye y vuelve a pintar. Devuelve true si hubo cambios.
+ */
+function refreshDueFlashcardQueue(): boolean {
+  if (flashcardsManager.getAllCardsCount() === 0) return false;
+  if (flashcardsManager.countDueCards() === 0) return false;
+  flashcardsManager.refreshDueQueue(flashcardReviewOrder);
+  updateFlashcardUI();
+  return true;
+}
+
+/**
+ * En la pantalla de completado se revisa cada 30 s si apareció alguna tarjeta
+ * vencida. Así no hace falta reiniciar la sesión a mano (T23).
+ */
+function scheduleFlashcardDueRecheck(): void {
+  if (flashcardDueRecheckTimer !== null) return;
+  flashcardDueRecheckTimer = window.setTimeout(() => {
+    flashcardDueRecheckTimer = null;
+    if (currentView !== "flashcards" || flashcardLoading || flashcardExplorerActive) return;
+    if (flashcardsManager.getCurrentCard()) return;
+    if (refreshDueFlashcardQueue()) return;
+    scheduleFlashcardDueRecheck();
+  }, FLASHCARD_DUE_RECHECK_MS);
+}
+
 function updateFlashcardUI() {
   updateReviewHistoryButtons();
   if (flashcardLoading) return;
@@ -10474,10 +10850,13 @@ function updateFlashcardUI() {
   syncClozeRevealLayout(card, false);
 
   if (!card) {
+    if (refreshDueFlashcardQueue()) return;
+    scheduleFlashcardDueRecheck();
     cardProgressEl.innerText = `${total} de ${total}`;
     cardTypePill.innerText = "FSRS";
     cardSourceEl.innerText = "🎉 ¡Completado!";
     cardFsrsBadge.innerText = "";
+    syncCardParentContext(null);
     cardQuestionEl.innerText = "¡Has completado todas las tarjetas pendientes con FSRS-4.5!";
     cardAnswerEl.classList.remove("visible");
     btnShowAnswer.style.display = "inline-block";
@@ -10492,6 +10871,7 @@ function updateFlashcardUI() {
     return;
   }
 
+  clearFlashcardDueRecheck();
   cardProgressEl.innerText = `Tarjeta ${current + 1} de ${total}`;
   cardTypePill.innerText = card.cardType === "image-occlusion"
     ? "IMAGEN"
@@ -10500,6 +10880,7 @@ function updateFlashcardUI() {
       : "BÁSICA";
   cardSourceEl.innerText = `Origen: ${card.pageTitle}`;
   cardFsrsBadge.innerText = `S: ${card.fsrs.stability}d • D: ${card.fsrs.difficulty} • Reps: ${card.fsrs.reps}`;
+  syncCardParentContext(card);
 
   cardQuestionEl.replaceChildren();
   cardAnswerEl.replaceChildren();
@@ -10577,11 +10958,107 @@ flashcardSyncButton.addEventListener("click", () => {
 document.querySelectorAll<HTMLButtonElement>(".btn-fsrs").forEach((btn) => {
   btn.addEventListener("click", () => {
     const rating = parseInt(btn.dataset.rating || "3", 10) as FSRSRating;
-    applyFSRSRating(rating);
+    const rect = btn.getBoundingClientRect();
+    applyFSRSRating(rating, true, {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    });
   });
 });
 
-function applyFSRSRating(rating: FSRSRating) {
+const celebrationCanvas = document.getElementById("celebration-canvas") as HTMLCanvasElement | null;
+let celebrationFrame: number | null = null;
+
+/**
+ * Recompensa breve al calificar "Fácil". Es puramente decorativa: no toca el
+ * DOM de la tarjeta ni bloquea la siguiente, y se cancela si se vuelve a
+ * lanzar (T4).
+ */
+function launchEasyCelebration(origin?: { x: number; y: number }): void {
+  const canvas = celebrationCanvas;
+  if (!canvas) return;
+  const reduced =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduced) return;
+
+  const context = canvas.getContext("2d");
+  if (!context) return;
+
+  if (celebrationFrame !== null) {
+    window.cancelAnimationFrame(celebrationFrame);
+    celebrationFrame = null;
+  }
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  canvas.width = Math.round(width * dpr);
+  canvas.height = Math.round(height * dpr);
+  context.setTransform(dpr, 0, 0, dpr, 0, 0);
+  context.clearRect(0, 0, width, height);
+  canvas.classList.add("is-active");
+
+  const accent =
+    getComputedStyle(document.documentElement).getPropertyValue("--ls-accent").trim() ||
+    "#3b82f6";
+  const colors = [accent, "#ffffff", "#facc15"];
+  const startX = origin?.x ?? width / 2;
+  const startY = origin?.y ?? height / 2;
+  const duration = 820;
+  const particles = Array.from({ length: 26 }, () => {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2.2 + Math.random() * 3.4;
+    return {
+      x: startX,
+      y: startY,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 1.4,
+      size: 2 + Math.random() * 2.6,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      rotation: Math.random() * Math.PI,
+      spin: (Math.random() - 0.5) * 0.28,
+    };
+  });
+
+  const started = performance.now();
+  const draw = (now: number): void => {
+    const elapsed = now - started;
+    const progress = Math.min(1, elapsed / duration);
+    context.clearRect(0, 0, width, height);
+    const fade = 1 - progress;
+    context.globalAlpha = Math.max(0, fade);
+    particles.forEach((particle) => {
+      particle.x += particle.vx;
+      particle.y += particle.vy;
+      particle.vy += 0.12;
+      particle.vx *= 0.99;
+      particle.rotation += particle.spin;
+      context.save();
+      context.translate(particle.x, particle.y);
+      context.rotate(particle.rotation);
+      context.fillStyle = particle.color;
+      context.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size * 1.7);
+      context.restore();
+    });
+    context.globalAlpha = 1;
+
+    if (progress < 1) {
+      celebrationFrame = window.requestAnimationFrame(draw);
+    } else {
+      celebrationFrame = null;
+      context.clearRect(0, 0, width, height);
+      canvas.classList.remove("is-active");
+    }
+  };
+  celebrationFrame = window.requestAnimationFrame(draw);
+}
+
+function applyFSRSRating(
+  rating: FSRSRating,
+  persist = true,
+  celebrationOrigin?: { x: number; y: number }
+) {
   // La vista se está reemplazando con cambios de otro dispositivo: calificar
   // ahora guardaría la página antigua sobre la versión recién leída.
   if (vaultSyncInFlight || isVaultSwitching || reviewHistoryActionInFlight || flashcardLoading) return;
@@ -10591,8 +11068,9 @@ function applyFSRSRating(rating: FSRSRating) {
   // Evita que una tecla o botón accidental salte a la siguiente tarjeta.
   if (!flashcardsManager.isRevealed()) return;
 
-  const result = flashcardsManager.rate(rating);
+  const result = flashcardsManager.rate(rating, persist);
   if (result) {
+    if (rating === 4 && persist) launchEasyCelebration(celebrationOrigin);
     resetFlashcardDailyProgress();
     flashcardProgressStats.reviewsToday += 1;
     flashcardProgressStats.totalReviews += 1;
@@ -10958,6 +11436,46 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+function applyGraphPages(): void {
+  if (!graphView) return;
+  const allPages = vault.getPages();
+  if (graphNeighborhoodOrigin) {
+    const connected = connectedPageTitles(allPages, graphNeighborhoodOrigin);
+    graphView.updateData(allPages.filter((page) => connected.has(page.title)));
+    graphView.selectNode(graphNeighborhoodOrigin);
+  } else {
+    graphView.updateData(allPages);
+  }
+  graphRenderedNeighborhood = graphNeighborhoodOrigin;
+  graphDataVersion = vault.getMutationVersion();
+  if (btnGraphShowAll) {
+    btnGraphShowAll.hidden = graphNeighborhoodOrigin === null;
+    if (graphNeighborhoodLabel) {
+      graphNeighborhoodLabel.textContent = graphNeighborhoodOrigin
+        ? `${translate("Vecindad")}: ${graphNeighborhoodOrigin}`
+        : translate("Ver todo el grafo");
+    }
+  }
+}
+
+/** Abre el grafo mostrando solo la nota actual y sus vecinas de 1 salto (T5). */
+function openGraphNeighborhood(): void {
+  graphNeighborhoodOrigin = currentPage.title;
+  switchView("graph");
+  requestAnimationFrame(() => {
+    graphView?.resetView();
+    graphView?.selectNode(currentPage.title);
+  });
+}
+
+function clearGraphNeighborhood(): void {
+  graphNeighborhoodOrigin = null;
+  if (currentView === "graph") {
+    renderGraphView();
+    graphView?.resetView();
+  }
+}
+
 function renderGraphView() {
   if (!graphView) {
     graphView = new GraphView("graph-canvas", (targetTitle: string) => {
@@ -10966,19 +11484,50 @@ function renderGraphView() {
     (window as any).__graphClickBackground = () => closeGraphPreview();
   }
   graphView.resize();
-  // Repintar solo cuando la bóveda cambió. Volver a la pestaña del grafo ya no
-  // reconstruye nodos, enlaces y lotes de revelado desde cero (con vaults
-  // grandes eso congelaba la interfaz un instante en cada visita).
+  // Repintar solo cuando la bóveda cambió o cuando se entra/sale de la
+  // vecindad. Volver a la pestaña del grafo ya no reconstruye nodos, enlaces y
+  // lotes de revelado desde cero (con vaults grandes eso congelaba la
+  // interfaz un instante en cada visita).
   const version = vault.getMutationVersion();
-  if (version !== graphDataVersion) {
-    graphView.updateData(vault.getPages());
-    graphDataVersion = version;
+  if (version !== graphDataVersion || graphRenderedNeighborhood !== graphNeighborhoodOrigin) {
+    applyGraphPages();
   }
+  if (!graphSettingsPanel.hidden && graphSettingsUiReady) syncGraphSettingsUi();
 }
+
+btnGraphNeighborhood?.addEventListener("click", openGraphNeighborhood);
+btnGraphShowAll?.addEventListener("click", clearGraphNeighborhood);
+
 
 /* ==================== GRAPH SETTINGS UI ==================== */
 let graphSettings: GraphSettings = loadGraphSettings();
 let graphSettingsSaveTimer: number | null = null;
+
+// Los ajustes del grafo viven ahora en un panel lateral de la propia vista de
+// grafo (antes eran una pestaña de Ajustes). El panel es estático, así que sus
+// listeners no se pierden al montar/desmontar el overlay de Ajustes.
+const graphSettingsPanel = document.getElementById("graph-settings-panel") as HTMLElement;
+const graphSettingsToggleButton = document.getElementById(
+  "btn-toggle-graph-settings"
+) as HTMLButtonElement | null;
+const graphSettingsCloseButton = document.getElementById(
+  "btn-close-graph-settings"
+) as HTMLButtonElement | null;
+
+function setGraphSettingsPanelOpen(open: boolean): void {
+  if (!graphSettingsPanel) return;
+  graphSettingsPanel.hidden = !open;
+  graphSettingsToggleButton?.setAttribute("aria-expanded", String(open));
+  graphSettingsToggleButton?.classList.toggle("active", open);
+  if (open && graphSettingsUiReady) syncGraphSettingsUi();
+}
+
+if (graphSettingsToggleButton) {
+  graphSettingsToggleButton.addEventListener("click", () => {
+    setGraphSettingsPanelOpen(graphSettingsPanel.hidden);
+  });
+}
+graphSettingsCloseButton?.addEventListener("click", () => setGraphSettingsPanelOpen(false));
 
 // El overlay de Ajustes se quita del DOM al iniciar la app, así que los hijos
 // deben buscarse cuando se usan (no al evaluar este módulo).
@@ -11228,7 +11777,7 @@ function resetGraphSettings(): void {
 
 // Delegación: los controles viven dentro del overlay, que se desmonta y vuelve
 // a montar al abrir/cerrar Ajustes. Así los listeners siguen funcionando.
-settingsOverlay.addEventListener("input", (event) => {
+graphSettingsPanel.addEventListener("input", (event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement)) return;
   const binding = graphSliderBindings.find((candidate) => candidate.inputId === target.id);
@@ -11240,7 +11789,7 @@ settingsOverlay.addEventListener("input", (event) => {
   updateGraphSettings((draft) => binding.set(draft, value));
 });
 
-settingsOverlay.addEventListener("keydown", (event) => {
+graphSettingsPanel.addEventListener("keydown", (event) => {
   if (event.key !== "Enter") return;
   const target = event.target;
   if (target instanceof HTMLElement && target.id === "graph-rule-name") {
@@ -11249,7 +11798,7 @@ settingsOverlay.addEventListener("keydown", (event) => {
   }
 });
 
-settingsOverlay.addEventListener("click", (event) => {
+graphSettingsPanel.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
   if (target.closest("#btn-add-graph-color-rule")) {
@@ -11283,6 +11832,253 @@ function readAllPagesSort(): AllPagesSort {
 
 let allPagesSort: AllPagesSort = readAllPagesSort();
 
+/* --- T2: anchos de columna persistentes --- */
+const ALL_PAGES_WIDTHS_STORAGE_KEY = "sinnotas-all-pages-widths";
+const ALL_PAGES_COLUMN_IDS = ["title", "blocks", "kind", "created", "updated", "actions"] as const;
+type AllPagesColumnId = (typeof ALL_PAGES_COLUMN_IDS)[number];
+const ALL_PAGES_DEFAULT_WIDTHS: Record<AllPagesColumnId, number> = {
+  title: 300,
+  blocks: 96,
+  kind: 110,
+  created: 165,
+  updated: 165,
+  actions: 96,
+};
+const ALL_PAGES_MIN_WIDTHS: Record<AllPagesColumnId, number> = {
+  title: 80,
+  blocks: 64,
+  kind: 100,
+  created: 110,
+  updated: 110,
+  actions: 50,
+};
+/* En el modo adaptativo el título conserva un mínimo más generoso que al
+   arrastrar: así se recorta con puntos suspensivos pero sigue siendo legible. */
+const ALL_PAGES_TITLE_FIT_MIN = 160;
+
+function isAllPagesColumnId(value: unknown): value is AllPagesColumnId {
+  return typeof value === "string" && (ALL_PAGES_COLUMN_IDS as readonly string[]).includes(value);
+}
+
+function readAllPagesColumnWidths(): Record<AllPagesColumnId, number> {
+  const widths = { ...ALL_PAGES_DEFAULT_WIDTHS };
+  try {
+    const raw = localStorage.getItem(ALL_PAGES_WIDTHS_STORAGE_KEY);
+    if (!raw) return widths;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return widths;
+    for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!isAllPagesColumnId(key)) continue;
+      if (typeof value !== "number" || !Number.isFinite(value)) continue;
+      widths[key] = Math.max(ALL_PAGES_MIN_WIDTHS[key], Math.min(1200, value));
+    }
+  } catch {
+    // Un localStorage corrupto no debe romper la tabla.
+  }
+  return widths;
+}
+
+let allPagesColumnWidths = readAllPagesColumnWidths();
+let allPagesRenderedWidths: Record<AllPagesColumnId, number> = { ...allPagesColumnWidths };
+// Si el usuario nunca ha arrastrado una columna, la tabla se adapta al ancho
+// disponible para que todo quepa y el título se recorte. En cuanto ajusta una
+// columna, se respetan sus anchos (aunque eso active el scroll horizontal).
+let allPagesHasCustomWidths = (() => {
+  try {
+    const raw = localStorage.getItem(ALL_PAGES_WIDTHS_STORAGE_KEY);
+    if (!raw) return false;
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return false;
+    // Una clave vacía o corrupta no debe desactivar el modo adaptativo.
+    return Object.entries(parsed as Record<string, unknown>).some(
+      ([key, value]) =>
+        isAllPagesColumnId(key) && typeof value === "number" && Number.isFinite(value)
+    );
+  } catch {
+    return false;
+  }
+})();
+
+function allPagesTableAvailableWidth(table: HTMLTableElement): number {
+  const container = table.closest<HTMLElement>(".table-view-container");
+  if (!container) return 0;
+  const style = window.getComputedStyle(container);
+  const padding =
+    (Number.parseFloat(style.paddingLeft) || 0) +
+    (Number.parseFloat(style.paddingRight) || 0);
+  return Math.max(0, container.clientWidth - padding);
+}
+
+/**
+ * Reparte el ancho disponible: primero encoge o estira el título y, solo si
+ * hace falta, reduce el resto de columnas hasta sus mínimos. Así el título
+ * muestra puntos suspensivos en lugar de empujar la tabla fuera de la vista.
+ */
+function fittedAllPagesWidths(
+  available: number
+): Record<AllPagesColumnId, number> {
+  const widths = { ...allPagesColumnWidths };
+  if (available <= 0) return widths;
+  const ids = [...ALL_PAGES_COLUMN_IDS];
+  const total = ids.reduce((sum, id) => sum + widths[id], 0);
+  if (total <= available) {
+    widths.title += available - total;
+    return widths;
+  }
+
+  let overflow = total - available;
+  const titleShrink = Math.min(
+    overflow,
+    widths.title - Math.max(ALL_PAGES_MIN_WIDTHS.title, ALL_PAGES_TITLE_FIT_MIN)
+  );
+  widths.title -= titleShrink;
+  overflow -= titleShrink;
+
+  if (overflow > 0) {
+    const otherIds = ids.filter((id) => id !== "title");
+    const flexible = otherIds.reduce(
+      (sum, id) => sum + (widths[id] - ALL_PAGES_MIN_WIDTHS[id]),
+      0
+    );
+    if (flexible > 0) {
+      const ratio = Math.min(1, overflow / flexible);
+      otherIds.forEach((id) => {
+        widths[id] -= (widths[id] - ALL_PAGES_MIN_WIDTHS[id]) * ratio;
+      });
+    }
+  }
+
+  ids.forEach((id) => {
+    // Redondeo hacia abajo para que la suma nunca supere el ancho disponible
+    // por culpa de los decimales (evita una barra de scroll de 1px).
+    widths[id] = Math.max(ALL_PAGES_MIN_WIDTHS[id], Math.floor(widths[id]));
+  });
+  return widths;
+}
+
+function applyAllPagesColumnWidths(): void {
+  const table = document.getElementById("all-pages-table") as HTMLTableElement | null;
+  if (!table) return;
+  const available = allPagesTableAvailableWidth(table);
+  allPagesRenderedWidths = allPagesHasCustomWidths
+    ? { ...allPagesColumnWidths }
+    : fittedAllPagesWidths(available);
+  table.querySelectorAll<HTMLTableColElement>("colgroup col[data-col]").forEach((col) => {
+    const id = col.dataset.col;
+    if (!isAllPagesColumnId(id)) return;
+    col.style.width = `${allPagesRenderedWidths[id]}px`;
+  });
+}
+
+function persistAllPagesColumnWidths(): void {
+  try {
+    localStorage.setItem(ALL_PAGES_WIDTHS_STORAGE_KEY, JSON.stringify(allPagesColumnWidths));
+  } catch {
+    // El redimensionado sigue funcionando durante la sesión.
+  }
+}
+
+/** Actualiza `aria-sort` y el indicador visible de la cabecera activa. */
+function syncAllPagesSortHeaders(): void {
+  const table = document.getElementById("all-pages-table") as HTMLTableElement | null;
+  if (!table) return;
+  const { key, direction } = {
+    key: allPagesSort.slice(0, allPagesSort.lastIndexOf("-")) as AllPagesSortKey,
+    direction: allPagesSort.endsWith("-asc") ? "asc" : "desc",
+  };
+  table.querySelectorAll<HTMLTableCellElement>("th[data-sort-key]").forEach((th) => {
+    const active = th.dataset.sortKey === key;
+    th.setAttribute("aria-sort", active ? (direction === "asc" ? "ascending" : "descending") : "none");
+    const indicator = th.querySelector<HTMLElement>(".sort-indicator");
+    if (indicator) indicator.textContent = active ? (direction === "asc" ? "▲" : "▼") : "";
+  });
+}
+
+function setAllPagesSort(next: AllPagesSort, persist = true): void {
+  allPagesSort = next;
+  if (persist) {
+    try {
+      localStorage.setItem(ALL_PAGES_SORT_STORAGE_KEY, allPagesSort);
+    } catch {
+      // La ordenación sigue activa aunque no se pueda persistir.
+    }
+  }
+  allPagesCurrentPage = 1;
+  renderAllPagesView();
+}
+
+/* Delegación: la tabla no se reconstruye entera salvo las filas, pero las
+   cabeceras viven en el HTML estático; se enlazan una sola vez. */
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest<HTMLElement>(".all-pages-sort-button");
+  if (!button) return;
+  const key = button.dataset.sortKey;
+  if (key !== "title" && key !== "created" && key !== "updated") return;
+  setAllPagesSort(nextAllPagesSort(allPagesSort, key));
+});
+
+document.addEventListener("keydown", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement) || !target.classList.contains("col-resizer")) return;
+  const id = target.dataset.col;
+  if (!isAllPagesColumnId(id)) return;
+  if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+  event.preventDefault();
+  const delta = event.key === "ArrowRight" ? 20 : -20;
+  allPagesHasCustomWidths = true;
+  allPagesColumnWidths[id] = Math.max(
+    ALL_PAGES_MIN_WIDTHS[id],
+    Math.min(1200, allPagesRenderedWidths[id] + delta)
+  );
+  applyAllPagesColumnWidths();
+  persistAllPagesColumnWidths();
+});
+
+/* Arrastre de los asas de columna. Se usa captura de puntero para que el
+   gesto siga funcionando aunque el cursor salga de la cabecera. */
+document.addEventListener("pointerdown", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement) || !target.classList.contains("col-resizer")) return;
+  const id = target.dataset.col;
+  if (!isAllPagesColumnId(id)) return;
+  event.preventDefault();
+  const startX = event.clientX;
+  const startWidth = allPagesRenderedWidths[id];
+  allPagesHasCustomWidths = true;
+  target.setPointerCapture(event.pointerId);
+  target.classList.add("is-resizing");
+
+  const onMove = (moveEvent: PointerEvent): void => {
+    const delta = moveEvent.clientX - startX;
+    allPagesColumnWidths[id] = Math.max(
+      ALL_PAGES_MIN_WIDTHS[id],
+      Math.min(1200, startWidth + delta)
+    );
+    applyAllPagesColumnWidths();
+  };
+
+  const finish = (): void => {
+    target.classList.remove("is-resizing");
+    target.removeEventListener("pointermove", onMove);
+    target.removeEventListener("pointerup", finish);
+    target.removeEventListener("pointercancel", finish);
+    persistAllPagesColumnWidths();
+  };
+
+  target.addEventListener("pointermove", onMove);
+  target.addEventListener("pointerup", finish);
+  target.addEventListener("pointercancel", finish);
+});
+
+/* Sin anchos personalizados, la tabla se reajusta al cambiar el tamaño de la
+   ventana para seguir ocupando el ancho visible. */
+window.addEventListener("resize", () => {
+  if (allPagesHasCustomWidths || currentView !== "all-pages") return;
+  applyAllPagesColumnWidths();
+});
+
 function renderAllPagesView() {
   const tbody = document.getElementById("all-pages-tbody") as HTMLTableSectionElement;
   const countEl = document.getElementById("all-pages-count") as HTMLSpanElement;
@@ -11293,6 +12089,8 @@ function renderAllPagesView() {
   const sortSelect = document.getElementById("all-pages-sort") as HTMLSelectElement | null;
   if (sortSelect && sortSelect.value !== allPagesSort) sortSelect.value = allPagesSort;
   tbody.innerHTML = "";
+  applyAllPagesColumnWidths();
+  syncAllPagesSortHeaders();
 
   const allPages = vault.getPages();
   const visiblePages = filterAllPages(allPages, allPagesSearchQuery, pageDisplayTitle);
@@ -11303,10 +12101,13 @@ function renderAllPagesView() {
     flashcardPageCreatedMs
   );
 
-  // Las fechas de creación viven en el sistema de archivos: se piden solo
-  // cuando el usuario ordena por creación (y no durante el precalentamiento
-  // de vistas ocultas) para no retrasar el arranque.
-  if (allPagesSort.startsWith("created-") && currentView === "all-pages") {
+  // Compatibilidad con bóvedas/cachés antiguas sin `createdAtMs`: se pide la
+  // fecha de creación al backend una sola vez y se repinta. Con el snapshot
+  // nuevo de Rust esta llamada no se hace.
+  const missingCreatedTimes = allPages.some(
+    (page) => !page.journalDate && typeof page.createdAtMs !== "number"
+  );
+  if (missingCreatedTimes && currentView === "all-pages") {
     void fillFlashcardPagesCreatedTimes(allPages.map((page) => page.title)).then((changed) => {
       if (changed && currentView === "all-pages") renderAllPagesView();
     });
@@ -11334,7 +12135,7 @@ function renderAllPagesView() {
   if (pageSlice.length === 0) {
     const row = document.createElement("tr");
     const emptyCell = document.createElement("td");
-    emptyCell.colSpan = 5;
+    emptyCell.colSpan = 6;
     emptyCell.className = "all-pages-empty";
     emptyCell.textContent = allPages.length === 0
       ? translate("Todavía no hay páginas en esta bóveda.")
@@ -11360,7 +12161,9 @@ function renderAllPagesView() {
       : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13h8M8 17h8"></path></svg>';
 
     const title = document.createElement("span");
-    title.textContent = pageDisplayTitle(p);
+    const displayTitle = pageDisplayTitle(p);
+    title.textContent = displayTitle;
+    title.title = displayTitle;
     linkCell.append(iconWrap, title);
     nameCell.appendChild(linkCell);
 
@@ -11378,10 +12181,18 @@ function renderAllPagesView() {
     kindBadge.append(kindDot, document.createTextNode(p.isJournal ? "Diario" : "Página"));
     kindCell.appendChild(kindBadge);
 
+    const createdCell = document.createElement("td");
+    createdCell.style.color = "var(--ls-text-muted)";
+    createdCell.style.fontSize = scaledFontSize(13);
+    createdCell.textContent = formatPageDate(
+      pageCreatedMs(p, flashcardPageCreatedMs),
+      currentLanguage()
+    );
+
     const updatedCell = document.createElement("td");
     updatedCell.style.color = "var(--ls-text-muted)";
     updatedCell.style.fontSize = scaledFontSize(13);
-    updatedCell.textContent = p.updatedAt || "Reciente";
+    updatedCell.textContent = formatPageDate(pageUpdatedMs(p), currentLanguage());
 
     const actionsCell = document.createElement("td");
     actionsCell.style.textAlign = "right";
@@ -11393,7 +12204,7 @@ function renderAllPagesView() {
     deleteButton.textContent = "🗑️";
     actionsCell.appendChild(deleteButton);
 
-    row.append(nameCell, blocksCell, kindCell, updatedCell, actionsCell);
+    row.append(nameCell, blocksCell, kindCell, createdCell, updatedCell, actionsCell);
 
     row.querySelector(".page-link-cell")?.addEventListener("click", () => {
       loadPage(p.title);
@@ -12254,7 +13065,7 @@ function renderContentResults(query: string, hits: ContentHit[]): void {
     excerpt.append(snippet.after);
 
     item.append(title, excerpt);
-    item.addEventListener("click", () => openContentHit(hit));
+    item.addEventListener("click", () => openContentHit(hit, query));
     searchResultsDropdown.appendChild(item);
   });
 
@@ -12268,20 +13079,724 @@ function renderContentResults(query: string, hits: ContentHit[]): void {
  * ajuste de scroll va en un requestAnimationFrame para que el DOM del editor
  * ya esté pintado cuando se busque el `.block-item`.
  */
-function openContentHit(hit: ContentHit): void {
+function openContentHit(hit: ContentHit, query = ""): void {
   sidebarSearchInput.value = "";
   closeSearchResults(true);
   openPage(hit.page);
   cursorState = { blockId: hit.block.id, offset: 0 };
   requestAnimationFrame(() => {
     // CSS.escape: los ids de bloque pueden contener caracteres del selector.
-    document
-      .querySelector<HTMLElement>(`.block-item[data-id="${CSS.escape(hit.block.id)}"]`)
-      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+    let item = document.querySelector<HTMLElement>(
+      `.block-item[data-id="${CSS.escape(hit.block.id)}"]`
+    );
+    if (!item) return;
+
+    // Si el bloque vive dentro de un padre colapsado, el editor no lo pinta.
+    if (expandAncestorsToBlock(currentPage.blocks, hit.block.id)) {
+      renderBlocksTree();
+      const refreshed = document.querySelector<HTMLElement>(
+        `.block-item[data-id="${CSS.escape(hit.block.id)}"]`
+      );
+      if (!refreshed) return;
+      item = refreshed;
+    }
+
+    item.scrollIntoView({ behavior: "smooth", block: "center" });
+    item.classList.remove("search-hit-pulse");
+    // Reinicia la animación si se pulsea dos veces el mismo bloque.
+    void item.offsetWidth;
+    item.classList.add("search-hit-pulse");
+    item.addEventListener("animationend", () => item.classList.remove("search-hit-pulse"), {
+      once: true,
+    });
+
+    const editor = item.querySelector<HTMLElement>(".block-editor");
+    if (!editor) return;
+    const range = locateMatch(
+      editor.textContent || "",
+      query,
+      hit.index,
+      hit.matchLength
+    );
+    if (range) selectEditorRange(editor, range.start, range.end);
   });
 }
 
+/**
+ * Expande los ancestros colapsados de un bloque. Devuelve true si cambió el
+ * estado de algún nodo, para que el llamador vuelva a pintar el árbol.
+ */
+function expandAncestorsToBlock(blocks: BlockNode[], targetId: string): boolean {
+  const walk = (nodes: BlockNode[], ancestors: BlockNode[]): boolean => {
+    for (const node of nodes) {
+      if (node.id === targetId) {
+        let changed = false;
+        ancestors.forEach((ancestor) => {
+          if (ancestor.collapsed) {
+            ancestor.collapsed = false;
+            changed = true;
+          }
+        });
+        return changed;
+      }
+      if (node.children.length > 0 && walk(node.children, [...ancestors, node])) {
+        return true;
+      }
+    }
+    return false;
+  };
+  return walk(blocks, []);
+}
+
+/** Selecciona un rango de texto plano dentro de un `contenteditable`. */
+function createTextRange(editor: HTMLElement, start: number, end: number): Range | null {
+  const range = document.createRange();
+  const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+  let current = 0;
+  let started = false;
+  let node = walker.nextNode();
+  while (node) {
+    const length = node.textContent?.length || 0;
+    if (!started && start <= current + length) {
+      range.setStart(node, Math.max(0, start - current));
+      started = true;
+    }
+    if (started && end <= current + length) {
+      range.setEnd(node, Math.max(0, end - current));
+      break;
+    }
+    current += length;
+    node = walker.nextNode();
+  }
+  return started ? range : null;
+}
+
+function selectEditorRange(editor: HTMLElement, start: number, end: number): void {
+  const selection = window.getSelection();
+  if (!selection) return;
+  const range = createTextRange(editor, start, end);
+  if (!range) return;
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+/* ==================== BUSCAR DENTRO DE LA NOTA (T20) ==================== */
+let noteFindMatches: NoteMatch[] = [];
+let noteFindIndex = -1;
+let noteFindQuery = "";
+let noteFindDebounce: number | null = null;
+let noteFindPreviousFocus: HTMLElement | null = null;
+let noteFindUsedNativeSelection = false;
+
+function updateNoteFindCount(): void {
+  if (!noteFindCount) return;
+  noteFindCount.textContent =
+    noteFindMatches.length === 0 ? "0/0" : `${noteFindIndex + 1}/${noteFindMatches.length}`;
+}
+
+/** Borra el resaltado nativo o de la Highlight API sin tocar el contenido. */
+function clearNoteFindHighlight(): void {
+  const highlights = (CSS as unknown as { highlights?: Map<string, unknown> } | undefined)
+    ?.highlights;
+  highlights?.delete("note-find-active");
+  if (noteFindUsedNativeSelection) {
+    window.getSelection()?.removeAllRanges();
+    noteFindUsedNativeSelection = false;
+  }
+  blocksContainer
+    .querySelectorAll<HTMLElement>(".note-find-current")
+    .forEach((item) => item.classList.remove("note-find-current"));
+}
+
+/**
+ * La Highlight API pinta el rango sin mover el foco (el usuario sigue
+ * escribiendo en la barra). Si el WebView no la soporta se usa una selección
+ * nativa como respaldo.
+ */
+function setNoteFindHighlight(range: Range): void {
+  const HighlightCtor = (window as unknown as { Highlight?: new (range: Range) => unknown })
+    .Highlight;
+  const highlights = (CSS as unknown as { highlights?: Map<string, unknown> } | undefined)
+    ?.highlights;
+  if (typeof HighlightCtor === "function" && highlights) {
+    highlights.set("note-find-active", new HighlightCtor(range));
+    return;
+  }
+  const selection = window.getSelection();
+  if (!selection) return;
+  selection.removeAllRanges();
+  selection.addRange(range);
+  noteFindUsedNativeSelection = true;
+}
+
+function runNoteFind(resetIndex = true): void {
+  if (!noteFindBar || noteFindBar.hidden || !noteFindInput) return;
+  noteFindQuery = noteFindInput.value;
+  noteFindMatches = noteFindQuery
+    ? findMatchesInBlocks(currentPage.blocks, noteFindQuery)
+    : [];
+  clearNoteFindHighlight();
+
+  if (noteFindMatches.length === 0) {
+    noteFindIndex = -1;
+    updateNoteFindCount();
+    return;
+  }
+  noteFindIndex =
+    resetIndex || noteFindIndex < 0
+      ? 0
+      : Math.min(noteFindIndex, noteFindMatches.length - 1);
+  showNoteFindMatch(noteFindIndex);
+}
+
+function showNoteFindMatch(index: number): void {
+  const match = noteFindMatches[index];
+  if (!match) return;
+  noteFindIndex = index;
+  clearNoteFindHighlight();
+
+  // Un bullet dentro de un padre colapsado no existe en el DOM: se expande y
+  // se repinta antes de buscar su editor.
+  if (expandAncestorsToBlock(currentPage.blocks, match.blockId)) {
+    renderBlocksTree();
+  }
+
+  const item = blocksContainer.querySelector<HTMLElement>(
+    `.block-item[data-id="${CSS.escape(match.blockId)}"]`
+  );
+  if (!item) {
+    updateNoteFindCount();
+    return;
+  }
+
+  const reduced =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  item.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "center" });
+  item.classList.add("note-find-current");
+
+  const editor = item.querySelector<HTMLElement>(".block-editor");
+  const range = editor
+    ? locateMatch(
+        editor.textContent || "",
+        noteFindQuery,
+        match.start,
+        match.end - match.start
+      )
+    : null;
+
+  // Mantener el foco en la barra permite pulsar Enter para seguir saltando.
+  noteFindInput?.focus({ preventScroll: true });
+  if (editor && range) {
+    const domRange = createTextRange(editor, range.start, range.end);
+    if (domRange) setNoteFindHighlight(domRange);
+  }
+  updateNoteFindCount();
+}
+
+function moveNoteFind(delta: number): void {
+  if (noteFindMatches.length === 0) return;
+  const next =
+    (noteFindIndex + delta + noteFindMatches.length) % noteFindMatches.length;
+  showNoteFindMatch(next);
+}
+
+/** Abre Ctrl/Cmd+F solo dentro del editor y sin robar el buscar del navegador. */
+function openNoteFind(): void {
+  if (!noteFindBar || !noteFindInput || currentView !== "editor") return;
+  if (!noteFindBar.hidden) {
+    // Ya estaba abierta: no sustituir el foco previo por el propio input.
+    noteFindInput.focus();
+    noteFindInput.select();
+    runNoteFind(true);
+    return;
+  }
+  noteFindPreviousFocus =
+    document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+  const selection = window.getSelection();
+  if (selection && !selection.isCollapsed && selection.rangeCount > 0) {
+    const anchor = selection.anchorNode;
+    const selected = selection.toString();
+    if (
+      anchor &&
+      blocksContainer.contains(anchor) &&
+      selected.length > 0 &&
+      selected.length <= 120 &&
+      !selected.includes("\n")
+    ) {
+      noteFindInput.value = selected;
+    }
+  }
+
+  noteFindBar.hidden = false;
+  noteFindInput.focus();
+  noteFindInput.select();
+  runNoteFind(true);
+}
+
+function closeNoteFind(restoreFocus = true): void {
+  if (!noteFindBar || noteFindBar.hidden) return;
+  if (noteFindDebounce !== null) {
+    window.clearTimeout(noteFindDebounce);
+    noteFindDebounce = null;
+  }
+  noteFindBar.hidden = true;
+  clearNoteFindHighlight();
+  noteFindMatches = [];
+  noteFindIndex = -1;
+  noteFindQuery = "";
+
+  if (restoreFocus) {
+    const previous =
+      noteFindPreviousFocus &&
+      noteFindPreviousFocus !== noteFindInput &&
+      noteFindPreviousFocus.isConnected
+        ? noteFindPreviousFocus
+        : blocksContainer.querySelector<HTMLElement>(".block-editor");
+    previous?.focus({ preventScroll: true });
+  }
+  noteFindPreviousFocus = null;
+}
+
+noteFindInput?.addEventListener("input", () => {
+  if (noteFindDebounce !== null) window.clearTimeout(noteFindDebounce);
+  noteFindDebounce = window.setTimeout(() => {
+    noteFindDebounce = null;
+    runNoteFind(true);
+  }, 120);
+});
+
+noteFindInput?.addEventListener("keydown", (event: KeyboardEvent) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    event.stopPropagation();
+    moveNoteFind(event.shiftKey ? -1 : 1);
+  } else if (event.key === "ArrowDown") {
+    event.preventDefault();
+    event.stopPropagation();
+    moveNoteFind(1);
+  } else if (event.key === "ArrowUp") {
+    event.preventDefault();
+    event.stopPropagation();
+    moveNoteFind(-1);
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    closeNoteFind();
+  }
+});
+
+noteFindBar?.addEventListener("keydown", (event: KeyboardEvent) => {
+  // Evita que Enter/Escape lleguen a los atajos globales del editor.
+  if (event.key === "Enter" || event.key === "Escape") event.stopPropagation();
+});
+
+btnNoteFindPrev?.addEventListener("click", () => moveNoteFind(-1));
+btnNoteFindNext?.addEventListener("click", () => moveNoteFind(1));
+btnNoteFindClose?.addEventListener("click", () => closeNoteFind());
+
+
+/* ==================== VISTA DIVIDIDA: PANEL DE REFERENCIA (T7, fase 1) ==================== */
+const SPLIT_VIEW_FLAG_KEY = "sinnotas-split-view";
+const SPLIT_REFERENCE_KEY = "sinnotas-split-reference-page";
+const SPLIT_REFERENCE_LIST_KEY = "sinnotas-split-reference-pages";
+const SPLIT_OPEN_KEY = "sinnotas-split-open";
+const MAX_REFERENCE_NOTES = 2;
+
+/** Flag de emergencia: `localStorage["sinnotas-split-view"] = "false"` lo oculta. */
+function splitViewEnabled(): boolean {
+  return localStorage.getItem(SPLIT_VIEW_FLAG_KEY) !== "false";
+}
+
+function readReferenceNoteTitles(): string[] {
+  const normalize = (values: unknown[]): string[] => {
+    const seen = new Set<string>();
+    const titles: string[] = [];
+    for (const value of values) {
+      if (typeof value !== "string") continue;
+      const title = value.trim();
+      if (!title || seen.has(title) || titles.length >= MAX_REFERENCE_NOTES) continue;
+      seen.add(title);
+      titles.push(title);
+    }
+    return titles;
+  };
+
+  try {
+    const raw = localStorage.getItem(SPLIT_REFERENCE_LIST_KEY);
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        const titles = normalize(parsed);
+        return titles.length > 0 ? titles : [""];
+      }
+    }
+    // Migración desde la clave antigua de una sola nota de referencia.
+    const legacy = localStorage.getItem(SPLIT_REFERENCE_KEY)?.trim();
+    if (legacy) return [legacy];
+  } catch {
+    // Un localStorage corrupto no debe impedir abrir el panel.
+  }
+  return [""];
+}
+
+let referenceNoteTitles: string[] = readReferenceNoteTitles();
+
+function persistReferenceNoteTitles(): void {
+  const titles = referenceNoteTitles
+    .map((title) => title.trim())
+    .filter((title, index, all) => Boolean(title) && all.indexOf(title) === index)
+    .slice(0, MAX_REFERENCE_NOTES);
+  try {
+    localStorage.setItem(SPLIT_REFERENCE_LIST_KEY, JSON.stringify(titles));
+    localStorage.removeItem(SPLIT_REFERENCE_KEY);
+  } catch {
+    // La selección sigue funcionando durante la sesión.
+  }
+}
+
+/** Pinta una nota como texto enriquecido de solo lectura, sin contenteditable. */
+function renderReferenceBlocks(nodes: BlockNode[], container: HTMLElement, depth = 0): void {
+  nodes.forEach((node) => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "reference-block";
+    wrapper.style.setProperty("--reference-depth", String(Math.min(depth, 12)));
+
+    if (node.type === "image") {
+      const image = document.createElement("div");
+      image.className = "reference-block-image";
+      image.textContent = `🖼 ${node.imageAlt?.trim() || "Imagen"}`;
+      wrapper.appendChild(image);
+    } else {
+      const text = stripSystemProperties(node.content).trim();
+      if (text) {
+        const content = document.createElement("div");
+        content.className = "reference-block-content markdown-rendered";
+        content.innerHTML = sanitizeHtml(renderMarkdownToHtml(text));
+        wrapper.appendChild(content);
+      }
+    }
+
+    if (node.children.length > 0) {
+      const children = document.createElement("div");
+      children.className = "reference-children";
+      renderReferenceBlocks(node.children, children, depth + 1);
+      if (children.childElementCount > 0) wrapper.appendChild(children);
+    }
+
+    if (wrapper.childElementCount > 0) container.appendChild(wrapper);
+  });
+}
+
+function referencePageChoices(): PageData[] {
+  return vault
+    .getPages()
+    .filter((page) => page.title !== currentPage.title)
+    .slice()
+    .sort((a, b) =>
+      pageDisplayTitle(a).localeCompare(pageDisplayTitle(b), currentLanguage(), {
+        numeric: true,
+        sensitivity: "base",
+      })
+    );
+}
+
+function referencePageMatches(query: string): PageData[] {
+  const tokens = fold(query).split(/\s+/).filter(Boolean);
+  const pages = referencePageChoices();
+  if (tokens.length === 0) return pages;
+  return pages.filter((page) => {
+    const haystack = fold(`${pageDisplayTitle(page)}\u0000${page.title}\u0000${page.path}`);
+    return tokens.every((token) => haystack.includes(token));
+  });
+}
+
+function updateReferencePaneChrome(): void {
+  if (referencePaneCount) {
+    const count = referenceNoteTitles.filter(Boolean).length;
+    referencePaneCount.textContent = `${count}/${MAX_REFERENCE_NOTES}`;
+  }
+  if (btnAddReferencePane) {
+    btnAddReferencePane.hidden = referenceNoteTitles.length >= MAX_REFERENCE_NOTES;
+    btnAddReferencePane.disabled = referenceNoteTitles.length >= MAX_REFERENCE_NOTES;
+  }
+}
+
+function selectReferenceNote(index: number, title: string): void {
+  if (index < 0 || index >= referenceNoteTitles.length) return;
+  referenceNoteTitles[index] = title;
+  persistReferenceNoteTitles();
+  renderReferenceSlots();
+}
+
+/** Crea el buscador de una ranura de referencia con resultados filtrados. */
+function createReferenceNotePicker(
+  index: number,
+  selectedTitle: string
+): HTMLElement {
+  const picker = document.createElement("div");
+  picker.className = "reference-note-picker";
+
+  // El valor guardado es el título interno; en el buscador mostramos el mismo
+  // título legible que aparece en la lista (p. ej. la fecha de un diario).
+  const selectedPage = selectedTitle ? vault.getPageByTitle(selectedTitle) : null;
+  const selectedDisplayTitle = selectedPage
+    ? pageDisplayTitle(selectedPage)
+    : selectedTitle;
+
+  const search = document.createElement("div");
+  search.className = "reference-note-search";
+
+  const icon = document.createElement("span");
+  icon.className = "reference-note-search-icon";
+  icon.innerHTML =
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>';
+
+  const input = document.createElement("input");
+  input.type = "search";
+  input.className = "reference-note-search-input";
+  input.placeholder = translate("Buscar nota de referencia…");
+  input.setAttribute("aria-label", translate("Buscar nota de referencia"));
+  input.autocomplete = "off";
+  input.spellcheck = false;
+  input.value = selectedDisplayTitle;
+  if (selectedDisplayTitle) input.title = selectedDisplayTitle;
+
+  const results = document.createElement("div");
+  results.className = "reference-note-results";
+  results.setAttribute("role", "listbox");
+  results.hidden = true;
+
+  // La ranura recorta su contenido: limitar la altura de la lista al espacio
+  // real evita que las últimas opciones queden fuera de la vista.
+  const fitResultsToSlot = (): void => {
+    const slot = picker.closest(".reference-slot");
+    const top = results.getBoundingClientRect().top;
+    const bottom = slot ? slot.getBoundingClientRect().bottom : window.innerHeight;
+    const available = bottom - top - 8;
+    results.style.maxHeight = `${Math.max(72, Math.min(230, available))}px`;
+  };
+
+  let activeChoices: PageData[] = [];
+
+  const hideResults = (): void => {
+    results.hidden = true;
+    results.replaceChildren();
+  };
+
+  const choose = (title: string): void => {
+    hideResults();
+    const page = vault.getPageByTitle(title);
+    const displayTitle = page ? pageDisplayTitle(page) : title;
+    input.value = displayTitle;
+    input.title = displayTitle;
+    selectReferenceNote(index, title);
+  };
+
+  const renderResults = (query: string): void => {
+    activeChoices = referencePageMatches(query);
+    results.replaceChildren();
+    if (activeChoices.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "reference-note-results-empty";
+      empty.textContent = translate("No hay notas coincidentes.");
+      results.appendChild(empty);
+    } else {
+      activeChoices.forEach((page) => {
+        const option = document.createElement("button");
+        option.type = "button";
+        option.className = "reference-note-option";
+        option.setAttribute("role", "option");
+        option.setAttribute("aria-selected", String(page.title === selectedTitle));
+        const label = document.createElement("span");
+        label.className = "reference-note-option-title";
+        label.textContent = pageDisplayTitle(page);
+        const meta = document.createElement("span");
+        meta.className = "reference-note-option-meta";
+        meta.textContent = page.isJournal ? translate("Diario") : translate("Página");
+        option.append(label, meta);
+        // `pointerdown` evita que el blur del input cierre la lista antes del clic.
+        option.addEventListener("pointerdown", (event) => {
+          event.preventDefault();
+          choose(page.title);
+        });
+        results.appendChild(option);
+      });
+    }
+    results.hidden = false;
+    fitResultsToSlot();
+  };
+
+  input.addEventListener("focus", () => {
+    if (selectedDisplayTitle && input.value === selectedDisplayTitle) input.select();
+    renderResults("");
+  });
+  input.addEventListener("input", () => renderResults(input.value));
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      const first = activeChoices[0];
+      if (first && !results.hidden) choose(first.title);
+    } else if (event.key === "Escape") {
+      hideResults();
+      input.value = selectedDisplayTitle;
+      input.title = selectedDisplayTitle;
+      input.blur();
+    }
+  });
+  input.addEventListener("blur", () => {
+    window.setTimeout(hideResults, 120);
+  });
+
+  search.append(icon, input);
+  picker.append(search, results);
+  return picker;
+}
+
+function createReferenceSlot(index: number, selectedTitle: string): HTMLElement {
+  const slot = document.createElement("section");
+  slot.className = "reference-slot";
+  slot.dataset.referenceIndex = String(index);
+  slot.setAttribute("aria-label", `${translate("Nota de referencia")} ${index + 1}`);
+
+  const header = document.createElement("header");
+  header.className = "reference-slot-header";
+
+  const label = document.createElement("span");
+  label.className = "reference-slot-label";
+  label.textContent = `${translate("Referencia")} ${index + 1}`;
+
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "btn-icon reference-slot-remove";
+  remove.title = translate("Quitar nota de referencia");
+  remove.setAttribute("aria-label", translate("Quitar nota de referencia"));
+  remove.textContent = "×";
+  remove.addEventListener("click", () => {
+    referenceNoteTitles.splice(index, 1);
+    if (referenceNoteTitles.length === 0) referenceNoteTitles = [""];
+    persistReferenceNoteTitles();
+    renderReferenceSlots();
+  });
+
+  header.append(label, remove);
+
+  const picker = createReferenceNotePicker(index, selectedTitle);
+
+  const body = document.createElement("div");
+  body.className = "reference-slot-body";
+
+  const page = selectedTitle ? vault.getPageByTitle(selectedTitle) : null;
+  if (!selectedTitle) {
+    const empty = document.createElement("div");
+    empty.className = "reference-pane-empty";
+    empty.textContent = translate("Busca y elige una nota para verla aquí.");
+    body.appendChild(empty);
+  } else if (!page) {
+    const missing = document.createElement("div");
+    missing.className = "reference-pane-empty";
+    missing.textContent = translate("Esta nota ya no existe en la bóveda.");
+    body.appendChild(missing);
+  } else {
+    const pageBody = document.createElement("div");
+    pageBody.className = "reference-page";
+    renderReferenceBlocks(page.blocks, pageBody);
+    if (pageBody.childElementCount === 0) {
+      const empty = document.createElement("div");
+      empty.className = "reference-pane-empty";
+      empty.textContent = translate("Esta nota no tiene contenido.");
+      body.appendChild(empty);
+    } else {
+      body.appendChild(pageBody);
+    }
+  }
+
+  slot.append(header, picker, body);
+  return slot;
+}
+
+function renderReferenceSlots(): void {
+  if (!referenceSlots) return;
+  referenceSlots.replaceChildren();
+  referenceNoteTitles.forEach((title, index) => {
+    referenceSlots.appendChild(createReferenceSlot(index, title));
+  });
+  updateReferencePaneChrome();
+}
+
+/** Carga las notas de referencia elegidas en el panel derecho. */
+function renderReferencePane(title?: string): void {
+  if (!referencePane) return;
+  if (title) {
+    const clean = title.trim();
+    if (clean && clean !== currentPage.title && !referenceNoteTitles.includes(clean)) {
+      if (referenceNoteTitles.length === 0) {
+        referenceNoteTitles = [clean];
+      } else if (!referenceNoteTitles[0]) {
+        referenceNoteTitles[0] = clean;
+      } else if (referenceNoteTitles.length < MAX_REFERENCE_NOTES) {
+        referenceNoteTitles.push(clean);
+      } else {
+        referenceNoteTitles[0] = clean;
+      }
+    }
+  }
+  if (referenceNoteTitles.length === 0) referenceNoteTitles = [""];
+  if (referenceNoteTitles.length > MAX_REFERENCE_NOTES) {
+    referenceNoteTitles = referenceNoteTitles.slice(0, MAX_REFERENCE_NOTES);
+  }
+  persistReferenceNoteTitles();
+  renderReferenceSlots();
+}
+
+function openReferencePane(title?: string): void {
+  if (!splitViewEnabled() || !referencePane) return;
+  document.body.classList.add("editor-split-active");
+  referencePane.hidden = false;
+  btnSplitView?.classList.add("active");
+  btnSplitView?.setAttribute("aria-pressed", "true");
+  localStorage.setItem(SPLIT_OPEN_KEY, "true");
+  renderReferencePane(title);
+}
+
+function closeReferencePane(): void {
+  if (!referencePane) return;
+  document.body.classList.remove("editor-split-active");
+  referencePane.hidden = true;
+  btnSplitView?.classList.remove("active");
+  btnSplitView?.setAttribute("aria-pressed", "false");
+  localStorage.setItem(SPLIT_OPEN_KEY, "false");
+}
+
+/** Restaura el panel tras recargar; solo si el flag sigue activo. */
+function restoreEditorSplitView(): void {
+  if (!btnSplitView) return;
+  if (!splitViewEnabled()) {
+    btnSplitView.hidden = true;
+    return;
+  }
+  if (localStorage.getItem(SPLIT_OPEN_KEY) !== "true") return;
+  requestAnimationFrame(() => openReferencePane());
+}
+
+btnSplitView?.addEventListener("click", () => {
+  if (!referencePane) return;
+  if (referencePane.hidden) openReferencePane();
+  else closeReferencePane();
+});
+btnCloseReferencePane?.addEventListener("click", closeReferencePane);
+btnAddReferencePane?.addEventListener("click", () => {
+  if (referenceNoteTitles.length >= MAX_REFERENCE_NOTES) return;
+  referenceNoteTitles.push("");
+  renderReferenceSlots();
+});
+
+if (!splitViewEnabled() && btnSplitView) btnSplitView.hidden = true;
+btnSplitView?.setAttribute("aria-pressed", String(!referencePane?.hidden));
+
 function highlightDropdownItem(index: number) {
+
   const items = searchResultsDropdown.querySelectorAll<HTMLDivElement>(".search-dropdown-item");
   if (items.length === 0) return;
 
@@ -12336,6 +13851,26 @@ window.addEventListener("click", (e) => {
 
 /* ==================== GLOBAL KEYBOARD SHORTCUTS ==================== */
 window.addEventListener("keydown", (e: KeyboardEvent) => {
+  if ((e.ctrlKey || e.metaKey) && (e.key === "f" || e.key === "F")) {
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    const inAnotherField =
+      target !== null &&
+      target !== noteFindInput &&
+      (target.matches("input, textarea, select") ||
+        (target.isContentEditable && !target.closest("#view-editor")));
+    if (currentView === "editor" && !hasMountedModal() && !inAnotherField) {
+      e.preventDefault();
+      openNoteFind();
+      return;
+    }
+  }
+
+  if (e.key === "Escape" && noteFindBar && !noteFindBar.hidden) {
+    e.preventDefault();
+    closeNoteFind();
+    return;
+  }
+
   if ((e.ctrlKey || e.metaKey) && e.key === "/") {
     // No abrir atajos encima de otro diálogo (ajustes, historial, etc.).
     if (hasMountedModalExcept(shortcutsModalOverlay)) return;
@@ -12404,6 +13939,30 @@ window.addEventListener("keydown", (e: KeyboardEvent) => {
 /* ==================== SINCRONIZACIÓN ENTRE DISPOSITIVOS ==================== */
 let vaultSyncInFlight = false;
 let lastVaultSyncAt = 0;
+let vaultFocusSyncTimer: number | null = null;
+
+/**
+ * Una vuelta desde otra ventana puede disparar `focus` y `visibilitychange` a
+ * la vez. Se unifican en una sola sincronización diferida: así no se lanza un
+ * `load_vault` doble ni se reescribe la tarjeta activa dos veces (T18).
+ */
+function scheduleVaultFocusSync(): void {
+  if (currentView !== "flashcards" || document.hidden) return;
+  if (vaultFocusSyncTimer !== null) window.clearTimeout(vaultFocusSyncTimer);
+  vaultFocusSyncTimer = window.setTimeout(() => {
+    vaultFocusSyncTimer = null;
+    if (currentView !== "flashcards" || document.hidden) return;
+    void synchronizeVaultFromDisk({ notify: false }).then((changed) => {
+      if (changed || currentView !== "flashcards" || flashcardLoading) return;
+      // Al volver puede haber vencido una tarjeta mientras la ventana estaba
+      // en segundo plano; reconstruir la cola sin salir de la sesión (T23).
+      if (!flashcardsManager.getCurrentCard() && !flashcardExplorerActive) {
+        refreshDueFlashcardQueue();
+      }
+    });
+  }, 300);
+}
+
 
 function blocksContentSignature(blocks: BlockNode[]): unknown[] {
   return blocks.map((block) => [
@@ -12685,13 +14244,9 @@ async function initializeDesktopApp(): Promise<void> {
       console.error("No se pudo cargar el historial de repasos:", error);
     });
 
-  window.addEventListener("focus", () => {
-    if (currentView === "flashcards") void synchronizeVaultFromDisk({ notify: false });
-  });
+  window.addEventListener("focus", scheduleVaultFocusSync);
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && currentView === "flashcards") {
-      void synchronizeVaultFromDisk({ notify: false });
-    }
+    if (!document.hidden) scheduleVaultFocusSync();
   });
   // Los diarios se crean únicamente cuando el usuario pulsa una fecha en el
   // calendario. Antes se creaba el diario de hoy en cada arranque, lo que
@@ -12713,6 +14268,7 @@ async function initializeDesktopApp(): Promise<void> {
   }
   if (!restored) renderEditor();
   recordNavigationHistory();
+  restoreEditorSplitView();
 
   const first = blocksContainer.querySelector<HTMLElement>(".block-editor");
   if (currentView === "editor") first?.focus();

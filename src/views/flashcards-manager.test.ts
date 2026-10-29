@@ -525,3 +525,93 @@ describe("FlashcardsManager - persistencia del estado FSRS", () => {
     expect(cleared).toBe("Pregunta :: Respuesta #card");
   });
 });
+
+describe("FlashcardsManager - contexto del bullet padre (T16)", () => {
+  it("usa el bullet padre inmediato y no la respuesta de una tarjeta padre", () => {
+    const page: PageData = {
+      id: "p-parent",
+      title: "Contexto",
+      path: "notes/Contexto.md",
+      blocks: [
+        {
+          id: "parent",
+          type: "text",
+          content: "Tema principal :: respuesta que no debe filtrarse",
+          children: [
+            {
+              id: "child",
+              type: "text",
+              content: "Pregunta hija :: Respuesta hija",
+              children: [],
+            },
+          ],
+        },
+      ],
+    };
+
+    const manager = new FlashcardsManager();
+    const cards = manager.scanVault([page], "new-first");
+    const child = cards.find((card) => card.blockId === "child");
+
+    expect(child?.parentContent).toBe("Tema principal");
+  });
+
+  it("omite imágenes y bullets sin texto visible", () => {
+    const page: PageData = {
+      id: "p-parent-image",
+      title: "Imagen",
+      path: "notes/Imagen.md",
+      blocks: [
+        {
+          id: "image-parent",
+          type: "image",
+          content: "![[foto.png]]",
+          children: [
+            { id: "child", type: "text", content: "Pregunta :: Respuesta", children: [] },
+          ],
+        },
+      ],
+    };
+
+    const manager = new FlashcardsManager();
+    const [card] = manager.scanVault([page], "new-first");
+    expect(card.parentContent).toBeUndefined();
+  });
+});
+
+describe("FlashcardsManager - rechequeo de tarjetas vencidas (T23)", () => {
+  it("no muta la cola si no hay vencidas y la reconstruye cuando las hay", () => {
+    const page = makePage("p-due", "Vencidas", "Pregunta :: Respuesta");
+    const manager = new FlashcardsManager();
+    const detected = manager.scanPages([page]);
+    manager.setDetectedCards(detected, "new-first");
+
+    expect(manager.getCardsCount()).toBe(1);
+    // Agota la cola sin programar nada nuevo.
+    manager.reveal();
+    manager.rate(3);
+    expect(manager.getCurrentCard()).toBeNull();
+
+    // Simula que el reloj avanza: la tarjeta vuelve a estar vencida.
+    const card = manager.getAllCards()[0];
+    card.dueDate = "2000-01-01T00:00:00.000Z";
+    card.fsrs.lastReviewDate = "2000-01-01T00:00:00.000Z";
+    card.lastIntervalDays = 0;
+
+    expect(manager.countDueCards()).toBe(1);
+    expect(manager.refreshDueQueue("new-first")).toBe(1);
+    expect(manager.getCurrentCard()?.id).toBe(card.id);
+    expect(manager.getCardsCount()).toBe(1);
+  });
+
+  it("deja la cola vacía cuando ninguna tarjeta está vencida", () => {
+    const manager = new FlashcardsManager();
+    manager.setDetectedCards(manager.scanPages([makePage("p-future", "Futura", "P :: R")]));
+    manager.reveal();
+    manager.rate(3);
+
+    expect(manager.countDueCards()).toBe(0);
+    expect(manager.refreshDueQueue("new-first")).toBe(0);
+    expect(manager.getCurrentCard()).toBeNull();
+  });
+});
