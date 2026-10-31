@@ -33,7 +33,7 @@ The current frontend uses neither React nor Tailwind CSS.
 - **Journals and pages:** create daily journals by date, browse all pages and check version history.
 - **Export:** export the current page as plain `.txt` text.
 - **Sync:** use your favorite sync service to keep notes up to date across devices.
-- **Adaptable UI:** light and dark themes, five accent colors, configurable fonts (system font separate from the font mosaic), glow-intensity control (with 3 positions/extended range), and a Spanish/English/Chinese interface on both desktop and the mobile review app.
+- **Adaptable UI:** light and dark themes, five accent colors, configurable fonts (system font separate from the font mosaic), and a Spanish/English/Chinese interface on both desktop and the mobile review app.
 - **Repository link:** a button in the settings to visit the project's GitHub repository directly.
 
 ## Editor shortcuts

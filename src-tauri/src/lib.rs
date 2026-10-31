@@ -1474,9 +1474,17 @@ impl VaultCacheRuntime {
             .collect();
         drop(cache);
 
-        if let Err(error) = metadata_cache::write_cache_file(&self.root, &snapshot) {
-            eprintln!("No se pudo persistir la caché de metadatos: {error}");
-        }
+        // La serialización bincode de toda la caché + fsync son lentos en
+        // discos mecánicos/antivirus activos (decenas de ms). Se sacan a un
+        // hilo aparte para no ocupar el worker del comando de guardado ni el
+        // hilo del watcher: la caché es prescindible (solo acelera el
+        // arranque) y la nota ya está guardada en el .md a estas alturas.
+        let write_root = self.root.clone();
+        std::thread::spawn(move || {
+            if let Err(error) = metadata_cache::write_cache_file(&write_root, &snapshot) {
+                eprintln!("No se pudo persistir la caché de metadatos: {error}");
+            }
+        });
 
         if notify_frontend {
             let revision = self.revision.fetch_add(1, Ordering::SeqCst) + 1;

@@ -699,8 +699,6 @@ const btnMobileBackToReview = document.getElementById(
 const btnEnterReviewMode = document.getElementById(
   "btn-enter-review-mode"
 ) as HTMLButtonElement | null;
-const glowIntensitySlider = document.getElementById("glow-intensity-slider") as HTMLInputElement;
-const glowIntensityValue = document.getElementById("glow-intensity-value") as HTMLOutputElement;
 const btnDeletePage = document.getElementById("btn-delete-page") as HTMLButtonElement;
 const btnPageHistory = document.getElementById("btn-page-history") as HTMLButtonElement;
 const btnClearBulletProperties = document.getElementById("btn-clear-bullet-properties") as HTMLButtonElement;
@@ -1208,9 +1206,9 @@ function initThemeAndTypography() {
 
   initTypographySettings();
 
-  const savedGlowIntensityRaw = localStorage.getItem("sinnotas-glow-intensity");
-  const savedGlowIntensity = savedGlowIntensityRaw === null ? 100 : Number(savedGlowIntensityRaw);
-  setGlowIntensity(Number.isFinite(savedGlowIntensity) ? savedGlowIntensity : 100);
+  // El control de intensidad del estilo Aero se retiró: se limpia el valor
+  // guardado para que el glow vuelva a su intensidad por defecto (1).
+  localStorage.removeItem("sinnotas-glow-intensity");
 
   const savedFocusMinutes = Number(localStorage.getItem("sinnotas-pomodoro-focus")) || 25;
   const savedBreakMinutes = Number(localStorage.getItem("sinnotas-pomodoro-break")) || 5;
@@ -1420,15 +1418,6 @@ function setPageWidth(value: number): void {
   pageWidthSlider.value = String(width);
   pageWidthValue.value = `${width} px`;
   localStorage.setItem("sinnotas-page-width", String(width));
-}
-
-function setGlowIntensity(value: number): void {
-  // Tres posiciones: 0 % sin glow, 50 % glow bajo, 100 % glow actual.
-  const clamped = Math.max(0, Math.min(100, Math.round(value / 50) * 50));
-  document.documentElement.style.setProperty("--ls-glow-intensity", String(clamped / 100));
-  if (glowIntensitySlider) glowIntensitySlider.value = String(clamped);
-  if (glowIntensityValue) glowIntensityValue.value = `${clamped}%`;
-  localStorage.setItem("sinnotas-glow-intensity", String(clamped));
 }
 
 let currentFontSizes = readFontSizes();
@@ -2846,10 +2835,6 @@ settingsDropdownMenu.querySelectorAll<HTMLButtonElement>("[data-visual-option]")
 
 pageWidthSlider.addEventListener("input", () => {
   setPageWidth(Number(pageWidthSlider.value));
-});
-
-glowIntensitySlider.addEventListener("input", () => {
-  setGlowIntensity(Number(glowIntensitySlider.value));
 });
 
 settingsDropdownMenu.querySelectorAll<HTMLButtonElement>(".font-option-btn[data-font]").forEach((btn) => {
@@ -10576,21 +10561,88 @@ function formatFlashcardDate(value?: string): string {
     : new Intl.DateTimeFormat(currentLanguage(), { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
+/** Tope y paso del zoom del repaso de oclusiones (1×: tamaño normal). */
+const OCCLUSION_ZOOM_MIN = 1;
+const OCCLUSION_ZOOM_MAX = 4;
+const OCCLUSION_ZOOM_STEP = 0.25;
+
+function clampOcclusionZoom(value: number): number {
+  return Math.max(OCCLUSION_ZOOM_MIN, Math.min(OCCLUSION_ZOOM_MAX, value));
+}
+
 function createImageOcclusionPreview(card: Flashcard, revealed: boolean): HTMLDivElement {
+  const viewport = document.createElement("div");
+  viewport.className = "flashcard-image-viewport";
+
   const preview = document.createElement("div");
   preview.className = "flashcard-image-preview";
   preview.classList.add("image-block-loading");
+  viewport.appendChild(preview);
+
+  // Zoom de repaso: agranda la imagen y, con ella, la capa SVG de máscaras.
+  // Ambas escalan en proporción exacta porque las máscaras se sitúan por
+  // fracciones (viewBox normalizado al tamaño con el que se dibujaron), así
+  // que siempre tapan el cloze aunque el contenedor crezca.
+  const zoomLabel = document.createElement("output");
+  zoomLabel.className = "flashcard-image-zoom-value";
+  let zoom = 1;
+  let baseHeight: number | null = null;
+
+  const zoomWrap = document.createElement("div");
+  zoomWrap.className = "flashcard-image-zoom-controls";
+  const zoomOutButton = document.createElement("button");
+  zoomOutButton.type = "button";
+  zoomOutButton.className = "font-option-btn";
+  zoomOutButton.title = "Reducir";
+  zoomOutButton.textContent = "−";
+  const zoomInButton = document.createElement("button");
+  zoomInButton.type = "button";
+  zoomInButton.className = "font-option-btn";
+  zoomInButton.title = "Ampliar";
+  zoomInButton.textContent = "+";
+  zoomLabel.innerText = "100%";
+  zoomWrap.append(zoomOutButton, zoomLabel, zoomInButton);
+
+  const applyZoom = (next: number): void => {
+    zoom = clampOcclusionZoom(next);
+    zoomLabel.innerText = `${Math.round(zoom * 100)}%`;
+    if (zoom === 1) {
+      image.style.removeProperty("height");
+      image.style.removeProperty("max-height");
+      image.style.removeProperty("max-width");
+      preview.style.removeProperty("max-width");
+      viewport.classList.toggle("is-zoomed", false);
+      zoomInButton.disabled = false;
+      zoomOutButton.disabled = true;
+    } else if (baseHeight !== null && baseHeight > 0) {
+      image.style.maxHeight = "none";
+      image.style.maxWidth = "none";
+      image.style.height = `${Math.round(baseHeight * zoom)}px`;
+      preview.style.maxWidth = "none";
+      viewport.classList.toggle("is-zoomed", true);
+      zoomInButton.disabled = zoom >= OCCLUSION_ZOOM_MAX;
+      zoomOutButton.disabled = zoom <= OCCLUSION_ZOOM_MIN;
+    }
+  };
 
   const image = document.createElement("img");
   image.alt = "";
+  image.decoding = "async";
   image.addEventListener("load", () => {
     preview.classList.remove("image-block-loading", "image-block-load-error");
+    baseHeight = image.clientHeight;
+    if (zoom !== 1) applyZoom(zoom);
   }, { once: true });
   image.addEventListener("error", () => {
     preview.classList.remove("image-block-loading");
     preview.classList.add("image-block-load-error");
+    zoomWrap.hidden = true;
     console.error(`No se pudo cargar la imagen de oclusión para ${card.pageTitle}.`);
   }, { once: true });
+  zoomInButton.addEventListener("click", () => applyZoom(zoom + OCCLUSION_ZOOM_STEP));
+  zoomOutButton.addEventListener("click", () => applyZoom(zoom - OCCLUSION_ZOOM_STEP));
+  zoomLabel.addEventListener("dblclick", () => applyZoom(1));
+  zoomOutButton.disabled = true;
   preview.appendChild(image);
   if (card.imageSource) {
     void resolveDisplayImageUrl(card.imageSource).then((url) => {
@@ -10608,7 +10660,10 @@ function createImageOcclusionPreview(card: Flashcard, revealed: boolean): HTMLDi
     // En la respuesta se muestra únicamente la imagen limpia, sin máscaras ni
     // contornos: la oclusión solo tiene sentido durante la pregunta.
     const visibleMasks = revealed ? [] : regions;
-    if (visibleMasks.length === 0) return preview;
+    if (visibleMasks.length === 0) {
+      viewport.appendChild(zoomWrap);
+      return viewport;
+    }
     const layer = document.createElement("div");
     layer.className = "flashcard-image-mask-layer";
     image.addEventListener("load", () => {
@@ -10617,12 +10672,47 @@ function createImageOcclusionPreview(card: Flashcard, revealed: boolean): HTMLDi
         visibleMasks,
         image,
         "image-occlusion-mask",
-        revealed ? undefined : card.imageOcclusion
+        revealed ? undefined : card.imageOcclusion,
+        // La capa se estira con la imagen: el zoom y los cambios de ventana
+        // mantienen las máscaras alineadas con su zona.
+        true
       );
     }, { once: true });
     preview.appendChild(layer);
   }
-  return preview;
+  // Pan con arrastre cuando el zoom saca parte de la imagen del contenedor.
+  viewport.addEventListener("pointerdown", (event) => {
+    if (!viewport.classList.contains("is-zoomed") || event.button !== 0) return;
+    if (viewport.scrollWidth <= viewport.clientWidth && viewport.scrollHeight <= viewport.clientHeight) return;
+    const startLeft = viewport.scrollLeft;
+    const startTop = viewport.scrollTop;
+    const startX = event.clientX;
+    const startY = event.clientY;
+    viewport.classList.add("is-panning");
+    viewport.setPointerCapture(event.pointerId);
+    const onMove = (moveEvent: PointerEvent): void => {
+      moveEvent.preventDefault();
+      viewport.scrollLeft = startLeft + startX - moveEvent.clientX;
+      viewport.scrollTop = startTop + startY - moveEvent.clientY;
+    };
+    const onEnd = (): void => {
+      viewport.classList.remove("is-panning");
+      viewport.removeEventListener("pointermove", onMove);
+      viewport.removeEventListener("pointerup", onEnd);
+      viewport.removeEventListener("pointercancel", onEnd);
+    };
+    viewport.addEventListener("pointermove", onMove);
+    viewport.addEventListener("pointerup", onEnd);
+    viewport.addEventListener("pointercancel", onEnd);
+  });
+  // Ctrl/rueda + también hace zoom sobre la propia imagen (rueda sola: desplaza).
+  viewport.addEventListener("wheel", (event) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    applyZoom(zoom + (event.deltaY > 0 ? -OCCLUSION_ZOOM_STEP : OCCLUSION_ZOOM_STEP));
+  }, { passive: false });
+  viewport.appendChild(zoomWrap);
+  return viewport;
 }
 
 function flashcardExplorerSortTime(card: Flashcard): number {

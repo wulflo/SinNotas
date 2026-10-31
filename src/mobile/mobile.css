@@ -713,6 +713,56 @@ body.mobile-review-body {
   min-height: 180px;
 }
 
+/* Contenedor con scroll y controles de zoom del repaso de oclusiones. */
+.mobile-image-viewport {
+  position: relative;
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: 14px;
+  touch-action: pan-x pan-y;
+}
+
+.mobile-image-viewport.is-zoomed {
+  cursor: grab;
+}
+
+.mobile-image-viewport.is-panning {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mobile-image-zoom-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 6px auto 12px;
+}
+
+.mobile-image-zoom-button {
+  min-width: 44px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--mobile-border, rgba(255, 255, 255, 0.14));
+  border-radius: 10px;
+  background: var(--mobile-bg-soft);
+  color: var(--mobile-text, #e5e7eb);
+  font-size: 16px;
+  line-height: 1;
+  touch-action: manipulation;
+}
+
+.mobile-image-zoom-value {
+  min-width: 3.2em;
+  text-align: center;
+  color: var(--mobile-muted);
+  font-size: calc(14px * var(--mobile-font-scale, 1));
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
 .mobile-image-preview.has-error > img {
   display: none;
 }

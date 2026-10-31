@@ -5342,6 +5342,42 @@ body.is-bullet-selecting {
   max-width: min(100%, 420px);
 }
 
+/* Contenedor con scroll del repaso de oclusiones: permite ver la imagen con
+   zoom mayor que el área de la tarjeta (con barras de desplazamiento). */
+.flashcard-image-viewport {
+  position: relative;
+  max-width: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  border-radius: 12px;
+}
+
+.flashcard-image-viewport.is-zoomed {
+  cursor: grab;
+}
+
+.flashcard-image-viewport.is-panning {
+  cursor: grabbing;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.flashcard-image-zoom-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 4px auto 10px;
+}
+
+.flashcard-image-zoom-value {
+  min-width: 3.2em;
+  text-align: center;
+  color: var(--ls-text-muted);
+  font-size: calc(12px * var(--ls-font-scale, 1));
+  cursor: pointer;
+}
+
 .flashcard-image-mask-layer .image-occlusion-mask {
   border-radius: 4px;
 }

@@ -31,6 +31,7 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::Write;
 use std::path::{Component, Path};
+use std::sync::LazyLock;
 use std::time::UNIX_EPOCH;
 use walkdir::WalkDir;
 
@@ -518,9 +519,14 @@ fn truncate_chars(value: &str, max_bytes: usize) -> String {
     value[..end].to_string()
 }
 
+/// Regex de tarjetas de relleno (cloze). Compilada una sola vez: se usa en
+/// cada re-parseo de notas y compilaba una copia nueva por llamada.
+static CLOZE_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"\{\{(?:c\d+::|cloze\s+)?(.*?)\}\}|==(.*?)==").expect("cloze regex")
+});
+
 fn flashcard_state(blocks: &[BlockNode]) -> CachedFlashcardState {
     let mut state = CachedFlashcardState::default();
-    let cloze_re = Regex::new(r"\{\{(?:c\d+::|cloze\s+)?(.*?)\}\}|==(.*?)==").expect("cloze regex");
     let mut stack: Vec<&BlockNode> = blocks.iter().collect();
     while let Some(block) = stack.pop() {
         let content = &block.content;
@@ -531,7 +537,7 @@ fn flashcard_state(blocks: &[BlockNode]) -> CachedFlashcardState {
         if content.to_ascii_lowercase().contains("image-occlusions::") {
             state.image_occlusions = state.image_occlusions.saturating_add(1);
         }
-        if cloze_re.is_match(content) {
+        if CLOZE_RE.is_match(content) {
             state.cloze_cards = state.cloze_cards.saturating_add(1);
             state.has_cards = true;
         } else if has_card_tag || has_colon {

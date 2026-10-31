@@ -2497,7 +2497,6 @@ rendimiento con bóvedas grandes y sirva para priorizar optimizaciones.
 | `sinnotas-font-size-*` | Tamaños por tipo (`ui`, `editor`, `pageTitle`, `h1`…). |
 | `sinnotas-font-size-flashcard-question` | Tamaño `em` del texto de tarjeta. |
 | `sinnotas-page-width` | Ancho de página en px. |
-| `sinnotas-glow-intensity` | Intensidad Aero (0–100). |
 | `sinnotas-settings-tab` | Última pestaña de Ajustes. |
 | `sinnotas-all-pages-sort` | Orden de “Todas las páginas”. |
 | `sinnotas-all-pages-widths` | Anchos de columnas (nuevo, T2). |

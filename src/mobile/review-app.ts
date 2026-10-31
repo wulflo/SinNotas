@@ -2366,13 +2366,70 @@ class MobileReviewApp {
   }
 
   private createImagePreview(card: Flashcard, revealed: boolean): HTMLDivElement {
+    const viewport = document.createElement("div");
+    viewport.className = "mobile-image-viewport";
+
     const preview = document.createElement("div");
     preview.className = "mobile-image-preview";
+    viewport.appendChild(preview);
+
+    // Zoom de repaso: la imagen y la capa de máscaras escalan en la misma
+    // proporción (las máscaras son fracciones del tamaño del dibujo), así
+    // que siguen tapando el cloze en cualquier aumento.
+    let zoom = 1;
+    let baseHeight: number | null = null;
+    const ZOOM_MIN = 1;
+    const ZOOM_MAX = 4;
+    const ZOOM_STEP = 0.25;
+
+    const zoomLabel = document.createElement("output");
+    zoomLabel.className = "mobile-image-zoom-value";
+    const zoomOutButton = document.createElement("button");
+    zoomOutButton.type = "button";
+    zoomOutButton.className = "mobile-image-zoom-button";
+    zoomOutButton.title = "Reducir";
+    zoomOutButton.textContent = "−";
+    zoomOutButton.disabled = true;
+    const zoomInButton = document.createElement("button");
+    zoomInButton.type = "button";
+    zoomInButton.className = "mobile-image-zoom-button";
+    zoomInButton.title = "Ampliar";
+    zoomInButton.textContent = "+";
+    zoomInButton.disabled = true;
+
+    const zoomWrap = document.createElement("div");
+    zoomWrap.className = "mobile-image-zoom-controls";
+    zoomWrap.append(zoomOutButton, zoomLabel, zoomInButton);
+    // Arranque desactivado: los botones solo se activan cuando la imagen
+    // carga de verdad (con error o pendiente no hay nada que ampliar).
+    zoomWrap.hidden = true;
 
     const image = document.createElement("img");
     image.alt = "Imagen de la tarjeta";
     image.decoding = "async";
     preview.appendChild(image);
+
+    const applyZoom = (next: number): void => {
+      zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, next));
+      zoomLabel.innerText = `${Math.round(zoom * 100)}%`;
+      if (zoom === 1) {
+        image.style.removeProperty("height");
+        image.style.removeProperty("max-height");
+        image.style.removeProperty("max-width");
+        preview.style.removeProperty("max-width");
+        viewport.classList.toggle("is-zoomed", false);
+        zoomInButton.disabled = true;
+        zoomOutButton.disabled = false;
+      } else if (baseHeight !== null && baseHeight > 0) {
+        image.style.maxHeight = "none";
+        image.style.maxWidth = "none";
+        image.style.height = `${Math.round(baseHeight * zoom)}px`;
+        preview.style.maxWidth = "none";
+        viewport.classList.toggle("is-zoomed", true);
+        zoomInButton.disabled = zoom >= ZOOM_MAX;
+        zoomOutButton.disabled = zoom <= ZOOM_MIN;
+      }
+    };
 
     const regions = card.imageOcclusions?.length
       ? card.imageOcclusions
@@ -2395,9 +2452,16 @@ class MobileReviewApp {
           visibleMasks,
           image,
           "image-occlusion-mask",
-          revealed ? undefined : card.imageOcclusion
+          revealed ? undefined : card.imageOcclusion,
+          // La capa se estira con la imagen: el zoom mantiene las máscaras
+          // alineadas con su zona.
+          true
         );
       }
+      baseHeight = image.clientHeight;
+      zoomWrap.hidden = false;
+      zoomInButton.disabled = false;
+      if (zoom !== 1) applyZoom(zoom);
     }, { once: true });
     image.addEventListener("error", () => {
       preview.classList.add("has-error");
@@ -2406,6 +2470,38 @@ class MobileReviewApp {
       error.textContent = "No se pudo cargar la imagen de esta tarjeta.";
       preview.appendChild(error);
     }, { once: true });
+
+    zoomInButton.addEventListener("click", () => applyZoom(zoom + ZOOM_STEP));
+    zoomOutButton.addEventListener("click", () => applyZoom(zoom - ZOOM_STEP));
+    zoomLabel.addEventListener("dblclick", () => applyZoom(1));
+
+    // Pan por arrastre cuando el zoom saca parte de la imagen del contenedor.
+    viewport.addEventListener("pointerdown", (event) => {
+      if (!viewport.classList.contains("is-zoomed")) return;
+      if (viewport.scrollWidth <= viewport.clientWidth && viewport.scrollHeight <= viewport.clientHeight) return;
+      const startLeft = viewport.scrollLeft;
+      const startTop = viewport.scrollTop;
+      const startX = event.clientX;
+      const startY = event.clientY;
+      viewport.classList.add("is-panning");
+      viewport.setPointerCapture(event.pointerId);
+      const onMove = (moveEvent: PointerEvent): void => {
+        moveEvent.preventDefault();
+        viewport.scrollLeft = startLeft + startX - moveEvent.clientX;
+        viewport.scrollTop = startTop + startY - moveEvent.clientY;
+      };
+      const onEnd = (): void => {
+        viewport.classList.remove("is-panning");
+        viewport.removeEventListener("pointermove", onMove);
+        viewport.removeEventListener("pointerup", onEnd);
+        viewport.removeEventListener("pointercancel", onEnd);
+      };
+      viewport.addEventListener("pointermove", onMove);
+      viewport.addEventListener("pointerup", onEnd);
+      viewport.addEventListener("pointercancel", onEnd);
+    });
+
+    viewport.appendChild(zoomWrap);
 
     void this.resolveImageUrl(card.imageSource)
       .then((url) => {
@@ -2417,7 +2513,7 @@ class MobileReviewApp {
         preview.classList.add("has-error");
       });
 
-    return preview;
+    return viewport;
   }
 
   private async resolveImageUrl(source?: string): Promise<string | null> {

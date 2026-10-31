@@ -196,13 +196,19 @@ export function occlusionRegionsMatch(
  * Dibuja las máscaras SVG de una tarjeta de oclusión. Todos los atributos SVG
  * se asignan con `setAttribute` a partir de valores numéricos/validados; nunca
  * se interpola HTML del usuario.
+ *
+ * `fill` (repaso) hace que el `<svg>` ocupe el 100 % del contenedor en lugar
+ * de su tamaño intrínseco (el del dibujo original). Así, si después la imagen
+ * crece por zoom o por un ajuste de ventana, la capa se estira a la vez y las
+ * máscaras —definidas como fracciones— siguen tapando exactamente su zona.
  */
 export function appendOcclusionMasks(
   layer: HTMLElement,
   regions: ImageOcclusionRegion[],
   imageElement?: HTMLImageElement,
   className = "image-occlusion-mask",
-  highlightedRegion?: ImageOcclusionRegion
+  highlightedRegion?: ImageOcclusionRegion,
+  fill = false
 ): void {
   const svgNamespace = "http://www.w3.org/2000/svg";
   const viewWidth = imageElement ? imageElement.clientWidth : (layer.clientWidth || 1000);
@@ -212,6 +218,12 @@ export function appendOcclusionMasks(
   svg.setAttribute("viewBox", `0 0 ${viewWidth} ${viewHeight}`);
   svg.setAttribute("preserveAspectRatio", "none");
   svg.setAttribute("aria-hidden", "true");
+  if (fill) {
+    // Un SVG es un elemento reemplazado: con `inset: 0` pero sin tamaño
+    // explícito usa las dimensiones del viewBox y no se estira con la imagen.
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", "100%");
+  }
 
   regions.forEach((region) => {
     const isQuestionTarget = Boolean(highlightedRegion && occlusionRegionsMatch(region, highlightedRegion));

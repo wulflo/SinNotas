@@ -32,8 +32,31 @@ function structureKeyOf(blocks: BlockNode[]): string {
   return parts.join("|");
 }
 
-function blocksEqual(a: BlockNode[], b: BlockNode[]): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+/**
+ * Comparación barata entre dos árboles sin serializar nada: nada de
+ * JSON.stringify (que recorre y concatena la nota entera dos veces por
+ * pulsación). Compara estructura y contenido con igualdad de strings; el
+ * coste real solo aparece cuando difieren. Devuelve true si son iguales.
+ */
+function treesEqual(a: BlockNode[], b: BlockNode[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let index = 0; index < a.length; index += 1) {
+    const left = a[index];
+    const right = b[index];
+    if (left === right) continue;
+    if (
+      left.id !== right.id ||
+      left.type !== right.type ||
+      left.content !== right.content ||
+      left.imageAlt !== right.imageAlt ||
+      left.collapsed !== right.collapsed
+    ) {
+      return false;
+    }
+    if (!treesEqual(left.children || [], right.children || [])) return false;
+  }
+  return true;
 }
 
 /**
@@ -69,20 +92,20 @@ export class DocumentHistory {
   public capture(pageId: string, blocks: BlockNode[], title: string): void {
     if (this.restoring) return;
 
-    const now = Date.now();
-    const snapshot: InternalEntry = {
-      blocks: cloneTree(blocks),
-      title,
-      at: now,
-      structureKey: structureKeyOf(blocks),
-    };
-
     const last = this.lastStates.get(pageId);
     if (!last) {
-      this.lastStates.set(pageId, snapshot);
+      this.lastStates.set(pageId, this.toEntry(blocks, title));
       return;
     }
-    if (blocksEqual(last.blocks, blocks) && last.title === title) return;
+    // Comparación sin serializar: el snapshot (clon profundo + firma de
+    // estructura) solo se construye si la nota cambió de verdad. Antes se
+    // clonaba y serializaba TODO el árbol en cada pulsación y luego se
+    // volcaba dos veces con JSON.stringify para descartar la mayoría de las
+    // capturas.
+    if (last.title === title && treesEqual(last.blocks, blocks)) return;
+
+    const snapshot = this.toEntry(blocks, title);
+    const now = snapshot.at;
 
     const undoStack = this.undoStacks.get(pageId) ?? [];
     const structureChanged = last.structureKey !== snapshot.structureKey;
