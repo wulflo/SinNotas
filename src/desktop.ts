@@ -13255,6 +13255,8 @@ function updateOmnibarDropdown() {
 /** Índice en memoria del contenido del vault; se reconstruye solo al cambiar la versión. */
 const contentSearchIndex = new ContentSearchIndex();
 let contentSearchTimer: number | null = null;
+/** Identifica la búsqueda en curso: solo la última respuesta del backend pinta. */
+let contentSearchRun = 0;
 
 function cancelScheduledContentSearch(): void {
   if (contentSearchTimer !== null) {
@@ -13272,11 +13274,37 @@ function scheduleContentSearch(query: string): void {
   if (query.trim().length < 2) return;
   contentSearchTimer = window.setTimeout(() => {
     contentSearchTimer = null;
+    void runContentSearch(query);
+  }, 150);
+}
+
+/**
+ * FASE 4-B: en Tauri la búsqueda vive en Rust (`search_content`, índice
+ * plegado con mantenimiento O(delta)); el hit trae la página en variante
+ * metadata, pero el bloque ganador va COMPLETO, suficiente para pintar el
+ * fragmento sin rehidratar nada. Con backend sin caché activa (p. ej. bóveda
+ * SAF) o en web, escala al índice del front (criterios idénticos).
+ */
+async function runContentSearch(query: string): Promise<void> {
+  const run = ++contentSearchRun;
+  let hits: ContentHit[] | null = null;
+  if (isTauri()) {
+    try {
+      hits = await invoke<ContentHit[]>("search_content", { query, limit: 25 });
+    } catch (error) {
+      console.debug("search_content no disponible; índice del front:", error);
+    }
+  }
+  if (!hits) {
     // Antes de cada búsqueda se refresca el índice con las versiones por nota
     // (incremental): si nada cambió desde la última llamada, es gratis.
     contentSearchIndex.update(vault.getPages(), vault.getVersionView());
-    renderContentResults(query, contentSearchIndex.search(query));
-  }, 150);
+    hits = contentSearchIndex.search(query);
+  }
+  // El backend puede responder tarde (siempre async ahora): si mientras
+  // tanto se lanzó otra búsqueda, esta respuesta ya está obsoleta.
+  if (run !== contentSearchRun) return;
+  renderContentResults(query, hits);
 }
 
 /**
@@ -13341,7 +13369,12 @@ function renderContentResults(query: string, hits: ContentHit[]): void {
 function openContentHit(hit: ContentHit, query = ""): void {
   sidebarSearchInput.value = "";
   closeSearchResults(true);
-  openPage(hit.page);
+  // FASE 4-B: el hit del backend trae solo la página en variante metadata;
+  // prefiere la copia registrada del vault (misma ruta absoluta). Con el
+  // boot de metadatos (4-E) ambas llegan `blocksLoaded: false`, y
+  // `openPage` rehidrata vía `ensurePageLoaded` antes del render.
+  const storedPage = vault.getPages().find((page) => page.path === hit.page.path);
+  openPage(storedPage ?? hit.page);
   cursorState = { blockId: hit.block.id, offset: 0 };
   requestAnimationFrame(() => {
     // CSS.escape: los ids de bloque pueden contener caracteres del selector.

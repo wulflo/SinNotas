@@ -56,6 +56,21 @@ qué queda a medias (y qué síntomas de código roto esperar) y cómo continuar
 > `visible_block_text`, `count_folded_occurrences`, búsqueda e índice
 > incremental) y MIGRACIÓN DEL FRONT (`content-search.ts`/omnibar →
 > `search_content` con fallback JS solo-web conservado).
+>
+> **Bitácora FASE 4-B cierre (2026-10-31):** completada. (1) Núcleo de
+> búsqueda extraído a `run_content_search` (función libre sin `AppHandle`)
+> con 8 tests unitarios Rust: plegado, texto visible, conteo con tope,
+> tokenización, índices UTF-16 con multibyte/emoji, filtro de imágenes y de
+> bloques solo-propiedades, AND de tokens, mejor bloque por nota (incluido
+> anidado), orden + desempate alfabético, truncado y guardas. (2) Front:
+> `scheduleContentSearch` → `runContentSearch` async: en Tauri
+> `invoke("search_content")`; el fallback JS queda solo para web/sin caché.
+> El hit de Rust trae página metadata + bloque ganador COMPLETO (el
+> fragmento del omnibar se pinta sin rehidratar); `openContentHit` resuelve
+> la página registrada del vault por ruta absoluta antes de abrir (compatible
+> con el boot metadata-only de 4-E). `cargo test` 63, clippy 0,
+> `npx tsc --noEmit` 0 y `npm test` 33/319. Verificación manual del omnibar
+> (app empaquetada, bóveda grande): PENDIENTE.
 
 ---
 
@@ -194,19 +209,19 @@ Decisiones de diseño (desviaciones razonadas del texto original del plan):
 
 **Sub-4-A** (primitivas bajo demanda) — ✅ COMMITTED `422238c` (ver bitácora).
 
-**Sub-4-B** (búsqueda de contenido Rust-first) — 🟡 mitad: Rust completo en el
-árbol (ver bitácora), front pendiente.
+**Sub-4-B** (búsqueda de contenido Rust-first) — ✅ COMPLETADA 2026-10-31
+(ver bitácora; falta verificación manual en la app empaquetada).
 
 - [x] 4.B-Rust `search_content`: comando + índice plegado incremental
   (`content_index`/`content_dirty`), hit con página metadata + bloque
-  ganador, criterios idénticos al `search` del front. *(Falta test
-  unitario Rust.)*
-- [ ] 4.B-Tests unitarios Rust del plegado/búsqueda/índice.
-- [ ] 4.B-Front: el omnibar consume `invoke("search_content")`; el índice JS
-  (`ContentSearchIndex`) queda SOLO como fallback modo web (mismo patrón que
-  los retroenlaces de FASE 3). Cuidar: conteo/posiciones plegadas ya llegan
-  en unidades UTF-16, el hit trae `blocksLoaded: false` (rehidratar con
-  `read_pages_cached` al saltar al bloque).
+  ganador, criterios idénticos al `search` del front. COMMITTED `bd1b9cb`.
+- [x] 4.B-Tests unitarios Rust del plegado/búsqueda/índice (8 tests; núcleo
+  extraído a `run_content_search` libre de `AppHandle`). COMMITTED `fc9a86f`.
+- [x] 4.B-Front: el omnibar consume `invoke("search_content")`; el índice JS
+  (`ContentSearchIndex`) queda SOLO como fallback (web sin backend o caché
+  inactiva, p. ej. bóveda SAF). Guard de carrera (`contentSearchRun`) para
+  respuestas async desordenadas; `openContentHit` prefiere la copia del
+  vault por ruta absoluta (compatible con el boot de metadatos de 4-E).
 
 - [ ] 4.1 Cambiar el payload del arranque: nuevo comando (o flag `metadata_only` en `load_vault`) que devuelva títulos/fechas/frontmatter/resumen flashcards, SIN árboles de bloques.
 - [ ] 4.2 `vault.replaceVault` construye páginas con `blocks: null` (indicador "no cargada"); todas las APIs de lectura pasan por `ensurePageLoaded(path) → invoke("read_page")` con cache LRU de ~50-100 notas cargadas (liberar las menos recientes).
