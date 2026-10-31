@@ -878,6 +878,92 @@ fn find_block_by_id<'local>(nodes: &'local [BlockNode], id: &str) -> Option<&'lo
     None
 }
 
+/// Núcleo de `search_content`, libre para poder probarlo sin `AppHandle`:
+/// puntuación por nota sobre el plegado, orden (apariciones descendente con
+/// desempate alfabético por ruta) y servido desde el cache (`page` en
+/// variante metadata + bloque ganador completo).
+fn run_content_search(
+    folded_map: &HashMap<String, FoldedNoteEntry>,
+    cache: &BTreeMap<String, metadata_cache::CachedNote>,
+    root: &Path,
+    tokens: &[String],
+    limit: usize,
+) -> Vec<ContentSearchHit> {
+    // Puntuación: mejor bloque por nota, plegado en memoria (sin tocar
+    // el cache con lock durante el scan).
+    let mut candidates: Vec<(String, ContentSearchCandidate)> = Vec::new();
+    for (relative, entry) in folded_map {
+        let mut best: Option<ContentSearchCandidate> = None;
+        for block in &entry.blocks {
+            let mut total = 0;
+            // (desplazamiento en bytes del plegado, longitud del token en unidades UTF-16)
+            let mut first: Option<(usize, usize)> = None;
+            let mut all_present = true;
+            for token in tokens {
+                let count = count_folded_occurrences(&block.folded, token, 20);
+                if count == 0 {
+                    all_present = false;
+                    break;
+                }
+                total += count;
+                if let Some(found) = block.folded.find(token.as_str()) {
+                    let earlier = first.is_none_or(|(best_found, _)| found < best_found);
+                    if earlier {
+                        first = Some((found, token.chars().map(char::len_utf16).sum()));
+                    }
+                }
+            }
+            if !all_present {
+                continue;
+            }
+            let Some((found_bytes, match_length)) = first else {
+                continue;
+            };
+            let candidate = ContentSearchCandidate {
+                block_id: block.id.clone(),
+                count: total,
+                index: folded_bytes_to_utf16_index(&block.folded, found_bytes),
+                match_length,
+            };
+            if best.as_ref().is_none_or(|current| current.count < candidate.count) {
+                best = Some(candidate);
+            }
+        }
+        if let Some(candidate) = best {
+            candidates.push((relative.clone(), candidate));
+        }
+    }
+
+    // Orden estable: más apariciones primero, desempate alfabético.
+    candidates.sort_by(|left, right| {
+        right
+            .1
+            .count
+            .cmp(&left.1.count)
+            .then_with(|| left.0.cmp(&right.0))
+    });
+    candidates.truncate(limit);
+
+    // Servido: page (metadata) + bloque ganador desde el cache.
+    let mut hits = Vec::with_capacity(candidates.len());
+    for (relative, candidate) in candidates {
+        let Some(note) = cache.get(&relative) else {
+            continue;
+        };
+        let Some(block) = find_block_by_id(&note.blocks, &candidate.block_id) else {
+            continue;
+        };
+        hits.push(ContentSearchHit {
+            page: note.to_page_data_metadata(root),
+            block: block.clone(),
+            count: candidate.count,
+            index: candidate.index,
+            match_length: candidate.match_length,
+        });
+    }
+    hits
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SkippedEntry {
@@ -1987,84 +2073,13 @@ impl VaultCacheRuntime {
         let Some(map) = index_read.as_ref() else {
             return Vec::new();
         };
-
-        // Puntuación: mejor bloque por nota, plegado en memoria (sin tocar
-        // el cache con lock durante el scan).
-        let mut candidates: Vec<(String, ContentSearchCandidate)> = Vec::new();
-        for (relative, entry) in map {
-            let mut best: Option<ContentSearchCandidate> = None;
-            for block in &entry.blocks {
-                let mut total = 0;
-                // (desplazamiento en bytes del plegado, longitud del token en unidades UTF-16)
-                let mut first: Option<(usize, usize)> = None;
-                let mut all_present = true;
-                for token in &tokens {
-                    let count = count_folded_occurrences(&block.folded, token, 20);
-                    if count == 0 {
-                        all_present = false;
-                        break;
-                    }
-                    total += count;
-                    if let Some(found) = block.folded.find(token.as_str()) {
-                        let earlier = first.is_none_or(|(best_found, _)| found < best_found);
-                        if earlier {
-                            first = Some((found, token.chars().map(char::len_utf16).sum()));
-                        }
-                    }
-                }
-                if !all_present {
-                    continue;
-                }
-                let Some((found_bytes, match_length)) = first else {
-                    continue;
-                };
-                let candidate = ContentSearchCandidate {
-                    block_id: block.id.clone(),
-                    count: total,
-                    index: folded_bytes_to_utf16_index(&block.folded, found_bytes),
-                    match_length,
-                };
-                if best.as_ref().is_none_or(|current| current.count < candidate.count) {
-                    best = Some(candidate);
-                }
-            }
-            if let Some(candidate) = best {
-                candidates.push((relative.clone(), candidate));
-            }
-        }
-        drop(index_read);
-
-        // Orden estable: más apariciones primero, desempate alfabético.
-        candidates.sort_by(|left, right| {
-            right
-                .1
-                .count
-                .cmp(&left.1.count)
-                .then_with(|| left.0.cmp(&right.0))
-        });
-        candidates.truncate(limit);
-
-        // Servido: page (metadata) + bloque ganador desde el cache.
-        let mut hits = Vec::with_capacity(candidates.len());
-        let Ok(cache) = self.cache.lock() else {
-            return hits;
+        // El lock del cache se sostiene durante el servido: el scan de
+        // puntuación ya corrió sobre el plegado (map), así que el tiempo con
+        // lock es proporcional al tamaño del resultado, no al de la bóveda.
+        let Some(cache) = self.cache.lock().ok() else {
+            return Vec::new();
         };
-        for (relative, candidate) in candidates {
-            let Some(note) = cache.entries.get(&relative) else {
-                continue;
-            };
-            let Some(block) = find_block_by_id(&note.blocks, &candidate.block_id) else {
-                continue;
-            };
-            hits.push(ContentSearchHit {
-                page: note.to_page_data_metadata(&self.root),
-                block: block.clone(),
-                count: candidate.count,
-                index: candidate.index,
-                match_length: candidate.match_length,
-            });
-        }
-        hits
+        run_content_search(map, &cache.entries, &self.root, &tokens, limit)
     }
 
     fn find_backlinks(&self, page_title: &str) -> Vec<Backlink> {
@@ -6821,5 +6836,281 @@ mod tests {
 
         fs::remove_dir_all(root).unwrap();
         fs::remove_dir_all(other).unwrap();
+    }
+
+    // ── FASE 4-B: búsqueda de contenido desde Rust ──
+
+    fn test_note(
+        relative: &str,
+        title: &str,
+        blocks: Vec<BlockNode>,
+    ) -> metadata_cache::CachedNote {
+        metadata_cache::CachedNote {
+            relative_path: relative.to_string(),
+            modified_ns: 1_000_000_000,
+            created_ns: 0,
+            size: 1,
+            content_hash: format!("hash-{relative}"),
+            title: title.to_string(),
+            frontmatter: Vec::new(),
+            blocks,
+            is_journal: false,
+            journal_date: None,
+            links: Vec::new(),
+            flashcards: metadata_cache::CachedFlashcardState::default(),
+        }
+    }
+
+    fn test_block(
+        id: &str,
+        block_type: &str,
+        content: &str,
+        children: Vec<BlockNode>,
+    ) -> BlockNode {
+        BlockNode {
+            id: id.to_string(),
+            block_type: block_type.to_string(),
+            content: content.to_string(),
+            image_alt: None,
+            children,
+            collapsed: false,
+        }
+    }
+
+    #[test]
+    fn fold_text_strips_case_and_accents() {
+        assert_eq!(fold_text("Café Ñandú ÀÉÎ"), "cafe nandu aei");
+        assert_eq!(fold_text("Referencia rápida"), "referencia rapida");
+        // Sin acentos: la longitud en bytes puede diferir del original
+        // (ñ -> n), pero el plegado es estable y determinista.
+        assert_eq!(fold_text("Año2026"), "ano2026");
+    }
+
+    #[test]
+    fn visible_block_text_drops_property_lines_only() {
+        // Líneas `clave:: valor` fuera del texto visible; el `::` de la
+        // flashcard ("Pregunta :: respuesta") sí se conserva (tiene espacio
+        // antes de `::` y por tanto no es una línea de propiedad).
+        assert_eq!(
+            visible_block_text("Pregunta :: respuesta #card\ncard-s:: 0.4\ncard-d:: 5"),
+            "Pregunta :: respuesta #card"
+        );
+        assert_eq!(visible_block_text("card-s:: 0.4"), "");
+        assert_eq!(visible_block_text("texto normal"), "texto normal");
+    }
+
+    #[test]
+    fn count_folded_occurrences_counts_and_respects_cap() {
+        assert_eq!(count_folded_occurrences("a b a c a", "a", 20), 3);
+        // Los solapados no cuentan: cada aparición avanza más allá del needle.
+        assert_eq!(count_folded_occurrences("aaa", "aa", 20), 1);
+        assert_eq!(count_folded_occurrences("xx", "x", 2), 2);
+        assert_eq!(count_folded_occurrences("xxx", "x", 20), 3);
+    }
+
+    #[test]
+    fn normalize_search_query_tokenizes_folded() {
+        assert_eq!(normalize_search_query("Hôlâ  MUndo"), vec!["hola", "mundo"]);
+        assert!(normalize_search_query("   ").is_empty());
+    }
+
+    #[test]
+    fn folded_bytes_to_utf16_index_accounts_for_multibyte() {
+        // "aña" son 4 bytes en UTF-8 y 3 unidades UTF-16.
+        assert_eq!(folded_bytes_to_utf16_index("añamundo", 4), 3);
+        // ASCII puro se mapea 1:1 en bytes.
+        assert_eq!(folded_bytes_to_utf16_index("cafe", 4), 4);
+        // Emoji: 4 bytes en UTF-8, 2 unidades UTF-16.
+        assert_eq!(folded_bytes_to_utf16_index("🔥cafe", 4), 2);
+    }
+
+    #[test]
+    fn fold_note_entries_skips_images_and_property_only_blocks() {
+        let note = test_note(
+            "a.md",
+            "A",
+            vec![test_block(
+                "img-1",
+                "image",
+                "assets/foto.png\nimage-occlusions:: []",
+                vec![test_block("hijo-img", "text", "cafe", vec![])],
+            )],
+        );
+        let folded = VaultCacheRuntime::fold_note_entries(&note);
+        // Los bloques de imagen se descartan por sí mismos, pero sus hijos
+        // con texto visible SÍ se recorren (criterio collectTextBlocks).
+        assert_eq!(folded.blocks.len(), 1);
+        assert_eq!(folded.blocks[0].id, "hijo-img");
+
+        let only_properties =
+            test_note("b.md", "B", vec![test_block("p-1", "text", "card-s:: 0.4", vec![])]);
+        assert!(
+            VaultCacheRuntime::fold_note_entries(&only_properties)
+                .blocks
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn run_content_search_matches_all_tokens_best_block_per_note_and_serves() {
+        let root = std::env::temp_dir().join("sinnotas-search-test-run");
+
+        // Nota A: el bloque ganador es el hijo anidado (más apariciones).
+        let note_a = test_note(
+            "a.md",
+            "A",
+            vec![test_block(
+                "padre",
+                "text",
+                "deja-vu gañido",
+                vec![test_block("ganador", "text", "café café café sal", vec![])],
+            )],
+        );
+        // Nota B tiene más "cafe" en total que A pero le falta "sal": no sale
+        // con la consulta AND.
+        let note_b = test_note(
+            "b.md",
+            "B",
+            vec![test_block("solo-cafe", "text", "café café café宝贵的 café", vec![])],
+        );
+
+        let cache = BTreeMap::from([
+            ("a.md".to_string(), note_a),
+            ("b.md".to_string(), note_b),
+        ]);
+        let folded_map: HashMap<String, FoldedNoteEntry> = cache
+            .iter()
+            .map(|(relative, note)| {
+                (
+                    relative.clone(),
+                    VaultCacheRuntime::fold_note_entries(note),
+                )
+            })
+            .collect();
+
+        // AND: la nota B descartada por no tener el segundo token.
+        let tokens = normalize_search_query("Cafe SAL");
+        let hits = run_content_search(&folded_map, &cache, &root, &tokens, 25);
+        assert_eq!(hits.len(), 1);
+        let hit = &hits[0];
+        assert_eq!(hit.count, 4); // 3 cafés + 1 sal, en el bloque ganador.
+        assert_eq!(hit.block.id, "ganador");
+        assert_eq!(hit.block.content, "café café café sal");
+        // La página viene en variante metadata: sin bloques, con block_count.
+        assert!(hit.page.blocks.is_empty());
+        assert!(!hit.page.blocks_loaded);
+        assert_eq!(hit.page.block_count, 1);
+        assert_eq!(hit.page.title, "A");
+        // El índice plegado apunta al primer "cafe" del texto plegado del
+        // bloque ganador ("cafe cafe cafe sal"), que mapea 1:1 a UTF-16.
+        assert_eq!(hit.index, 0);
+        assert_eq!(hit.match_length, 4);
+
+        // Solo "cafe": salen las dos notas, ganando por apariciones el
+        // bloque entero de B (4) y el hijo de A (3).
+        let hits = run_content_search(
+            &folded_map,
+            &cache,
+            &root,
+            &normalize_search_query("café"),
+            25,
+        );
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].block.id, "solo-cafe");
+        assert_eq!(hits[0].count, 4);
+        assert_eq!(hits[1].block.id, "ganador");
+        assert_eq!(hits[1].count, 3);
+
+        // Índices plegados con acentos: el plegado de "¡Café!" suelta la
+        // marca NFD, así que el índice ya no cae exactamente en el original;
+        // debe reportar la posición del TEXTO PLEGADO (para locateMatch).
+        let note_accents = test_note(
+            "c.md",
+            "C",
+            vec![test_block("accent", "text", "¡Café! con sal", vec![])],
+        );
+        let cache_c = BTreeMap::from([("c.md".to_string(), note_accents)]);
+        let folded_c: HashMap<String, FoldedNoteEntry> = cache_c
+            .iter()
+            .map(|(relative, note)| {
+                (
+                    relative.clone(),
+                    VaultCacheRuntime::fold_note_entries(note),
+                )
+            })
+            .collect();
+        let hits = run_content_search(
+            &folded_c,
+            &cache_c,
+            &root,
+            &normalize_search_query("cafe"),
+            25,
+        );
+        assert_eq!(hits.len(), 1);
+        // Plegado: "¡cafe! con sal" — el primer "cafe" está en la unidad 1.
+        assert_eq!(hits[0].index, 1);
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn run_content_search_orders_and_truncates_with_alphabetical_tie() {
+        let root = std::env::temp_dir().join("sinnotas-search-test-order");
+        let mut cache = BTreeMap::new();
+        for relative in ["z.md", "a.md", "m.md"] {
+            cache.insert(
+                relative.to_string(),
+                test_note(
+                    relative,
+                    &relative.trim_end_matches(".md").to_uppercase(),
+                    vec![test_block("b1", "text", "cafe", vec![])],
+                ),
+            );
+        }
+        let folded_map: HashMap<String, FoldedNoteEntry> = cache
+            .iter()
+            .map(|(relative, note)| {
+                (
+                    relative.clone(),
+                    VaultCacheRuntime::fold_note_entries(note),
+                )
+            })
+            .collect();
+
+        // Empate en apariciones => orden alfabético; límite 2 trunca.
+        let hits = run_content_search(
+            &folded_map,
+            &cache,
+            &root,
+            &normalize_search_query("café"),
+            2,
+        );
+        assert_eq!(hits.len(), 2);
+        assert_eq!(hits[0].page.title, "A");
+        assert_eq!(hits[1].page.title, "M");
+
+        // Consulta vacía o límite 0: sin resultados (guardas del método).
+        assert!(
+            run_content_search(
+                &folded_map,
+                &cache,
+                &root,
+                &normalize_search_query("   "),
+                25
+            )
+            .is_empty()
+        );
+        assert!(
+            run_content_search(
+                &folded_map,
+                &cache,
+                &root,
+                &normalize_search_query("cafe"),
+                0
+            )
+            .is_empty()
+        );
+
+        fs::remove_dir_all(root).ok();
     }
 }
