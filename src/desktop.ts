@@ -12,6 +12,7 @@ import {
   SnapshotState,
   SnapshotActiveNote,
   VaultCacheDelta,
+  Backlink,
 } from "./types";
 import "katex/dist/katex.min.css";
 import "./style.css";
@@ -4047,6 +4048,37 @@ function hideWikilinkAutocomplete(): void {
   wikilinkAutocompleteState = null;
 }
 
+/** Entrada del índice de títulos de `[[…]]`: título canónico + su forma en
+ * minúsculas (sin recalcular por tecla). */
+interface WikilinkTitleEntry {
+  title: string;
+  lower: string;
+}
+
+let wikilinkTitleIndex: WikilinkTitleEntry[] | null = null;
+let wikilinkTitleIndexStructural = -1;
+
+/**
+ * Índice pre-ordenado de títulos para el autocompletado (3.3). Se reconstruye
+ * solo cuando la versión ESTRUCTURAL del vault cambia (crear/borrar/renombrar
+ * o volcado por deltas); las ediciones de contenido no lo tocan y la
+ * comparación por tecla es O(1) antes del propio filtrado.
+ * El array queda ordenado por título: los primeros 8 matches del recorrido
+ * salen en el mismo orden que daba el `.sort()` anterior.
+ */
+function ensureWikilinkTitleIndex(): WikilinkTitleEntry[] {
+  const structural = vault.getMutationVersion();
+  if (wikilinkTitleIndex && wikilinkTitleIndexStructural === structural) {
+    return wikilinkTitleIndex;
+  }
+  wikilinkTitleIndex = vault
+    .getPages()
+    .map((page) => ({ title: page.title, lower: page.title.toLocaleLowerCase() }))
+    .sort((left, right) => left.title.localeCompare(right.title));
+  wikilinkTitleIndexStructural = structural;
+  return wikilinkTitleIndex;
+}
+
 function updateWikilinkAutocomplete(editor: HTMLElement, blockId: string): void {
   const content = serializeEditorContent(editor);
   const cursorEnd = getCaretOffset(editor);
@@ -4071,14 +4103,23 @@ function updateWikilinkAutocomplete(editor: HTMLElement, blockId: string): void 
   caretRange.collapse(false);
   const caretRect = caretRange.getBoundingClientRect();
   const menu = getWikilinkAutocompleteMenu();
-  const matchingPages = vault.getPages()
-    .filter((page) => page.title.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
-    .sort((left, right) => left.title.localeCompare(right.title))
-    .slice(0, 8);
-  const exactMatch = matchingPages.some((page) => page.title.toLocaleLowerCase() === query.trim().toLocaleLowerCase());
+  // 3.3: el filtrado usa el índice PRE-ordenado y PRE-en-minúsculas de
+  // títulos (regenerado cuando la bóveda cambia estructuralmente, no en cada
+  // tecla: con 14k notas el sort por `localeCompare` por tecla era supersticioso).
+  const index = ensureWikilinkTitleIndex();
+  const lowerQuery = query.toLocaleLowerCase();
+  const normalizedQuery = query.trim().toLocaleLowerCase();
+  const matchingPages: string[] = [];
+  let exactMatch = false;
+  for (const entry of index) {
+    if (!exactMatch && entry.lower === normalizedQuery) exactMatch = true;
+    if (entry.lower.includes(lowerQuery) && matchingPages.length < 8) {
+      matchingPages.push(entry.title);
+    }
+  }
   const entries: Array<{ title: string; create: boolean }> = [];
   if (query.trim() && !exactMatch) entries.push({ title: query.trim(), create: true });
-  matchingPages.forEach((page) => entries.push({ title: page.title, create: false }));
+  matchingPages.forEach((title) => entries.push({ title, create: false }));
 
   wikilinkAutocompleteState = {
     editor,
@@ -7032,61 +7073,102 @@ function scheduleRenderBacklinks(): void {
 }
 
 function renderBacklinks() {
-  const backlinks = vault.findBacklinksFor(currentPage.title);
+  // Los retroenlaces del Tauri salen de la caché de Rust (`find_backlinks`),
+  // que ya trae los refs por nota extraídos en el parseo; el scan regex del
+  // 100% de la bóveda solo queda para el modo web (sin backend).
+  const token = backlinksRenderToken;
+  const pageId = currentPage.id;
   const outgoing = collectOutgoingLinks(currentPage);
-  refCountBadge.innerText = backlinks.length.toString();
   if (outgoingCountBadge) outgoingCountBadge.innerText = outgoing.length.toString();
-  backlinksContainer.innerHTML = "";
   if (outgoingLinksContainer) outgoingLinksContainer.innerHTML = "";
+  paintOutgoingLinks(outgoing);
 
-  if (backlinks.length === 0) {
-    backlinksContainer.innerHTML =
-      '<div class="empty-backlinks">No hay retroenlaces vinculados a esta página.</div>';
-  } else {
-    for (const ref of backlinks) {
-      const card = document.createElement("div");
-      card.className = "backlink-card";
+  const applyBacklinks = (backlinks: Backlink[]) => {
+    if (token !== backlinksRenderToken || currentPage.id !== pageId) return;
+    refCountBadge.innerText = backlinks.length.toString();
+    backlinksContainer.innerHTML = "";
+    if (backlinks.length === 0) {
+      backlinksContainer.innerHTML =
+        '<div class="empty-backlinks">No hay retroenlaces vinculados a esta página.</div>';
+    } else {
+      for (const ref of backlinks) {
+        const card = document.createElement("div");
+        card.className = "backlink-card";
 
-      const source = document.createElement("div");
-      source.className = "backlink-source";
-      source.append(`📄 ${ref.source_page} `);
-      const lineInfo = document.createElement("span");
-      lineInfo.style.color = "var(--ls-text-muted)";
-      lineInfo.style.fontSize = scaledFontSize(11);
-      lineInfo.textContent = `(línea ${ref.line_number})`;
-      source.append(lineInfo);
-      source.addEventListener("click", () => {
-        loadPage(ref.source_page);
-      });
-
-      const snippet = document.createElement("div");
-      snippet.className = "backlink-snippet";
-
-      const escaped = ref.snippet
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#39;");
-      snippet.innerHTML = escaped.replace(
-        /\[\[(.*?)\]\]/g,
-        '<span class="wikilink-pill" data-page="$1">[[$1]]</span>'
-      );
-
-      snippet.querySelectorAll(".wikilink-pill").forEach((pill) => {
-        pill.addEventListener("click", (e) => {
-          e.stopPropagation();
-          const target = (pill as HTMLElement).dataset.page;
-          if (target) loadPage(target);
+        const source = document.createElement("div");
+        source.className = "backlink-source";
+        source.append(`📄 ${ref.source_page} `);
+        const lineInfo = document.createElement("span");
+        lineInfo.style.color = "var(--ls-text-muted)";
+        lineInfo.style.fontSize = scaledFontSize(11);
+        lineInfo.textContent = `(línea ${ref.line_number})`;
+        source.append(lineInfo);
+        source.addEventListener("click", () => {
+          loadPage(ref.source_page);
         });
-      });
 
-      card.appendChild(source);
-      card.appendChild(snippet);
-      backlinksContainer.appendChild(card);
+        const snippet = document.createElement("div");
+        snippet.className = "backlink-snippet";
+
+        const escaped = ref.snippet
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#39;");
+        snippet.innerHTML = escaped.replace(
+          /\[\[(.*?)\]\]/g,
+          '<span class="wikilink-pill" data-page="$1">[[$1]]</span>'
+        );
+
+        snippet.querySelectorAll(".wikilink-pill").forEach((pill) => {
+          pill.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const target = (pill as HTMLElement).dataset.page;
+            if (target) loadPage(target);
+          });
+        });
+
+        card.appendChild(source);
+        card.appendChild(snippet);
+        backlinksContainer.appendChild(card);
+      }
     }
-  }
+  };
 
+  if (isTauri()) {
+    invoke<Backlink[]>("find_backlinks", { pageTitle: currentPage.title })
+      .then(applyBacklinks)
+      .catch((error: unknown) => {
+        console.error("No se pudo consultar retroenlaces del backend:", error);
+        applyBacklinks([]);
+      });
+    return;
+  }
+  applyBacklinks(legacyScanBacklinks(currentPage.title));
+}
+
+/** Escaneo retroenlaces en memoria: modo web/fallback sin backend. */
+function legacyScanBacklinks(targetTitle: string): Backlink[] {
+  const backlinks: Backlink[] = [];
+  const pattern = new RegExp(`\\[\\[${targetTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]\\]`, "i");
+  vault.getPages().forEach((page) => {
+    if (page.title.toLowerCase() === targetTitle.toLowerCase()) return;
+    getAllBlocksFlat(page.blocks).forEach((block, index) => {
+      if (pattern.test(block.content)) {
+        backlinks.push({
+          source_page: page.title,
+          source_path: page.path,
+          line_number: index + 1,
+          snippet: block.content,
+        });
+      }
+    });
+  });
+  return backlinks;
+}
+
+function paintOutgoingLinks(outgoing: ReturnType<typeof collectOutgoingLinks>): void {
   if (!outgoingLinksContainer) return;
   if (outgoing.length === 0) {
     outgoingLinksContainer.innerHTML =

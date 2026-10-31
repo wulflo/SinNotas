@@ -19,6 +19,13 @@ qué queda a medias (y qué síntomas de código roto esperar) y cómo continuar
 > `JSON.stringify` (2.3). `cargo test` 54 en verde (3 nuevos del journal),
 > `cargo clippy` sin avisos, `npx tsc --noEmit` y `npm test` 33/319. 2.4
 > (medición release) queda manual. Véase la FASE 2 para decisiones de diseño.
+>
+> **Bitácora FASE 3 (2026-10-31):** retroenlaces vía `find_backlinks` de Rust
+> (con fallback JS solo para modo web); autocompletado `[[` con índice
+> pre-ordenado regenerado por cambios estructurales; búsqueda de contenido
+> resuelta con el índice incremental del front (decisión documentada en la
+> FASE 3; "Rust-first" se reevalúa en la FASE 4, cuando los bloques salgan de
+> memoria). Validación: `npx tsc --noEmit` 0 y `npm test` 33/319.
 
 ---
 
@@ -147,11 +154,11 @@ Decisiones de diseño (desviaciones razonadas del texto original del plan):
 - [x] 2.3 Nuevo comando `vault_fingerprint(&self) -> u64` → implementado como `vault_sync_state` (fingerprint + revision externa en una consulta y con ruta SAF); `synchronizeVaultFromDisk` compara revision/fingerprint y SOLO relee si difieren; los 2 `JSON.stringify` eliminados.
 - [ ] 2.4 Medir: `cargo build --release` + nota de 200 bullets, save < ~5 ms de trabajo bloqueante → **MANUAL** (no requiere red; ejecutar en equipo del usuario).
 
-### FASE 3 — Backlinks y búsqueda desde Rust — 🔴 NO EMPEZADA ☐
+### FASE 3 — Backlinks y búsqueda desde Rust — ✅ COMPLETADA 2026-10-31 ✔
 
-- [ ] 3.1 Llamar `invoke("find_backlinks", ...)` en `renderBacklinks` (desktop.ts:7019) en lugar del scan JS de vault.ts:950; eliminar `findBacklinksFor` JS completo.
-- [ ] 3.2 Búsqueda de contenido: comando Rust que consulte los textos del cache (o índice incremental en front solo con deltas; decisión recomendada: Rust-first).
-- [ ] 3.3 `updateWikilinkAutocomplete` (desktop.ts:4059): pre-sorted index de títulos regenerado por delta, no por tecla.
+- [x] 3.1 `renderBacklinks` llama `invoke("find_backlinks", { pageTitle })` (refs ya extraídas por el parseo de Rust en `metadata_cache.find_cached_backlinks`); `findBacklinksFor` eliminado de `vault.ts`. El scan regex queda como fallback SOLO en modo web sin backend (`legacyScanBacklinks` en desktop.ts). Nota de comportamiento: los retroenlaces de Rust incluyen también referencias por `#tag` (superset de lo que mostraba el scan JS de wikilinks); es el mismo criterio del fallback nativo de SAF del comando.
+- [x] 3.2 Búsqueda de contenido: **se queda el índice incremental del front** (implantado en FASE 1: `ContentSearchIndex` con epochs por nota; omnibar usa `vault.getVersionView()`). Motivo: con los bloques aún en memoria (FASE 4 pendiente), mantener un índice plegado DUPLICADO en Rust solo añade memoria/formateo sin ganar nada; el camino "Rust-first" se vuelve obligatorio y natural en FASE 4, cuando los bloques salgan de la memoria del front (`blocks: null`). Queda escrita la decisión para esa fase.
+- [x] 3.3 `updateWikilinkAutocomplete`: índice pre-ordenado y pre-minúsculas de títulos (`ensureWikilinkTitleIndex`), regenerado SOLO en cambios estructurales (`bumpMutationVersion`: crear/borrar/renombrar/volcado completo), no en cada tecla; el per-key queda un bucle O(títulos) con `includes()` sin sort ni allocs (corta al conseguir 8 + detecta match exacto).
 
 ### FASE 4 — Arranque con metadatos + bloques bajo demanda — 🔴 NO EMPEZADA ☐ (la grande)
 

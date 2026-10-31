@@ -1,4 +1,4 @@
-import { PageData, Backlink, PageRevision, BlockNode, RestoredSnapshot, VaultCacheDelta } from "../types";
+import { PageData, PageRevision, BlockNode, RestoredSnapshot, VaultCacheDelta } from "../types";
 import { getAllBlocksFlat, findNodeLocation, cloneTree } from "../editor/tree-engine";
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import {
@@ -1032,29 +1032,6 @@ export class VaultStore {
 
     this.savePage(page);
     return page;
-  }
-
-  public findBacklinksFor(targetTitle: string): Backlink[] {
-    const backlinks: Backlink[] = [];
-    const pattern = new RegExp(`\\[\\[${targetTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]\\]`, "i");
-
-    this.pages.forEach((page) => {
-      if (page.title.toLowerCase() === targetTitle.toLowerCase()) return;
-
-      const flat = getAllBlocksFlat(page.blocks);
-      flat.forEach((b, idx) => {
-        if (pattern.test(b.content)) {
-          backlinks.push({
-            source_page: page.title,
-            source_path: page.path,
-            line_number: idx + 1,
-            snippet: b.content,
-          });
-        }
-      });
-    });
-
-    return backlinks;
   }
 
   private persist() {
