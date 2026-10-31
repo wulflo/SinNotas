@@ -79,6 +79,14 @@ qué queda a medias (y qué síntomas de código roto esperar) y cómo continuar
 > streaming, rename, arrastre de tarea sobre nota fría, sync externo y
 > reinicio.**
 >
+> **Bitácora smoke web (2026-10-31):** smoke test en navegador con el dev
+> server (`--port 5199 --strictPort`), modo web (flag metadata inactivo en
+> `isTauri() === false`): arranca sin errores de consola (0 errores,
+> 0 mensajes perdidos) y navegación por Editor/Flashcards/Tareas/Todas las
+> páginas/Vista gráfica sin errores; el grafo pinta nodos y aristas con la
+> bóveda demo. Regresión web de los caminos flag-OFF de 4-D: limpia.
+> Servidor dev apagado con `fuser -k 5199/tcp`, pestañas cerradas.
+>
 > **Bitácora FASE 4-D (2026-10-31):** cableado de los consumidores que
 > escanean bloques, todo bajo el flag (con flag OFF el comportamiento no
 > cambia ni una línea: mismo camino de siempre).
