@@ -1,6 +1,6 @@
 [package]
 name = "sin-notas"
-version = "0.3.7"
+version = "0.3.8"
 description = "A blazing-fast, file-first markdown outliner inspired by Logseq"
 authors = ["Wulflo"]
 license = ""
