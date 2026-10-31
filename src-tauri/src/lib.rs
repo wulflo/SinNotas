@@ -885,7 +885,8 @@ fn find_block_by_id<'local>(nodes: &'local [BlockNode], id: &str) -> Option<&'lo
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct GraphLinksEntry {
-    /// Ruta absoluta de la nota (mismo formato que `PageData.path`).
+    /// Ruta RELATIVA de la nota (mismo formato que `PageData.path` del front,
+    /// que normaliza a relativo en `replaceVault`).
     pub path: String,
     pub title: String,
     /// Wikilinks salientes RESUELTOS (sin alias, `is_tag == false`), en orden
@@ -896,10 +897,7 @@ pub struct GraphLinksEntry {
 
 /// Núcleo de `graph_links`, libre para probarlo sin `AppHandle`: filtra los
 /// wikilinks cacheados por nota. Notas sin wikilinks se omiten del payload.
-fn graph_links_from_cache(
-    cache: &BTreeMap<String, metadata_cache::CachedNote>,
-    root: &Path,
-) -> Vec<GraphLinksEntry> {
+fn graph_links_from_cache(cache: &BTreeMap<String, metadata_cache::CachedNote>) -> Vec<GraphLinksEntry> {
     let mut entries = Vec::with_capacity(cache.len());
     for note in cache.values() {
         let targets = note
@@ -912,10 +910,7 @@ fn graph_links_from_cache(
             continue;
         }
         entries.push(GraphLinksEntry {
-            path: root
-                .join(&note.relative_path)
-                .to_string_lossy()
-                .into_owned(),
+            path: note.relative_path.clone(),
             title: note.title.clone(),
             targets,
         });
@@ -925,7 +920,7 @@ fn graph_links_from_cache(
 
 fn graph_links_from_runtime(runtime: &Arc<VaultCacheRuntime>) -> Vec<GraphLinksEntry> {
     match runtime.cache.lock() {
-        Ok(cache) => graph_links_from_cache(&cache.entries, &runtime.root),
+        Ok(cache) => graph_links_from_cache(&cache.entries),
         Err(_) => Vec::new(),
     }
 }
@@ -2373,7 +2368,7 @@ fn scan_vault(root: &Path) -> Result<(Vec<PageData>, Vec<SkippedEntry>), String>
         let mut hasher = DefaultHasher::new();
         path.hash(&mut hasher);
         let (frontmatter, blocks) = parse_markdown_with_frontmatter(&content);
-        let blocks_len = blocks.len();
+        let blocks_len = metadata_cache::total_block_count(&blocks);
         let journal_date = journal_date_from_path(path);
         let (updated_at_ms, created_at_ms) = metadata_times(&metadata);
         pages.push(PageData {
@@ -3825,7 +3820,7 @@ async fn load_vault(
             let mut hasher = DefaultHasher::new();
             relative_path.hash(&mut hasher);
             let (frontmatter, blocks) = parse_markdown_with_frontmatter(&content);
-            let block_count_saf = blocks.len();
+            let block_count_saf = metadata_cache::total_block_count(&blocks);
             let journal_date = journal_date_from_relative_path(&relative_path);
             pages.push(PageData {
                 id: format!("p-{:x}", hasher.finish()),
@@ -4093,7 +4088,7 @@ async fn read_page(
     let storage = active_storage(&state)?;
     let content = storage.read_note(&file_path).await?;
     let (frontmatter, blocks) = parse_markdown_with_frontmatter(&content);
-    let block_count = blocks.len();
+    let block_count = metadata_cache::total_block_count(&blocks);
     let title = Path::new(&file_path)
         .file_stem()
         .and_then(|s| s.to_str())
@@ -7066,10 +7061,11 @@ mod tests {
         assert_eq!(hit.count, 4); // 3 cafés + 1 sal, en el bloque ganador.
         assert_eq!(hit.block.id, "ganador");
         assert_eq!(hit.block.content, "café café café sal");
-        // La página viene en variante metadata: sin bloques, con block_count.
+        // La página viene en variante metadata: sin bloques, con block_count
+        // en su semántica plana (2: el padre y el hijo anidado).
         assert!(hit.page.blocks.is_empty());
         assert!(!hit.page.blocks_loaded);
-        assert_eq!(hit.page.block_count, 1);
+        assert_eq!(hit.page.block_count, 2);
         assert_eq!(hit.page.title, "A");
         // El índice plegado apunta al primer "cafe" del texto plegado del
         // bloque ganador ("cafe cafe cafe sal"), que mapea 1:1 a UTF-16.
@@ -7234,12 +7230,12 @@ mod tests {
             ("b.md".to_string(), note_b),
             ("sola.md".to_string(), note_solo),
         ]);
-        let entries = graph_links_from_cache(&cache, &root);
+        let entries = graph_links_from_cache(&cache);
 
         assert_eq!(entries.len(), 2);
         let entry_a = &entries[0];
         assert_eq!(entry_a.title, "A");
-        assert_eq!(entry_a.path, root.join("a.md").to_string_lossy());
+        assert_eq!(entry_a.path, "a.md");
         assert_eq!(entry_a.targets, vec!["Destino", "Destino"]);
         assert_eq!(entries[1].title, "B");
         assert_eq!(entries[1].targets, vec!["A"]);

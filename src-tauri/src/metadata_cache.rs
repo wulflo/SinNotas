@@ -116,6 +116,22 @@ pub struct CachedNote {
     pub flashcards: CachedFlashcardState,
 }
 
+/// Conteo PLANO de bloques de una nota: incluye los hijos anidados, igual
+/// que `getAllBlocksFlat` en el front. Era el número que las vistas
+/// resumen mostraban con el scan completo; `block_count` lo replica para
+/// sufrir sin los árboles.
+pub fn total_block_count(nodes: &[crate::BlockNode]) -> usize {
+    fn walk(nodes: &[crate::BlockNode], out: &mut usize) {
+        *out += nodes.len();
+        for node in nodes {
+            walk(&node.children, out);
+        }
+    }
+    let mut total = 0;
+    walk(nodes, &mut total);
+    total
+}
+
 impl CachedNote {
     pub fn to_page_data(&self, root: &Path) -> PageData {
         let absolute = root.join(&self.relative_path);
@@ -138,7 +154,7 @@ impl CachedNote {
                 } / 1_000_000,
             ),
             blocks_loaded: true,
-            block_count: self.blocks.len(),
+            block_count: total_block_count(&self.blocks),
         }
     }
 
@@ -167,7 +183,7 @@ impl CachedNote {
                 } / 1_000_000,
             ),
             blocks_loaded: false,
-            block_count: self.blocks.len(),
+            block_count: total_block_count(&self.blocks),
         }
     }
 }

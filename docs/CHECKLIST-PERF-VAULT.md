@@ -57,6 +57,21 @@ qué queda a medias (y qué síntomas de código roto esperar) y cómo continuar
 > incremental) y MIGRACIÓN DEL FRONT (`content-search.ts`/omnibar →
 > `search_content` con fallback JS solo-web conservado).
 >
+> **Bitácora 4-C fix + FASE 4-D (avance) (2026-10-31):** (1) Corrección de
+> un bug del cierre de 4-B: `PageData.path` del vault es RELATIVA
+> (`replaceVault` normaliza a relativo), así que el match de la copia
+> registrada en `openContentHit` por ruta absoluta nunca casaba; ahora se
+> resuelve por id estable (mismo hash de ruta canónica en Rust que en
+> `load_vault`) con fallback por título, y `graph_links` sirve su `path`
+> relativo (aunque el front no lo usa). (2) `block_count` pasa a semántica
+> PLANA (`total_block_count`, hijos anidados incluidos: análoga de
+> `getAllBlocksFlat`), rellenado en cache/scan_fallback/SAF/read_page. (3)
+> Consumidores con resumen listo para el boot de metadatos: all-pages
+> (conteo por fila) y lista de diarios usan `blockCount` cuando la nota
+> está descargada, y `showGraphPreview` rehidrata con `ensurePageLoaded` y
+> re-pinta. Verificación manual: pendiente (igual que el resto de la FASE
+> 4).
+>
 > **Bitácora FASE 4-C (2026-10-31):** grafo Rust-first completado. (1) La
 > caché gana `CachedLinkReference.is_tag` (v2→v3: las cachés antiguas se
 > descartan y la bóveda se re-escanea una vez con el fallback diseñado) y

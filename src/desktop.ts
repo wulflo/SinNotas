@@ -11633,6 +11633,16 @@ function showGraphPreview(pageTitle: string): void {
   const page = vault.getPageByTitle(pageTitle);
   if (!page) return;
 
+  // FASE 4-D: con el boot de metadatos (4-E) la nota puede estar descargada;
+  // rehidrata en segundo plano y re-pinta el detalle cuando llegue.
+  if (page.blocksLoaded === false && isTauri()) {
+    void vault.ensurePageLoaded(page).then(() => {
+      if (graphPreviewPageTitle !== page.title) return;
+      const hydrated = vault.getPageByTitle(page.title);
+      if (hydrated?.blocks?.length) renderGraphPreviewContent(hydrated);
+    });
+  }
+
   if (graphPreviewPageTitle === page.title && graphPreviewEl.classList.contains("is-open")) {
     closeGraphPreview();
     return;
@@ -12441,7 +12451,10 @@ function renderAllPagesView() {
 
   pageSlice.forEach((p) => {
     const row = document.createElement("tr");
-    const blockCount = getAllBlocksFlat(p.blocks).length;
+    // FASE 4-D: con el boot de metadatos (4-E) la nota puede estar
+    // descargada; el resumen de Rust ya trae el conteo plano de bloques.
+    const blockCount =
+      p.blocksLoaded === false ? p.blockCount ?? 0 : getAllBlocksFlat(p.blocks).length;
 
     const nameCell = document.createElement("td");
     const linkCell = document.createElement("div");
@@ -12723,7 +12736,12 @@ function renderJournalsView() {
     label.textContent = pageDisplayTitle(journal);
     const meta = document.createElement("span");
     meta.className = "journals-list-meta";
-    meta.textContent = `${journal.blocks.length} ${journal.blocks.length === 1 ? "bullet" : "bullets"}`;
+    // FASE 4-D: bajo el boot de metadatos vale el resumen (conteo plano).
+    const bulletCount =
+      journal.blocksLoaded === false
+        ? journal.blockCount ?? 0
+        : getAllBlocksFlat(journal.blocks).length;
+    meta.textContent = `${bulletCount} ${bulletCount === 1 ? "bullet" : "bullets"}`;
     button.append(label, meta);
     button.addEventListener("click", () => {
       loadPage(journal.title);
@@ -13410,11 +13428,15 @@ function renderContentResults(query: string, hits: ContentHit[]): void {
 function openContentHit(hit: ContentHit, query = ""): void {
   sidebarSearchInput.value = "";
   closeSearchResults(true);
-  // FASE 4-B: el hit del backend trae solo la página en variante metadata;
-  // prefiere la copia registrada del vault (misma ruta absoluta). Con el
-  // boot de metadatos (4-E) ambas llegan `blocksLoaded: false`, y
+  // FASE 4-B: el hit del backend trae la página en variante metadata y con
+  // ruta ABSOLUTA de Rust (`to_page_data_metadata`); `PageData.path` del
+  // vault es RELATIVA, así que el match de la copia registrada se hace por
+  // id estable (mismo hash de ruta canónica) y por título. Con el boot de
+  // metadatos (4-E) la copia del vault llega `blocksLoaded: false` y
   // `openPage` rehidrata vía `ensurePageLoaded` antes del render.
-  const storedPage = vault.getPages().find((page) => page.path === hit.page.path);
+  const storedPage =
+    vault.getPages().find((page) => page.id === hit.page.id) ??
+    vault.getPages().find((page) => page.title === hit.page.title);
   openPage(storedPage ?? hit.page);
   cursorState = { blockId: hit.block.id, offset: 0 };
   requestAnimationFrame(() => {
