@@ -21,6 +21,31 @@
 
 ---
 
+## Aviso de seguridad abierto
+
+### `glib` — GHSA-wrw7-89jp-8q8g (alerta 13 de Dependabot)
+
+- **Qué es:** código *unsound* en `glib::VariantStrIter` (binding Rust de GTK).
+  Produce accesos a memoria inválida/crashes al iterar `Variant`; no es
+  ejecución remota ni fuga de datos.
+- **Estado (31 oct 2026):** **sin fix alcanzable**. El fix oficial está en
+  `glib 0.20.0`, pero la pila GTK de Tauri 2 (`gtk 0.18` / `muda ^0.20` /
+  `tao`) exige `glib ^0.18`; `cargo update -p glib` ya está al máximo
+  compatible (0.18.5) y la última estable de Tauri (2.12.5) sigue arrastrando
+  0.18.
+- **Riesgo para SinNotas:** bajo. El backend no llama nunca a `VariantStrIter`
+  ni a la API de `Variant`; el código vulnerable solo se alcanzaría desde el
+  interior de GTK.
+- **Tratamiento:** vigilado con Dependabot y cerrado como riesgo tolerado
+  (`tolerable_risk`) con comentario. Criterio de cierre real: migrar cuando
+  Tauri publique una 2.x con `glib 0.20` en su pila GTK o en la eventual
+  migración a Tauri 3.
+- **Actualizaciones hechas mientras tanto:** `tauri 2.12.4 → 2.12.5`
+  (+ `tauri-build`/`tauri-codegen`/`tauri-macros` 2.7.4,
+  `tauri-runtime-wry 2.12.3`, `ico 0.6.0`), máximo dentro del mismo semver.
+
+---
+
 ## 0. Cómo usar y cómo retomar este trabajo
 
 ### 0.1 Estado de partida
