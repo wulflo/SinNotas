@@ -71,6 +71,14 @@ export interface PageData {
   revisions?: PageRevision[];
   pinned?: boolean;
   pinnedAt?: string;
+  /**
+   * FASE 4: `false` cuando la página llegó del arranque metadata-only y sus
+   * bloques NO están en memoria (se rehidratan con `read_pages_cached` vía
+   * `vault.ensurePageLoaded`). `undefined`/`true` ⇒ bloques completos.
+   */
+  blocksLoaded?: boolean;
+  /** Número de bloques top-level (servido por Rust desde el cacheo). */
+  blockCount?: number;
 }
 
 export interface Backlink {

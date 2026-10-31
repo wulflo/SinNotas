@@ -127,6 +127,37 @@ impl CachedNote {
                     self.modified_ns
                 } / 1_000_000,
             ),
+            blocks_loaded: true,
+            block_count: self.blocks.len(),
+        }
+    }
+
+    /// `PageData` SIN los árboles de bloques (FASE 4: arranque con
+    /// metadatos y bloques bajo demanda). Conserva título/fechas/frontmatter
+    /// y expone `block_count` para las vistas de resumen; el front
+    /// rehidrata los bloques con `read_pages_cached` cuando los necesita.
+    pub fn to_page_data_metadata(&self, root: &Path) -> PageData {
+        let absolute = root.join(&self.relative_path);
+        let mut hasher = DefaultHasher::new();
+        absolute.hash(&mut hasher);
+        PageData {
+            id: format!("p-{:x}", hasher.finish()),
+            title: self.title.clone(),
+            path: absolute.to_string_lossy().into_owned(),
+            frontmatter: self.frontmatter.clone(),
+            blocks: Vec::new(),
+            is_journal: self.is_journal,
+            journal_date: self.journal_date.clone(),
+            updated_at_ms: (self.modified_ns > 0).then_some(self.modified_ns / 1_000_000),
+            created_at_ms: Some(
+                if self.created_ns > 0 {
+                    self.created_ns
+                } else {
+                    self.modified_ns
+                } / 1_000_000,
+            ),
+            blocks_loaded: false,
+            block_count: self.blocks.len(),
         }
     }
 }
@@ -855,6 +886,17 @@ pub fn read_cached_note(root: &Path, relative: &str) -> Result<Option<CachedNote
 /// Loads the cache (if any), sweeps the vault with `std::fs::metadata` and
 /// reparses only new/modified notes.
 pub fn load_or_scan_vault(root: &Path) -> Result<CacheScanOutput, String> {
+    load_or_scan_vault_with_mode(root, false)
+}
+
+/// FASE 4: con `metadata_only = true`, las páginas del arranque NO traen los
+/// árboles de bloques (títulos/fechas/frontmatter/límites de bloques sí); el
+/// front las rehidrata a demanda con `read_pages_cached`. La caché en disco
+/// sigue idéntica: el modo afecta solo al payload IPC.
+pub fn load_or_scan_vault_with_mode(
+    root: &Path,
+    metadata_only: bool,
+) -> Result<CacheScanOutput, String> {
     let started = std::time::Instant::now();
     let canonical_root =
         fs::canonicalize(root).map_err(|_| "El vault activo no está disponible.".to_string())?;
@@ -981,7 +1023,11 @@ pub fn load_or_scan_vault(root: &Path) -> Result<CacheScanOutput, String> {
         };
 
         seen.insert(relative.clone());
-        pages.push(note.to_page_data(&canonical_root));
+        pages.push(if metadata_only {
+            note.to_page_data_metadata(&canonical_root)
+        } else {
+            note.to_page_data(&canonical_root)
+        });
         entries.insert(relative, note);
     }
 
@@ -1164,6 +1210,45 @@ mod tests {
         assert!(second.pages.is_empty());
         assert!(second.cache.entries.is_empty());
         assert_eq!(second.stats.removed_entries, 1);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn metadata_only_scan_serves_blocks_on_demand() {
+        let root = test_root("metadata-only");
+        fs::create_dir_all(root.join("pages")).unwrap();
+        fs::write(root.join("pages/nota.md"), "- uno\n- dos\n- tres\n").unwrap();
+
+        // Modo metadata-only: sin árboles, pero con metadatos y conteo.
+        let metadata_scan = load_or_scan_vault_with_mode(&root, true).unwrap();
+        assert_eq!(metadata_scan.pages.len(), 1);
+        let metadata_page = &metadata_scan.pages[0];
+        assert!(metadata_page.blocks.is_empty());
+        assert!(!metadata_page.blocks_loaded);
+        assert_eq!(metadata_page.block_count, 3);
+        assert_eq!(metadata_page.title, "nota");
+        assert_eq!(metadata_page.path, root.join("pages/nota.md").to_string_lossy());
+
+        // Modo completo: bloques presentes y conteo coherente.
+        let full_scan = load_or_scan_vault_with_mode(&root, false).unwrap();
+        let full_page = &full_scan.pages[0];
+        assert!(full_page.blocks_loaded);
+        assert_eq!(full_page.block_count, 3);
+        assert_eq!(full_page.blocks.len(), 3);
+        // El id deriva de la ruta absoluta: estable entre ambos modos.
+        assert_eq!(metadata_page.id, full_page.id);
+
+        // Rehidratación individual: la entrada cacheada sigue disponible para
+        // el comando `read_pages_cached` (sirve `to_page_data` sobre la misma
+        // `CachedNote`; aquí solo verificamos la conservación del conteo).
+        let cached = full_scan.cache.entries.get("pages/nota.md").unwrap();
+        let served = cached.to_page_data(&root);
+        assert!(served.blocks_loaded);
+        assert_eq!(served.block_count, 3);
+        let metadata_served = cached.to_page_data_metadata(&root);
+        assert!(!metadata_served.blocks_loaded);
+        assert_eq!(metadata_served.block_count, 3);
 
         fs::remove_dir_all(root).unwrap();
     }

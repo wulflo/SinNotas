@@ -49,7 +49,7 @@ import {
   outdentBlocks,
 } from "./editor/tree-engine";
 import { DocumentHistory } from "./editor/history";
-import { VaultStore } from "./store/vault";
+import { VaultStore, isMetadataOnlyBoot } from "./store/vault";
 import {
   DECK_SEPARATOR,
   hasInvalidDeckTitleCharacters,
@@ -7241,21 +7241,32 @@ function renderEditor() {
   if (noteFindBar && !noteFindBar.hidden) runNoteFind(true);
 }
 
-function loadPage(title: string) {
+async function loadPage(title: string): Promise<void> {
   let target = vault.getPageByTitle(title);
   if (!target) {
     target = vault.createPage(title);
   }
   currentPage = target;
-  showEditorPage();
+  await showEditorPage();
 }
 
-function openPage(page: PageData) {
+async function openPage(page: PageData): Promise<void> {
   currentPage = page;
-  showEditorPage();
+  await showEditorPage();
 }
 
-function showEditorPage() {
+/** Ruta (normalizada relativa) de la nota abierta que nunca se descarga. */
+let pinnedEditorPagePath: string | null = null;
+
+async function showEditorPage(): Promise<void> {
+  // FASE 4 (bloques bajo demanda): la nota abierta va pinned (el sweep del
+  // LRU no la descarga) y la anterior vuelve a ser descartable.
+  if (pinnedEditorPagePath) vault.unpinPage(pinnedEditorPagePath);
+  pinnedEditorPagePath = currentPage.path;
+  vault.pinPage(currentPage.path);
+  if (currentPage.blocksLoaded === false && isTauri()) {
+    await vault.ensurePageLoaded(currentPage, { pin: true });
+  }
   cursorState = { blockId: currentPage.blocks[0]?.id || "b-1", offset: 0 };
   snapshotState = null;
   snapshotActivateForm.hidden = true;
@@ -13037,7 +13048,10 @@ async function openVaultAtPath(rootPath: string): Promise<void> {
   vaultManagerStatus.textContent = "Abriendo bóveda…";
   try {
     await vault.flushPendingFileOperations();
-    const snapshot = await invoke<VaultSnapshot>("load_vault", { rootPath });
+    const snapshot = await invoke<VaultSnapshot>("load_vault", {
+      rootPath,
+      metadataOnly: isMetadataOnlyBoot(),
+    });
     stampVaultSyncBaseline(snapshot);
     clearResolvedImages();
     vault.replaceVault(snapshot.pages, snapshot.rootPath, snapshot.vaultName);
@@ -14286,6 +14300,7 @@ async function synchronizeVaultFromDisk(options: { notify?: boolean; force?: boo
     // 3) Recarga completa (camino lento, solo si hubo cambios externos).
     const snapshot = await invoke<VaultSnapshot>("load_vault", {
       rootPath: vault.getActiveRootPath(),
+      metadataOnly: isMetadataOnlyBoot(),
     });
     lastVaultSyncAt = Date.now();
     stampVaultSyncBaseline(snapshot);
@@ -14309,9 +14324,19 @@ async function synchronizeVaultFromDisk(options: { notify?: boolean; force?: boo
     if (nextPage) {
       currentPage = nextPage;
       lastValidPageTitle = currentPage.title;
+      if (isTauri()) {
+        // FASE 4: el replaceVault limpió el LRU; la nota abierta vuelve a ir
+        // pinned y rehidrata antes de seedear historial/renderizar.
+        if (pinnedEditorPagePath) vault.unpinPage(pinnedEditorPagePath);
+        pinnedEditorPagePath = currentPage.path;
+        vault.pinPage(currentPage.path);
+      }
     }
     documentHistory.clearAll();
     if (nextPage) {
+      if (currentPage.blocksLoaded === false && isTauri()) {
+        await vault.ensurePageLoaded(currentPage, { pin: true });
+      }
       documentHistory.seed(currentPage.id, currentPage.blocks, currentPage.title);
     }
     renderSidebar();
@@ -14427,7 +14452,10 @@ async function initializeNativeVault(): Promise<void> {
     }
   }
   try {
-    const snapshot = await invoke<VaultSnapshot>("load_vault", { rootPath: savedRootPath });
+    const snapshot = await invoke<VaultSnapshot>("load_vault", {
+      rootPath: savedRootPath,
+      metadataOnly: isMetadataOnlyBoot(),
+    });
     stampVaultSyncBaseline(snapshot);
     if (snapshot.pages.length > 0 || savedRootPath) {
       vault.replaceVault(snapshot.pages, snapshot.rootPath, snapshot.vaultName);

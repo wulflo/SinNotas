@@ -740,6 +740,19 @@ pub struct PageData {
     /// usa la modificación como aproximación).
     #[serde(default)]
     pub created_at_ms: Option<i64>,
+    /// FASE 4: `false` cuando el arranque se hizo `metadata_only` (arranque
+    /// con metadatos + bloques bajo demanda). El front vuelve a false/true en
+    /// cuanto lea los bloques con `read_pages_cached` (ensurePageLoaded).
+    #[serde(default = "default_blocks_loaded")]
+    pub blocks_loaded: bool,
+    /// Número de bloques top-level de la nota (contado en el parseo). Sirve
+    /// para las columnas/chips de "N bullets" con bloques bajo demanda.
+    #[serde(default)]
+    pub block_count: usize,
+}
+
+fn default_blocks_loaded() -> bool {
+    true
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -848,6 +861,23 @@ async fn vault_sync_state(
         external_revision: 0,
         storage: storage_id,
     })
+}
+
+/// FASE 4: rehidratación de bloques bajo demanda. Solo bóvedas locales (SAF
+/// mantiene los bloques completos en el snapshot: su caché de parseo vive en
+/// el front). Devuelve las páginas pedidas con bloques; las no resolubles
+/// simplemente no aparecen en la respuesta.
+#[tauri::command]
+async fn read_pages_cached(
+    paths: Vec<String>,
+    state: tauri::State<'_, ActiveVault>,
+    cache_state: tauri::State<'_, VaultCacheState>,
+) -> Result<Vec<PageData>, String> {
+    let _vault_path = active_root(&state)?;
+    let Some(runtime) = cache_state.current() else {
+        return Err("read_pages_cached requiere bóveda local con caché activa.".to_string());
+    };
+    Ok(runtime.read_pages_cached(&paths))
 }
 
 /// Carpeta interna del vault para datos administrados por la app. Las carpetas
@@ -1657,6 +1687,66 @@ impl VaultCacheRuntime {
         }
     }
 
+    /// FASE 4: rehidratación de bloques bajo demanda (streaming flashcards/
+    /// kanban/renombres). Devuelve las páginas pedidas CON sus bloques desde
+    /// la caché cuando existen (sin IO, sin reparsar) y, para las que faltan
+    /// en la caché, las relee del disco vía `update_paths` (que además las
+    /// inserta). Rutas no resolubles se omiten: el front decide.
+    fn read_pages_cached(self: &Arc<Self>, paths: &[String]) -> Vec<PageData> {
+        let mut result: Vec<PageData> = Vec::with_capacity(paths.len());
+        let mut misses: Vec<PathBuf> = Vec::new();
+        {
+            let cache = match self.cache.lock() {
+                Ok(cache) => cache,
+                Err(_) => return result,
+            };
+            for path in paths {
+                let Some(absolute) = self.resolve_note_input(path) else { continue };
+                let Some(relative) = metadata_cache::relative_note_path(&self.root, &absolute)
+                else {
+                    continue;
+                };
+                match cache.entries.get(&relative) {
+                    Some(note) => result.push(note.to_page_data(&self.root)),
+                    None => misses.push(absolute),
+                }
+            }
+        }
+        if !misses.is_empty() {
+            // Relectura real: `update_paths` relee estos archivos, los inserta
+            // en la caché (notify=false: no emite delta propio ni compone
+            // revisión) y deja las entradas listas para el re-servido.
+            self.update_paths(&misses, false);
+            let cache = match self.cache.lock() {
+                Ok(cache) => cache,
+                Err(_) => return result,
+            };
+            for miss in &misses {
+                if let Some(relative) =
+                    metadata_cache::relative_note_path(&self.root, miss.as_path())
+                {
+                    if let Some(note) = cache.entries.get(&relative) {
+                        result.push(note.to_page_data(&self.root));
+                    }
+                }
+            }
+        }
+        result
+    }
+
+    /// Acepta rutas absolutas (snapshot local) y relativas (el front
+    /// normaliza `page.path` contra la raíz) y devuelve la absoluta del note
+    /// cuando vive dentro del vault activo.
+    fn resolve_note_input(&self, path: &str) -> Option<PathBuf> {
+        let candidate = Path::new(path);
+        let absolute = if candidate.is_absolute() {
+            candidate.to_path_buf()
+        } else {
+            self.root.join(candidate)
+        };
+        metadata_cache::relative_note_path(&self.root, &absolute).map(|_| absolute)
+    }
+
     fn find_backlinks(&self, page_title: &str) -> Vec<Backlink> {
         match self.cache.lock() {
             Ok(cache) => metadata_cache::find_cached_backlinks(&cache, &self.root, page_title),
@@ -1757,8 +1847,9 @@ impl VaultCacheState {
         &self,
         app: &AppHandle,
         root: &Path,
+        metadata_only: bool,
     ) -> Result<(Vec<PageData>, Vec<SkippedEntry>), String> {
-        let output = metadata_cache::load_or_scan_vault(root)?;
+        let output = metadata_cache::load_or_scan_vault_with_mode(root, metadata_only)?;
         let runtime = Arc::new(VaultCacheRuntime {
             root: fs::canonicalize(root).map_err(|error| error.to_string())?,
             app: app.clone(),
@@ -1878,6 +1969,7 @@ fn scan_vault(root: &Path) -> Result<(Vec<PageData>, Vec<SkippedEntry>), String>
         let mut hasher = DefaultHasher::new();
         path.hash(&mut hasher);
         let (frontmatter, blocks) = parse_markdown_with_frontmatter(&content);
+        let blocks_len = blocks.len();
         let journal_date = journal_date_from_path(path);
         let (updated_at_ms, created_at_ms) = metadata_times(&metadata);
         pages.push(PageData {
@@ -1890,6 +1982,8 @@ fn scan_vault(root: &Path) -> Result<(Vec<PageData>, Vec<SkippedEntry>), String>
             journal_date,
             updated_at_ms,
             created_at_ms,
+            blocks_loaded: true,
+            block_count: blocks_len,
         });
     }
     Ok((pages, skipped))
@@ -3244,6 +3338,9 @@ fn saf_dir_path_from_root(
 #[tauri::command]
 async fn load_vault(
     root_path: Option<String>,
+    // FASE 4: arranque con metadatos (sin árboles de bloques). Solo afecta
+    // a bóvedas locales; SAF siempre devuelve bloques completos.
+    metadata_only: Option<bool>,
     app: AppHandle,
     state: tauri::State<'_, ActiveVault>,
     approved_roots: tauri::State<'_, ApprovedVaultRoots>,
@@ -3324,6 +3421,7 @@ async fn load_vault(
             let mut hasher = DefaultHasher::new();
             relative_path.hash(&mut hasher);
             let (frontmatter, blocks) = parse_markdown_with_frontmatter(&content);
+            let block_count_saf = blocks.len();
             let journal_date = journal_date_from_relative_path(&relative_path);
             pages.push(PageData {
                 id: format!("p-{:x}", hasher.finish()),
@@ -3337,6 +3435,8 @@ async fn load_vault(
                 // creación queda como aproximación a la modificación.
                 updated_at_ms: (note_modified_ms > 0).then_some(note_modified_ms),
                 created_at_ms: None,
+                blocks_loaded: true,
+                block_count: block_count_saf,
             });
         }
 
@@ -3415,7 +3515,7 @@ async fn load_vault(
                 .and_then(|name| name.to_str())
                 .unwrap_or("Vault")
                 .to_string();
-            let (pages, skipped) = match cache_state.activate(&app, &root) {
+            let (pages, skipped) = match cache_state.activate(&app, &root, metadata_only.unwrap_or(false)) {
                 Ok(result) => result,
                 Err(error) => {
                     eprintln!("No se pudo usar la caché de metadatos ({error}); se usa el escaneo completo.");
@@ -3477,7 +3577,7 @@ async fn load_vault(
                 .forbid_directory(&legacy_progress_path, true);
 
             let vault_name = "Vault local".to_string();
-            let (pages, skipped) = match cache_state.activate(&app, &root) {
+            let (pages, skipped) = match cache_state.activate(&app, &root, metadata_only.unwrap_or(false)) {
                 Ok(result) => result,
                 Err(error) => {
                     eprintln!("No se pudo usar la caché de metadatos ({error}); se usa el escaneo completo.");
@@ -3589,6 +3689,7 @@ async fn read_page(
     let storage = active_storage(&state)?;
     let content = storage.read_note(&file_path).await?;
     let (frontmatter, blocks) = parse_markdown_with_frontmatter(&content);
+    let block_count = blocks.len();
     let title = Path::new(&file_path)
         .file_stem()
         .and_then(|s| s.to_str())
@@ -3614,6 +3715,8 @@ async fn read_page(
         // El storage (incluido SAF) no expone birthtime en esta ruta; la UI
         // usa la fecha del diario o la aproximación de modificación.
         created_at_ms: None,
+        blocks_loaded: true,
+        block_count,
     })
 }
 
@@ -4969,6 +5072,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             load_vault,
             vault_sync_state,
+            read_pages_cached,
             pick_vault_root,
             list_system_fonts,
             resolve_image_path,

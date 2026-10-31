@@ -252,9 +252,27 @@ const REVISIONS_STORAGE_KEY = "sinnotas-revisions-v1";
 const REVISIONS_MIGRATED_KEY = "sinnotas-revisions-migrated-v1";
 const ACTIVE_ROOT_STORAGE_KEY = "sinnotas-active-vault-root";
 const ACTIVE_NAME_STORAGE_KEY = "sinnotas-active-vault-name";
+/** FASE 4: interruptor del arranque con metadatos (bloques bajo demanda). */
+const METADATA_BOOT_STORAGE_KEY = "sinnotas-metadata-boot";
+/** Máximo de notas con bloques residentes en memoria (LRU; la abierta va pinned). */
+const MAX_LOADED_PAGES = 120;
 
 /** Milisegundos que se agrupan las ediciones de texto antes de escribir a disco. */
 const SAVE_DEBOUNCE_MS = 300;
+
+/**
+ * FASE 4: ¿arranca la app "metadata-only" (títulos/fechas/frontmatter sin
+ * árboles de bloques) y rehidrata con `read_pages_cached`? OFF por defecto
+ * mientras se cablea el resto de consumidores; se activa en FASE 4-E.
+ * Solo tiene efecto en Tauri con bóveda local.
+ */
+export function isMetadataOnlyBoot(): boolean {
+  try {
+    return window.localStorage.getItem(METADATA_BOOT_STORAGE_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
 
 let storageWarningShown = false;
 
@@ -346,6 +364,15 @@ export class VaultStore {
 
   /** Escrituras propias completadas (guardados a disco de esta sesión). */
   private ownWriteEpoch = 0;
+
+  /**
+   * FASE 4 (bloques bajo demanda): orden de último uso por nota rehidratada
+   * (ruta relativa => tick). Lleva la cuenta del LRU y del sweep de descarga.
+   */
+  private loadedPageEpochs = new Map<string, number>();
+  /** Notas que NO pueden descargarse con el sweep (p. ej. la página abierta). */
+  private pinnedLoadedPaths = new Set<string>();
+  private loadedTick = 0;
 
   public getMutationVersion(): number {
     return this.mutationVersion;
@@ -600,6 +627,10 @@ export class VaultStore {
     this.activeRootPath = rootPath;
     this.activeVaultName = vaultName;
     this.bumpMutationVersion();
+    // FASE 4: el estado del LRU de bloques pertenece al vault anterior.
+    this.loadedPageEpochs.clear();
+    this.pinnedLoadedPaths.clear();
+    this.loadedTick = 0;
     // Las revisiones viven en disco por vault: solo limpiamos la caché en memoria.
     this.revisionCache.clear();
     safeSetItem(ACTIVE_ROOT_STORAGE_KEY, rootPath);
@@ -707,6 +738,113 @@ export class VaultStore {
     safeSetItem(ACTIVE_NAME_STORAGE_KEY, vaultName);
   }
 
+  /**
+   * FASE 4 (bloques bajo demanda): marca una nota como NO descargable por el
+   * sweep del LRU (la página abierta en el editor, p. ej.).
+   */
+  public pinPage(path: string): void {
+    this.pinnedLoadedPaths.add(this.relativeKeyFor(path));
+  }
+
+  /** Devuelve una nota al conjunto que el sweep del LRU puede descargar. */
+  public unpinPage(path: string): void {
+    this.pinnedLoadedPaths.delete(this.relativeKeyFor(path));
+  }
+
+  private relativeKeyFor(path: string): string {
+    const root = this.activeRootPath;
+    return root ? this.toRelativeNotePath(path, root) : path;
+  }
+
+  /**
+   * Garantiza que la nota tenga bloques en memoria. En modo full (flag OFF,
+   * SAF, web) es un no-op; en metadata-only invoca `read_pages_cached`
+   * (cacheada en Rust) y mezcla el resultado.
+   */
+  public async ensurePageLoaded(
+    page: PageData,
+    options: { pin?: boolean } = {}
+  ): Promise<PageData> {
+    if (!isTauri() || page.blocksLoaded !== false) return page;
+    await this.loadPagesCached([page], options);
+    const fresh = this.pages.find((candidate) => candidate.id === page.id);
+    return fresh ?? page;
+  }
+
+  /**
+   * Rehidrata un lote de notas SIN bloques desde la caché de Rust
+   * (`read_pages_cached`): streaming para scans de flashcards/Kanban y
+   * renombres en bóvedas enormes. Aplica pin, sube el LRU y barre las notas
+   * menos recientes no pinned.
+   */
+  public async loadPagesCached(
+    pages: PageData[],
+    options: { pin?: boolean } = {}
+  ): Promise<void> {
+    if (!isTauri()) return;
+    const targets = pages.filter((page) => page.blocksLoaded === false);
+    if (targets.length === 0) return;
+    const paths = [...new Set(targets.map((page) => page.path))];
+    let loaded: PageData[];
+    try {
+      loaded = await invoke<PageData[]>("read_pages_cached", { paths });
+    } catch (error) {
+      console.error("No se pudo rehidratar la nota desde la caché de Rust:", error);
+      return;
+    }
+    if (loaded.length === 0) return;
+    this.loadedTick += 1;
+    const activeRoot = this.activeRootPath;
+    for (const fresh of loaded) {
+      if (!Array.isArray(fresh.blocks)) continue;
+      normalizeBlockTypes(fresh.blocks);
+      if (activeRoot) fresh.path = this.toRelativeNotePath(fresh.path, activeRoot);
+      const idx = this.pages.findIndex(
+        (candidate) => candidate.id === fresh.id || normalizePathForCompare(candidate.path) === normalizePathForCompare(fresh.path)
+      );
+      if (idx < 0) continue;
+      const existing = this.pages[idx];
+      existing.blocks = fresh.blocks;
+      existing.blocksLoaded = true;
+      existing.blockCount = fresh.blockCount;
+      existing.isJournal = fresh.isJournal;
+      existing.journalDate = fresh.journalDate;
+      existing.updatedAtMs = fresh.updatedAtMs;
+      existing.createdAtMs = fresh.createdAtMs;
+      this.loadedPageEpochs.set(existing.path, this.loadedTick);
+    }
+    if (options.pin) {
+      for (const fresh of loaded) this.pinPage(fresh.path);
+    }
+    this.sweepUnpinnedPages();
+  }
+
+  /** LRU: descarga (blocks = []) las notas no pinned más viejas del límite. */
+  private sweepUnpinnedPages(): void {
+    if (this.loadedPageEpochs.size <= MAX_LOADED_PAGES) return;
+    const pendingIds = new Set([...this.pendingSaves.values()].map((entry) => entry.page.id));
+    const entries = [...this.loadedPageEpochs.entries()].sort(
+      (left, right) => left[1] - right[1]
+    );
+    let excess = this.loadedPageEpochs.size - MAX_LOADED_PAGES;
+    for (const [path] of entries) {
+      if (excess <= 0) break;
+      if (this.pinnedLoadedPaths.has(path)) continue;
+      const page = this.pages.find(
+        (candidate) => normalizePathForCompare(candidate.path) === normalizePathForCompare(path)
+      );
+      if (!page || page.blocksLoaded === false) {
+        this.loadedPageEpochs.delete(path);
+        continue;
+      }
+      if (pendingIds.has(page.id)) continue; // escritura diferida: no se toca.
+      page.blocks = [];
+      page.blocksLoaded = false;
+      this.loadedPageEpochs.delete(path);
+      excess -= 1;
+    }
+  }
+
   public async flushPendingFileOperations(): Promise<void> {
     await this.flushPendingSaves();
     await Promise.all([...new Set(this.pendingFileOperations.values())]);
@@ -717,6 +855,12 @@ export class VaultStore {
    * (debounce por nota) para no guardar en cada tecla.
    */
   public scheduleSavePage(page: PageData): void {
+    // FASE 4: una nota descargada (metadata-only, LRU) no tiene bloques
+    // editables en memoria; guardarla aplanaria SU contenido. No-op.
+    if (page.blocksLoaded === false) {
+      console.warn("savePage ignorado: la nota no tiene bloques cargados:", page.title);
+      return;
+    }
     this.rememberPage(page);
     // La página cambió en memoria: invalidar SOLO su epoch. Las cachés
     // incrementales (flashcards, Kanban, búsqueda) reescanean únicamente esta
@@ -774,6 +918,12 @@ export class VaultStore {
 
   /** Persiste la página (localStorage en web y .md en Tauri). */
   private persistPage(updatedPage: PageData, propagateError = false): Promise<void> {
+    // FASE 4: defensa en profundidad del guard del schedule: no aplanar
+    // nunca una nota descargada con `blocks: []`.
+    if (updatedPage.blocksLoaded === false) {
+      console.warn("persistPage ignorado: la nota no tiene bloques cargados:", updatedPage.title);
+      return Promise.resolve();
+    }
     this.persist();
 
     if (!isTauri()) return Promise.resolve();
