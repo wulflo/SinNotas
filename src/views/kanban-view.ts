@@ -121,12 +121,21 @@ export class KanbanManager {
    * Reconstruye las tareas en modo incremental: rescata solo las notas
    * cambiadas, descarta buckets de notas borradas y reensambla en el orden de
    * páginas actual.
+   * FASE 4-D: una nota escaneada SIN bloques (boot de metadatos con la nota
+   * aún descargada) se captura con epoch centinela `-1`; cuando el stream de
+   * hidratación le trae bloques, la comparación contra el epoch real la marca
+   * cambiada y el próximo scan la procesa con su contenido.
    */
   private rebuildFrom(pages: PageData[], changed: PageData[]): void {
     const currentPaths = new Set(pages.map((page) => page.path));
     for (const page of changed) {
       this.tasksByPage.set(page.path, KanbanManager.scanTasksForPage(page));
-      if (this.view) this.epochs?.set(page.path, this.view.getPageVersion(page));
+      if (this.view) {
+        this.epochs?.set(
+          page.path,
+          page.blocksLoaded === false ? -1 : this.view.getPageVersion(page)
+        );
+      }
     }
     for (const key of [...this.tasksByPage.keys()]) {
       if (!currentPaths.has(key)) this.tasksByPage.delete(key);
@@ -142,6 +151,9 @@ export class KanbanManager {
   /** Tareas de una sola nota (la unidad de rescate incremental). */
   private static scanTasksForPage(page: PageData): KanbanTask[] {
     const list: KanbanTask[] = [];
+    // Boot de metadatos: sin bloques todavía, nada que escanear (el epoch
+    // centinela de rebuildFrom garantiza que se rescane al hidratar).
+    if (page.blocksLoaded === false) return list;
     const flat = getAllBlocksFlat(page.blocks);
 
     flat.forEach((b) => {

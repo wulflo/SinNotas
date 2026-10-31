@@ -348,8 +348,12 @@ function executeQuery(queryText: string): QueryResult[] {
 }
 
 const flashcardsManager = new FlashcardsManager();
-/** Escaneo por lotes + caché por versión del vault para Flashcards. */
-const flashcardLoader = new FlashcardLoader(flashcardsManager);
+/**
+ * Escaneo por lotes + caché por versión del vault para Flashcards. Con el
+ * boot de metadatos (4-E) el lote del scan hidrata sus notas viajando por la
+ * caché de Rust; el barrido del LRU mantiene la memoria acotada.
+ */
+const flashcardLoader = new FlashcardLoader(flashcardsManager, (chunk) => vault.loadPagesCached(chunk));
 let desktopReady = false;
 let flashcardLoading = false;
 /** Evita re-renderizar la pantalla de "completado" en cada tick. */
@@ -7285,7 +7289,7 @@ async function showEditorPage(): Promise<void> {
  * El título de una nota es su nombre de archivo, así que el cambio debe
  * renombrar el archivo y sincronizar título, ruta y contenido a la vez.
  */
-function commitPageTitleRename(): void {
+async function commitPageTitleRename(): Promise<void> {
   // Si el usuario cambió de nota con el título a medio editar, el renombrado ya no aplica.
   if (pageTitleRenamePageId && pageTitleRenamePageId !== currentPage.id) return;
 
@@ -7319,7 +7323,7 @@ function commitPageTitleRename(): void {
 
   const oldTitle = currentPage.title;
   const oldPath = currentPage.path;
-  if (!vault.renamePage(currentPage.id, newTitle)) {
+  if (!(await vault.renamePage(currentPage.id, newTitle))) {
     showToast("No se pudo renombrar la nota.");
     restoreTitle();
     vault.savePage(currentPage);
@@ -8149,6 +8153,35 @@ function renderKanbanBoard() {
   lists.todo.setItems(todoTasks);
   lists.doing.setItems(doingTasks);
   lists.done.setItems(kanbanHideCompleted.checked ? [] : doneTasks);
+
+  // FASE 4-D: con el boot de metadatos las tareas llegan al revés que el
+  // scan (el stream hidrata los lotes); cada hidratación re-pinta y el
+  // rescan incremental procesa solo las notas recién hidratadas (epoch
+  // centinela), así que re-renderizar es barato.
+  void ensureKanbanContentLoaded();
+}
+
+/** Stream de hidratación de notas para el tablero Kanban (boot de metadatos). */
+let kanbanContentStream: Promise<void> | null = null;
+const KANBAN_HYDRATION_BATCH = 96;
+
+function ensureKanbanContentLoaded(): void {
+  if (!isTauri() || !isMetadataOnlyBoot()) return;
+  if (kanbanContentStream) return;
+  kanbanContentStream = (async () => {
+    for (;;) {
+      // La lista pendiente se recalcula a cada vuelta: deltas externos y
+      // barridos del LRU entran y salen sin invalidar el stream.
+      const pending = vault.getPages().filter((page) => page.blocksLoaded === false);
+      if (pending.length === 0 || currentView !== "kanban") break;
+      const batch = pending.slice(0, KANBAN_HYDRATION_BATCH);
+      await vault.loadPagesCached(batch);
+      if (currentView !== "kanban") break;
+      renderKanbanBoard();
+    }
+  })().finally(() => {
+    kanbanContentStream = null;
+  });
 }
 
 function updateTaskState(task: KanbanTask, newStatus: KanbanStatus) {
@@ -9717,7 +9750,7 @@ document.getElementById("sctx-rename")?.addEventListener("click", async () => {
   const newTitle = newName ? normalizeDeckTitle(newName) : "";
   if (newTitle && newTitle !== oldTitle) {
     const oldPath = vault.getPageByTitle(oldTitle)?.path;
-    const renamed = vault.renamePage(pageId, newTitle);
+    const renamed = await vault.renamePage(pageId, newTitle);
     if (!renamed) {
       showToast("No se pudo renombrar la nota.");
       return;

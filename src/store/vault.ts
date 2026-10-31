@@ -991,7 +991,7 @@ export class VaultStore {
     return true;
   }
 
-  public renamePage(pageId: string, newTitle: string): boolean {
+  public async renamePage(pageId: string, newTitle: string): Promise<boolean> {
     const page = this.pages.find((p) => p.id === pageId);
     if (!page) return false;
 
@@ -1008,6 +1008,13 @@ export class VaultStore {
       )
     ) {
       return false;
+    }
+
+    // FASE 4-D: hidrata la nota renombrada ANTES de tocarla (con el boot de
+    // metadatos, su renombre cambia la ruta que la caché de Rust todavía no
+    // conoce; si se hidratara después, el read fallaría como fichero inexistente).
+    if (isMetadataOnlyBoot() && isTauri() && page.blocksLoaded === false) {
+      await this.ensurePageLoaded(page);
     }
 
     const oldTitle = page.title;
@@ -1030,20 +1037,7 @@ export class VaultStore {
     // Update wikilinks across all pages, remembering which ones changed
     const oldPattern = new RegExp(`\\[\\[${oldTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]\\]`, "g");
     const newLink = `[[${trimmed}]]`;
-    const changedPages: PageData[] = [];
-
-    this.pages.forEach((p) => {
-      let changed = false;
-      getAllBlocksFlat(p.blocks).forEach((b) => {
-        oldPattern.lastIndex = 0;
-        if (oldPattern.test(b.content)) {
-          oldPattern.lastIndex = 0;
-          b.content = b.content.replace(oldPattern, newLink);
-          changed = true;
-        }
-      });
-      if (changed) changedPages.push(p);
-    });
+    const changedPages = await this.rewriteRenameLinks(oldTitle, oldPattern, newLink, page);
 
     this.persist();
 
@@ -1060,6 +1054,78 @@ export class VaultStore {
     }
 
     return true;
+  }
+
+  /**
+   * FASE 4-D: reescritura de los `[[TítuloAntiguo]]` del vault tras un
+   * rename.
+   * - Modo completo (flag OFF, SAF, web): escaneo JS de todas las páginas,
+   *   como siempre.
+   * - Modo metadata-only: los candidatos salen de `find_backlinks` (cached:
+   *   superset — incluye refs por #tag que la regex audita deja pasar de
+   *   largo) y se rehidratan por lotes con el barrido del LRU antes del
+   *   rewrite. Si falla la consulta, cae al escaneo en memoria.
+   */
+  private async rewriteRenameLinks(
+    oldTitle: string,
+    oldPattern: RegExp,
+    newLink: string,
+    renamedPage: PageData
+  ): Promise<PageData[]> {
+    const rewrite = (pages: PageData[]): PageData[] => {
+      const changedPages: PageData[] = [];
+      pages.forEach((p) => {
+        let changed = false;
+        getAllBlocksFlat(p.blocks).forEach((b) => {
+          oldPattern.lastIndex = 0;
+          if (oldPattern.test(b.content)) {
+            oldPattern.lastIndex = 0;
+            b.content = b.content.replace(oldPattern, newLink);
+            changed = true;
+          }
+        });
+        if (changed) changedPages.push(p);
+      });
+      return changedPages;
+    };
+
+    if (!isMetadataOnlyBoot() || !isTauri()) return rewrite(this.pages);
+
+    let backlinks: Array<{ sourcePath: string; sourcePage: string }> = [];
+    try {
+      backlinks = await invoke<Array<{ sourcePath: string; sourcePage: string }>>(
+        "find_backlinks",
+        { pageTitle: oldTitle }
+      );
+    } catch (error) {
+      console.error("find_backlinks no disponible; reescritura en memoria:", error);
+      return rewrite(this.pages);
+    }
+
+    // Los retroenlaces de Rust citan la página por título del file stem:
+    // resuelve a las notas del vault. El propia renombrada puede seguir
+    // contieniendo enlaces de texto planos a su título anterior: entra en
+    // el lote de hidratación aunque tenga bloques pendientes.
+    const byTitle = new Map<string, PageData>();
+    this.pages.forEach((p) => byTitle.set(p.title.toLowerCase(), p));
+    const candidates: PageData[] = [];
+    const seen = new Set<string>();
+    const push = (page: PageData | undefined): void => {
+      if (!page || seen.has(page.id)) return;
+      seen.add(page.id);
+      candidates.push(page);
+    };
+    [...new Set(backlinks.map((b) => b.sourcePage.toLowerCase()))].forEach((key) =>
+      push(byTitle.get(key))
+    );
+    if (renamedPage.blocksLoaded === false) push(renamedPage);
+
+    // Rehidratación por lotes; el barrido del LRU descarta lo que no queda
+    // residente, así que la memoria no crece con el tamaño del vault.
+    const dry = candidates.filter((p) => p.blocksLoaded === false);
+    if (dry.length > 0) await this.loadPagesCached(dry);
+
+    return rewrite(candidates);
   }
 
   public updateBlockContent(pageTitle: string, blockId: string, newContent: string): void {

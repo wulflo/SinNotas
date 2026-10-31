@@ -57,6 +57,38 @@ qué queda a medias (y qué síntomas de código roto esperar) y cómo continuar
 > incremental) y MIGRACIÓN DEL FRONT (`content-search.ts`/omnibar →
 > `search_content` con fallback JS solo-web conservado).
 >
+> **Bitácora FASE 4-D (2026-10-31):** cableado de los consumidores que
+> escanean bloques, todo bajo el flag (con flag OFF el comportamiento no
+> cambia ni una línea: mismo camino de siempre).
+>
+> - **Flashcards streaming**: `FlashcardLoader` acepta un hidratador
+>   opcional (`FlashcardPageHydrator`); cada lote del scan con
+>   `blocksLoaded === false` lo pasa por el hidratador (desktop:
+>   `vault.loadPagesCached`) antes de escanearlo, con guard de
+>   generación tras el await. El barrido del LRU mantiene la memoria
+>   acotada aunque pase toda la bóveda.
+> - **Kanban streaming**: epoch centinela `-1` en `KanbanManager` para
+>   notas escaneadas sin bloques (`scanTasksForPage` sale temprano); la
+>   comparación epoch centinela vs. real marca cambiadas las notas recién
+>   hidratadas, así que el rescate incremental procesa exactamente el lote
+>   nuevo. `desktop.renderKanbanBoard` dispara `ensureKanbanContentLoaded`
+>   (stream por lotes de 96, re-pinta cada vuelta y se corta al salir de
+>   la vista; la pendiente se recalcula a cada vuelta, sin estado global).
+>   Test nuevo del centinela (`hidratada → rescate → fresca`).
+> - **Rename streaming** (`vault.renamePage` ahora async): hidrata la
+>   nota renombrada ANTES de mutar su título/ruta (la caché de Rust aún
+>   no conoce la nueva; hidratar después sería un read a fichero
+>   inexistente). La reescritura de `[[TítuloAntiguo]]` sale de
+>   `find_backlinks` (superset con refs por tag que la regex deja pasar) y
+>   los candidatos se rehidratan por lotes antes del rewrite; si la
+>   consulta falla, cae al escaneo en memoria. El resto del flujo
+>   (rename_page + saves encolados) no cambia. Llamadores actualizados a
+>   `await` (commitPageTitleRename async, menú contextual).
+>
+> Validación: `cargo test` 66, clippy 0, `npx tsc --noEmit` 0, `npm test`
+> 33/322 (2 nuevos: kanban centinela, loader hidratado). Verificación
+> manual con el flag ON (app empaquetada): PENDIENTE.
+>
 > **Bitácora 4-C fix + FASE 4-D (avance) (2026-10-31):** (1) Corrección de
 > un bug del cierre de 4-B: `PageData.path` del vault es RELATIVA
 > (`replaceVault` normaliza a relativo), así que el match de la copia

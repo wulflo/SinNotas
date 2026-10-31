@@ -49,4 +49,26 @@ describe("KanbanManager", () => {
 
     expect(manager.scanTasks(pages)).not.toBe(manager.scanTasks(pages));
   });
+
+  it("rescata las notas hidratadas tras un escaneo sin bloques (FASE 4-D)", () => {
+    const manager = new KanbanManager();
+    const versions = {
+      getStructural: () => 1,
+      getPageVersion: (_page: PageData) => 7,
+    };
+    const dry: PageData = { ...page("a", ["TODO Uno"]), blocksLoaded: false, blocks: [] };
+
+    // Boot de metadatos: el primer scan ve las notas descargadas y captura
+    // el epoch centinela; no hay tareas y el tablero queda vacío.
+    expect(manager.scanTasks([dry], versions)).toHaveLength(0);
+
+    // Hidratación: misma página, mismos epochs del vault, ahora con bloques.
+    const hydrated = page("a", ["TODO Uno"]);
+    const tasks = manager.scanTasks([hydrated], versions);
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].status).toBe("todo");
+
+    // Fresca: segundo parseo conserva el mismo estado sin reescaneo.
+    expect(manager.scanTasks([hydrated], versions)).toBe(tasks);
+  });
 });

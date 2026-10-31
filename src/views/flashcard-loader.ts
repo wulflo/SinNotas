@@ -17,6 +17,13 @@ export interface FlashcardLoadOptions {
   onDone?: (cards: readonly Flashcard[]) => void;
 }
 
+/**
+ * FASE 4-D: proveedor de bloques para el scan en streaming. Con el boot de
+ * metadatos las notas llegan sin árboles; el lote del scan los pide viajando
+ * por la caché de Rust (`read_pages_cached`) justo antes de escanearlas.
+ */
+export type FlashcardPageHydrator = (pages: PageData[]) => void | Promise<void>;
+
 /** Número o bien la vista de epochs de `VaultStore` (modo incremental). */
 export type FlashcardVersion = number | VaultVersionView;
 
@@ -81,9 +88,11 @@ export class FlashcardLoader {
   private cache: ScanCache | null = null;
   private task: LoadTask | null = null;
   private generation = 0;
+  private hydrate: FlashcardPageHydrator | null;
 
-  constructor(manager: FlashcardsManager) {
+  constructor(manager: FlashcardsManager, hydrate?: FlashcardPageHydrator) {
     this.manager = manager;
+    this.hydrate = hydrate ?? null;
   }
 
   /**
@@ -267,20 +276,42 @@ export class FlashcardLoader {
 
   private schedule(task: LoadTask): void {
     // globalThis también funciona en tests y entornos sin `window`.
-    task.timer = globalThis.setTimeout(() => this.run(task.generation), 0);
+    task.timer = globalThis.setTimeout(() => void this.processChunk(task.generation), 0);
   }
 
-  private run(generation: number): void {
+  private async processChunk(generation: number): Promise<void> {
     const task = this.task;
     if (!task || task.generation !== generation || this.generation !== generation) return;
     task.timer = null;
 
-    const startedAt = performance.now();
     const end = Math.min(task.scanPagesList.length, task.nextPage + task.chunkSize);
+    let chunk: PageData[] = [];
     if (end > task.nextPage) {
       // Escaneo nota a nota: permite asociar cada tarjeta a su página y por
       // tanto conservar las demás tras un rescate parcial.
-      const chunk = task.scanPagesList.slice(task.nextPage, end);
+      chunk = task.scanPagesList.slice(task.nextPage, end);
+    }
+
+    // FASE 4-D: con el boot de metadatos el lote llega sin árboles; los
+    // trae el hidratador (streaming: el barrido del LRU descarta notas que
+    // este lote ya no necesita) justo antes del scan. La medida del lote
+    // (chunkSize) separa el coste de la hidratación del del scan.
+    if (chunk.length && chunk.some((page) => page.blocksLoaded === false) && this.hydrate) {
+      try {
+        await this.hydrate(chunk);
+      } catch (error) {
+        console.debug("No se pudo hidratar el lote del repaso:", error);
+      }
+      // La hidratación abre una ventana async: si el task o el generation
+      // ya no son los vigentes, este resultado está obsoleto.
+      const still = this.task;
+      if (!still || still !== task || still.generation !== generation || this.generation !== generation) {
+        return;
+      }
+    }
+
+    const startedAt = performance.now();
+    if (chunk.length) {
       for (const page of chunk) {
         const detected = this.manager.scanPages([page]);
         task.scannedBuckets.set(page.path, detected);
@@ -289,7 +320,7 @@ export class FlashcardLoader {
         }
         for (const card of detected) task.cards.push(card);
       }
-      task.nextPage = end;
+      task.nextPage = chunk.length ? task.nextPage + chunk.length : task.nextPage;
     }
 
     const elapsed = performance.now() - startedAt;

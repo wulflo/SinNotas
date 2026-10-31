@@ -14,6 +14,10 @@ function makePages(count: number): PageData[] {
   );
 }
 
+function makeDryPage(id: string, title: string): PageData {
+  return { id, title, path: `notes/${title}.md`, blocks: [], blocksLoaded: false };
+}
+
 function load(
   loader: FlashcardLoader,
   pages: PageData[],
@@ -122,5 +126,30 @@ describe("FlashcardLoader", () => {
     expect(card.searchText).toContain("agil");
     expect(card.searchText).toContain("acentos");
     expect(card.searchText).not.toContain("<b>");
+  });
+
+  it("hidrata los lotes sin bloques antes de escanearlos (FASE 4-D)", async () => {
+    const manager = new FlashcardsManager();
+    const hydrated: string[] = [];
+    const loader = new FlashcardLoader(manager, (chunk) => {
+      // Simula lo que hace vault.loadPagesCached: muta en sitio las notas
+      // del vault con el contenido de Rust.
+      chunk.forEach((page) => {
+      if (page.blocksLoaded === false) {
+        page.blocks = makePage(page.id, page.title, `Pregunta ${page.id} :: Respuesta ${page.id}`)
+          .blocks;
+        page.blocksLoaded = true;
+        hydrated.push(page.id);
+        }
+      });
+    });
+
+    const pages = [makeDryPage("p0", "Uno"), makeDryPage("p1", "Dos")];
+    await load(loader, pages, 1);
+
+    // Hidratación streaming: una llamada por lote, con las notas del lote.
+    expect(hydrated.sort()).toEqual(["p0", "p1"]);
+    expect(manager.getAllCardsCount()).toBe(2);
+    expect(loader.getCachedCards(pages, 1)?.length).toBe(2);
   });
 });
