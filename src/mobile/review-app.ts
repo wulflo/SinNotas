@@ -60,6 +60,9 @@ interface VaultSnapshot {
   vaultName: string;
   pages: PageData[];
   skipped?: SkippedEntry[];
+  /** Fingerprint al terminar la carga (None => no computable). */
+  fingerprint?: number | null;
+  externalRevision?: number;
 }
 
 interface SkippedEntry {

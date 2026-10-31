@@ -195,6 +195,13 @@ pub fn load_cache_file(root: &Path) -> Option<VaultMetadataCache> {
     if cache.version != CACHE_FORMAT_VERSION {
         return None;
     }
+    // Replay del diario de deltas al día (orden: registro a registro; las
+    // reglas de apply_cache_delta son convergentes, así que rejugar registros
+    // ya plegados en el archivo maestro es inofensivo). Se aplica ANTES de
+    // sanitizar para validar también las entradas que trajo el diario.
+    if let Some(records) = load_cache_delta(root) {
+        let _applied = apply_cache_delta(&mut cache, &records);
+    }
     sanitize_cache(root, &mut cache);
     Some(cache)
 }
@@ -252,6 +259,230 @@ pub fn write_cache_file(root: &Path, cache: &VaultMetadataCache) -> Result<(), S
     result
 }
 
+// ==================== Diario de deltas (2.1/2.2) ====================
+
+/// Journal of incremental cache updates, next to the main cache file. Every
+/// `update_paths` batch appends framed records (an upsert or a delete) instead
+/// of re-serializing the whole vault: with a cold 14k-note cache a full write
+/// costs tens of ms of blocking work, while the journal costs O(delta).
+/// On load the journal replays over the base cache; when it accumulates
+/// `CACHE_DELTA_COMPACT_RECORDS` records it is folded back into the main
+/// cache file and truncated.
+pub const CACHE_DELTA_FILE_NAME: &str = ".sinnotas_cache_delta.log";
+const CACHE_DELTA_MAGIC: &[u8; 4] = b"SND1";
+const CACHE_DELTA_FORMAT_VERSION: u32 = 1;
+/// Fold the journal back into the main cache after this many records.
+pub const CACHE_DELTA_COMPACT_RECORDS: u64 = 256;
+/// Defensive cap on how old a journaled record may be.
+const MAX_CACHE_DELTA_RECORD_BYTES: usize = 64 * 1024 * 1024;
+const MAX_CACHE_DELTA_RECORDS: usize = 512_000;
+
+/// One journal record: an upsert (`note: Some`) or a delete (`note: None`,
+/// with the deletion timestamp for convergence rules).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheDeltaRecord {
+    pub relative_path: String,
+    pub note: Option<CachedNote>,
+    pub deleted_at_ns: i64,
+}
+
+fn delta_options() -> impl Options {
+    bincode::DefaultOptions::new().with_fixint_encoding()
+}
+
+/// Framerate-free journal header: magic + version, written when the journal
+/// is (re)created empty.
+fn write_delta_header<W: Write>(file: &mut W) -> Result<(), String> {
+    file.write_all(CACHE_DELTA_MAGIC)
+        .map_err(|error| error.to_string())?;
+    file.write_all(&CACHE_DELTA_FORMAT_VERSION.to_le_bytes())
+        .map_err(|error| error.to_string())
+}
+
+fn is_delta_header_missing(path: &std::path::PathBuf) -> bool {
+    fs::metadata(path)
+        .map(|meta| meta.len() < 8)
+        .unwrap_or(true)
+}
+
+/// Appends a batch of delta records (upserts then removes) to the journal,
+/// creating an empty headered journal when needed, and fsyncs. Returns how
+/// many records were actually appended.
+pub fn append_cache_delta(
+    root: &Path,
+    changed: &[(String, CachedNote)],
+    removed: &[(String, i64)],
+) -> Result<usize, String> {
+    if changed.is_empty() && removed.is_empty() {
+        return Ok(0);
+    }
+    let path = root.join(CACHE_DELTA_FILE_NAME);
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)
+        .map_err(|error| error.to_string())?;
+    if is_delta_header_missing(&path) {
+        // A missing/short header means a fresh (or damaged) journal: since we
+        // opened in append mode there is nothing to truncate, just stamp it.
+        write_delta_header(&mut file)?;
+    }
+    let mut count = 0usize;
+    for (relative, note) in changed {
+        let record = CacheDeltaRecord {
+            relative_path: relative.clone(),
+            note: Some(note.clone()),
+            deleted_at_ns: 0,
+        };
+        let payload = bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .serialize(&record)
+            .map_err(|error| format!("No se pudo serializar el delta: {error}"))?;
+        file.write_all(&(payload.len() as u32).to_le_bytes())
+            .map_err(|error| error.to_string())?;
+        file.write_all(&payload).map_err(|error| error.to_string())?;
+        count += 1;
+    }
+    for (relative, deleted_at_ns) in removed {
+        let record = CacheDeltaRecord {
+            relative_path: relative.clone(),
+            note: None,
+            deleted_at_ns: *deleted_at_ns,
+        };
+        let payload = bincode::DefaultOptions::new()
+            .with_fixint_encoding()
+            .serialize(&record)
+            .map_err(|error| format!("No se pudo serializar el delta: {error}"))?;
+        file.write_all(&(payload.len() as u32).to_le_bytes())
+            .map_err(|error| error.to_string())?;
+        file.write_all(&payload).map_err(|error| error.to_string())?;
+        count += 1;
+    }
+    file.sync_all().map_err(|error| error.to_string())?;
+    Ok(count)
+}
+
+/// Reads and parses the journal. A damaged or truncated tail is discarded
+/// (the cache file plus the valid prefix is still consistent); returning
+/// `None` means "no journal / unusable header" and replay is skipped.
+pub fn load_cache_delta(root: &Path) -> Option<Vec<CacheDeltaRecord>> {
+    let path = root.join(CACHE_DELTA_FILE_NAME);
+    let bytes = fs::read(&path).ok()?;
+    if bytes.len() < 8 || &bytes[..4] != CACHE_DELTA_MAGIC {
+        return None;
+    }
+    let version = u32::from_le_bytes(
+        bytes[4..8]
+            .try_into()
+            .ok()?,
+    );
+    if version != CACHE_DELTA_FORMAT_VERSION {
+        return None;
+    }
+    let mut records = Vec::new();
+    let mut cursor = 8usize;
+    while cursor + 4 <= bytes.len() && records.len() < MAX_CACHE_DELTA_RECORDS {
+        let length = u32::from_le_bytes(bytes[cursor..cursor + 4].try_into().ok()?) as usize;
+        cursor += 4;
+        if length > MAX_CACHE_DELTA_RECORD_BYTES {
+            break;
+        }
+        let end = cursor.checked_add(length)?;
+        if end > bytes.len() {
+            // Truncated tail (crash mid-append): stop at the last full record.
+            break;
+        }
+        let record = delta_options()
+            .deserialize::<CacheDeltaRecord>(&bytes[cursor..end])
+            .ok()?;
+        cursor = end;
+        records.push(record);
+    }
+    Some(records)
+}
+
+/// Replays journal records over a base cache. Rules are convergent so that
+/// re-playing a journal that survived a mid-compaction crash cannot revert
+/// newer changes:
+/// - Upsert: only wins when the cached entry is strictly older
+///   (`cached.modified_ns >= note.modified_ns` → keep the cached one).
+/// - Delete: applies unless a later upsert already re-created the note
+///   (`cached.modified_ns > deleted_at_ns` → keep).
+///
+/// Returns the number of records that actually changed the base.
+pub fn apply_cache_delta(cache: &mut VaultMetadataCache, records: &[CacheDeltaRecord]) -> usize {
+    let mut applied = 0usize;
+    for record in records {
+        match (&record.note, record.deleted_at_ns) {
+            (Some(note), _) => {
+                let dominated = cache
+                    .entries
+                    .get(&record.relative_path)
+                    .is_some_and(|cached| cached.modified_ns >= note.modified_ns);
+                if !dominated {
+                    cache
+                        .entries
+                        .insert(record.relative_path.clone(), note.clone());
+                    applied += 1;
+                }
+            }
+            (None, deleted_at_ns) => {
+                let dominated = cache
+                    .entries
+                    .get(&record.relative_path)
+                    .is_some_and(|cached| cached.modified_ns > deleted_at_ns);
+                if !dominated && cache.entries.remove(&record.relative_path).is_some() {
+                    applied += 1;
+                }
+            }
+        }
+    }
+    applied
+}
+
+/// Truncates the journal back to its (empty) header. Used (a) right after a
+/// cold scan rewrites the main cache — the scan already saw the current
+/// disk state, so pending records are stale — and (b) after compaction.
+pub fn truncate_cache_delta(root: &Path) -> Result<(), String> {
+    let path = root.join(CACHE_DELTA_FILE_NAME);
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .truncate(true)
+        .write(true)
+        .open(&path)
+        .map_err(|error| error.to_string())?;
+    write_delta_header(&mut file)?;
+    file.sync_all().map_err(|error| error.to_string())
+}
+
+/// Compaction: rewrite the main cache file, then drop the journal whose
+/// records are now folded into it. Caller must serialize this against
+/// concurrent `append_cache_delta` calls (the runtime persist lock).
+pub fn compact_cache_file(root: &Path, cache: &VaultMetadataCache) -> Result<(), String> {
+    write_cache_file(root, cache)?;
+    truncate_cache_delta(root)
+}
+
+/// Deterministic fingerprint of a materialized cache: size + ordered
+/// (path, mtime, size, content hash) tuples. O(notes) string hashing, no
+/// IPC/IO — used by `vault_sync_state` to detect changes without reloading.
+pub fn vault_fingerprint(cache: &VaultMetadataCache) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    hasher.write_u64(cache.entries.len() as u64);
+    for (relative, note) in &cache.entries {
+        hasher.write(relative.as_bytes());
+        hasher.write_u8(0);
+        hasher.write_i64(note.modified_ns);
+        hasher.write_u8(0);
+        hasher.write_u64(note.size);
+        hasher.write_u8(0);
+        hasher.write(note.content_hash.as_bytes());
+        hasher.write_u8(0);
+    }
+    hasher.finish()
+}
+
 /// Converts a watcher path to a normalized vault-relative note path, if it is
 /// a valid `.md` note inside the root. Returns `None` for cache files, temp
 /// files, reserved folders and anything outside the vault.
@@ -263,6 +494,7 @@ pub fn relative_note_path(root: &Path, path: &Path) -> Option<String> {
     let normalized = relative.to_string_lossy().replace('\\', "/");
     if normalized.contains("sinnotas-tmp")
         || normalized.contains(CACHE_FILE_NAME.trim_start_matches('.'))
+        || normalized.contains(CACHE_DELTA_FILE_NAME.trim_start_matches('.'))
     {
         return None;
     }
@@ -767,6 +999,10 @@ pub fn load_or_scan_vault(root: &Path) -> Result<CacheScanOutput, String> {
         let write_started = std::time::Instant::now();
         if write_cache_file(&canonical_root, &cache).is_ok() {
             stats.cache_written = true;
+            // El escaneo ya vio el estado actual del disco: cualquier registro
+            // pendiente del diario es viejo. Se trunca para que la próxima
+            // carga no re-pliegue registros obsoletos sobre el maestro fresco.
+            let _ = truncate_cache_delta(&canonical_root);
         }
         stats.write_ms = write_started.elapsed().as_millis();
     }
@@ -947,6 +1183,153 @@ mod tests {
         assert_eq!(backlinks.len(), 2);
         assert_eq!(backlinks[0].source_page, "origen");
         assert_eq!(backlinks[0].line_number, 1);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn cache_delta_round_trips_with_upserts_and_removes() {
+        let root = test_root("delta-roundtrip");
+        let note = cached_note_from_content("pages/nota.md", 100, 0, 10, "- contenido\n").unwrap();
+
+        // Caché base en disco SIN la nota.
+        write_cache_file(&root, &VaultMetadataCache::default()).unwrap();
+
+        // Upsert por diario.
+        assert_eq!(
+            append_cache_delta(&root, &[("pages/nota.md".to_string(), note.clone())], &[]).unwrap(),
+            1
+        );
+        let loaded = load_cache_file(&root).expect("el diario debe rejugarse");
+        assert!(loaded.entries.contains_key("pages/nota.md"));
+        assert_eq!(loaded.entries["pages/nota.md"].modified_ns, 100);
+
+        // Upsert más nuevo gana al envejecer de diario.
+        let newer = cached_note_from_content("pages/nota.md", 200, 0, 10, "- otro\n").unwrap();
+        append_cache_delta(&root, &[("pages/nota.md".to_string(), newer)], &[]).unwrap();
+        let reloaded = load_cache_file(&root).unwrap();
+        assert_eq!(reloaded.entries["pages/nota.md"].modified_ns, 200);
+
+        // Upsert más viejo NO revierte al plegado.
+        let older = cached_note_from_content("pages/nota.md", 150, 0, 10, "- viejo\n").unwrap();
+        append_cache_delta(&root, &[("pages/nota.md".to_string(), older)], &[]).unwrap();
+        let reloaded = load_cache_file(&root).unwrap();
+        assert_eq!(reloaded.entries["pages/nota.md"].modified_ns, 200);
+
+        // Borrado: la nota desaparece.
+        append_cache_delta(&root, &[], &[("pages/nota.md".to_string(), 900)]).unwrap();
+        let reloaded = load_cache_file(&root).unwrap();
+        assert!(reloaded.entries.is_empty());
+
+        // Borrado con recreación posterior (mtime > delete): la recreación gana.
+        let recreated = cached_note_from_content("pages/nota.md", 1_000, 0, 10, "- nueva\n").unwrap();
+        append_cache_delta(
+            &root,
+            &[("pages/nota.md".to_string(), recreated)],
+            &[("pages/nota.md".to_string(), 900)],
+        )
+        .unwrap();
+        let reloaded = load_cache_file(&root).unwrap();
+        assert_eq!(reloaded.entries["pages/nota.md"].modified_ns, 1_000);
+
+        // Compacción: plega el diario y trunca; la carga sigue igual.
+        let snapshot = load_cache_file(&root).unwrap();
+        compact_cache_file(&root, &snapshot).unwrap();
+        let reloaded = load_cache_file(&root).unwrap();
+        assert_eq!(reloaded.entries["pages/nota.md"].modified_ns, 1_000);
+        let journal = load_cache_delta(&root).unwrap_or_default();
+        assert!(journal.is_empty());
+
+        // Fingerprint determinista y sensible al contenido.
+        let before = vault_fingerprint(&reloaded);
+        assert_eq!(before, vault_fingerprint(&load_cache_file(&root).unwrap()));
+        let other_note =
+            cached_note_from_content("pages/otra.md", 1_000, 0, 10, "- otra\n").unwrap();
+        append_cache_delta(&root, &[("pages/otra.md".to_string(), other_note)], &[]).unwrap();
+        let after = vault_fingerprint(&load_cache_file(&root).unwrap());
+        assert_ne!(before, after);
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn journal_tail_damage_is_tolerated_and_header_versioning_rejects_old_layouts() {
+        let root = test_root("delta-damage");
+        let note = cached_note_from_content("pages/nota.md", 100, 0, 10, "- contenido\n").unwrap();
+        let other =
+            cached_note_from_content("pages/nota.md", 200, 0, 10, "- segundo\n").unwrap();
+        append_cache_delta(
+            &root,
+            &[
+                ("pages/nota.md".to_string(), note),
+                ("pages/nota.md".to_string(), other),
+            ],
+            &[],
+        )
+        .unwrap();
+
+        let journal_path = root.join(CACHE_DELTA_FILE_NAME);
+        let bytes = fs::read(&journal_path).unwrap();
+
+        // Cola truncada: se conservan los registros completos (aquí solo hay
+        // uno; la carga no debe fallar por bytes rotos).
+        let mut damaged = bytes.clone();
+        damaged.pop();
+        fs::write(&journal_path, damaged).unwrap();
+        let records = load_cache_delta(&root).unwrap();
+        assert_eq!(records.len(), 1);
+
+        // Cabecera de versión incompatible: el diario se ignora (la base gana).
+        let mut wrong_version = bytes.clone();
+        wrong_version[7] = 0xFF;
+        fs::write(&journal_path, wrong_version).unwrap();
+        assert!(load_cache_delta(&root).is_none());
+
+        // Truncado de diario (compacción/cold scan): vacía y válida.
+        truncate_cache_delta(&root).unwrap();
+        assert!(load_cache_delta(&root).unwrap().is_empty());
+        assert_eq!(
+            append_cache_delta(
+                &root,
+                &[(
+                    "pages/otra.md".to_string(),
+                    cached_note_from_content("pages/otra.md", 5, 0, 5, "- o\n").unwrap()
+                )],
+                &[]
+            )
+            .unwrap(),
+            1
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn cold_scan_after_journal_activity_truncates_pending_records() {
+        let root = test_root("delta-cold-scan");
+        fs::write(root.join("fresca.md"), "- nota desde el diario\n").unwrap();
+        // Journal dice que la nota tiene OTRO contenido más nuevo en disco.
+        let stale = cached_note_from_content(
+            "fresca.md",
+            i64::MAX / 2,
+            0,
+            3,
+            "- contenido que ya no existe\n",
+        )
+        .unwrap();
+        append_cache_delta(&root, &[("fresca.md".to_string(), stale)], &[]).unwrap();
+
+        // El escaneo frío reescribe la caché desde el disco real y trunca el
+        // diario: el contenuo viejo del diario no puede reinsertarse encima
+        // del estado real en la siguiente carga.
+        let output = load_or_scan_vault(&root).unwrap();
+        assert!(output.stats.cache_written);
+        let journal = load_cache_delta(&root).unwrap_or_default();
+        assert!(journal.is_empty(), "el diario debe vaciarse tras el cold scan");
+        let reloaded = load_or_scan_vault(&root).unwrap();
+        assert!(reloaded
+            .pages
+            .iter()
+            .all(|page| page.blocks[0].content.contains("desde el diario")));
 
         fs::remove_dir_all(root).unwrap();
     }

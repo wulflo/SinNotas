@@ -178,6 +178,19 @@ interface VaultSnapshot {
   vaultName: string;
   pages: PageData[];
   skipped?: SkippedEntry[];
+  /** Fingerprint de la bóveda al terminar la carga (ver VaultSyncState). */
+  fingerprint?: number | null;
+  /** Revision externa del runtime al terminar la carga (baseline). */
+  externalRevision?: number;
+}
+
+/** Respuesta del comando Rust `vault_sync_state` (cheque de frescura O(n)
+ * para synchronizeVaultFromDisk: sustituye los dos JSON.stringify de la
+ * bóveda entera). */
+interface VaultSyncState {
+  fingerprint: number | null;
+  externalRevision: number;
+  storage: string;
 }
 
 interface SkippedEntry {
@@ -12943,6 +12956,7 @@ async function openVaultAtPath(rootPath: string): Promise<void> {
   try {
     await vault.flushPendingFileOperations();
     const snapshot = await invoke<VaultSnapshot>("load_vault", { rootPath });
+    stampVaultSyncBaseline(snapshot);
     clearResolvedImages();
     vault.replaceVault(snapshot.pages, snapshot.rootPath, snapshot.vaultName);
     flashcardLoader.invalidate();
@@ -14091,6 +14105,31 @@ let lastVaultSyncAt = 0;
 let vaultFocusSyncTimer: number | null = null;
 
 /**
+ * Baseline de sincronización con disco (ver synchronizeVaultFromDisk): se
+ * estampa con cada `load_vault` y con cada delta externo aplicado.
+ */
+interface VaultSyncBaseline {
+  /** Fingerprint del backend al estampar (null: desconocido). */
+  fingerprint: number | null;
+  /** Revision externa del runtime al estampar (deltas del watcher). */
+  externalRevision: number;
+  /** vault.getOwnWriteEpoch() al estampar (ediciones propias de la sesión). */
+  ownWriteEpoch: number;
+}
+const vaultSyncBaseline: VaultSyncBaseline = {
+  fingerprint: null,
+  externalRevision: -1,
+  ownWriteEpoch: 0,
+};
+
+/** Estampa el baseline tras una carga completa (`load_vault`). */
+function stampVaultSyncBaseline(snapshot: VaultSnapshot): void {
+  vaultSyncBaseline.fingerprint = snapshot.fingerprint ?? null;
+  vaultSyncBaseline.externalRevision = snapshot.externalRevision ?? -1;
+  vaultSyncBaseline.ownWriteEpoch = vault.getOwnWriteEpoch();
+}
+
+/**
  * Una vuelta desde otra ventana puede disparar `focus` y `visibilitychange` a
  * la vez. Se unifican en una sola sincronización diferida: así no se lanza un
  * `load_vault` doble ni se reescribe la tarjeta activa dos veces (T18).
@@ -14113,24 +14152,6 @@ function scheduleVaultFocusSync(): void {
 }
 
 
-function blocksContentSignature(blocks: BlockNode[]): unknown[] {
-  return blocks.map((block) => [
-    block.id,
-    block.type,
-    block.content,
-    block.imageAlt || "",
-    blocksContentSignature(block.children || []),
-  ]);
-}
-
-function vaultContentSignature(pages: PageData[]): string {
-  return JSON.stringify(
-    pages
-      .map((page) => [page.path, page.title, page.frontmatter || [], blocksContentSignature(page.blocks)])
-      .sort((left, right) => String(left[0]).localeCompare(String(right[0])))
-  );
-}
-
 /**
  * Vuelve a leer la bóveda desde disco y aplica cambios externos (por ejemplo,
  * repasos hechos en el móvil). Antes de leer se vacían las escrituras
@@ -14145,16 +14166,47 @@ async function synchronizeVaultFromDisk(options: { notify?: boolean; force?: boo
   vaultSyncInFlight = true;
   updateReviewHistoryButtons();
   try {
-    const beforeSignature = vaultContentSignature(vault.getPages());
+    // 1) Volcar escrituras propias pendientes: el disco queda igualado a la
+    //    sesión y `ownWriteEpoch` avanza (solo si escribió algo).
     await vault.flushPendingFileOperations();
+
+    // 2) Cheque de frescura O(notas) en el backend. Reglas:
+    //    - Revision externa igual al baseline => el watcher no reportó
+    //      cambios ajenos desde la última estampada (y las ediciones propias
+    //      ya están volcadas en el paso 1).
+    //    - Fingerprint igual al baseline cubre el caso "sin ediciones
+    //      propias, pero el editor de antes dejó el cache al día por vías
+    //      que no suben la revision" (p. ej. guardar/borrar/renombrar
+    //      propios): también saltamos.
+    //    - Ediciones propias frenan el skip: explican un fingerprint que
+    //      difiere aunque no haya cambios externos.
+    if (!options.force) {
+      let state: VaultSyncState | null = null;
+      try {
+        state = await invoke<VaultSyncState>("vault_sync_state");
+      } catch (error) {
+        console.error("vault_sync_state no disponible; se relee la bóveda:", error);
+      }
+      if (state) {
+        const externalUnchanged = state.externalRevision === vaultSyncBaseline.externalRevision;
+        const ownWritesSinceStamp = vault.getOwnWriteEpoch() !== vaultSyncBaseline.ownWriteEpoch;
+        const fingerprintUnchanged =
+          state.fingerprint !== null &&
+          state.fingerprint === vaultSyncBaseline.fingerprint;
+        if (externalUnchanged && (ownWritesSinceStamp || fingerprintUnchanged)) {
+          lastVaultSyncAt = Date.now();
+          if (options.notify) showToast(translate("La bóveda ya está sincronizada."));
+          return false;
+        }
+      }
+    }
+
+    // 3) Recarga completa (camino lento, solo si hubo cambios externos).
     const snapshot = await invoke<VaultSnapshot>("load_vault", {
       rootPath: vault.getActiveRootPath(),
     });
     lastVaultSyncAt = Date.now();
-    if (vaultContentSignature(snapshot.pages) === beforeSignature) {
-      if (options.notify) showToast(translate("La bóveda ya está sincronizada."));
-      return false;
-    }
+    stampVaultSyncBaseline(snapshot);
 
     const activeCard = flashcardsManager.getCurrentCard();
     const activeCardId = activeCard?.id || null;
@@ -14231,6 +14283,12 @@ async function installVaultCacheDeltaListener(): Promise<void> {
       });
       if (!result.changed.length && !result.added.length && !result.removed.length) return;
 
+      // El delta se aplicó en memoria: la revision del backend ya conoce
+      // estos cambios externos; estampamos para que el cheque de frescura
+      // de synchronizeVaultFromDisk no relea la bóveda entera.
+      vaultSyncBaseline.externalRevision = payload.revision;
+      vaultSyncBaseline.ownWriteEpoch = vault.getOwnWriteEpoch();
+
       // Sin invalidate(): applyExternalDelta sube los epochs de las notas
       // del delta, y las cachés incrementales (flashcards, Kanban, búsqueda)
       // reescanean solo esas notas en su próxima verificación de frescura.
@@ -14288,6 +14346,7 @@ async function initializeNativeVault(): Promise<void> {
   }
   try {
     const snapshot = await invoke<VaultSnapshot>("load_vault", { rootPath: savedRootPath });
+    stampVaultSyncBaseline(snapshot);
     if (snapshot.pages.length > 0 || savedRootPath) {
       vault.replaceVault(snapshot.pages, snapshot.rootPath, snapshot.vaultName);
       flashcardLoader.invalidate();

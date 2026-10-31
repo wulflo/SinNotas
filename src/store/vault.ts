@@ -344,6 +344,9 @@ export class VaultStore {
   /** Epochs por nota (ruta normalizada => contador) para cachés incrementales. */
   private pageVersions = new Map<string, number>();
 
+  /** Escrituras propias completadas (guardados a disco de esta sesión). */
+  private ownWriteEpoch = 0;
+
   public getMutationVersion(): number {
     return this.mutationVersion;
   }
@@ -781,9 +784,25 @@ export class VaultStore {
         filePath: updatedPage.path,
         blocks: updatedPage.blocks,
         frontmatter: updatedPage.frontmatter || [],
-      }).then(() => undefined),
+      }).then(() => {
+        // Escritura propia completada: el baseline de sincronización del
+        // disco queda obsoleto sin que existan cambios externos (ver
+        // synchronizeVaultFromDisk, que usa este contador para distinguirlos).
+        this.ownWriteEpoch += 1;
+      }),
       propagateError
     );
+  }
+
+  /** Contador de escrituras propias completadas (guardados a disco hechos
+   * por esta sesión). Sirve para distinguir en la verificación de frescura
+   * un "fingerprint distinto por ediciones propias" de un cambio externo. */
+  public getOwnWriteEpoch(): number {
+    return this.ownWriteEpoch;
+  }
+
+  private markOwnWrite(): void {
+    this.ownWriteEpoch += 1;
   }
 
   public savePage(updatedPage: PageData, propagateError = false): Promise<void> {
@@ -813,7 +832,9 @@ export class VaultStore {
 
     if (isTauri()) {
       void this.enqueueFileOperation([pageToDelete.path], "delete markdown file", () =>
-        invoke("delete_page", { filePath: pageToDelete.path }).then(() => undefined)
+        invoke("delete_page", { filePath: pageToDelete.path }).then(() => {
+          this.markOwnWrite();
+        })
       );
     }
 
@@ -878,7 +899,9 @@ export class VaultStore {
 
     if (isTauri()) {
       void this.enqueueFileOperation([oldPath, newPath], "rename markdown file", () =>
-        invoke("rename_page", { oldPath, newPath }).then(() => undefined)
+        invoke("rename_page", { oldPath, newPath }).then(() => {
+          this.markOwnWrite();
+        })
       );
       // Guardar la página renombrada con su nuevo path y contenido actualizado
       void this.savePage(page);

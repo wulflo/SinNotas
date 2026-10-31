@@ -13,6 +13,12 @@ qué queda a medias (y qué síntomas de código roto esperar) y cómo continuar
 > `npx tsc --noEmit` (0 errores) y `npm test` (33/319), y se hizo COMMIT único
 > (temas + FASE 1 juntos, porque ambos sets comparten `desktop.ts`).
 > Verificación manual F1: PENDIENTE (ver FASE 1).
+>
+> **Bitácora FASE 2 (2026-10-31):** completada íntegra: diario de deltas
+> (2.1/2.2), `vault_sync_state` + `synchronizeVaultFromDisk` sin
+> `JSON.stringify` (2.3). `cargo test` 54 en verde (3 nuevos del journal),
+> `cargo clippy` sin avisos, `npx tsc --noEmit` y `npm test` 33/319. 2.4
+> (medición release) queda manual. Véase la FASE 2 para decisiones de diseño.
 
 ---
 
@@ -103,14 +109,43 @@ Validación F1: editar una nota con la vista Flashcards abierta no dispara escan
 
 Síntoma de corte a mitad de F1: `tsc` falla en `flashcard-loader.ts`/`vault.ts` por clave de cache sin la nueva firma; ver sección 3.
 
-### FASE 2 — Guardado barato en Rust + focus sin stringify — 🔴 NO EMPEZADA ☐
+### FASE 2 — Guardado barato en Rust + focus sin stringify — ✅ COMPLETADA 2026-10-31 ✔ (falta medición 2.4)
 
-- [ ] 2.1 Eliminar el `cache.clone()` global por save (lib.rs:1465): persistir solo la entrada modificada (rebincode de esa nota, escritura atómica per-entry o diario de deltas).
-- [ ] 2.2 El thread de persistencia debe poder saltarse escrituras si la entrada no cambió (dedupe por content hash — ya existe en `CachedNote`).
-- [ ] 2.3 Nuevo comando `vault_fingerprint(&self) -> u64` (hash incremental ya disponible vía content hashes del cache) para `synchronizeVaultFromDisk` (desktop.ts:14112-14190): comparar hash antes/después y SOLO reler si difiere. Eliminar los dos `JSON.stringify` de bóveda entera.
-- [ ] 2.4 Medir: con `cargo build --release` + nota de 200 bullets, save < ~5ms de trabajo bloqueante.
+Decisiones de diseño (desviaciones razonadas del texto original del plan):
 
-Riesgo conocido: el formato de `.sinnotas_cache.bin` cambia → versionar cabecera del bincode y conservar fallback a rescan completo (ya existe: `load_or_scan_vault`, metadata_cache.rs:623).
+- **2.1 → diario de deltas** (`metadata_cache.rs`): el nuevo archivo
+  `<vault>/.sinnotas_cache_delta.log` (magic `SND1`, versión 1) recibe los
+  registros enmarcados (upsert `Option<CachedNote>` / delete con marca de
+  tiempo) de cada `update_paths`; el hilo de persistencia solo rebincodea el
+  delta y fsynca (O(delta), no O(bóveda)). `cache.clone()` global eliminado:
+  el payload de deltas del frontend se construye desde las entradas
+  cambiadas. Se compacta (reescribe maestro + trunca journal) tras
+  `CACHE_DELTA_COMPACT_RECORDS` (256) registros bajo `persist_lock`
+  (`VaultCacheRuntime`, mutex que serializa append/compactación).
+  Reglas de rejugada convergentes: upsert gana solo si `modified_ns` es
+  mayor que la entrada cacheada; delete aplica salvo recreación posterior
+  (sobrevive a un crash entre write_cache_file y truncate).
+- **Cambio de formato NO rompe la caché existente**: `.sinnotas_cache.bin`
+  mantiene `SNC1` v2; el diario es un archivo aparte con su propia cabecera y
+  el fallback de escaneo completo (`load_or_scan_vault`) sigue intacto —a
+  además, un cold scan trunca el diario para no replegar registros viejos.
+- **Dedupe 2.2**: ya existía en `update_paths` por `content_hash`; ahora las
+  escrituras sin cambio ni siquiera tocan el diario.
+- **2.3 → comando `vault_sync_state`** (fingerprint O(entradas) sin IO +
+  `external_revision` solo de deltas watcher; SAF: fingerprint desde
+  `list_notes`). `VaultSnapshot` añade `fingerprint`/`externalRevision`.
+  El frontend declina saltarse el reload SOLO si: revision externa sin
+  cambiar Y (sin escrituras propias desde el baseline O fingerprint igual).
+  Las escrituras propias se rastrean con `vault.getOwnWriteEpoch()` (bump en
+  save/delete/rename). Esto sustituye los dos `JSON.stringify` de la bóveda
+  entera (menos el caro `blocksContentSignature` recursivo y su sort).
+  El cheque primario es la revision (correcto con watcher vivo; el
+  fingerprint es el safety net para SAF y cambios sin delta).
+
+- [x] 2.1 Eliminar el `cache.clone()` global por save (lib.rs:1465): journal `append_cache_delta` + `persist_delta` con `persist_lock`.
+- [x] 2.2 El hilo de persistencia salta escrituras sin cambio (`update_paths` ya descartaba por content hash; el diario solo recibe deltas reales).
+- [x] 2.3 Nuevo comando `vault_fingerprint(&self) -> u64` → implementado como `vault_sync_state` (fingerprint + revision externa en una consulta y con ruta SAF); `synchronizeVaultFromDisk` compara revision/fingerprint y SOLO relee si difieren; los 2 `JSON.stringify` eliminados.
+- [ ] 2.4 Medir: `cargo build --release` + nota de 200 bullets, save < ~5 ms de trabajo bloqueante → **MANUAL** (no requiere red; ejecutar en equipo del usuario).
 
 ### FASE 3 — Backlinks y búsqueda desde Rust — 🔴 NO EMPEZADA ☐
 

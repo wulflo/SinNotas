@@ -749,6 +749,22 @@ pub struct SkippedEntry {
     pub reason: String,
 }
 
+/// Estado de sincronización para el "cheque de frescura" del frontend
+/// (`synchronizeVaultFromDisk`): sustituye los dos `JSON.stringify` de la
+/// bóveda entera por una consulta O(notas) en el backend.
+/// - `fingerprint`: hash estable del contenido cacheado (bóvedas locales) o de
+///   `list_notes` (SAF); `None` cuando no se pudo computar (el frontend,
+///   entonces, NO debe saltarse la recarga).
+/// - `external_revision`: version de cambios EXTERNOS desembolsados por el
+///   watcher; es 0 para bóvedas sin runtime (SAF).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VaultSyncState {
+    pub fingerprint: Option<u64>,
+    pub external_revision: u64,
+    pub storage: String,
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VaultSnapshot {
@@ -757,6 +773,81 @@ pub struct VaultSnapshot {
     pub pages: Vec<PageData>,
     #[serde(default)]
     pub skipped: Vec<SkippedEntry>,
+    /// Fingerprint coherente con `vault_sync_state` en el momento de carga.
+    pub fingerprint: Option<u64>,
+    /// Revision externa leída tras cargar (baseline inicial para el frontend).
+    #[serde(default)]
+    pub external_revision: u64,
+}
+
+/// Lee (fingerprint, revision externa) del runtime activo, si lo hay.
+fn cache_sync_state(cache_state: &VaultCacheState) -> (Option<u64>, u64) {
+    cache_state
+        .current()
+        .map(|runtime| {
+            let fingerprint = match runtime.cache.lock() {
+                Ok(cache) => Some(metadata_cache::vault_fingerprint(&cache)),
+                Err(_) => None,
+            };
+            (
+                fingerprint,
+                runtime.revision.load(Ordering::SeqCst),
+            )
+        })
+        .unwrap_or((None, 0))
+}
+
+/// Fingerprint determinista de la lista de notas SAF: rutas ordenadas con
+/// su mtime. Con el mismo set produce siempre el mismo hash.
+fn saf_notes_fingerprint(notes: &[NoteEntry]) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    hasher.write_u64(notes.len() as u64);
+    let mut sorted: Vec<&NoteEntry> = notes.iter().collect();
+    sorted.sort_by(|left, right| left.relative_path.cmp(&right.relative_path));
+    for note in sorted {
+        hasher.write(note.relative_path.as_bytes());
+        hasher.write_u8(0);
+        hasher.write_i64(note.modified);
+        hasher.write_u8(0);
+        hasher.write_u64(note.size);
+        hasher.write_u8(0);
+    }
+    hasher.finish()
+}
+
+/// Comando de frescura para `synchronizeVaultFromDisk`. En bóvedas locales el
+/// runtime existe y responde O(entradas) sin IO; en SAF (sin runtime) el
+/// fingerprint sale de `list_notes()` y la revisión externa queda en 0.
+#[tauri::command]
+async fn vault_sync_state(
+    state: tauri::State<'_, ActiveVault>,
+    cache_state: tauri::State<'_, VaultCacheState>,
+) -> Result<VaultSyncState, String> {
+    let storage = active_storage(&state)?;
+    let storage_id = storage.storage_id().to_string();
+    if let Some(runtime) = cache_state.current() {
+        let fingerprint = match runtime.cache.lock() {
+            Ok(cache) => Some(metadata_cache::vault_fingerprint(&cache)),
+            Err(_) => None,
+        };
+        return Ok(VaultSyncState {
+            fingerprint,
+            external_revision: runtime.revision.load(Ordering::SeqCst),
+            storage: storage_id,
+        });
+    }
+    // Sin runtime (SAF): fingerprint desde list_notes; None => el frontend
+    // no debe saltarse la recarga.
+    let fingerprint = storage
+        .list_notes()
+        .await
+        .ok()
+        .map(|notes| saf_notes_fingerprint(&notes));
+    Ok(VaultSyncState {
+        fingerprint,
+        external_revision: 0,
+        storage: storage_id,
+    })
 }
 
 /// Carpeta interna del vault para datos administrados por la app. Las carpetas
@@ -1394,6 +1485,15 @@ pub struct VaultCacheDelta {
     pub revision: u64,
 }
 
+/// Current time in nanoseconds since the Unix epoch (journal markers and
+/// queue timestamps use ns; 0 when the clock was before the epoch).
+fn now_unix_ns() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos() as i64)
+        .unwrap_or(0)
+}
+
 /// State holder for the persistent metadata cache and the filesystem watcher.
 /// Only local filesystem vaults use it; SAF vaults on Android keep their own
 /// incremental index and never touch `.sinnotas_cache.bin`.
@@ -1404,7 +1504,15 @@ struct VaultCacheRuntime {
     root: PathBuf,
     app: AppHandle,
     cache: Mutex<metadata_cache::VaultMetadataCache>,
+    /// Cambios EXTERNOS conocidos por el frontend (solo sube en deltas
+    /// emitidos con notify=true; los guardados propios no lo mueven).
     revision: AtomicU64,
+    /// Registros pendientes en el diario desde la última compartición
+    /// (compaction) del archivo maestro de caché.
+    pending_delta_records: AtomicU64,
+    /// Serializa apéndices del diario y compacciones del archivo maestro
+    /// (la persistencia O(delta) corre en hilos de `update_paths`).
+    persist_lock: Mutex<()>,
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     pending: Mutex<BTreeSet<PathBuf>>,
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -1418,7 +1526,11 @@ impl VaultCacheRuntime {
         resolve_note_path(&self.root, file_path).ok()
     }
 
-    fn update_paths(&self, paths: &[PathBuf], notify_frontend: bool) {
+    /// Permite clonar `Arc<Self>` dentro del método para el hilo de
+    /// persistencia (el snapshot ya no necesita clonarse: el diario es
+    /// O(delta), ver `persist_delta`). Los llamadores siempre tienen el
+    /// `Arc<VaultCacheRuntime>` de `VaultCacheState::current()`.
+    fn update_paths(self: &Arc<Self>, paths: &[PathBuf], notify_frontend: bool) {
         if paths.is_empty() {
             return;
         }
@@ -1428,6 +1540,8 @@ impl VaultCacheRuntime {
         };
         let mut changed = Vec::new();
         let mut removed = Vec::new();
+        let mut changed_entries: Vec<(String, metadata_cache::CachedNote)> = Vec::new();
+        let mut removed_records: Vec<(String, i64)> = Vec::new();
 
         for path in paths {
             let Some(relative) = metadata_cache::relative_note_path(&self.root, path) else {
@@ -1441,13 +1555,16 @@ impl VaultCacheRuntime {
                             || old.content_hash != note.content_hash
                     });
                     if changed_note {
-                        cache.entries.insert(relative.clone(), note);
-                        changed.push(relative);
+                        cache.entries.insert(relative.clone(), note.clone());
+                        changed.push(relative.clone());
+                        changed_entries.push((relative.clone(), note));
                     }
                 }
                 Ok(None) => {
                     if cache.entries.remove(&relative).is_some() {
-                        removed.push(relative);
+                        removed.push(relative.clone());
+                        let deleted_at_ns = now_unix_ns();
+                        removed_records.push((relative, deleted_at_ns));
                     }
                 }
                 Err(error) => {
@@ -1462,11 +1579,11 @@ impl VaultCacheRuntime {
             return;
         }
 
-        let snapshot = cache.clone();
-        let changed_pages: Vec<PageData> = changed
+        // El payload para el frontend se construye desde las entradas del
+        // delta (antes: clon deep de TODA la bóveda 14k×200 bloques).
+        let changed_pages: Vec<PageData> = changed_entries
             .iter()
-            .filter_map(|relative| snapshot.entries.get(relative))
-            .map(|note| note.to_page_data(&self.root))
+            .map(|(_, note)| note.to_page_data(&self.root))
             .collect();
         let removed_paths: Vec<String> = removed
             .iter()
@@ -1474,16 +1591,14 @@ impl VaultCacheRuntime {
             .collect();
         drop(cache);
 
-        // La serialización bincode de toda la caché + fsync son lentos en
-        // discos mecánicos/antivirus activos (decenas de ms). Se sacan a un
-        // hilo aparte para no ocupar el worker del comando de guardado ni el
-        // hilo del watcher: la caché es prescindible (solo acelera el
-        // arranque) y la nota ya está guardada en el .md a estas alturas.
-        let write_root = self.root.clone();
+        // Persistencia O(delta): el diario recibe solo las entradas cambiadas
+        // (bincode + fsync de los registros, no de la bóveda entera) y se
+        // compacta periódicamente en un hilo aparte. El propio `update_paths`
+        // ya saltó las entradas sin cambios (content hash), así que los
+        // guardados que no alteran el contenido no cuestan escrituras.
+        let runtime = Arc::clone(self);
         std::thread::spawn(move || {
-            if let Err(error) = metadata_cache::write_cache_file(&write_root, &snapshot) {
-                eprintln!("No se pudo persistir la caché de metadatos: {error}");
-            }
+            runtime.persist_delta(changed_entries, removed_records);
         });
 
         if notify_frontend {
@@ -1497,6 +1612,48 @@ impl VaultCacheRuntime {
                     revision,
                 },
             );
+        }
+    }
+
+    /// Serializa apéndices del diario y compacciones contra otros hilos de
+    /// persistencia. Lento por orden del disco pero O(delta) por guardado;
+    /// la compactación (cada `CACHE_DELTA_COMPACT_RECORDS` registros) es la
+    /// única operación O(bóveda) y es la frecuencia que elige el umbral.
+    fn persist_delta(
+        self: Arc<Self>,
+        changed_entries: Vec<(String, metadata_cache::CachedNote)>,
+        removed_records: Vec<(String, i64)>,
+    ) {
+        if changed_entries.is_empty() && removed_records.is_empty() {
+            return;
+        }
+        let Ok(_guard) = self.persist_lock.lock() else {
+            return;
+        };
+        let appended = match metadata_cache::append_cache_delta(
+            &self.root,
+            &changed_entries,
+            &removed_records,
+        ) {
+            Ok(count) => count as u64,
+            Err(error) => {
+                eprintln!("No se pudo escribir el diario de caché de metadatos: {error}");
+                // El diario puede haber quedado corto/roto: la compactación
+                // reconstruye el archivo maestro y lo trunca igualmente.
+                0
+            }
+        };
+        let pending =
+            self.pending_delta_records
+                .fetch_add(appended, Ordering::Relaxed) + appended;
+        if pending >= metadata_cache::CACHE_DELTA_COMPACT_RECORDS {
+            let snapshot = match self.cache.lock() {
+                Ok(cache) => cache.clone(),
+                Err(_) => return,
+            };
+            if metadata_cache::compact_cache_file(&self.root, &snapshot).is_ok() {
+                self.pending_delta_records.store(0, Ordering::Relaxed);
+            }
         }
     }
 
@@ -1607,6 +1764,8 @@ impl VaultCacheState {
             app: app.clone(),
             cache: Mutex::new(output.cache),
             revision: AtomicU64::new(0),
+            pending_delta_records: AtomicU64::new(0),
+            persist_lock: Mutex::new(()),
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             pending: Mutex::new(BTreeSet::new()),
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -3122,6 +3281,7 @@ async fn load_vault(
         ));
 
         let notes = storage.list_notes().await?;
+        let fingerprint = saf_notes_fingerprint(&notes);
         let mut pages = Vec::with_capacity(notes.len());
         let mut skipped = Vec::new();
 
@@ -3195,6 +3355,8 @@ async fn load_vault(
             vault_name,
             pages,
             skipped,
+            fingerprint: Some(fingerprint),
+            external_revision: 0,
         })
     } else {
         // Lógica original para filesystem local
@@ -3277,11 +3439,15 @@ async fn load_vault(
 
             let _ = migrate_legacy_revisions(&root, false);
 
+            let (fingerprint, external_revision) = cache_sync_state(&cache_state);
+
             Ok(VaultSnapshot {
                 root_path: root.to_string_lossy().into_owned(),
                 vault_name,
                 pages,
                 skipped,
+                fingerprint,
+                external_revision,
             })
         } else {
             // Vault predeterminado: sí creamos el directorio si no existe.
@@ -3335,11 +3501,15 @@ async fn load_vault(
 
             let _ = migrate_legacy_revisions(&root, false);
 
+            let (fingerprint, external_revision) = cache_sync_state(&cache_state);
+
             Ok(VaultSnapshot {
                 root_path: root.to_string_lossy().into_owned(),
                 vault_name,
                 pages,
                 skipped,
+                fingerprint,
+                external_revision,
             })
         }
     }
@@ -4798,6 +4968,7 @@ pub fn run() {
     builder
         .invoke_handler(tauri::generate_handler![
             load_vault,
+            vault_sync_state,
             pick_vault_root,
             list_system_fonts,
             resolve_image_path,
