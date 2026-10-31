@@ -57,6 +57,38 @@ qué queda a medias (y qué síntomas de código roto esperar) y cómo continuar
 > incremental) y MIGRACIÓN DEL FRONT (`content-search.ts`/omnibar →
 > `search_content` con fallback JS solo-web conservado).
 >
+> **Bitácora arnés perf (2026-10-31):** nuevo módulo
+> `src-tauri/src/perf_e2e_tests.rs` (`#[cfg(test)]`, saltado sin
+> `SINNOTAS_PERF_VAULT`): mide el pipeline real de Rust sobre una COPIA de
+> la bóveda en tempdir (rescan frío v3, arranque seco, grafo,
+> retroenlaces, rehidratación en lotes, índice plegado + búsquedas y pico
+> de RSS). Ejecución en release:
+> `SINNOTAS_PERF_VAULT="/ruta" cargo test --release perf_e2e -- --nocapture`.
+> Es cota inferior de la app (no incluye IPC JSON ni el árbol del editor).
+>
+> Números medidos sobre `Sin Notas (Copiar)` (4,830 notas, 50.4 MB):
+> - Copia a tempdir: 0.97s. **FRÍO** (rescan completo v3): **1.73s**.
+> - **SECO** (toda apertura normal): **0.80s** — deserialización bincode
+>   de la caché (74 MB) + chequeo mtime/tamaño + payload metadata.
+> - RSS pico del proceso de test (incluye copia+frío+índice): 520 MB —
+>   la app residente queda muy por debajo (el front solo recibe metadata).
+> - **GRAFO:** 324 aristas en **1.4 ms**.
+> - **BACKLINKS:** **0.37 ms** por consulta (scan lineal del caché).
+> - **REHIDRATACIÓN desde la caché:** **1.95 ms por lote de 96 notas**
+>   (sin IO, sin reparsar) — la base kanban/flashcards/preview.
+> - **ÍNDICE plegado de búsqueda:** 1,007 ms una vez por vault activo;
+>   luego solo deltas por nota tocada.
+> - **BÚSQUEDAS (límite 20):** token común ("la") **125 ms**; multi-token
+>   real **63 ms**. Ojo: el sample de títulos de retroenlaces resultó sin
+>   referentes (0 hits) — el timing vale, el conteo no prueba datos.
+>
+> Lectura: el arranque seco ya está dominado por la deserialización de la
+> caché completa — a escala 14k sería ~2-2.5s si la caché crece lineal.
+> Ese es exactamente el punto que ataca la mitad Rust del 4.5 (árboles en
+> disco + índice sin árboles + lru en Rust): el próximo único palo de
+> palanca que queda. Percepción del usuario con la app viva (4,830 notes,
+> flag ON en la ventana de `cargo tauri dev`): "increíblemente veloz".
+>
 > **Bitácora FASE 4-E (2026-10-31):** flag ON por defecto. (1)
 > `isMetadataOnlyBoot()` es true si no hay override (`off` en localStorage
 > queda como escape manual de una sesión; `on` explícito también vale).

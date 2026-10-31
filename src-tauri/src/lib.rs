@@ -27,6 +27,8 @@ use uuid::Uuid;
 use walkdir::WalkDir;
 
 pub mod metadata_cache;
+#[cfg(test)]
+mod perf_e2e_tests;
 
 /// Trait que abstrae el almacenamiento de la bóveda.
 /// Permite implementaciones para filesystem local (FsStorage) y SAF (SafStorage).
