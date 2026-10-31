@@ -26,16 +26,16 @@
   --md-outline-variant: color-mix(in srgb, var(--ls-accent) 18%, #2a3140);
   --md-primary: var(--ls-accent);
   --md-on-primary: color-mix(in srgb, var(--ls-accent) 12%, #061018);
-  --md-primary-container: color-mix(in srgb, var(--ls-accent) 26%, #0c1017);
-  --md-on-primary-container: color-mix(in srgb, var(--ls-accent) 55%, #f5f9ff);
-  --md-secondary-container: color-mix(in srgb, var(--ls-accent) 14%, #121620);
+  --md-primary-container: color-mix(in srgb, var(--ls-accent) 32%, #0c1017);
+  --md-on-primary-container: color-mix(in srgb, var(--ls-accent) 60%, #f5f9ff);
+  --md-secondary-container: color-mix(in srgb, var(--ls-accent) 18%, #121620);
   --md-on-secondary-container: color-mix(in srgb, var(--ls-accent) 34%, #dfe6f2);
   --md-tertiary: color-mix(in srgb, var(--ls-accent) 62%, #ff8fd8);
   --md-tertiary-container: color-mix(in srgb, var(--md-tertiary) 22%, #10141d);
   --md-shadow: rgba(0, 0, 0, 0.58);
   --md-scrim: rgba(2, 4, 8, 0.62);
-  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
-  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 14%, transparent);
+  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 14%, transparent);
+  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 20%, transparent);
   --md-elevation-1: 0 1px 2px var(--md-shadow), 0 2px 8px -4px var(--md-shadow);
   --md-elevation-2: 0 2px 6px -2px var(--md-shadow), 0 12px 32px -18px var(--md-shadow);
   --md-elevation-3: 0 8px 20px -10px var(--md-shadow), 0 28px 64px -30px var(--md-shadow);
@@ -132,16 +132,16 @@
   --md-outline-variant: color-mix(in srgb, var(--ls-accent) 16%, #d8dee8);
   --md-primary: var(--ls-accent);
   --md-on-primary: #ffffff;
-  --md-primary-container: color-mix(in srgb, var(--md-primary) 15%, #ffffff);
-  --md-on-primary-container: color-mix(in srgb, var(--md-primary) 48%, #0b1220);
-  --md-secondary-container: color-mix(in srgb, var(--md-primary) 10%, #ffffff);
+  --md-primary-container: color-mix(in srgb, var(--md-primary) 28%, #ffffff);
+  --md-on-primary-container: color-mix(in srgb, var(--md-primary) 54%, #0b1220);
+  --md-secondary-container: color-mix(in srgb, var(--md-primary) 20%, #ffffff);
   --md-on-secondary-container: color-mix(in srgb, var(--md-primary) 38%, #18202c);
   --md-tertiary: color-mix(in srgb, var(--ls-accent) 55%, #b01e86);
   --md-tertiary-container: color-mix(in srgb, var(--md-tertiary) 12%, #ffffff);
   --md-shadow: rgba(16, 24, 40, 0.18);
   --md-scrim: rgba(20, 28, 42, 0.32);
-  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 6%, transparent);
-  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 10%, transparent);
+  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 10%, transparent);
+  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 14%, transparent);
   --md-elevation-1: 0 1px 2px rgba(16, 24, 40, 0.05), 0 2px 8px -4px rgba(16, 24, 40, 0.08);
   --md-elevation-2: 0 2px 6px -2px rgba(16, 24, 40, 0.08), 0 14px 34px -18px rgba(16, 24, 40, 0.18);
   --md-elevation-3: 0 10px 24px -12px rgba(16, 24, 40, 0.16), 0 32px 72px -34px rgba(16, 24, 40, 0.24);
@@ -174,13 +174,13 @@
 /* Los selectores de acento de la hoja base fijan rgba; los unificamos con
    color-mix para que cualquier acento nuevo funcione sin añadir reglas. */
 :root[data-accent] {
-  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 15%, transparent);
+  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 20%, transparent);
   --ls-text-link: var(--ls-accent);
   --ls-guideline-hover: color-mix(in srgb, var(--ls-accent) 42%, transparent);
 }
 
 :root[data-theme="light"][data-accent] {
-  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 11%, transparent);
+  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 16%, transparent);
   --ls-text-link: var(--ls-accent);
   --ls-guideline-hover: color-mix(in srgb, var(--ls-accent) 38%, transparent);
 }
@@ -594,7 +594,7 @@ body {
 .flashcard-tab:hover,
 .settings-tab:hover {
   background: var(--md-state-hover);
-  border-color: color-mix(in srgb, var(--md-primary) 28%, var(--ma-glass-border));
+  border-color: color-mix(in srgb, var(--md-primary) 45%, var(--ma-glass-border));
   color: var(--md-on-surface);
 }
 

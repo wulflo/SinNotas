@@ -1,4 +1,5 @@
 import { PageData, BlockNode } from "../types";
+import type { VaultVersionView } from "./vault";
 
 /** Resultado de la búsqueda de contenido: una coincidencia por nota. */
 export interface ContentHit {
@@ -138,29 +139,76 @@ function countOccurrences(haystack: string, needle: string): number {
 
 /**
  * Índice de búsqueda de contenido en memoria. Se alimenta de las páginas que
- * ya devuelve load_vault y se reconstruye solo cuando cambia la versión del
- * vault (getMutationVersion), así que llamadas repetidas con la misma versión
- * son gratis. Sin comandos Rust ni índice persistente.
+ * ya devuelve load_vault. Modo de versiones:
+ * - `number` (compatibilidad): se reconstruye por completo cuando cambia.
+ * - `VaultVersionView`: incremental — se reindexan únicamente las notas cuyo
+ *   epoch cambió; el resto de entradas se conserva (con 14k notas, reconstruir
+ *   todo el índice por cada tecla en el omnibar congelaba la interfaz).
  */
 export class ContentSearchIndex {
-  private entries: BlockEntry[] = [];
+  /** Entradas agrupadas por nota (ruta normalizada). */
+  private entriesByPage = new Map<string, BlockEntry[]>();
   private version = -1;
+  private epochs: Map<string, number> | null = null;
+  private structural = -1;
+  private view: VaultVersionView | null = null;
   private hasIndex = false;
 
-  /** Reconstruye el índice solo si cambia la versión del vault. */
-  update(pages: readonly PageData[], version: number): void {
-    if (this.hasIndex && version === this.version) return;
-    this.version = version;
+  /** Reconstruye o actualiza el índice según la versión del vault. */
+  update(pages: readonly PageData[], versions: number | VaultVersionView): void {
+    if (typeof versions === "object" && versions !== null) {
+      this.updateIncremental(pages, versions);
+      return;
+    }
+
+    if (this.hasIndex && versions === this.version) return;
+    this.version = versions;
+    this.view = null;
+    this.epochs = null;
     this.hasIndex = true;
-    const entries: BlockEntry[] = [];
+    const entriesByPage = new Map<string, BlockEntry[]>();
     pages.forEach((page) => {
-      collectTextBlocks(page.blocks).forEach((block) => {
-        const text = visibleBlockText(block.content);
-        if (!text.trim()) return;
-        entries.push({ page, block, text, folded: fold(text) });
-      });
+      entriesByPage.set(page.path, buildPageEntries(page));
     });
-    this.entries = entries;
+    this.entriesByPage = entriesByPage;
+  }
+
+  /** Modo incremental: reindexa solo las notas con epoch cambiado. */
+  private updateIncremental(pages: readonly PageData[], versions: VaultVersionView): void {
+    const structural = versions.getStructural();
+    if (!this.hasIndex || this.view !== versions || this.structural !== structural) {
+      this.structural = structural;
+      this.view = versions;
+      this.version = -1;
+      this.hasIndex = true;
+      this.epochs = new Map();
+      const entriesByPage = new Map<string, BlockEntry[]>();
+      pages.forEach((page) => {
+        entriesByPage.set(page.path, buildPageEntries(page));
+        this.epochs!.set(page.path, versions.getPageVersion(page));
+      });
+      this.entriesByPage = entriesByPage;
+      return;
+    }
+
+    const currentPaths = new Set<string>();
+    const changed: PageData[] = [];
+    pages.forEach((page) => {
+      const key = page.path;
+      currentPaths.add(key);
+      if (this.epochs!.get(key) !== versions.getPageVersion(page)) changed.push(page);
+    });
+    // Notas borradas: descartar sus buckets.
+    for (const key of [...this.entriesByPage.keys()]) {
+      if (!currentPaths.has(key)) {
+        this.entriesByPage.delete(key);
+        this.epochs!.delete(key);
+      }
+    }
+    for (const page of changed) {
+      this.entriesByPage.set(page.path, buildPageEntries(page));
+      this.epochs!.set(page.path, versions.getPageVersion(page));
+    }
   }
 
   /**
@@ -175,45 +223,53 @@ export class ContentSearchIndex {
     if (tokens.length === 0) return [];
 
     const bestByPath = new Map<string, ContentHit>();
-    for (const entry of this.entries) {
-      let total = 0;
-      let first: { index: number; length: number } | null = null;
-      let allPresent = true;
-      for (const token of tokens) {
-        const count = countOccurrences(entry.folded, token);
-        if (count === 0) {
-          allPresent = false;
-          break;
+    this.entriesByPage.forEach((pageEntries) => {
+      let best: ContentHit | null = null;
+      for (const entry of pageEntries) {
+        let total = 0;
+        let first: { index: number; length: number } | null = null;
+        let allPresent = true;
+        for (const token of tokens) {
+          const count = countOccurrences(entry.folded, token);
+          if (count === 0) {
+            allPresent = false;
+            break;
+          }
+          total += count;
+          const index = entry.folded.indexOf(token);
+          if (!first || index < first.index) first = { index, length: token.length };
         }
-        total += count;
-        const index = entry.folded.indexOf(token);
-        if (!first || index < first.index) first = { index, length: token.length };
-      }
-      if (!allPresent || !first) continue;
+        if (!allPresent || !first) continue;
 
-      const existing = bestByPath.get(entry.page.path);
-      if (existing) {
         // Una coincidencia por nota: queda el bloque con más apariciones.
-        if (total <= existing.count) continue;
-        existing.count = total;
-        existing.block = entry.block;
-        existing.index = first.index;
-        existing.matchLength = first.length;
-        continue;
+        if (!best || total > best.count) {
+          best = {
+            page: entry.page,
+            block: entry.block,
+            count: total,
+            index: first.index,
+            matchLength: first.length,
+          };
+        }
       }
-      bestByPath.set(entry.page.path, {
-        page: entry.page,
-        block: entry.block,
-        count: total,
-        index: first.index,
-        matchLength: first.length,
-      });
-    }
+      if (best) bestByPath.set(best.page.path, best);
+    });
 
     return Array.from(bestByPath.values())
       .sort((left, right) => right.count - left.count)
       .slice(0, limit);
   }
+}
+
+/** Entradas de una sola nota (la unidad de reindexado incremental). */
+function buildPageEntries(page: PageData): BlockEntry[] {
+  const entries: BlockEntry[] = [];
+  collectTextBlocks(page.blocks).forEach((block) => {
+    const text = visibleBlockText(block.content);
+    if (!text.trim()) return;
+    entries.push({ page, block, text, folded: fold(text) });
+  });
+  return entries;
 }
 
 /** Tokeniza la consulta plegada por espacios y descarta los huecos. */

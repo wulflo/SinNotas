@@ -27,17 +27,17 @@
   --md-outline-variant: color-mix(in srgb, var(--ls-accent) 14%, #3d4055);
   --md-primary: var(--ls-accent);
   --md-on-primary: color-mix(in srgb, var(--ls-accent) 14%, #1b1c28);
-  --md-primary-container: color-mix(in srgb, var(--ls-accent) 26%, #282a36);
-  --md-on-primary-container: color-mix(in srgb, var(--ls-accent) 55%, #f8f8f2);
-  --md-secondary-container: color-mix(in srgb, var(--ls-accent) 15%, #3c3f52);
+  --md-primary-container: color-mix(in srgb, var(--ls-accent) 32%, #282a36);
+  --md-on-primary-container: color-mix(in srgb, var(--ls-accent) 60%, #f8f8f2);
+  --md-secondary-container: color-mix(in srgb, var(--ls-accent) 19%, #3c3f52);
   --md-on-secondary-container: color-mix(in srgb, var(--ls-accent) 32%, #eceef4);
   /* El rosa pastel de Dracula queda detrás del acento terciario. */
   --md-tertiary: color-mix(in srgb, var(--ls-accent) 55%, #ff79c6);
   --md-tertiary-container: color-mix(in srgb, var(--md-tertiary) 20%, #30323f);
   --md-shadow: rgba(8, 7, 20, 0.55);
   --md-scrim: rgba(20, 17, 38, 0.6);
-  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 9%, transparent);
-  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 15%, transparent);
+  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 14%, transparent);
+  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 20%, transparent);
 
   /* Estados de la app con los colores distintivos de la paleta. */
   --ls-todo-bg: color-mix(in srgb, #ffb86c 15%, var(--md-surface-container));
@@ -64,7 +64,7 @@
   --ls-bullet-hover: color-mix(in srgb, var(--md-primary) 82%, #ffffff);
   --ls-guideline-color: color-mix(in srgb, var(--md-on-surface) 10%, transparent);
   --ls-guideline-hover: color-mix(in srgb, var(--md-primary) 46%, transparent);
-  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 15%, transparent);
+  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 20%, transparent);
   --ls-text-link: var(--ls-accent);
   --ls-glow-theme-scale: 0.3;
 
@@ -97,16 +97,16 @@
   --md-outline-variant: color-mix(in srgb, var(--ls-accent) 12%, #dfe1e9);
   --md-primary: var(--ls-accent);
   --md-on-primary: #ffffff;
-  --md-primary-container: color-mix(in srgb, var(--md-primary) 12%, #ffffff);
+  --md-primary-container: color-mix(in srgb, var(--md-primary) 20%, #ffffff);
   --md-on-primary-container: color-mix(in srgb, var(--md-primary) 62%, #23252f);
-  --md-secondary-container: color-mix(in srgb, var(--md-primary) 8%, #ffffff);
+  --md-secondary-container: color-mix(in srgb, var(--md-primary) 19%, #ffffff);
   --md-on-secondary-container: color-mix(in srgb, var(--md-primary) 48%, #2b2d3a);
   --md-tertiary: color-mix(in srgb, var(--ls-accent) 55%, #b62d92);
   --md-tertiary-container: color-mix(in srgb, var(--md-tertiary) 10%, #ffffff);
   --md-shadow: rgba(28, 26, 48, 0.15);
   --md-scrim: rgba(28, 26, 48, 0.3);
-  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 5%, transparent);
-  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 9%, transparent);
+  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 10%, transparent);
+  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 14%, transparent);
   --md-elevation-1: 0 1px 2px rgba(28, 26, 48, 0.05), 0 2px 8px -4px rgba(28, 26, 48, 0.07);
   --md-elevation-2: 0 2px 6px -2px rgba(28, 26, 48, 0.08), 0 12px 30px -18px rgba(28, 26, 48, 0.15);
   --md-elevation-3: 0 8px 22px -12px rgba(28, 26, 48, 0.14), 0 28px 60px -34px rgba(28, 26, 48, 0.22);
@@ -128,7 +128,7 @@
   --ls-kanban-card-bg: var(--md-surface-bright);
   --ls-guideline-color: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
   --ls-guideline-hover: color-mix(in srgb, var(--md-primary) 38%, transparent);
-  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 10%, transparent);
+  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 15%, transparent);
   --ls-glow-theme-scale: 0.2;
 
   --ma-glass: var(--md-surface-bright);

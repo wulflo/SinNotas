@@ -445,6 +445,8 @@ let flashcardPagesCreatedTimesInFlight = false;
 const kanbanManager = new KanbanManager();
 let graphView: GraphView | null = null;
 let graphDataVersion = -1;
+/** Captura de epochs de notas al último repintado del grafo. */
+let graphEpochs: ReadonlyMap<string, number> | null = null;
 /** Título cuya vecindad se está mostrando; null = grafo completo. */
 let graphNeighborhoodOrigin: string | null = null;
 let graphRenderedNeighborhood: string | null = null;
@@ -490,8 +492,9 @@ const accentColors = [
 ] as const;
 type AccentColor = (typeof accentColors)[number];
 /**
- * Estilos visuales de la app. `aero` es el tema de origen; `lino` y
- * `dracula` son capas de tokens sobre aero (ver `theme-lino.css` y
+ * Estilos visuales de la app. `aero` es el tema de origen; `lino` (mostrado
+ * como "Simple") y `dracula` son capas de tokens sobre aero (ver
+ * `theme-lino.css` y
  * `theme-dracula.css`). El activo se guarda en `sinnotas-visual`.
  */
 const visualThemes = ["aero", "lino", "dracula"] as const;
@@ -1916,7 +1919,7 @@ function renderFlashcardPagesFilter(_scanVault = true): void {
   }
 
   const vaultPages = vault.getPages();
-  const version = vault.getMutationVersion();
+  const version = vault.getVersionView();
   const cached = flashcardLoader.getCachedCards(vaultPages, version);
 
   if (!cached) {
@@ -8025,7 +8028,7 @@ function renderKanbanBoard() {
   const countDone = document.getElementById("count-done") as HTMLSpanElement;
   const totalCount = document.getElementById("kanban-total-count") as HTMLSpanElement;
 
-  const allTasks = kanbanManager.scanTasks(vault.getPages(), vault.getMutationVersion());
+  const allTasks = kanbanManager.scanTasks(vault.getPages(), vault.getVersionView());
   totalCount.innerText = `${allTasks.length} tareas activas`;
 
   const todoTasks = kanbanManager.getTasksByStatus("todo");
@@ -10378,7 +10381,7 @@ interface EnsureFlashcardScanOptions {
 function ensureFlashcardScan(options: EnsureFlashcardScanOptions = {}): void {
   if (!desktopReady) return;
   const pages = vault.getPages();
-  const version = vault.getMutationVersion();
+  const version = vault.getVersionView();
   const cached = flashcardLoader.getCachedCards(pages, version);
   // Si ya hay una sesión visible (aunque sea la pantalla de completado) no se
   // pinta "Escaneando": al volver de otra ventana la tarjeta debe quedarse
@@ -10469,7 +10472,7 @@ function startFlashcardsSession(preserve?: { cardId: string; revealed: boolean }
   loadFlashcardProgressStats();
   renderPomodoro();
   const pages = vault.getPages();
-  const version = vault.getMutationVersion();
+  const version = vault.getVersionView();
   const cached = flashcardLoader.getCachedCards(pages, version);
   if (!cached && flashcardsManager.getCardsCount() === 0) {
     updateFlashcardLoadingState(
@@ -10577,7 +10580,14 @@ function createImageOcclusionPreview(card: Flashcard, revealed: boolean): HTMLDi
   const preview = document.createElement("div");
   preview.className = "flashcard-image-preview";
   preview.classList.add("image-block-loading");
-  viewport.appendChild(preview);
+  // El desplazamiento del zoom vive en un hijo propio del viewport: así el tope
+  // de altura solo limita el área de imagen, los controles de zoom quedan
+  // siempre visibles (fuera del área desplazable) y la rueda del WebView puede
+  // encadenar al contenedor interno en el eje del gesto.
+  const scroller = document.createElement("div");
+  scroller.className = "flashcard-image-scroller";
+  scroller.appendChild(preview);
+  viewport.appendChild(scroller);
 
   // Zoom de repaso: agranda la imagen y, con ella, la capa SVG de máscaras.
   // Ambas escalan en proporción exacta porque las máscaras se sitúan por
@@ -10681,32 +10691,35 @@ function createImageOcclusionPreview(card: Flashcard, revealed: boolean): HTMLDi
     preview.appendChild(layer);
   }
   // Pan con arrastre cuando el zoom saca parte de la imagen del contenedor.
-  viewport.addEventListener("pointerdown", (event) => {
+  scroller.addEventListener("pointerdown", (event) => {
     if (!viewport.classList.contains("is-zoomed") || event.button !== 0) return;
-    if (viewport.scrollWidth <= viewport.clientWidth && viewport.scrollHeight <= viewport.clientHeight) return;
-    const startLeft = viewport.scrollLeft;
-    const startTop = viewport.scrollTop;
+    if (scroller.scrollWidth <= scroller.clientWidth && scroller.scrollHeight <= scroller.clientHeight) return;
+    const startLeft = scroller.scrollLeft;
+    const startTop = scroller.scrollTop;
     const startX = event.clientX;
     const startY = event.clientY;
     viewport.classList.add("is-panning");
-    viewport.setPointerCapture(event.pointerId);
+    scroller.setPointerCapture(event.pointerId);
     const onMove = (moveEvent: PointerEvent): void => {
       moveEvent.preventDefault();
-      viewport.scrollLeft = startLeft + startX - moveEvent.clientX;
-      viewport.scrollTop = startTop + startY - moveEvent.clientY;
+      scroller.scrollLeft = startLeft + startX - moveEvent.clientX;
+      scroller.scrollTop = startTop + startY - moveEvent.clientY;
     };
     const onEnd = (): void => {
       viewport.classList.remove("is-panning");
-      viewport.removeEventListener("pointermove", onMove);
-      viewport.removeEventListener("pointerup", onEnd);
-      viewport.removeEventListener("pointercancel", onEnd);
+      scroller.removeEventListener("pointermove", onMove);
+      scroller.removeEventListener("pointerup", onEnd);
+      scroller.removeEventListener("pointercancel", onEnd);
     };
-    viewport.addEventListener("pointermove", onMove);
-    viewport.addEventListener("pointerup", onEnd);
-    viewport.addEventListener("pointercancel", onEnd);
+    // Los move/up/cancel se retargetizan al elemento capturado: deben ir en el
+    // scroller, no en el viewport.
+    scroller.addEventListener("pointermove", onMove);
+    scroller.addEventListener("pointerup", onEnd);
+    scroller.addEventListener("pointercancel", onEnd);
   });
-  // Ctrl/rueda + también hace zoom sobre la propia imagen (rueda sola: desplaza).
-  viewport.addEventListener("wheel", (event) => {
+  // Ctrl/rueda + también hace zoom sobre la propia imagen (rueda sola: desplaza
+  // el área de imagen internamente).
+  scroller.addEventListener("wheel", (event) => {
     if (!event.ctrlKey && !event.metaKey) return;
     event.preventDefault();
     applyZoom(zoom + (event.deltaY > 0 ? -OCCLUSION_ZOOM_STEP : OCCLUSION_ZOOM_STEP));
@@ -10844,7 +10857,7 @@ function renderFlashcardExplorer(): void {
   if (!flashcardExplorerActive) return;
 
   const pages = vault.getPages();
-  const version = vault.getMutationVersion();
+  const version = vault.getVersionView();
   const cached = flashcardLoader.getCachedCards(pages, version);
   const loading = flashcardLoader.isLoading();
   const willStartScan =
@@ -11572,6 +11585,10 @@ function applyGraphPages(): void {
   }
   graphRenderedNeighborhood = graphNeighborhoodOrigin;
   graphDataVersion = vault.getMutationVersion();
+  // Captura de epochs por nota: el contenido de una nota ya no mueve la
+  // versión estructural, así que la frescura del grafo se comprueba contra
+  // esta captura (renderGraphView usa collectPageChanges).
+  graphEpochs = vault.capturePageVersions();
   if (btnGraphShowAll) {
     btnGraphShowAll.hidden = graphNeighborhoodOrigin === null;
     if (graphNeighborhoodLabel) {
@@ -11608,12 +11625,19 @@ function renderGraphView() {
     (window as any).__graphClickBackground = () => closeGraphPreview();
   }
   graphView.resize();
-  // Repintar solo cuando la bóveda cambió o cuando se entra/sale de la
-  // vecindad. Volver a la pestaña del grafo ya no reconstruye nodos, enlaces y
-  // lotes de revelado desde cero (con vaults grandes eso congelaba la
-  // interfaz un instante en cada visita).
-  const version = vault.getMutationVersion();
-  if (version !== graphDataVersion || graphRenderedNeighborhood !== graphNeighborhoodOrigin) {
+  // Repintar solo cuando la bóveda cambió (estructural: reemplazo/borrado/
+  // renombrado/delta; o contenido: epoch de alguna nota) o cuando se entra/
+  // sale de la vecindad. Volver a la pestaña del grafo ya no reconstruye
+  // nodos, enlaces y lotes de revelado desde cero (con vaults grandes eso
+  // congelaba la interfaz un instante en cada visita).
+  const structural = vault.getMutationVersion();
+  const contentChanged =
+    graphEpochs === null || vault.collectPageChanges(graphEpochs).length > 0;
+  if (
+    structural !== graphDataVersion ||
+    contentChanged ||
+    graphRenderedNeighborhood !== graphNeighborhoodOrigin
+  ) {
     applyGraphPages();
   }
   if (!graphSettingsPanel.hidden && graphSettingsUiReady) syncGraphSettingsUi();
@@ -13138,8 +13162,9 @@ function scheduleContentSearch(query: string): void {
   if (query.trim().length < 2) return;
   contentSearchTimer = window.setTimeout(() => {
     contentSearchTimer = null;
-    // Antes de cada búsqueda se refresca el índice con la versión del vault.
-    contentSearchIndex.update(vault.getPages(), vault.getMutationVersion());
+    // Antes de cada búsqueda se refresca el índice con las versiones por nota
+    // (incremental): si nada cambió desde la última llamada, es gratis.
+    contentSearchIndex.update(vault.getPages(), vault.getVersionView());
     renderContentResults(query, contentSearchIndex.search(query));
   }, 150);
 }
@@ -14206,7 +14231,9 @@ async function installVaultCacheDeltaListener(): Promise<void> {
       });
       if (!result.changed.length && !result.added.length && !result.removed.length) return;
 
-      flashcardLoader.invalidate();
+      // Sin invalidate(): applyExternalDelta sube los epochs de las notas
+      // del delta, y las cachés incrementales (flashcards, Kanban, búsqueda)
+      // reescanean solo esas notas en su próxima verificación de frescura.
 
       if (!editingOpenPage) {
         const previousPath = currentPage.path;
@@ -14404,7 +14431,7 @@ async function initializeDesktopApp(): Promise<void> {
     window.setTimeout(() => {
       if (!desktopReady) return;
       const pages = vault.getPages();
-      const version = vault.getMutationVersion();
+      const version = vault.getVersionView();
       if (flashcardLoader.isFresh(pages, version) || flashcardLoader.isLoading()) return;
       ensureFlashcardScan({
         order: flashcardReviewOrder,

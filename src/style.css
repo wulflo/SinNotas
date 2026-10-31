@@ -1853,7 +1853,7 @@ select {
   padding: 2px 0 6px;
 }
 
-/* Selector de estilo visual (Aero · Lino · Dracula): fila con botones
+/* Selector de estilo visual (Aero · Simple · Dracula): fila con botones
    reutilizando `.font-option-btn`; aero le da las píldoras. */
 .visual-row {
   display: block;
@@ -1902,7 +1902,9 @@ select {
 .accent-option.active,
 .accent-option:focus-visible {
   border-color: var(--ls-accent);
-  outline: 2px solid var(--ls-accent-subtle);
+  /* El anillo de selección era accent-subtle (translúcido y apenas visible
+     sobre el menú de ajustes); con una mezcla al 45% marca el punto activo. */
+  outline: 2px solid color-mix(in srgb, var(--ls-accent) 45%, transparent);
   outline-offset: 2px;
 }
 
@@ -5342,21 +5344,31 @@ body.is-bullet-selecting {
   max-width: min(100%, 420px);
 }
 
-/* Contenedor con scroll del repaso de oclusiones: permite ver la imagen con
-   zoom mayor que el área de la tarjeta (con barras de desplazamiento). */
+/* Contenedor de repaso de oclusiones: la estructura es viewport (fijo, sin
+   scroll) > scroller (área de imagen desplazable) > preview. Así el zoom grande
+   se desplaza dentro del área de imagen con barras visibles en ambos ejes, sin
+   empujar a los controles de zoom fuera de la pantalla ni atascar la rueda del
+   WebView en un contenedor que solo puede desplazar en horizontal. */
 .flashcard-image-viewport {
   position: relative;
   max-width: 100%;
+}
+
+.flashcard-image-scroller {
   overflow: auto;
   overscroll-behavior: contain;
   border-radius: 12px;
 }
 
-.flashcard-image-viewport.is-zoomed {
+/* Con zoom, el desplazamiento interno se acota a una altura cercana a la del
+   tamaño base (52/58vh) para que la tarjeta no crezca desproporcionada y los
+   controles de zoom queden siempre a la vista debajo del área de imagen. */
+.flashcard-image-viewport.is-zoomed .flashcard-image-scroller {
+  max-height: 62vh;
   cursor: grab;
 }
 
-.flashcard-image-viewport.is-panning {
+.flashcard-image-viewport.is-panning .flashcard-image-scroller {
   cursor: grabbing;
   user-select: none;
   -webkit-user-select: none;

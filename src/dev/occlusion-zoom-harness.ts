@@ -34,12 +34,15 @@ const regions: ImageOcclusionRegion[] = [
 const stage = document.getElementById("stage")!;
 const viewport = document.createElement("div");
 viewport.className = "flashcard-image-viewport";
+const scroller = document.createElement("div");
+scroller.className = "flashcard-image-scroller";
 const preview = document.createElement("div");
 preview.className = "flashcard-image-preview";
 const layer = document.createElement("div");
 layer.className = "flashcard-image-mask-layer";
 preview.appendChild(layer);
-viewport.appendChild(preview);
+scroller.appendChild(preview);
+viewport.appendChild(scroller);
 stage.appendChild(viewport);
 
 const image = document.createElement("img");

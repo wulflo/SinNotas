@@ -287,6 +287,18 @@ export interface ExternalDeltaResult {
 }
 
 /**
+ * Vista de versiones para las vistas con caché por nota (flashcards, Kanban,
+ * índice de búsqueda). `getStructural` cambia solo cuando el CONJUNTO de notas
+ * cambia (bóveda reemplazada, borrado, renombrado, delta externo); `getPageVersion`
+ * es un contador por nota que sube con cada cambio de contenido de esa nota.
+ */
+export interface VaultVersionView {
+  getStructural(): number;
+  getPageVersion(page: PageData): number;
+}
+
+
+/**
  * Escribe en localStorage sin lanzar excepciones si la cuota está llena.
  * Avisa al usuario una única vez mediante el toast existente.
  */
@@ -323,10 +335,14 @@ export class VaultStore {
   private pendingSaves = new Map<string, { page: PageData; timer: number }>();
 
   /**
-   * Contador monótono de mutaciones del vault. Las vistas caras (Kanban,
-   * flashcards) lo usan para reutilizar su último escaneo cuando nada cambió.
+   * Contador monótono de mutaciones ESTRUCTURALES de la bóveda (reemplazo,
+   * borrado, renombrado, deltas externos). Las ediciones de contenido de una
+   * nota ya no lo mueven: para eso están los epochs por página.
    */
   private mutationVersion = 0;
+
+  /** Epochs por nota (ruta normalizada => contador) para cachés incrementales. */
+  private pageVersions = new Map<string, number>();
 
   public getMutationVersion(): number {
     return this.mutationVersion;
@@ -334,6 +350,50 @@ export class VaultStore {
 
   private bumpMutationVersion(): void {
     this.mutationVersion += 1;
+  }
+
+  /** Epoch (contador de cambios de contenido) de una nota concreta. */
+  public getPageVersion(page: PageData): number {
+    const key = normalizePathForCompare(page?.path || "");
+    if (!key) return 0;
+    return this.pageVersions.get(key) ?? 0;
+  }
+
+  private bumpPageVersion(page: PageData): void {
+    const key = normalizePathForCompare(page?.path || "");
+    if (!key) return;
+    this.pageVersions.set(key, (this.pageVersions.get(key) ?? 0) + 1);
+  }
+
+  /** Copia el mapa de epochs (para vistas que detectan "qué cambió" luego). */
+  public capturePageVersions(): ReadonlyMap<string, number> {
+    return new Map(this.pageVersions);
+  }
+
+  /**
+   * Devuelve las notas cuyo epoch actual difiere de la captura dada (o que no
+   * existían en ella). Es O(numero total de notas): solo se usa al entrar en
+   * una vista cacheada, no en el camino de cada tecla.
+   */
+  public collectPageChanges(since: ReadonlyMap<string, number>): PageData[] {
+    const changed: PageData[] = [];
+    this.pages.forEach((page) => {
+      const key = normalizePathForCompare(page?.path || "");
+      if (key && (since.get(key) ?? -1) !== (this.pageVersions.get(key) ?? 0)) {
+        changed.push(page);
+      }
+    });
+    return changed;
+  }
+
+  private readonly versionView: VaultVersionView = {
+    getStructural: () => this.mutationVersion,
+    getPageVersion: (page) => this.getPageVersion(page),
+  };
+
+  /** Objeto estable para que las vistas cacheadas consulten versiones. */
+  public getVersionView(): VaultVersionView {
+    return this.versionView;
   }
 
   constructor() {
@@ -613,6 +673,7 @@ export class VaultStore {
       normalizeBlockTypes(updated.blocks);
       nextPages.push(updated);
       result.changed.push(page.path);
+      this.bumpPageVersion(page);
     }
 
     for (const [key, entry] of incoming) {
@@ -625,6 +686,7 @@ export class VaultStore {
       normalizeBlockTypes(added.blocks);
       nextPages.push(added);
       result.added.push(added.path);
+      this.bumpPageVersion(added);
     }
 
     if (result.changed.length || result.added.length || result.removed.length) {
@@ -653,10 +715,10 @@ export class VaultStore {
    */
   public scheduleSavePage(page: PageData): void {
     this.rememberPage(page);
-    // La página ya cambió en memoria; el guardado diferido solo afecta al disco.
-    // Sin este incremento, el Kanban reutilizaría un escaneo anterior si se
-    // abre antes de que venza el debounce.
-    this.bumpMutationVersion();
+    // La página cambió en memoria: invalidar SOLO su epoch. Las cachés
+    // incrementales (flashcards, Kanban, búsqueda) reescanean únicamente esta
+    // nota en lugar de la bóveda completa por cada tecla.
+    this.bumpPageVersion(page);
 
     const pending = this.pendingSaves.get(page.id);
     if (pending) window.clearTimeout(pending.timer);
@@ -733,7 +795,7 @@ export class VaultStore {
     updatedPage.updatedAtMs = savedAt;
     updatedPage.updatedAt = new Date(savedAt).toISOString().replace("T", " ").substring(0, 16);
     this.rememberPage(updatedPage);
-    this.bumpMutationVersion();
+    this.bumpPageVersion(updatedPage);
     return this.persistPage(updatedPage, propagateError);
   }
 
@@ -865,7 +927,9 @@ export class VaultStore {
     if (pageToUpdate) {
       pageToUpdate.blocks = cloneTree(restored.blocks);
       pageToUpdate.frontmatter = [...restored.frontmatter];
-      this.bumpMutationVersion();
+      // Solo cambia el contenido de esta nota: bump de su epoch (las vistas
+      // incrementales reescanean únicamente esta página).
+      this.bumpPageVersion(pageToUpdate);
       // El backend ya escribió el archivo; solo sincronizamos memoria/estado.
       this.rememberPage(pageToUpdate);
     }

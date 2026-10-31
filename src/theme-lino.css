@@ -1,5 +1,9 @@
 /*
- * Lino — tema visual claro y plano de SinNotas.
+ * Simple (antes "Lino") — tema visual claro y plano de SinNotas.
+ *
+ * Identidad: papel tapiz de un solo color sin gradientes ni luces de
+ * acento, y barras (sidebar + headbar) en contraste con el fondo: más
+ * oscuras en modo oscuro y más claras (blanco) en modo claro.
  *
  * Estrategia "capa de tokens": este archivo se importa DESPUÉS de
  * `style.css` y `material-aero.css`, cuyos componentes están tokenizados.
@@ -14,6 +18,9 @@
  * `[data-theme="light"]` (0,3,0) ganan a los bloques claros de aero y
  * `style.css` (0,2,0). La sección final "Neutralizar Aero" tapa los
  * sheens, glows y translucidez hard-coded que no pasan por tokens.
+ *
+ * El valor `data-visual` y los ajustes guardados mantienen el nombre
+ * interno `lino` para no romper preferencias existentes.
  */
 
 :root[data-visual="lino"] {
@@ -32,16 +39,16 @@
   --md-outline-variant: color-mix(in srgb, var(--ls-accent) 15%, #292e39);
   --md-primary: var(--ls-accent);
   --md-on-primary: color-mix(in srgb, var(--ls-accent) 10%, #131720);
-  --md-primary-container: color-mix(in srgb, var(--ls-accent) 22%, #1b1e26);
+  --md-primary-container: color-mix(in srgb, var(--ls-accent) 28%, #1b1e26);
   --md-on-primary-container: color-mix(in srgb, var(--ls-accent) 60%, #f2f6ff);
-  --md-secondary-container: color-mix(in srgb, var(--ls-accent) 13%, #232730);
+  --md-secondary-container: color-mix(in srgb, var(--ls-accent) 17%, #232730);
   --md-on-secondary-container: color-mix(in srgb, var(--ls-accent) 30%, #e3e8f2);
   --md-tertiary: color-mix(in srgb, var(--ls-accent) 58%, #8f7ad6);
   --md-tertiary-container: color-mix(in srgb, var(--md-tertiary) 18%, #1e222b);
   --md-shadow: rgba(8, 10, 16, 0.5);
   --md-scrim: rgba(10, 12, 18, 0.52);
-  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 7%, transparent);
-  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 12%, transparent);
+  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 13%, transparent);
+  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 18%, transparent);
 
   /* Mapa de compat con la hoja base (los componentes usan --ls-*). */
   --ls-menu-bg: var(--md-surface-container-high);
@@ -60,15 +67,18 @@
   --ls-glow-theme-scale: 0.25;
   --ls-text-link: var(--ls-accent);
 
-  /* Aero neutralizado para lino: sin vidrio ni luces; superficies opacas. */
+  /* Aero neutralizado para Simple (antes lino): tapiz plano de un solo
+     color, sin mezclas de acento ni gradientes. Las barras (sidebar y
+     headbar) van más OSCURAS que el fondo en modo oscuro, para que el
+     contenido destaque sobre ellas. */
   --ma-blur: 0px;
   --ma-glass: var(--md-surface-container-low);
   --ma-glass-strong: var(--md-surface-container);
   --ma-glass-border: var(--md-outline-variant);
   --ma-sheen: none;
-  --visual-body-bg: var(--md-surface);
-  --visual-sidebar-bg: var(--md-surface-container-lowest);
-  --visual-prefix-bg: var(--md-surface-dim);
+  --visual-body-bg: #1b1e26;
+  --visual-sidebar-bg: #14161d;
+  --visual-prefix-bg: #14161d;
   --visual-glow-opacity: 0;
 }
 
@@ -88,16 +98,16 @@
   --md-outline-variant: color-mix(in srgb, var(--ls-accent) 13%, #e0e5ed);
   --md-primary: var(--ls-accent);
   --md-on-primary: #ffffff;
-  --md-primary-container: color-mix(in srgb, var(--md-primary) 11%, #ffffff);
+  --md-primary-container: color-mix(in srgb, var(--md-primary) 20%, #ffffff);
   --md-on-primary-container: color-mix(in srgb, var(--md-primary) 62%, #131720);
-  --md-secondary-container: color-mix(in srgb, var(--md-primary) 8%, #ffffff);
+  --md-secondary-container: color-mix(in srgb, var(--md-primary) 19%, #ffffff);
   --md-on-secondary-container: color-mix(in srgb, var(--md-primary) 48%, #1d2532);
   --md-tertiary: color-mix(in srgb, var(--ls-accent) 55%, #a2328b);
   --md-tertiary-container: color-mix(in srgb, var(--md-tertiary) 10%, #ffffff);
   --md-shadow: rgba(23, 30, 46, 0.14);
   --md-scrim: rgba(23, 30, 46, 0.30);
-  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 5%, transparent);
-  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 9%, transparent);
+  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 10%, transparent);
+  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 14%, transparent);
   --md-elevation-1: 0 1px 2px rgba(23, 30, 46, 0.05), 0 2px 8px -4px rgba(23, 30, 46, 0.06);
   --md-elevation-2: 0 2px 6px -2px rgba(23, 30, 46, 0.07), 0 12px 30px -18px rgba(23, 30, 46, 0.14);
   --md-elevation-3: 0 8px 22px -12px rgba(23, 30, 46, 0.14), 0 28px 60px -34px rgba(23, 30, 46, 0.20);
@@ -121,9 +131,11 @@
   --ma-glass: var(--md-surface-bright);
   --ma-glass-strong: var(--md-surface-bright);
   --ma-glass-border: var(--md-outline-variant);
-  --visual-body-bg: var(--md-surface);
-  --visual-sidebar-bg: var(--md-surface-container-lowest);
-  --visual-prefix-bg: var(--md-surface-dim);
+  /* Tapiz claro plano: fondo casi blanco de un solo color y barras (sidebar y
+     headbar) MÁS CLARAS que el fondo, en blanco puro. */
+  --visual-body-bg: #fbfcfe;
+  --visual-sidebar-bg: #ffffff;
+  --visual-prefix-bg: #ffffff;
   --visual-glow-opacity: 0;
 }
 
@@ -132,7 +144,7 @@
  * Reglas para lo que aero hard-codea sin pasar por tokens: fondos de
  * gradiente del body/contenedores, sheens y glows en pseudoelementos y
  * frosted glass en superficies planas. La mayoría termina en estado
- * neutro (fondo plano lino, sin luces de acento).
+ * neutro (fondo plano Simple, sin luces de acento).
  */
 
 :root[data-visual="lino"] body {
@@ -140,10 +152,18 @@
   background-attachment: fixed;
 }
 
+/* El tapiz debe ser plano: las decoraciones radiales con acento que aero y
+   la hoja base pintan sobre el fondo de body/superiores se anulan, de modo
+   que una sola tonalidad cubre todo el "papel tapiz". */
 :root[data-visual="lino"] .main-container {
   background: var(--visual-body-bg);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+:root[data-visual="lino"] #view-flashcards,
+:root[data-visual="lino"] #view-journals {
+  background: none;
 }
 
 :root[data-visual="lino"] .main-container::before,
@@ -235,11 +255,25 @@
   background: color-mix(in srgb, var(--md-primary) 8%, var(--md-surface-container-low));
 }
 
+/* Tarjetas y herramientas de repaso planas: aero les pinta un gradiente de
+   acento en el borde superior y una sombra de acento; Simple las sustituye
+   por la superficie plana del tema y la elevación neutra que ya impuso la
+   sección de neutralización. */
+:root[data-visual="lino"] .flashcard-box,
+:root[data-visual="lino"] .flashcard-review-tools {
+  background: var(--ls-card-bg);
+}
+
+/* El menú desplegable de ajustes también plano: sin halo radial de acento. */
+:root[data-visual="lino"] .settings-dropdown-menu.m3-surface {
+  background: var(--ls-menu-bg);
+}
+
 /* Acento seleccionando (los tokens de style.css fijan rgba por acento). */
 :root[data-visual="lino"] {
-  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 12%, transparent);
+  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 18%, transparent);
 }
 
 :root[data-visual="lino"][data-theme="light"] {
-  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 9%, transparent);
+  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 14%, transparent);
 }
