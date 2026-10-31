@@ -131,7 +131,8 @@ empaquetados con Vite, con backend Rust para archivos.
 | `index.html` | Estructura fija del escritorio: barra superior, vistas, ajustes y modales. |
 | `src/desktop.ts` | Monolito principal: editor, vistas, ajustes, repaso, grafo, búsqueda. |
 | `src/style.css` | Estilos del escritorio (tema, layout, tarjetas, tablas, focus). |
-| `src/material-aero.css` | Capa visual adicional sobre el tema. |
+| `src/material-aero.css` | Tema visual Aero de escritorio (capa de superficie translúcida). |
+| `src/theme-lino.css` / `src/theme-dracula.css` | Estilos visuales alternativos: redefinen los tokens de `--md-*`/`--ma-*` bajo `:root[data-visual="…"]` y neutralizan el vidrio/brillo de aero. La activación es `data-visual` en `<html>` (persistido en `sinnotas-visual`); el orden de imports en `desktop.ts` garantiza la cascada. |
 | `src/views/` | Componentes de vista: flashcards, grafo, kanban, listas virtuales. |
 | `src/store/` | Bóveda (`vault.ts`), búsqueda de contenido, progreso de repaso. |
 | `src/editor/` | Modelo de bloques, Markdown, FSRS, oclusiones, historial. |

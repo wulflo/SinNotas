@@ -86,6 +86,23 @@
 
   /* Aero: radio y desenfoque compartidos. */
   --ma-blur: 26px;
+  /*
+   * Escala de radios "suave, sin redondeos": los radios duros del tema
+   * (píldoras de 999px, paneles de 20-28px) se rige desde aquí para que
+   * Lino y Dracula los hereden sin redefinirlos.
+   * - xs: dropdown/scrollbar y detalles mínimos.
+   * - sm: casi-circulares y chips (badges, atajos de teclado, días del calendario).
+   * - md: lo que antes era píldora (nav, tabs, toast).
+   * - lg: inputs, botones rectangulares y items de menú.
+   * - xl: tarjetas (kanban, tablas, imágenes).
+   * - 2xl: paneles y modales grandes (ajustes, flashcard box, diarios).
+   */
+  --ma-radius-xs: 4px;
+  --ma-radius-sm: 6px;
+  --ma-radius-md: 8px;
+  --ma-radius-lg: 10px;
+  --ma-radius-xl: 14px;
+  --ma-radius-2xl: 16px;
   --ma-glass: color-mix(in srgb, var(--md-surface-container-high) 72%, transparent);
   --ma-glass-strong: color-mix(in srgb, var(--md-surface-container-high) 86%, transparent);
   --ma-glass-border: color-mix(in srgb, var(--md-outline-variant) 78%, transparent);
@@ -215,7 +232,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-xs);
   background: color-mix(in srgb, var(--md-primary) 52%, transparent);
 }
 
@@ -379,7 +396,7 @@ body {
   min-height: 44px;
   padding: 9px 16px;
   gap: 12px;
-  border-radius: 999px;
+  border-radius: var(--ma-radius-md);
   color: var(--md-on-surface-variant);
   font-weight: 550;
   letter-spacing: 0.01em;
@@ -415,7 +432,7 @@ body {
 }
 
 .sidebar-review-button {
-  border-radius: 20px;
+  border-radius: var(--ma-radius-lg);
   border: 1px solid color-mix(in srgb, var(--md-primary) 26%, var(--ma-glass-border));
   background:
     linear-gradient(
@@ -437,7 +454,7 @@ body {
 }
 
 .sidebar-review-icon {
-  border-radius: 12px;
+  border-radius: var(--ma-radius-lg);
   background: var(--md-primary-container);
   color: var(--md-on-primary-container);
   box-shadow: none;
@@ -449,7 +466,7 @@ body {
 
 .sidebar-search-input {
   min-height: 42px;
-  border-radius: 999px;
+  border-radius: var(--ma-radius-lg);
   border: 1px solid var(--ma-glass-border);
   background: color-mix(in srgb, var(--md-surface-container-highest) 62%, transparent);
   color: var(--md-on-surface);
@@ -483,7 +500,7 @@ body {
 }
 
 .sidebar-search-shortcut {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-sm);
   border-color: var(--md-outline-variant);
   background: color-mix(in srgb, var(--md-surface-container-highest) 70%, transparent);
   color: var(--md-on-surface-variant);
@@ -491,7 +508,7 @@ body {
 
 .vault-tree-page,
 .vault-tree-folder > summary {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-md);
   color: var(--md-on-surface-variant);
 }
 
@@ -517,7 +534,7 @@ body {
 
 .vault-switch-button {
   min-height: 44px;
-  border-radius: 999px;
+  border-radius: var(--ma-radius-md);
   border: 1px solid var(--ma-glass-border);
   background: color-mix(in srgb, var(--md-surface-container-high) 58%, transparent);
   color: var(--md-on-surface);
@@ -531,7 +548,7 @@ body {
 /* ==================== BOTONES, CHIPS E INPUTS ==================== */
 
 .btn-icon {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-md);
   color: var(--md-on-surface-variant);
   transition:
     background-color 0.18s ease,
@@ -564,7 +581,7 @@ body {
 .btn-fsrs,
 .flashcard-tab,
 .settings-tab {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-md);
   border: 1px solid var(--ma-glass-border);
   background: color-mix(in srgb, var(--md-surface-container-high) 54%, transparent);
   color: var(--md-on-surface-variant);
@@ -593,7 +610,7 @@ body {
 }
 
 .btn-primary {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-lg);
   border: 1px solid transparent;
   background: var(--md-primary);
   color: var(--md-on-primary);
@@ -614,7 +631,7 @@ select {
   background-color: color-mix(in srgb, var(--md-surface-container-high) 76%, transparent) !important;
   color: var(--md-on-surface) !important;
   border: 1px solid var(--ma-glass-border) !important;
-  border-radius: 12px !important;
+  border-radius: var(--ma-radius-lg) !important;
 }
 
 [data-theme="light"] select {
@@ -631,7 +648,7 @@ select {
 .flashcard-pages-controls input,
 .flashcard-pages-controls select,
 .graph-color-rule input[type="text"] {
-  border-radius: 12px;
+  border-radius: var(--ma-radius-lg);
   border: 1px solid var(--ma-glass-border);
   background: color-mix(in srgb, var(--md-surface-container-highest) 64%, transparent);
   color: var(--md-on-surface);
@@ -709,7 +726,7 @@ input[type="checkbox"] {
 }
 
 .settings-dropdown-menu.m3-surface {
-  border-radius: 28px;
+  border-radius: var(--ma-radius-2xl);
   padding: 24px 6px 24px 28px;
 }
 
@@ -752,7 +769,7 @@ input[type="checkbox"] {
 .table-context-menu,
 .slash-command-menu,
 .wikilink-autocomplete {
-  border-radius: 20px;
+  border-radius: var(--ma-radius-xl);
 }
 
 .app-dialog,
@@ -761,7 +778,7 @@ input[type="checkbox"] {
 .vault-manager,
 .concept-map-modal,
 .history-modal {
-  border-radius: 28px;
+  border-radius: var(--ma-radius-2xl);
 }
 
 .flashcard-box,
@@ -772,7 +789,7 @@ input[type="checkbox"] {
 .journal-entry-wrapper,
 .sync-box,
 .update-box {
-  border-radius: 20px;
+  border-radius: var(--ma-radius-2xl);
 }
 
 .search-dropdown-item,
@@ -788,7 +805,7 @@ input[type="checkbox"] {
 .kanban-card,
 .revision-item,
 .snapshot-note-row {
-  border-radius: 14px;
+  border-radius: var(--ma-radius-lg);
 }
 
 .search-dropdown-item:hover,
@@ -860,11 +877,11 @@ input[type="checkbox"] {
 }
 
 .all-pages-table tbody tr td:first-child {
-  border-radius: 16px 0 0 16px;
+  border-radius: var(--ma-radius-xl) 0 0 var(--ma-radius-xl);
 }
 
 .all-pages-table tbody tr td:last-child {
-  border-radius: 0 16px 16px 0;
+  border-radius: 0 var(--ma-radius-xl) var(--ma-radius-xl) 0;
 }
 
 .all-pages-table tbody tr:hover td {
@@ -882,7 +899,7 @@ input[type="checkbox"] {
 .blocks-count,
 .badge-tag,
 .badge-kind {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-sm);
   border: 1px solid color-mix(in srgb, var(--md-primary) 22%, transparent);
   background: color-mix(in srgb, var(--md-primary) 12%, transparent);
   color: var(--md-on-surface);
@@ -895,7 +912,7 @@ input[type="checkbox"] {
 }
 
 .btn-table-delete {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-md);
 }
 
 .btn-table-delete:hover {
@@ -915,7 +932,7 @@ input[type="checkbox"] {
 }
 
 .journal-calendar-day {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-sm);
 }
 
 .journal-calendar-day:hover:not(:disabled) {
@@ -971,7 +988,7 @@ input[type="checkbox"] {
 }
 
 .block-row {
-  border-radius: 12px;
+  border-radius: var(--ma-radius-lg);
   transition: background-color 0.16s ease, box-shadow 0.16s ease;
 }
 
@@ -995,7 +1012,7 @@ input[type="checkbox"] {
 }
 
 .add-bullet-btn {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-md);
   background: color-mix(in srgb, var(--md-surface-container-high) 62%, transparent);
   color: var(--md-on-surface-variant);
 }
@@ -1006,13 +1023,13 @@ input[type="checkbox"] {
 }
 
 .block-row > .block-image-node {
-  border-radius: 16px;
+  border-radius: var(--ma-radius-xl);
   box-shadow: var(--md-elevation-1);
 }
 
 .page-properties-values {
   border-left-color: var(--md-primary);
-  border-radius: 0 12px 12px 0;
+  border-radius: 0 var(--ma-radius-lg) var(--ma-radius-lg) 0;
   background: color-mix(in srgb, var(--md-surface-container-high) 62%, transparent);
 }
 
@@ -1031,7 +1048,7 @@ input[type="checkbox"] {
 
 .flashcard-progress,
 .fsrs-stats-badge {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-sm);
 }
 
 .flashcard-explorer-item {
@@ -1040,13 +1057,13 @@ input[type="checkbox"] {
 }
 
 .kanban-column {
-  border-radius: 22px;
+  border-radius: var(--ma-radius-2xl);
   background: color-mix(in srgb, var(--md-surface-container-low) 58%, transparent);
   box-shadow: inset 0 0 0 1px var(--ma-glass-border);
 }
 
 .kanban-card {
-  border-radius: 16px;
+  border-radius: var(--ma-radius-xl);
   background: color-mix(in srgb, var(--md-surface-container-high) 74%, transparent);
   border: 1px solid color-mix(in srgb, var(--md-outline-variant) 58%, transparent);
   box-shadow: var(--md-elevation-1);
@@ -1058,13 +1075,13 @@ input[type="checkbox"] {
 }
 
 .kanban-column-header .badge-tag {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-sm);
 }
 
 .graph-container,
 .graph-legend,
 .graph-preview {
-  border-radius: 20px;
+  border-radius: var(--ma-radius-2xl);
 }
 
 .graph-preview,
@@ -1081,7 +1098,7 @@ input[type="checkbox"] {
 .settings-tabs {
   background: color-mix(in srgb, var(--md-surface-container-high) 56%, transparent);
   border-bottom: 1px solid var(--ma-glass-border);
-  border-radius: 999px;
+  border-radius: var(--ma-radius-lg);
   margin: 0 20px 0 0;
   padding: 8px;
 }
@@ -1123,7 +1140,7 @@ input[type="checkbox"] {
     overflow-x: hidden;
     overflow-y: auto;
     border: 1px solid var(--ma-glass-border);
-    border-radius: 20px;
+    border-radius: var(--ma-radius-lg);
     background: color-mix(in srgb, var(--md-surface-container-high) 48%, transparent);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
@@ -1136,7 +1153,7 @@ input[type="checkbox"] {
     width: 100%;
     padding: 10px 14px;
     border: 1px solid color-mix(in srgb, var(--md-outline-variant) 68%, transparent);
-    border-radius: 12px;
+    border-radius: var(--ma-radius-lg);
     background: color-mix(in srgb, var(--md-surface-container-high) 58%, transparent);
     color: var(--md-on-surface-variant);
     text-align: left;
@@ -1191,7 +1208,7 @@ input[type="checkbox"] {
 }
 
 .sync-box {
-  border-radius: 20px;
+  border-radius: var(--ma-radius-2xl);
   padding: 16px;
 }
 
@@ -1213,7 +1230,7 @@ input[type="checkbox"] {
 }
 
 .toast-notification {
-  border-radius: 999px;
+  border-radius: var(--ma-radius-md);
   border: 1px solid var(--ma-glass-border);
   background: var(--ma-glass-strong);
   color: var(--md-on-surface);
@@ -1275,7 +1292,7 @@ input[type="checkbox"] {
 
 @media (max-width: 720px) {
   .settings-dropdown-menu.m3-surface:not(.shortcuts-modal) {
-    border-radius: 24px;
+    border-radius: var(--ma-radius-2xl);
     padding: 20px 4px 20px 18px;
   }
 
@@ -1290,6 +1307,56 @@ input[type="checkbox"] {
   .journals-list-item,
   .kanban-column,
   .sync-box {
-    border-radius: 16px;
+    border-radius: var(--ma-radius-2xl);
   }
+}
+
+/* ==================== NORMALIZACIÓN DE RADIOS DUROS ==================== */
+/*
+ * `style.css` (compartida con la APK móvil) fija píldoras de 999px en
+ * algunos componentes con ids o especificidad que ganarían por encima de
+ * las redeclaraciones con selector de clase del tema. En lugar de tocar
+ * esa hoja, se normalizan aquí con la misma escala "suave": al ser el
+ * último archivo importado, con la misma especificidad gana este bloque.
+ */
+.pomodoro-time-pill,
+#headbar-pomodoro-clock {
+  border-radius: var(--ma-radius-md);
+}
+
+#flashcard-points-badge,
+#kanban-total-count,
+.editor-tag,
+.outgoing-broken-badge,
+.reference-pane-count,
+.vault-manager-badge,
+.badge-kind {
+  border-radius: var(--ma-radius-sm);
+}
+
+.journal-date-badge {
+  border-radius: var(--ma-radius-md);
+}
+
+.all-pages-search input,
+.settings-subtabs {
+  border-radius: var(--ma-radius-lg);
+}
+
+/* La hoja base fuerza 999px !important en el orden de la tabla: sólo otra
+   regla con !important remedia ese caso puntual. */
+#all-pages-sort {
+  border-radius: var(--ma-radius-lg) !important;
+}
+
+.settings-subtab {
+  border-radius: var(--ma-radius-md);
+}
+
+/* Scrollbars scopes de la hoja base (más específicos que el global de aero). */
+.settings-dropdown-menu::-webkit-scrollbar-thumb,
+.settings-tab-panel::-webkit-scrollbar-thumb,
+.settings-tabs::-webkit-scrollbar-thumb,
+.shortcuts-modal-body::-webkit-scrollbar-thumb {
+  border-radius: var(--ma-radius-xs);
 }

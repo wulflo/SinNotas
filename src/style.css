@@ -1327,9 +1327,10 @@ body {
   display: none;
 }
 
-/* El tiempo es el propio control: una píldora accent que pasa a un rojo suave
-   cuando el Pomodoro está pausado. Se usa el ID para que las reglas genéricas
-   de botones (incluidas las del tema) no anulen estos estilos. */
+/* El tiempo es el control: el reloj comparte la paleta del botón que colapsa
+   la sidebar (btn-icon: fondo transparente y texto tenue) y el único estado
+   con color propio es la pausa, en rojo. Se usa el ID para que las reglas
+   genéricas de botones (incluidas las del tema) no anulen estos estilos. */
 #headbar-pomodoro-clock {
   display: inline-flex;
   min-width: 68px;
@@ -1337,34 +1338,28 @@ body {
   align-items: center;
   justify-content: center;
   padding: 4px 10px;
-  border: none;
-  border-radius: 999px;
-  background: linear-gradient(
-    140deg,
-    color-mix(in srgb, var(--ls-accent) 72%, #ffffff 28%),
-    var(--ls-accent)
-  );
-  color: var(--ls-accent-foreground);
+  border: 1px solid transparent;
+  border-radius: var(--ma-radius-md, 8px);
+  background: none;
+  color: var(--ls-text-muted);
   font: inherit;
   font-size: calc(13px * var(--ls-font-scale, 1));
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  box-shadow:
-    0 4px 12px -3px color-mix(in srgb, var(--ls-accent) 70%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 30%, transparent);
+  box-shadow: none;
   transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
     color 0.18s ease,
-    box-shadow 0.18s ease,
-    transform 0.14s ease,
-    filter 0.14s ease;
+    box-shadow 0.18s ease;
 }
 
-#headbar-pomodoro-clock:hover,
-#headbar-pomodoro-clock:focus-visible {
-  filter: brightness(1.08);
-  transform: translateY(-1px);
+#headbar-pomodoro-clock:hover {
+  background-color: var(--ls-bg-secondary);
+  border-color: var(--ls-border-subtle);
+  color: var(--ls-text-title);
 }
 
 #headbar-pomodoro-clock:focus-visible {
@@ -1372,22 +1367,9 @@ body {
   outline-offset: 2px;
 }
 
-#headbar-pomodoro-clock.is-running {
-  box-shadow:
-    0 0 0 3px color-mix(in srgb, var(--ls-accent) 20%, transparent),
-    0 4px 14px -3px color-mix(in srgb, var(--ls-accent) 75%, transparent);
-}
-
 #headbar-pomodoro-clock.is-paused {
-  background: linear-gradient(
-    140deg,
-    color-mix(in srgb, #e06c75 72%, #ffffff 28%),
-    #e06c75
-  );
-  color: color-mix(in srgb, #e06c75 12%, #061018);
-  box-shadow:
-    0 4px 12px -3px color-mix(in srgb, #e06c75 68%, transparent),
-    inset 0 1px 0 color-mix(in srgb, #ffffff 28%, transparent);
+  background-color: color-mix(in srgb, #e06c75 14%, transparent);
+  color: #e06c75;
 }
 
 #headbar-pomodoro-clock.is-paused:focus-visible {
@@ -1869,6 +1851,19 @@ select {
   flex-wrap: wrap;
   gap: 12px;
   padding: 2px 0 6px;
+}
+
+/* Selector de estilo visual (Aero · Lino · Dracula): fila con botones
+   reutilizando `.font-option-btn`; aero le da las píldoras. */
+.visual-row {
+  display: block;
+}
+
+.visual-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0 2px;
 }
 
 .accent-option {
@@ -7645,88 +7640,13 @@ body.is-bullet-selecting {
   font-weight: 700;
 }
 
-/* Splash screen */
-.app-splash {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--ls-bg);
-  z-index: 99999;
-  transition: opacity 0.4s ease, visibility 0.4s ease;
-}
-
-.app-splash.is-hidden {
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.app-splash-inner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 24px;
-  animation: splash-fade-in 0.6s ease;
-}
-
-.app-splash-logo {
-  width: 72px;
-  height: 72px;
-  border-radius: 18px;
-  background: linear-gradient(135deg, var(--ls-accent) 0%, color-mix(in srgb, var(--ls-accent) 70%, transparent) 100%);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(28px * var(--ls-font-scale, 1));
-  font-weight: 700;
-  box-shadow: 0 8px 32px color-mix(in srgb, var(--ls-accent) 40%, transparent);
-  letter-spacing: -0.02em;
-}
-
-.app-splash-bar {
-  width: 200px;
-  height: 3px;
-  background: color-mix(in srgb, var(--ls-text-secondary) 15%, transparent);
-  border-radius: 2px;
-  overflow: hidden;
-  position: relative;
-}
-
-.app-splash-bar-fill {
-  width: 100%;
-  height: 100%;
-  background: var(--ls-accent);
-  border-radius: 2px;
-  transform-origin: left center;
-  will-change: transform;
-  animation: splash-bar 1.2s ease-in-out infinite;
-}
-
-@keyframes splash-fade-in {
-  from {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-@keyframes splash-bar {
-  0% {
-    transform: scaleX(0);
-  }
-  50% {
-    transform: scaleX(1);
-  }
-  100% {
-    transform: translateX(100%) scaleX(1);
-  }
-}
+/*
+ * El splash no se declara aquí a propósito: su única fuente de estilo es el
+ * bloque crítico inline de `index.html`. Si esta hoja redeclarara
+ * `.app-splash`, el splash cambiaría de apariencia justo al llegar el CSS y
+ * parecería una segunda pantalla de carga distinta (ver el detalle del fix en
+ * `docs/CHECKLIST-TEMAS-VISUALES.md`).
+ */
 
 /* ==================== GRAPH SETTINGS ==================== */
 .graph-settings-box {

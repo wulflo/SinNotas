@@ -16,6 +16,8 @@ import {
 import "katex/dist/katex.min.css";
 import "./style.css";
 import "./material-aero.css";
+import "./theme-lino.css";
+import "./theme-dracula.css";
 import { hideAppSplash } from "./splash";
 import { requestReviewMode } from "./app-mode";
 import {
@@ -487,6 +489,13 @@ const accentColors = [
   "gray",
 ] as const;
 type AccentColor = (typeof accentColors)[number];
+/**
+ * Estilos visuales de la app. `aero` es el tema de origen; `lino` y
+ * `dracula` son capas de tokens sobre aero (ver `theme-lino.css` y
+ * `theme-dracula.css`). El activo se guarda en `sinnotas-visual`.
+ */
+const visualThemes = ["aero", "lino", "dracula"] as const;
+type VisualTheme = (typeof visualThemes)[number];
 let selectedImageOcclusionIndex: number | null = null;
 let pomodoroMode: "focus" | "break" = "focus";
 let pomodoroRemainingSeconds = 25 * 60;
@@ -1175,6 +1184,9 @@ function initThemeAndTypography() {
   const savedTheme = localStorage.getItem("sinnotas-theme") || "dark";
   setTheme(savedTheme === "light");
 
+  const savedVisual = localStorage.getItem("sinnotas-visual");
+  setVisual(visualThemes.includes(savedVisual as VisualTheme) ? (savedVisual as VisualTheme) : "aero");
+
   const savedAccent = localStorage.getItem("sinnotas-accent");
   setAccent(accentColors.includes(savedAccent as AccentColor) ? savedAccent as AccentColor : "blue");
 
@@ -1357,6 +1369,21 @@ function setTheme(isLight: boolean) {
     btnThemeSwitch.innerText = "Modo Oscuro Activo";
     localStorage.setItem("sinnotas-theme", "dark");
   }
+}
+
+/**
+ * Cambia el estilo visual activo solamente con el atributo `data-visual`:
+ * las hojas de los temas están tokenizadas, así que no hace falta mover
+ * nodos ni recargar. Espeja el estado en los botones del selector.
+ */
+function setVisual(visual: VisualTheme): void {
+  document.documentElement.setAttribute("data-visual", visual);
+  localStorage.setItem("sinnotas-visual", visual);
+  settingsDropdownMenu.querySelectorAll<HTMLButtonElement>("[data-visual-option]").forEach((button) => {
+    const selected = button.dataset.visualOption === visual;
+    button.setAttribute("aria-pressed", String(selected));
+    button.classList.toggle("active", selected);
+  });
 }
 
 function setAccent(accent: AccentColor): void {
@@ -2807,6 +2834,13 @@ settingsDropdownMenu.querySelectorAll<HTMLButtonElement>("[data-accent-option]")
   button.addEventListener("click", () => {
     const accent = button.dataset.accentOption;
     if (accent && accentColors.includes(accent as AccentColor)) setAccent(accent as AccentColor);
+  });
+});
+
+settingsDropdownMenu.querySelectorAll<HTMLButtonElement>("[data-visual-option]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const visual = button.dataset.visualOption as VisualTheme | undefined;
+    if (visual && visualThemes.includes(visual)) setVisual(visual);
   });
 });
 

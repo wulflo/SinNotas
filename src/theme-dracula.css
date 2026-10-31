@@ -1,0 +1,239 @@
+/*
+ * Dracula — tema visual oscuro de SinNotas.
+ *
+ * Misma estrategia "capa de tokens" que `theme-lino.css`: se importa después
+ * de `style.css` y `material-aero.css` y redefinie los roles `--md-*` /
+ * `--ma-*` bajo `:root[data-visual="dracula"]`, con la paleta y personalidad
+ * del tema Dracula (superficies grave violeta, rosa de acento terciario,
+ * verde/cian/ámbar para estados) pero manteniendo `--md-primary` apuntando
+ * a `var(--ls-accent)`, de modo que también responde al color de interfaz
+ * elegido. La variante `[data-theme="light"]` da una versión diurna
+ * desaturada para el conmutador claro/oscuro.
+ */
+
+:root[data-visual="dracula"] {
+  /* Superficies: la lila #282a36 con un velo del acento activo. */
+  --md-surface-dim: color-mix(in srgb, var(--ls-accent) 3%, #212330);
+  --md-surface: color-mix(in srgb, var(--ls-accent) 4%, #282a36);
+  --md-surface-bright: color-mix(in srgb, var(--ls-accent) 7%, #343746);
+  --md-surface-container-lowest: color-mix(in srgb, var(--ls-accent) 3%, #242633);
+  --md-surface-container-low: color-mix(in srgb, var(--ls-accent) 5%, #2b2d3a);
+  --md-surface-container: color-mix(in srgb, var(--ls-accent) 7%, #30323f);
+  --md-surface-container-high: color-mix(in srgb, var(--ls-accent) 9%, #383b4a);
+  --md-surface-container-highest: color-mix(in srgb, var(--ls-accent) 12%, #3e4152);
+  --md-on-surface: color-mix(in srgb, var(--ls-accent) 6%, #f8f8f2);
+  --md-on-surface-variant: color-mix(in srgb, var(--ls-accent) 12%, #a6a9c5);
+  --md-outline: color-mix(in srgb, var(--ls-accent) 22%, #565a75);
+  --md-outline-variant: color-mix(in srgb, var(--ls-accent) 14%, #3d4055);
+  --md-primary: var(--ls-accent);
+  --md-on-primary: color-mix(in srgb, var(--ls-accent) 14%, #1b1c28);
+  --md-primary-container: color-mix(in srgb, var(--ls-accent) 26%, #282a36);
+  --md-on-primary-container: color-mix(in srgb, var(--ls-accent) 55%, #f8f8f2);
+  --md-secondary-container: color-mix(in srgb, var(--ls-accent) 15%, #3c3f52);
+  --md-on-secondary-container: color-mix(in srgb, var(--ls-accent) 32%, #eceef4);
+  /* El rosa pastel de Dracula queda detrás del acento terciario. */
+  --md-tertiary: color-mix(in srgb, var(--ls-accent) 55%, #ff79c6);
+  --md-tertiary-container: color-mix(in srgb, var(--md-tertiary) 20%, #30323f);
+  --md-shadow: rgba(8, 7, 20, 0.55);
+  --md-scrim: rgba(20, 17, 38, 0.6);
+  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 9%, transparent);
+  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 15%, transparent);
+
+  /* Estados de la app con los colores distintivos de la paleta. */
+  --ls-todo-bg: color-mix(in srgb, #ffb86c 15%, var(--md-surface-container));
+  --ls-todo-color: color-mix(in srgb, #ffb86c 76%, var(--md-on-surface));
+  --ls-doing-bg: color-mix(in srgb, #8be9fd 14%, var(--md-surface-container));
+  --ls-doing-color: color-mix(in srgb, #8be9fd 78%, var(--md-on-surface));
+  --ls-done-bg: color-mix(in srgb, #50fa7b 14%, var(--md-surface-container));
+  --ls-done-color: color-mix(in srgb, #50fa7b 74%, var(--md-on-surface));
+  --ls-cloze-gap-bg: var(--md-primary-container);
+  --ls-cloze-gap-color: var(--md-on-primary-container);
+  --ls-cloze-revealed-bg: color-mix(in srgb, #50fa7b 22%, transparent);
+  --ls-cloze-revealed-color: color-mix(in srgb, #50fa7b 76%, var(--md-on-surface));
+
+  --ls-menu-bg: var(--md-surface-container-high);
+  --ls-card-bg: var(--md-surface-container);
+  --ls-card-border: var(--md-outline-variant);
+  --ls-kanban-card-bg: var(--md-surface-container-high);
+  --ls-accent-foreground: var(--md-on-primary);
+  --ls-accent-bold: color-mix(in srgb, var(--md-primary) 74%, var(--md-on-surface));
+  --ls-accent-highlight: color-mix(in srgb, var(--md-primary) 26%, transparent);
+  --ls-accent-highlight-text: color-mix(in srgb, var(--md-primary) 70%, var(--md-on-surface));
+  --ls-bullet-color: var(--md-primary);
+  --ls-bullet-border: color-mix(in srgb, var(--md-primary) 32%, transparent);
+  --ls-bullet-hover: color-mix(in srgb, var(--md-primary) 82%, #ffffff);
+  --ls-guideline-color: color-mix(in srgb, var(--md-on-surface) 10%, transparent);
+  --ls-guideline-hover: color-mix(in srgb, var(--md-primary) 46%, transparent);
+  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 15%, transparent);
+  --ls-text-link: var(--ls-accent);
+  --ls-glow-theme-scale: 0.3;
+
+  /* Vidrio de aero plano: superficies opacas, sin sheen. */
+  --ma-blur: 0px;
+  --ma-glass: var(--md-surface-container);
+  --ma-glass-strong: var(--md-surface-container-high);
+  --ma-glass-border: var(--md-outline-variant);
+  --ma-sheen: none;
+  --visual-body-bg: var(--md-surface);
+  --visual-sidebar-bg: var(--md-surface-container-lowest);
+  --visual-prefix-bg: var(--md-surface-dim);
+  --visual-glow-opacity: 0;
+}
+
+/* Variante diurna para el conmutador claro/oscuro: papel lavanda muy suave
+   con los mismos estados atenuados, para que el tema no pierda identidad. */
+:root[data-visual="dracula"][data-theme="light"] {
+  --md-surface-dim: color-mix(in srgb, var(--ls-accent) 3%, #edeef4);
+  --md-surface: color-mix(in srgb, var(--ls-accent) 3%, #f8f8fa);
+  --md-surface-bright: #ffffff;
+  --md-surface-container-lowest: color-mix(in srgb, var(--ls-accent) 2%, #f4f4f7);
+  --md-surface-container-low: color-mix(in srgb, var(--ls-accent) 4%, #eff0f5);
+  --md-surface-container: color-mix(in srgb, var(--ls-accent) 5%, #eaebf1);
+  --md-surface-container-high: color-mix(in srgb, var(--ls-accent) 6%, #e5e7ee);
+  --md-surface-container-highest: color-mix(in srgb, var(--ls-accent) 8%, #e0e2ea);
+  --md-on-surface: color-mix(in srgb, var(--ls-accent) 5%, #2b2d3a);
+  --md-on-surface-variant: color-mix(in srgb, var(--ls-accent) 10%, #606377);
+  --md-outline: color-mix(in srgb, var(--ls-accent) 22%, #c8cad6);
+  --md-outline-variant: color-mix(in srgb, var(--ls-accent) 12%, #dfe1e9);
+  --md-primary: var(--ls-accent);
+  --md-on-primary: #ffffff;
+  --md-primary-container: color-mix(in srgb, var(--md-primary) 12%, #ffffff);
+  --md-on-primary-container: color-mix(in srgb, var(--md-primary) 62%, #23252f);
+  --md-secondary-container: color-mix(in srgb, var(--md-primary) 8%, #ffffff);
+  --md-on-secondary-container: color-mix(in srgb, var(--md-primary) 48%, #2b2d3a);
+  --md-tertiary: color-mix(in srgb, var(--ls-accent) 55%, #b62d92);
+  --md-tertiary-container: color-mix(in srgb, var(--md-tertiary) 10%, #ffffff);
+  --md-shadow: rgba(28, 26, 48, 0.15);
+  --md-scrim: rgba(28, 26, 48, 0.3);
+  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 5%, transparent);
+  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 9%, transparent);
+  --md-elevation-1: 0 1px 2px rgba(28, 26, 48, 0.05), 0 2px 8px -4px rgba(28, 26, 48, 0.07);
+  --md-elevation-2: 0 2px 6px -2px rgba(28, 26, 48, 0.08), 0 12px 30px -18px rgba(28, 26, 48, 0.15);
+  --md-elevation-3: 0 8px 22px -12px rgba(28, 26, 48, 0.14), 0 28px 60px -34px rgba(28, 26, 48, 0.22);
+
+  --ls-todo-bg: color-mix(in srgb, #b45309 11%, var(--md-surface-container));
+  --ls-todo-color: color-mix(in srgb, #b45309 76%, var(--md-on-surface));
+  --ls-doing-bg: color-mix(in srgb, #0369a1 11%, var(--md-surface-container));
+  --ls-doing-color: color-mix(in srgb, #0369a1 76%, var(--md-on-surface));
+  --ls-done-bg: color-mix(in srgb, #15803d 11%, var(--md-surface-container));
+  --ls-done-color: color-mix(in srgb, #15803d 76%, var(--md-on-surface));
+  --ls-cloze-gap-bg: var(--md-primary-container);
+  --ls-cloze-gap-color: var(--md-on-primary-container);
+  --ls-cloze-revealed-bg: color-mix(in srgb, #15803d 16%, transparent);
+  --ls-cloze-revealed-color: color-mix(in srgb, #15803d 82%, var(--md-on-surface));
+
+  --ls-menu-bg: var(--md-surface-bright);
+  --ls-card-bg: var(--md-surface-bright);
+  --ls-card-border: var(--md-outline-variant);
+  --ls-kanban-card-bg: var(--md-surface-bright);
+  --ls-guideline-color: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  --ls-guideline-hover: color-mix(in srgb, var(--md-primary) 38%, transparent);
+  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 10%, transparent);
+  --ls-glow-theme-scale: 0.2;
+
+  --ma-glass: var(--md-surface-bright);
+  --ma-glass-strong: var(--md-surface-bright);
+  --ma-glass-border: var(--md-outline-variant);
+  --visual-body-bg: color-mix(in srgb, var(--md-primary) 6%, #e9eaf2);
+  --visual-sidebar-bg: var(--md-surface-container-lowest);
+  --visual-prefix-bg: var(--md-surface-dim);
+  --visual-glow-opacity: 0;
+}
+
+/* ==================== NEUTRALIZAR AERO ==================== */
+
+:root[data-visual="dracula"] body {
+  background: var(--visual-body-bg);
+  background-attachment: fixed;
+}
+
+:root[data-visual="dracula"] .main-container {
+  background: var(--visual-body-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-visual="dracula"] .main-container::before,
+:root[data-visual="dracula"] .main-container::after {
+  background: none;
+  opacity: var(--visual-glow-opacity);
+}
+
+:root[data-visual="dracula"] .sidebar-left {
+  background: var(--visual-sidebar-bg);
+  border-right: 1px solid var(--md-outline-variant);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-visual="dracula"] .sidebar-left::before,
+:root[data-visual="dracula"] .sidebar-left::after {
+  background: none;
+  opacity: var(--visual-glow-opacity);
+}
+
+:root[data-visual="dracula"] .headbar,
+:root[data-visual="dracula"] .sidebar-header {
+  background: var(--visual-prefix-bg);
+  border-bottom: 1px solid var(--md-outline-variant);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-visual="dracula"] .headbar::before,
+:root[data-visual="dracula"] .sidebar-header::before,
+:root[data-visual="dracula"] .headbar::after,
+:root[data-visual="dracula"] .sidebar-header::after {
+  background: none;
+  opacity: var(--visual-glow-opacity);
+}
+
+:root[data-visual="dracula"] .settings-dropdown-menu::before,
+:root[data-visual="dracula"] .settings-dropdown-menu::after,
+:root[data-visual="dracula"] .flashcard-box::before,
+:root[data-visual="dracula"] .history-modal::before,
+:root[data-visual="dracula"] .journal-calendar::before,
+:root[data-visual="dracula"] .journal-entry-wrapper::before {
+  background: none;
+  opacity: var(--visual-glow-opacity);
+}
+
+:root[data-visual="dracula"] .settings-dropdown-menu.m3-surface,
+:root[data-visual="dracula"] .custom-context-menu,
+:root[data-visual="dracula"] .search-results-dropdown,
+:root[data-visual="dracula"] .page-export-dropdown,
+:root[data-visual="dracula"] .wikilink-autocomplete,
+:root[data-visual="dracula"] .slash-command-menu,
+:root[data-visual="dracula"] .table-context-menu,
+:root[data-visual="dracula"] .app-dialog,
+:root[data-visual="dracula"] .image-occlusion-dialog,
+:root[data-visual="dracula"] .shortcuts-modal,
+:root[data-visual="dracula"] .vault-manager,
+:root[data-visual="dracula"] .concept-map-modal,
+:root[data-visual="dracula"] .history-modal,
+:root[data-visual="dracula"] .flashcard-box,
+:root[data-visual="dracula"] .flashcard-review-tools,
+:root[data-visual="dracula"] .flashcard-explorer,
+:root[data-visual="dracula"] .references-panel,
+:root[data-visual="dracula"] .journal-calendar,
+:root[data-visual="dracula"] .journal-entry-wrapper,
+:root[data-visual="dracula"] .sync-box,
+:root[data-visual="dracula"] .update-box,
+:root[data-visual="dracula"] .graph-preview,
+:root[data-visual="dracula"] .graph-legend,
+:root[data-visual="dracula"] .toast-notification {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: var(--md-outline-variant);
+  box-shadow: var(--md-elevation-2);
+}
+
+:root[data-visual="dracula"] .all-pages-table td {
+  background: var(--md-surface-container-lowest);
+}
+
+:root[data-visual="dracula"] .all-pages-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--md-primary) 10%, var(--md-surface-container-low));
+}

@@ -7,7 +7,19 @@
     <!-- Sin fuentes externas: la app funciona sin conexión y no filtra
          peticiones a Google Fonts. Usa las fuentes del sistema. -->
     <!-- Estilos críticos del splash: se aplican antes de cargar CSS/JS para que
-         nunca aparezca el HTML sin estilo (especialmente en Android). -->
+         nunca aparezca el HTML sin estilo (especialmente en Android).
+
+         Este bloque es la ÚNICA fuente de estilo del splash: `style.css` no
+         redeclara `.app-splash` para evitar el repintado que parecía "otro
+         splash distinto" al llegar cada hoja (ver
+         `docs/CHECKLIST-TEMAS-VISUALES.md`). Por eso se usan valores fijos
+         en lugar de tokens que aún no existen:
+         - fondo `#0a0c12` = superficie oscura final del tema Aero;
+         - acento `#61afef` = `--ls-accent` por defecto (azul); un usuario
+           con otro acento verá una única recomposición sutil del logo al
+           llegar el CSS, sin cambio de layout;
+         - tamaño de tipografía fijo porque `--ls-font-scale` aún no está
+           definido antes del CSS y alteraría el logo a mitad de carga. -->
     <style>
       #app-splash {
         position: fixed;
@@ -15,7 +27,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: var(--ls-bg, #1e1e2e);
+        background: #0a0c12;
         z-index: 99999;
         transition: opacity 0.4s ease, visibility 0.4s ease;
       }
@@ -35,29 +47,29 @@
         width: 72px;
         height: 72px;
         border-radius: 18px;
-        background: linear-gradient(135deg, var(--ls-accent, #89b4fa) 0%, color-mix(in srgb, var(--ls-accent, #89b4fa) 70%, transparent) 100%);
+        background: linear-gradient(135deg, var(--ls-accent, #61afef) 0%, color-mix(in srgb, var(--ls-accent, #61afef) 70%, transparent) 100%);
         color: #fff;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: calc(28px * var(--ls-font-scale, 1));
+        font-size: 32px;
         font-weight: 700;
         font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         letter-spacing: -0.02em;
-        box-shadow: 0 8px 32px color-mix(in srgb, var(--ls-accent, #89b4fa) 40%, transparent);
+        box-shadow: 0 8px 32px color-mix(in srgb, var(--ls-accent, #61afef) 40%, transparent);
       }
       #app-splash .app-splash-bar {
         width: 200px;
         height: 3px;
         border-radius: 2px;
         overflow: hidden;
-        background: color-mix(in srgb, var(--ls-text-secondary, #a6adc8) 15%, transparent);
+        background: color-mix(in srgb, #aeb8c9 15%, transparent);
       }
       #app-splash .app-splash-bar-fill {
         width: 100%;
         height: 100%;
         border-radius: 2px;
-        background: var(--ls-accent, #89b4fa);
+        background: var(--ls-accent, #61afef);
         transform-origin: left center;
         will-change: transform;
         animation: splash-bar 1.2s ease-in-out infinite;
@@ -334,6 +346,16 @@
                   <span>Modo Oscuro / Claro</span>
                   <button class="font-option-btn active" id="btn-theme-switch">Alternar Modo</button>
                 </div>
+
+                <div class="settings-row visual-row">
+                  <span>Estilo visual</span>
+                  <div class="visual-selector" role="group" aria-label="Estilo visual">
+                    <button class="font-option-btn active" type="button" data-visual-option="aero" aria-pressed="true">Aero</button>
+                    <button class="font-option-btn" type="button" data-visual-option="lino" aria-pressed="false">Lino</button>
+                    <button class="font-option-btn" type="button" data-visual-option="dracula" aria-pressed="false">Dracula</button>
+                  </div>
+                </div>
+                <p class="settings-help">Lino: claro y plano · Dracula: oscuro distinto. Ambos siguen el color de interfaz.</p>
 
                 <div class="settings-section-title">Color de interfaz</div>
                 <div class="accent-selector" role="group" aria-label="Color de interfaz">

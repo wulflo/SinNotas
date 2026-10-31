@@ -1,0 +1,245 @@
+/*
+ * Lino — tema visual claro y plano de SinNotas.
+ *
+ * Estrategia "capa de tokens": este archivo se importa DESPUÉS de
+ * `style.css` y `material-aero.css`, cuyos componentes están tokenizados.
+ * Basta con redefinir los roles `--md-*` / `--ma-*` bajo
+ * `:root[data-visual="lino"]` para que TODA la superficie de aero adopte
+ * este look sin duplicar sus mil líneas de componentes. La paleta deriva
+ * de `var(--ls-accent)` con `color-mix`, así que responde al color de
+ * interfaz elegido igual que Aero.
+ *
+ * Specificity: `:root[data-visual="lino"]` (0,2,0) gana a los bloques
+ * `:root` de aero (0,1,0) y a `style.css`; los bloques con
+ * `[data-theme="light"]` (0,3,0) ganan a los bloques claros de aero y
+ * `style.css` (0,2,0). La sección final "Neutralizar Aero" tapa los
+ * sheens, glows y translucidez hard-coded que no pasan por tokens.
+ */
+
+:root[data-visual="lino"] {
+  /* Roles tonales, derivados del acento activo (modo oscuro suave). */
+  --md-surface-dim: color-mix(in srgb, var(--ls-accent) 4%, #171a21);
+  --md-surface: color-mix(in srgb, var(--ls-accent) 4%, #1b1e26);
+  --md-surface-bright: color-mix(in srgb, var(--ls-accent) 6%, #262a35);
+  --md-surface-container-lowest: color-mix(in srgb, var(--ls-accent) 3%, #191c23);
+  --md-surface-container-low: color-mix(in srgb, var(--ls-accent) 5%, #1e222b);
+  --md-surface-container: color-mix(in srgb, var(--ls-accent) 7%, #22262f);
+  --md-surface-container-high: color-mix(in srgb, var(--ls-accent) 9%, #272b36);
+  --md-surface-container-highest: color-mix(in srgb, var(--ls-accent) 12%, #2c3140);
+  --md-on-surface: color-mix(in srgb, var(--ls-accent) 6%, #e7eaf1);
+  --md-on-surface-variant: color-mix(in srgb, var(--ls-accent) 10%, #a2a9b7);
+  --md-outline: color-mix(in srgb, var(--ls-accent) 24%, #3c4250);
+  --md-outline-variant: color-mix(in srgb, var(--ls-accent) 15%, #292e39);
+  --md-primary: var(--ls-accent);
+  --md-on-primary: color-mix(in srgb, var(--ls-accent) 10%, #131720);
+  --md-primary-container: color-mix(in srgb, var(--ls-accent) 22%, #1b1e26);
+  --md-on-primary-container: color-mix(in srgb, var(--ls-accent) 60%, #f2f6ff);
+  --md-secondary-container: color-mix(in srgb, var(--ls-accent) 13%, #232730);
+  --md-on-secondary-container: color-mix(in srgb, var(--ls-accent) 30%, #e3e8f2);
+  --md-tertiary: color-mix(in srgb, var(--ls-accent) 58%, #8f7ad6);
+  --md-tertiary-container: color-mix(in srgb, var(--md-tertiary) 18%, #1e222b);
+  --md-shadow: rgba(8, 10, 16, 0.5);
+  --md-scrim: rgba(10, 12, 18, 0.52);
+  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 7%, transparent);
+  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 12%, transparent);
+
+  /* Mapa de compat con la hoja base (los componentes usan --ls-*). */
+  --ls-menu-bg: var(--md-surface-container-high);
+  --ls-card-bg: var(--md-surface-container);
+  --ls-card-border: var(--md-outline-variant);
+  --ls-kanban-card-bg: var(--md-surface-container-high);
+  --ls-accent-foreground: var(--md-on-primary);
+  --ls-accent-bold: color-mix(in srgb, var(--md-primary) 72%, var(--md-on-surface));
+  --ls-accent-highlight: color-mix(in srgb, var(--md-primary) 24%, transparent);
+  --ls-accent-highlight-text: color-mix(in srgb, var(--md-primary) 66%, var(--md-on-surface));
+  --ls-bullet-color: var(--md-primary);
+  --ls-bullet-border: color-mix(in srgb, var(--md-primary) 30%, transparent);
+  --ls-bullet-hover: color-mix(in srgb, var(--md-primary) 80%, #ffffff);
+  --ls-guideline-color: color-mix(in srgb, var(--md-on-surface) 9%, transparent);
+  --ls-guideline-hover: color-mix(in srgb, var(--md-primary) 42%, transparent);
+  --ls-glow-theme-scale: 0.25;
+  --ls-text-link: var(--ls-accent);
+
+  /* Aero neutralizado para lino: sin vidrio ni luces; superficies opacas. */
+  --ma-blur: 0px;
+  --ma-glass: var(--md-surface-container-low);
+  --ma-glass-strong: var(--md-surface-container);
+  --ma-glass-border: var(--md-outline-variant);
+  --ma-sheen: none;
+  --visual-body-bg: var(--md-surface);
+  --visual-sidebar-bg: var(--md-surface-container-lowest);
+  --visual-prefix-bg: var(--md-surface-dim);
+  --visual-glow-opacity: 0;
+}
+
+/* Lino claro (identidad del tema): blancos cálidos-tiza con tinte del acento. */
+:root[data-visual="lino"][data-theme="light"] {
+  --md-surface-dim: color-mix(in srgb, var(--ls-accent) 4%, #eceef5);
+  --md-surface: color-mix(in srgb, var(--ls-accent) 3%, #fbfcfe);
+  --md-surface-bright: #ffffff;
+  --md-surface-container-lowest: color-mix(in srgb, var(--ls-accent) 2%, #f8fafd);
+  --md-surface-container-low: color-mix(in srgb, var(--ls-accent) 4%, #f3f6fb);
+  --md-surface-container: color-mix(in srgb, var(--ls-accent) 5%, #eef2f8);
+  --md-surface-container-high: color-mix(in srgb, var(--ls-accent) 7%, #e9edf5);
+  --md-surface-container-highest: color-mix(in srgb, var(--ls-accent) 9%, #e3e8f1);
+  --md-on-surface: color-mix(in srgb, var(--ls-accent) 6%, #222832);
+  --md-on-surface-variant: color-mix(in srgb, var(--ls-accent) 10%, #5c6473);
+  --md-outline: color-mix(in srgb, var(--ls-accent) 24%, #c9cfda);
+  --md-outline-variant: color-mix(in srgb, var(--ls-accent) 13%, #e0e5ed);
+  --md-primary: var(--ls-accent);
+  --md-on-primary: #ffffff;
+  --md-primary-container: color-mix(in srgb, var(--md-primary) 11%, #ffffff);
+  --md-on-primary-container: color-mix(in srgb, var(--md-primary) 62%, #131720);
+  --md-secondary-container: color-mix(in srgb, var(--md-primary) 8%, #ffffff);
+  --md-on-secondary-container: color-mix(in srgb, var(--md-primary) 48%, #1d2532);
+  --md-tertiary: color-mix(in srgb, var(--ls-accent) 55%, #a2328b);
+  --md-tertiary-container: color-mix(in srgb, var(--md-tertiary) 10%, #ffffff);
+  --md-shadow: rgba(23, 30, 46, 0.14);
+  --md-scrim: rgba(23, 30, 46, 0.30);
+  --md-state-hover: color-mix(in srgb, var(--md-on-surface) 5%, transparent);
+  --md-state-pressed: color-mix(in srgb, var(--md-on-surface) 9%, transparent);
+  --md-elevation-1: 0 1px 2px rgba(23, 30, 46, 0.05), 0 2px 8px -4px rgba(23, 30, 46, 0.06);
+  --md-elevation-2: 0 2px 6px -2px rgba(23, 30, 46, 0.07), 0 12px 30px -18px rgba(23, 30, 46, 0.14);
+  --md-elevation-3: 0 8px 22px -12px rgba(23, 30, 46, 0.14), 0 28px 60px -34px rgba(23, 30, 46, 0.20);
+
+  --ls-menu-bg: var(--md-surface-bright);
+  --ls-card-bg: var(--md-surface-bright);
+  --ls-card-border: var(--md-outline-variant);
+  --ls-kanban-card-bg: var(--md-surface-bright);
+  --ls-todo-bg: color-mix(in srgb, #d97706 10%, var(--md-surface-container));
+  --ls-todo-color: color-mix(in srgb, #b45309 74%, var(--md-on-surface));
+  --ls-doing-bg: color-mix(in srgb, #0284c7 10%, var(--md-surface-container));
+  --ls-doing-color: color-mix(in srgb, #0369a1 74%, var(--md-on-surface));
+  --ls-done-bg: color-mix(in srgb, #16a34a 10%, var(--md-surface-container));
+  --ls-done-color: color-mix(in srgb, #15803d 74%, var(--md-on-surface));
+  --ls-cloze-revealed-bg: color-mix(in srgb, #16a34a 15%, transparent);
+  --ls-cloze-revealed-color: color-mix(in srgb, #15803d 82%, var(--md-on-surface));
+  --ls-guideline-color: color-mix(in srgb, var(--md-on-surface) 8%, transparent);
+  --ls-guideline-hover: color-mix(in srgb, var(--md-primary) 36%, transparent);
+  --ls-glow-theme-scale: 0.15;
+
+  --ma-glass: var(--md-surface-bright);
+  --ma-glass-strong: var(--md-surface-bright);
+  --ma-glass-border: var(--md-outline-variant);
+  --visual-body-bg: var(--md-surface);
+  --visual-sidebar-bg: var(--md-surface-container-lowest);
+  --visual-prefix-bg: var(--md-surface-dim);
+  --visual-glow-opacity: 0;
+}
+
+/* ==================== NEUTRALIZAR AERO ==================== */
+/*
+ * Reglas para lo que aero hard-codea sin pasar por tokens: fondos de
+ * gradiente del body/contenedores, sheens y glows en pseudoelementos y
+ * frosted glass en superficies planas. La mayoría termina en estado
+ * neutro (fondo plano lino, sin luces de acento).
+ */
+
+:root[data-visual="lino"] body {
+  background: var(--visual-body-bg);
+  background-attachment: fixed;
+}
+
+:root[data-visual="lino"] .main-container {
+  background: var(--visual-body-bg);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-visual="lino"] .main-container::before,
+:root[data-visual="lino"] .main-container::after {
+  background: none;
+  opacity: var(--visual-glow-opacity);
+}
+
+:root[data-visual="lino"] .sidebar-left {
+  background: var(--visual-sidebar-bg);
+  border-right: 1px solid var(--md-outline-variant);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-visual="lino"] .sidebar-left::before,
+:root[data-visual="lino"] .sidebar-left::after {
+  background: none;
+  opacity: var(--visual-glow-opacity);
+}
+
+:root[data-visual="lino"] .headbar,
+:root[data-visual="lino"] .sidebar-header {
+  background: var(--visual-prefix-bg);
+  border-bottom: 1px solid var(--md-outline-variant);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-visual="lino"] .headbar::before,
+:root[data-visual="lino"] .sidebar-header::before,
+:root[data-visual="lino"] .headbar::after,
+:root[data-visual="lino"] .sidebar-header::after {
+  background: none;
+  opacity: var(--visual-glow-opacity);
+}
+
+/* Decoraciones internas de paneles flotantes (::before y ::after de aero). */
+:root[data-visual="lino"] .settings-dropdown-menu::before,
+:root[data-visual="lino"] .settings-dropdown-menu::after,
+:root[data-visual="lino"] .flashcard-box::before,
+:root[data-visual="lino"] .history-modal::before,
+:root[data-visual="lino"] .journal-calendar::before,
+:root[data-visual="lino"] .journal-entry-wrapper::before {
+  background: none;
+  opacity: var(--visual-glow-opacity);
+}
+
+/* El backdrop-filter a 0 llega vía --ma-blur; aquí se matan los blur
+   hard-coded de aero en superficies planas y se fijan bordes/sombras. */
+:root[data-visual="lino"] .settings-dropdown-menu.m3-surface,
+:root[data-visual="lino"] .custom-context-menu,
+:root[data-visual="lino"] .search-results-dropdown,
+:root[data-visual="lino"] .page-export-dropdown,
+:root[data-visual="lino"] .wikilink-autocomplete,
+:root[data-visual="lino"] .slash-command-menu,
+:root[data-visual="lino"] .table-context-menu,
+:root[data-visual="lino"] .app-dialog,
+:root[data-visual="lino"] .image-occlusion-dialog,
+:root[data-visual="lino"] .shortcuts-modal,
+:root[data-visual="lino"] .vault-manager,
+:root[data-visual="lino"] .concept-map-modal,
+:root[data-visual="lino"] .history-modal,
+:root[data-visual="lino"] .flashcard-box,
+:root[data-visual="lino"] .flashcard-review-tools,
+:root[data-visual="lino"] .flashcard-explorer,
+:root[data-visual="lino"] .references-panel,
+:root[data-visual="lino"] .journal-calendar,
+:root[data-visual="lino"] .journal-entry-wrapper,
+:root[data-visual="lino"] .sync-box,
+:root[data-visual="lino"] .update-box,
+:root[data-visual="lino"] .graph-preview,
+:root[data-visual="lino"] .graph-legend,
+:root[data-visual="lino"] .toast-notification {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: var(--md-outline-variant);
+  box-shadow: var(--md-elevation-2);
+}
+
+/* Tablas planas: sin la semitransparencia de aero. */
+:root[data-visual="lino"] .all-pages-table td {
+  background: var(--md-surface-container-lowest);
+}
+
+:root[data-visual="lino"] .all-pages-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--md-primary) 8%, var(--md-surface-container-low));
+}
+
+/* Acento seleccionando (los tokens de style.css fijan rgba por acento). */
+:root[data-visual="lino"] {
+  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 12%, transparent);
+}
+
+:root[data-visual="lino"][data-theme="light"] {
+  --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 9%, transparent);
+}
