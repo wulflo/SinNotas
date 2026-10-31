@@ -57,6 +57,28 @@ qué queda a medias (y qué síntomas de código roto esperar) y cómo continuar
 > incremental) y MIGRACIÓN DEL FRONT (`content-search.ts`/omnibar →
 > `search_content` con fallback JS solo-web conservado).
 >
+> **Bitácora FASE 4-E (2026-10-31):** flag ON por defecto. (1)
+> `isMetadataOnlyBoot()` es true si no hay override (`off` en localStorage
+> queda como escape manual de una sesión; `on` explícito también vale).
+> Solo aplica a Tauri con bóveda local: los comandos de Rust devuelven el
+> flag solo en las ramas locales (SAF queda a bloques completos y todos los
+> caminos lazy son no-op con `blocksLoaded: true`). (2) Última grieta del
+> boot de metadatos cerrada: `updateBlockContent` (arrastre de tareas del
+> Kanban) rehidrata la nota (pin incluido) antes de editar el árbol; antes
+> el cambio era un no-op silencioso sobre `blocks: []`. (3) Auditoría
+> rápida de los consumidores que quedaban: persist() no serializa en
+> Tauri, `renameFlashcardPageReferences` trabaja por título (sin bloques),
+> el índice JS de búsqueda solo corre en fallback, documentHistory y sync
+> rehidratan la nota abierta (4-A). El grafo/preview/omnibar/all-pages/
+> diarios ya se cubrieron en 4-B/4-C/4-D.
+>
+> Validación: cargo test 66, clippy 0, npx tsc --noEmit 0, npm test
+> 33/322. **Pendiente END-TO-END (el único de la fase 4): apertura y
+> verificación manual de la app empaquetada con bóveda grande y flag ON:
+> arranque, boot seco, omnibar, grafo, kanban streaming, flashcards
+> streaming, rename, arrastre de tarea sobre nota fría, sync externo y
+> reinicio.**
+>
 > **Bitácora FASE 4-D (2026-10-31):** cableado de los consumidores que
 > escanean bloques, todo bajo el flag (con flag OFF el comportamiento no
 > cambia ni una línea: mismo camino de siempre).
@@ -277,12 +299,22 @@ Decisiones de diseño (desviaciones razonadas del texto original del plan):
 - [x] 3.2 Búsqueda de contenido: **se queda el índice incremental del front** (implantado en FASE 1: `ContentSearchIndex` con epochs por nota; omnibar usa `vault.getVersionView()`). Motivo: con los bloques aún en memoria (FASE 4 pendiente), mantener un índice plegado DUPLICADO en Rust solo añade memoria/formateo sin ganar nada; el camino "Rust-first" se vuelve obligatorio y natural en FASE 4, cuando los bloques salgan de la memoria del front (`blocks: null`). Queda escrita la decisión para esa fase.
 - [x] 3.3 `updateWikilinkAutocomplete`: índice pre-ordenado y pre-minúsculas de títulos (`ensureWikilinkTitleIndex`), regenerado SOLO en cambios estructurales (`bumpMutationVersion`: crear/borrar/renombrar/volcado completo), no en cada tecla; el per-key queda un bucle O(títulos) con `includes()` sin sort ni allocs (corta al conseguir 8 + detecta match exacto).
 
-### FASE 4 — Arranque con metadatos + bloques bajo demanda — 🟡 EN CURSO
+### FASE 4 — Arranque con metadatos + bloques bajo demanda — ✅ CABLEADA (falta verificación manual con flag ON)
 
 **Sub-4-A** (primitivas bajo demanda) — ✅ COMMITTED `422238c` (ver bitácora).
 
 **Sub-4-B** (búsqueda de contenido Rust-first) — ✅ COMPLETADA 2026-10-31
 (ver bitácora; falta verificación manual en la app empaquetada).
+
+**Sub-4-C** (grafo Rust-first) — ✅ COMPLETADA 2026-10-31 (`231822d`).
+
+**Sub-4-D** (streaming flashcards/kanban/rename) — ✅ COMPLETADA 2026-10-31
+(`f93164b`; todo bajo el flag, con flag OFF el camino es el de siempre).
+
+**Sub-4-E** (flag ON) — ✅ IMPLEMENTADA: `isMetadataOnlyBoot` devuelve true
+por defecto (escape manual con `off` en localStorage; solo Tauri+bóveda
+local; SAF queda full). `updateBlockContent` rehidrata antes de tocar el
+árbol (drag de tareas del Kanban sobre notas descargadas).
 
 - [x] 4.B-Rust `search_content`: comando + índice plegado incremental
   (`content_index`/`content_dirty`), hit con página metadata + bloque

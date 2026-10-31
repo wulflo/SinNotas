@@ -262,16 +262,22 @@ const SAVE_DEBOUNCE_MS = 300;
 
 /**
  * FASE 4: ¿arranca la app "metadata-only" (títulos/fechas/frontmatter sin
- * árboles de bloques) y rehidrata con `read_pages_cached`? OFF por defecto
- * mientras se cablea el resto de consumidores; se activa en FASE 4-E.
- * Solo tiene efecto en Tauri con bóveda local.
+ * árboles de bloques) y rehidrata con `read_pages_cached`?
+ * FASE 4-E: ON por defecto. Solo tiene efecto en Tauri con bóveda local (SAF
+ * sigue devolviendo bloques completos; sus líneas lazy son no-op). El
+ * interruptor `off` queda como escape para una sesión: si algo fallase en
+ * campo, el usuario (o soporte) vuelve al arranque completo sin actualizar
+ * la app.
  */
 export function isMetadataOnlyBoot(): boolean {
   try {
-    return window.localStorage.getItem(METADATA_BOOT_STORAGE_KEY) === "on";
+    const stored = window.localStorage.getItem(METADATA_BOOT_STORAGE_KEY);
+    if (stored === "off") return false;
+    if (stored === "on") return true;
   } catch {
-    return false;
+    // localStorage inaccesible: sirve el default.
   }
+  return true;
 }
 
 let storageWarningShown = false;
@@ -1128,14 +1134,25 @@ export class VaultStore {
     return rewrite(candidates);
   }
 
-  public updateBlockContent(pageTitle: string, blockId: string, newContent: string): void {
-    const page = this.getPageByTitle(pageTitle);
+  /**
+   * Cambia el contenido de un bloque por título de nota (el residuo de las
+   * tareas del Kanban). FASE 4-E: la nota puede estar descargada (boot de
+   * metadatos); rehidrata ANTES de tocar el árbol, o el cambio sería un
+   * no-op silencioso.
+   */
+  public async updateBlockContent(pageTitle: string, blockId: string, newContent: string): Promise<void> {
+    let page = this.getPageByTitle(pageTitle);
     if (!page) return;
+    if (page.blocksLoaded === false && isTauri()) {
+      await this.ensurePageLoaded(page, { pin: true });
+      page = this.getPageByTitle(pageTitle);
+      if (!page || page.blocksLoaded === false) return;
+    }
 
     const loc = findNodeLocation(page.blocks, blockId);
     if (loc) {
       loc.parentList[loc.index].content = newContent;
-      this.savePage(page);
+      await this.savePage(page);
     }
   }
 

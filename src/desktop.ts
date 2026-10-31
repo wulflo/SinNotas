@@ -854,7 +854,7 @@ document.querySelectorAll<HTMLElement>(".kanban-column[data-kanban-status]").for
     column.classList.remove("drop-target");
     const status = column.dataset.kanbanStatus;
     if (!draggedKanbanTask || (status !== "todo" && status !== "doing" && status !== "done")) return;
-    updateTaskState(draggedKanbanTask, status);
+    void updateTaskState(draggedKanbanTask, status);
     draggedKanbanTask = null;
   });
 });
@@ -8184,11 +8184,11 @@ function ensureKanbanContentLoaded(): void {
   });
 }
 
-function updateTaskState(task: KanbanTask, newStatus: KanbanStatus) {
+async function updateTaskState(task: KanbanTask, newStatus: KanbanStatus) {
   if (task.status === newStatus) return;
   const formatted = KanbanManager.formatBlockWithStatus(task.content, newStatus);
   const newContent = applyTaskCompletionReward(task.content, formatted);
-  vault.updateBlockContent(task.pageTitle, task.blockId, newContent);
+  await vault.updateBlockContent(task.pageTitle, task.blockId, newContent);
   renderKanbanBoard();
 }
 
