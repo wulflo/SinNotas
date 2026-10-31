@@ -11679,15 +11679,56 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-function applyGraphPages(): void {
+/** Identifica la reconstrucción del grafo en curso: solo la última pinta. */
+let graphEdgesRun = 0;
+
+interface GraphLinksEntry {
+  path: string;
+  title: string;
+  targets: string[];
+}
+
+/**
+ * Pide la adyacencia al backend. Devuelve null cuando no hay backend con
+ * caché activa (web, o bóveda SAF sin caché): el grafo cae entonces al
+ * recuento JS de siempre.
+ */
+async function buildGraphEdges(): Promise<Map<string, string[]> | null> {
+  if (!isTauri()) return null;
+  try {
+    const entries = await invoke<GraphLinksEntry[]>("graph_links");
+    const adjacency = new Map<string, string[]>();
+    entries.forEach((entry) => adjacency.set(entry.title, entry.targets));
+    return adjacency;
+  } catch (error) {
+    console.debug("graph_links no disponible; recuento JS del grafo:", error);
+    return null;
+  }
+}
+
+async function applyGraphPages(): Promise<void> {
   if (!graphView) return;
+  const run = ++graphEdgesRun;
+  const edges = await buildGraphEdges();
+  // El backend puede responder tarde: si mientras tanto se lanzó otra
+  // reconstrucción, esta ya está obsoleta.
+  if (run !== graphEdgesRun || !graphView) return;
+
   const allPages = vault.getPages();
   if (graphNeighborhoodOrigin) {
-    const connected = connectedPageTitles(allPages, graphNeighborhoodOrigin);
-    graphView.updateData(allPages.filter((page) => connected.has(page.title)));
+    const connected = connectedPageTitles(
+      allPages,
+      graphNeighborhoodOrigin,
+      1,
+      edges ?? undefined
+    );
+    graphView.updateData(
+      allPages.filter((page) => connected.has(page.title)),
+      edges ?? undefined
+    );
     graphView.selectNode(graphNeighborhoodOrigin);
   } else {
-    graphView.updateData(allPages);
+    graphView.updateData(allPages, edges ?? undefined);
   }
   graphRenderedNeighborhood = graphNeighborhoodOrigin;
   graphDataVersion = vault.getMutationVersion();
@@ -14455,9 +14496,13 @@ async function installVaultCacheDeltaListener(): Promise<void> {
       }
 
       // La evaluación de datos del grafo se agenda en el siguiente frame para
-      // no competir con la física ni con la escritura del usuario.
+      // no competir con la física ni con la escritura del usuario. La
+      // adyacencia ya no sale de escanear bloques en JS: se pide a Rust
+      // (`graph_links`) vía applyGraphPages, que re-aplica la vecindad.
       if (currentView === "graph" && typeof requestAnimationFrame === "function") {
-        requestAnimationFrame(() => graphView?.updateData(vault.getPages()));
+        requestAnimationFrame(() => {
+          void applyGraphPages();
+        });
       }
     });
     vaultCacheDeltaListenerReady = true;

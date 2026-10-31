@@ -5,11 +5,15 @@ import { collectOutgoingLinks } from "../store/wikilinks";
  * Títulos conectados a `origin` a una profundidad dada, contando enlaces
  * entrantes y salientes. Solo se devuelven notas que existen en `pages`; el
  * origen se incluye siempre para poder centrar el grafo aunque no haya aristas.
+ * FASE 4-C: `links` permite pasar la adyacencia servida por Rust
+ * (`graph_links`, title => wikilinks salientes sin alias); sin ella se extrae
+ * de los bloques con `collectOutgoingLinks` como siempre.
  */
 export function connectedPageTitles(
   pages: readonly PageData[],
   origin: string,
-  depth = 1
+  depth = 1,
+  links?: ReadonlyMap<string, readonly string[]>
 ): Set<string> {
   const byLower = new Map<string, string>();
   pages.forEach((page) => byLower.set(page.title.toLowerCase(), page.title));
@@ -35,8 +39,11 @@ export function connectedPageTitles(
   };
 
   pages.forEach((page) => {
-    collectOutgoingLinks(page).forEach((link) => {
-      const target = byLower.get(link.targetTitle.toLowerCase());
+    const targets = links
+      ? links.get(page.title) ?? []
+      : collectOutgoingLinks(page).map((link) => link.targetTitle);
+    targets.forEach((targetTitle) => {
+      const target = byLower.get(targetTitle.toLowerCase());
       if (target) connect(page.title, target);
     });
   });

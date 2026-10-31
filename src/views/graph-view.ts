@@ -239,7 +239,7 @@ export class GraphView {
     return this.nodesByTitle.get(title)?.computedColor ?? null;
   }
 
-  public updateData(pages: PageData[]) {
+  public updateData(pages: PageData[], links?: Map<string, string[]>) {
     const width = (this.canvas.width || 800) / this.dpr;
     const height = (this.canvas.height || 600) / this.dpr;
 
@@ -252,8 +252,13 @@ export class GraphView {
     // Pre-build title set for O(1) existence check
     const pageTitles = new Set(pages.map(p => p.title));
 
+    // FASE 4-C: la adyacencia puede venir servida por Rust (`graph_links`).
+    // Sin ella (modo web o backend sin caché) se mantiene el recuento JS,
+    // idéntico en criterios, solo que aquí.
+    const adjacency = links ?? new Map(pages.map((p) => [p.title, collectWikiLinkTitles(p.blocks)]));
+
     pages.forEach((p) => {
-      for (const targetTitle of collectWikiLinkTitles(p.blocks)) {
+      for (const targetTitle of adjacency.get(p.title) ?? []) {
         if (!pageTitles.has(targetTitle)) continue;
         const link = { source: p.title, target: targetTitle };
         this.allLinks.push(link);

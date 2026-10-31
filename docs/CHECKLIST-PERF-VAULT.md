@@ -57,6 +57,31 @@ qué queda a medias (y qué síntomas de código roto esperar) y cómo continuar
 > incremental) y MIGRACIÓN DEL FRONT (`content-search.ts`/omnibar →
 > `search_content` con fallback JS solo-web conservado).
 >
+> **Bitácora FASE 4-C (2026-10-31):** grafo Rust-first completado. (1) La
+> caché gana `CachedLinkReference.is_tag` (v2→v3: las cachés antiguas se
+> descartan y la bóveda se re-escanea una vez con el fallback diseñado) y
+> `extract_links` resuelve el alias (`[[Destino|Alias]]` → `Destino`, bug
+> latente del grafo y de los retroenlaces cacheados; alineado también el
+> regex del fallback SAF de `find_backlinks`). (2) Comando `graph_links`:
+> adyacencia por nota (title + ruta absoluta + targets resueltos sin alias,
+> sin tags y SIN deduplicar — el radio de nodo cuenta apariciones),
+> O(enlaces cacheados) por llamada, sin tocar bloques. (3) Front:
+> `GraphView.updateData(pages, links?)` y `connectedPageTitles(..., links?)`
+> aceptan la adyacencia servida (fallback JS idéntico para web/sin caché);
+> `applyGraphPages` pasa a async con guard de carrera — y el listener de
+> `vault-cache-delta` re-aplica la vecindad en vez de re-escanear bloques.
+> > Validación: `cargo test` 66 (3 nuevos: clasificación de links con alias,
+> migración v2→v3 y servicio del grafo), clippy 0, `npx tsc --noEmit` 0 y
+> `npm test` 33/320 (nuevo test del neighborhood con adyacencia Rust).
+> Verificación manual del grafo en la app empaquetada: PENDIENTE.
+>
+> **Nota de comportamiento 4-C:** con alias resueltos, aristas que antes no
+> existían (`[[C|alias]]` caía en un título fantasma) ahora conectan; y los
+> retroenlaces (caché y SAF) ya muestran notas que enlazan con alias. Los
+> Los
+> tags `#` siguen fuera del grafo (criterio vigente) y siguen contando en
+> retroenlaces (FASE 3).
+>
 > **Bitácora FASE 4-B cierre (2026-10-31):** completada. (1) Núcleo de
 > búsqueda extraído a `run_content_search` (función libre sin `AppHandle`)
 > con 8 tests unitarios Rust: plegado, texto visible, conteo con tope,

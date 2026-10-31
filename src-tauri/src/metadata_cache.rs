@@ -38,9 +38,13 @@ use walkdir::WalkDir;
 /// Binary cache file stored at the vault root.
 pub const CACHE_FILE_NAME: &str = ".sinnotas_cache.bin";
 const CACHE_MAGIC: &[u8; 4] = b"SNC1";
-// 2: añade `created_ns`. Bump obligatorio porque bincode no es
-// auto-descriptivo y una caché con el layout anterior no se puede decodificar.
-const CACHE_FORMAT_VERSION: u32 = 2;
+// Historial de versiones (bincode no es auto-descriptivo: cada cambio de
+// layout exige bump, y la caché incompatible se descarta con escaneo frío).
+// v2: añade `created_ns`.
+// v3: `CachedLinkReference.is_tag` separa wikilinks de `#tag`; las cachés
+// antiguas no distinguían las dos gramáticas y se re-escanean una vez con el
+// fallback de escaneo completo (el camino diseñado para cualquier migración).
+const CACHE_FORMAT_VERSION: u32 = 3;
 /// Defensive bound for the on-disk cache (a 20 MB note limit makes larger
 /// caches implausible).
 const MAX_CACHE_BYTES: u64 = 256 * 1024 * 1024;
@@ -56,13 +60,19 @@ const MAX_TITLE_BYTES: usize = 512;
 
 /// One extracted outbound reference (wikilink or `#tag`) with the line that
 /// contains it. This is what makes cached backlink lookups possible without
-/// reading the Markdown file again.
+/// reading the Markdown file again. `is_tag` separates the two grammars: los
+/// retroenlaces cuentan ambos, pero el grafo solo forma aristas con
+/// wikilinks (criterio `collectWikiLinkTitles` del front).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CachedLinkReference {
+    /// Destino resuelto: para wikilinks se recorta el alias
+    /// (`[[Destino|Alias]]` → `Destino`); para tags es el texto tras `#`.
     pub target: String,
     pub line_number: usize,
     pub snippet: String,
+    #[serde(default)]
+    pub is_tag: bool,
 }
 
 /// Cheap flashcard summary extracted from a note. The frontend still runs the
@@ -712,6 +722,10 @@ fn extract_links(content: &str) -> Vec<CachedLinkReference> {
                 break;
             };
             let target = line[start..start + close].trim();
+            // Con alias la arista apunta al destino real: `[[Destino|Alias]]`
+            // enlaza a `Destino` (lo que ya hacía el scan del front para los
+            // retroenlaces; sin esto el alias quedaba pegado al título).
+            let target = target.split('|').next().unwrap_or(target).trim();
             if !target.is_empty()
                 && target.len() <= MAX_LINK_TARGET_BYTES
                 && !target.contains(['[', ']', '\r', '\n', '\0'])
@@ -720,6 +734,7 @@ fn extract_links(content: &str) -> Vec<CachedLinkReference> {
                     target: target.to_string(),
                     line_number: index + 1,
                     snippet: snippet.clone(),
+                    is_tag: false,
                 });
                 if links.len() >= MAX_LINK_REFERENCES {
                     break;
@@ -761,6 +776,7 @@ fn extract_links(content: &str) -> Vec<CachedLinkReference> {
                     target,
                     line_number: index + 1,
                     snippet: snippet.clone(),
+                    is_tag: true,
                 });
                 if links.len() >= MAX_LINK_REFERENCES {
                     break;
@@ -1415,6 +1431,54 @@ mod tests {
             .pages
             .iter()
             .all(|page| page.blocks[0].content.contains("desde el diario")));
+
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn cached_links_separate_wikilinks_from_tags_and_resolve_alias() {
+        // El alias se recorta del destino (el grafo y los retroenlaces
+        // enlazan al título real) y `is_tag` distingue las dos gramáticas.
+        let links =
+            extract_links("- error [[|Alias]] no vale\n- [[Destino|Alias]] y [[Otra]] y #Papel\n");
+        assert_eq!(links.len(), 3);
+        assert_eq!(links[0].target, "Destino");
+        assert!(!links[0].is_tag);
+        assert_eq!(links[1].target, "Otra");
+        assert!(!links[1].is_tag);
+        assert_eq!(links[2].target, "Papel");
+        assert!(links[2].is_tag);
+
+        // Wikilinks repetidos se cachean dos veces: el radio de nodo del
+        // grafo front cuenta apariciones.
+        let links = extract_links("- [[Igual]] y [[Igual]]\n");
+        assert_eq!(links.len(), 2);
+        assert!(links.iter().all(|link| !link.is_tag));
+    }
+
+    #[test]
+    fn cache_from_older_format_is_discarded_and_rescanned() {
+        let root = test_root("migracion-formato");
+        fs::create_dir_all(root.join("pages")).unwrap();
+        fs::write(root.join("pages/nota.md"), "- Enlaza a [[Destino]]\n").unwrap();
+
+        let scanned = load_or_scan_vault(&root).unwrap();
+
+        // Simula un archivo en formato v2 (histórico: sin `is_tag`): la
+        // versión no coincide y la caché se descarta en favor del escaneo.
+        let old = VaultMetadataCache {
+            version: 2,
+            entries: scanned.cache.entries.clone(),
+        };
+        write_cache_file(&root, &old).unwrap();
+        assert!(load_cache_file(&root).is_none());
+
+        let rescanned = load_or_scan_vault(&root).unwrap();
+        assert_eq!(rescanned.cache.version, CACHE_FORMAT_VERSION);
+        let note = rescanned.cache.entries.get("pages/nota.md").unwrap();
+        let link = note.links.first().unwrap();
+        assert_eq!(link.target, "Destino");
+        assert!(!link.is_tag);
 
         fs::remove_dir_all(root).unwrap();
     }

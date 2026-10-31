@@ -878,6 +878,58 @@ fn find_block_by_id<'local>(nodes: &'local [BlockNode], id: &str) -> Option<&'lo
     None
 }
 
+/// FASE 4-C: adyacencia del grafo servida desde la caché de Rust. Una entrada
+/// por nota con wikilinks salientes; el front arma las aristas comprobando la
+/// existencia del destino por título exacto (igual que hacía con
+/// `collectWikiLinkTitles`, del que este es el suplente incremental).
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphLinksEntry {
+    /// Ruta absoluta de la nota (mismo formato que `PageData.path`).
+    pub path: String,
+    pub title: String,
+    /// Wikilinks salientes RESUELTOS (sin alias, `is_tag == false`), en orden
+    /// de aparición y SIN deduplicar: el radio de nodo del grafo cuenta
+    /// apariciones, así que repiten las repetidas (criterio vigente del front).
+    pub targets: Vec<String>,
+}
+
+/// Núcleo de `graph_links`, libre para probarlo sin `AppHandle`: filtra los
+/// wikilinks cacheados por nota. Notas sin wikilinks se omiten del payload.
+fn graph_links_from_cache(
+    cache: &BTreeMap<String, metadata_cache::CachedNote>,
+    root: &Path,
+) -> Vec<GraphLinksEntry> {
+    let mut entries = Vec::with_capacity(cache.len());
+    for note in cache.values() {
+        let targets = note
+            .links
+            .iter()
+            .filter(|link| !link.is_tag)
+            .map(|link| link.target.clone())
+            .collect::<Vec<String>>();
+        if targets.is_empty() {
+            continue;
+        }
+        entries.push(GraphLinksEntry {
+            path: root
+                .join(&note.relative_path)
+                .to_string_lossy()
+                .into_owned(),
+            title: note.title.clone(),
+            targets,
+        });
+    }
+    entries
+}
+
+fn graph_links_from_runtime(runtime: &Arc<VaultCacheRuntime>) -> Vec<GraphLinksEntry> {
+    match runtime.cache.lock() {
+        Ok(cache) => graph_links_from_cache(&cache.entries, &runtime.root),
+        Err(_) => Vec::new(),
+    }
+}
+
 /// Núcleo de `search_content`, libre para poder probarlo sin `AppHandle`:
 /// puntuación por nota sobre el plegado, orden (apariciones descendente con
 /// desempate alfabético por ruta) y servido desde el cache (`page` en
@@ -1105,6 +1157,21 @@ async fn search_content(
         return Err("search_content requiere bóveda local con caché activa.".to_string());
     };
     Ok(runtime.search_content(&query, limit.unwrap_or(25)))
+}
+
+/// FASE 4-C: adyacencia del grafo desde la caché (solo bóvedas locales). El
+/// front monta las aristas con su criterio de existencia (título exacto) y
+/// deja de recorrer los bloques de la bóveda en cada repintado.
+#[tauri::command]
+async fn graph_links(
+    state: tauri::State<'_, ActiveVault>,
+    cache_state: tauri::State<'_, VaultCacheState>,
+) -> Result<Vec<GraphLinksEntry>, String> {
+    let _vault_path = active_root(&state)?;
+    let Some(runtime) = cache_state.current() else {
+        return Err("graph_links requiere bóveda local con caché activa.".to_string());
+    };
+    Ok(graph_links_from_runtime(&runtime))
 }
 
 /// Carpeta interna del vault para datos administrados por la app. Las carpetas
@@ -5023,7 +5090,9 @@ fn find_backlinks(
         return Ok(runtime.find_backlinks(&page_title));
     }
     let mut backlinks = Vec::new();
-    let wikilink_pattern = format!(r"\[\[{}\]\]", regex::escape(&page_title));
+    // Paridad con la extracción cacheada: `[[Título]]` y `[[Título|Alias]]`
+    // son retroenlaces del mismo destino.
+    let wikilink_pattern = format!(r"\[\[{}\s*(?:\|[^\]]*)?\]\]", regex::escape(&page_title));
     let tag_pattern = format!(r"#{}\b", regex::escape(&page_title));
     let re =
         Regex::new(&format!("{}|{}", wikilink_pattern, tag_pattern)).map_err(|e| e.to_string())?;
@@ -5411,6 +5480,7 @@ pub fn run() {
             vault_sync_state,
             read_pages_cached,
             search_content,
+            graph_links,
             pick_vault_root,
             list_system_fonts,
             resolve_image_path,
@@ -7110,6 +7180,69 @@ mod tests {
             )
             .is_empty()
         );
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn graph_links_serves_wikilinks_only_keeps_duplicates_and_skips_tagless_notes() {
+        let root = std::env::temp_dir().join("sinnotas-graph-links-test");
+
+        let mut note_a = test_note("a.md", "A", vec![test_block("b1", "text", "x", vec![])]);
+        note_a.links = vec![
+            metadata_cache::CachedLinkReference {
+                target: "Destino".to_string(),
+                line_number: 1,
+                snippet: String::new(),
+                is_tag: false,
+            },
+            // Sigue el criterio del front: el radio de nodo cuenta
+            // apariciones, así que los destinos repetidos se sirven dos veces.
+            metadata_cache::CachedLinkReference {
+                target: "Destino".to_string(),
+                line_number: 2,
+                snippet: String::new(),
+                is_tag: false,
+            },
+            // Los tags NO forman aristas del grafo.
+            metadata_cache::CachedLinkReference {
+                target: "Papel".to_string(),
+                line_number: 3,
+                snippet: String::new(),
+                is_tag: true,
+            },
+        ];
+        let mut note_b = test_note("b.md", "B", vec![test_block("b2a", "text", "y", vec![])]);
+        note_b.links = vec![metadata_cache::CachedLinkReference {
+            target: "A".to_string(),
+            line_number: 1,
+            snippet: String::new(),
+            is_tag: false,
+        }];
+        // Sin wikilinks => fuera del payload.
+        let mut note_solo =
+            test_note("sola.md", "Sola", vec![test_block("b3", "text", "sin enlaces", vec![])]);
+        note_solo.links = vec![metadata_cache::CachedLinkReference {
+            target: "Papel".to_string(),
+            line_number: 1,
+            snippet: String::new(),
+            is_tag: true,
+        }];
+
+        let cache = BTreeMap::from([
+            ("a.md".to_string(), note_a),
+            ("b.md".to_string(), note_b),
+            ("sola.md".to_string(), note_solo),
+        ]);
+        let entries = graph_links_from_cache(&cache, &root);
+
+        assert_eq!(entries.len(), 2);
+        let entry_a = &entries[0];
+        assert_eq!(entry_a.title, "A");
+        assert_eq!(entry_a.path, root.join("a.md").to_string_lossy());
+        assert_eq!(entry_a.targets, vec!["Destino", "Destino"]);
+        assert_eq!(entries[1].title, "B");
+        assert_eq!(entries[1].targets, vec!["A"]);
 
         fs::remove_dir_all(root).ok();
     }

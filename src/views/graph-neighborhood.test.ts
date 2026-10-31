@@ -41,4 +41,20 @@ describe("connectedPageTitles", () => {
     const titles = connectedPageTitles([page("A", "[[Fantasma]]")], "A");
     expect([...titles]).toEqual(["A"]);
   });
+
+  it("usa la adyacencia servida por Rust cuando llega (FASE 4-C)", () => {
+    // Bloques vacíos: sin la adyacencia no habría aristas; con ella sí.
+    const noti = [page("A", ""), page("B", ""), page("C", ""), page("D", "")];
+    const links = new Map<string, string[]>([
+      ["A", ["B"]],
+      ["B", ["C"]],
+      ["D", ["C"]],
+    ]);
+    expect([...connectedPageTitles(noti, "A", 1, links)].sort()).toEqual(["A", "B"]);
+    // Profundidad 2: hasta C; D queda a 3 saltos (vecina del vecino, no del origen).
+    expect([...connectedPageTitles(noti, "A", 2, links)].sort()).toEqual(["A", "B", "C"]);
+    // Los destinos que no corresponden a ninguna nota se siguen descartando.
+    const conFantasma = new Map<string, string[]>([["A", ["Fantasma", "B"]]]);
+    expect([...connectedPageTitles(noti, "A", 1, conFantasma)]).toEqual(["A", "B"]);
+  });
 });
