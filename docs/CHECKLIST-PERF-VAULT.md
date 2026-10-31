@@ -301,6 +301,13 @@ Decisiones de diseño (desviaciones razonadas del texto original del plan):
 
 ### FASE 4 — Arranque con metadatos + bloques bajo demanda — ✅ CABLEADA (falta verificación manual con flag ON)
 
+Alcance por ítem original:
+- [x] 4.1 (payload metadata-only) → sub-4-A (`load_vault { metadata_only }`, `read_pages_cached`).
+- [x] 4.2 (`blocks: null` + `ensurePageLoaded` + LRU) → sub-4-A (`blocksLoaded` + LRU ~120 con pin/unpin).
+- [x] 4.3 (auditar consumidores) → 4-B (omnibar/retroenlaces→Rust), 4-C (grafo→Rust, preview rehidrata), 4-D (flashcards/kanban/rename streaming), 4-E (`blockCount` en all-pages/diarios, `updateBlockContent` rehidrata; boot de metadatos en 4-B fix).
+- [x] 4.4 (idle liberar no abiertas) → sweep del LRU en `loadPagesCached`/`ensurePageLoaded`.
+- [ ] **4.5 parcial** (alcanza al ~2.8M `BlockNode` del FRONT: bajo el boot los residentes son ≤ LRU+pin). La MITAD de RUST sigue abierta: la caché de `metadata_cache.rs` sigue cargando TODOS los árboles en memoria de Rust para poder servir `read_pages_cached` sin IO. Propuesta pendiente: árboles solo en disco con índice por nota sin árboles (o mapa ruta→offset) y `read_pages_cached` leyendo del master con lru propio en Rust.
+
 **Sub-4-A** (primitivas bajo demanda) — ✅ COMMITTED `422238c` (ver bitácora).
 
 **Sub-4-B** (búsqueda de contenido Rust-first) — ✅ COMPLETADA 2026-10-31
