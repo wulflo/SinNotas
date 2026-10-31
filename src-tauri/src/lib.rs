@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::hash_map::DefaultHasher;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::fs;
 use std::hash::{Hash, Hasher};
 use std::io::{Read, Write};
@@ -10,8 +10,9 @@ use std::path::{Component, Path, PathBuf};
 use std::process;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
-    Arc, Mutex,
+    Arc, Mutex, RwLock,
 };
+use unicode_normalization::UnicodeNormalization;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_android_fs::{init as init_android_fs, AndroidFs, AndroidFsExt};
@@ -755,6 +756,128 @@ fn default_blocks_loaded() -> bool {
     true
 }
 
+/// FASE 4-B: resultado de `search_content` (una coincidencia por nota, tal
+/// como producía el índice del front). `page` llega en su variante de
+/// metadatos (sin bloques: el front la rehidrata con `read_pages_cached`);
+/// `block` es el bloque ganador completo, para saltar al cursor y pintar el
+/// fragmento del omnibar sin otra ronda de IPC.
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ContentSearchHit {
+    /// Página ganadora (variante metadata: `blocksLoaded: false`).
+    pub page: PageData,
+    /// Bloque superior con la mejor aparición de la nota.
+    pub block: BlockNode,
+    /// Apariciones acumuladas de todos los tokens (tope 20 por token).
+    pub count: usize,
+    /// Índice de la primera coincidencia en el texto PLEGADO (unidades de
+    /// código UTF-16 para que mapee con las posiciones de `locateMatch`).
+    pub index: usize,
+    /// Longitud del primer token coincidente en el texto plegado.
+    pub match_length: usize,
+}
+
+/// Entrada plegada de un bloque con contenido visible del índice de búsqueda.
+struct FoldedBlockEntry {
+    id: String,
+    folded: String,
+}
+
+/// Entrada plegada de una nota (la unidad de mantenimiento del índice).
+struct FoldedNoteEntry {
+    blocks: Vec<FoldedBlockEntry>,
+}
+
+/// Candidato interno de `search_content` antes de servir bloque/página.
+struct ContentSearchCandidate {
+    /// Id del bloque ganador de la nota (el de más apariciones).
+    block_id: String,
+    count: usize,
+    index: usize,
+    match_length: usize,
+}
+
+/// Plegado de texto sin mayúsculas ni acentos: el mismo criterio del `fold`
+/// del front (lowercase + NFD + descartar marcas de acento). Los rangos
+/// cubren las zonas Unicode de marcas combinantes que aparecen tras la
+/// descomposición; equivale a `\p{Diacritic}` para los alfabetos latinos y
+/// los diacríticos comunes.
+fn fold_text(value: &str) -> String {
+    const COMBINING_RANGES: [(u32, u32); 5] = [
+        (0x0300, 0x036F), // Combining Diacritical Marks
+        (0x1AB0, 0x1AFF), // Combining Extended
+        (0x1DC0, 0x1DFF), // Combining Supplement
+        (0x20D0, 0x20F0), // Combining Marks for Symbols
+        (0xFE20, 0xFE2F), // Combining Half Marks
+    ];
+    value
+        .to_lowercase()
+        .nfd()
+        .filter(|character| {
+            let code = *character as u32;
+            !COMBINING_RANGES
+                .iter()
+                .any(|(start, end)| code >= *start && code <= *end)
+        })
+        .collect()
+}
+
+/// Texto visible de un bloque: descarta líneas de propiedad `clave:: valor`
+/// (misma regla que `visibleBlockText` en el front).
+fn visible_block_text(content: &str) -> String {
+    static PROPERTY_LINE: std::sync::OnceLock<Regex> = std::sync::OnceLock::new();
+    let pattern = PROPERTY_LINE.get_or_init(|| Regex::new(r"^[\w\-]+::\s*.*$").unwrap());
+    content
+        .split(['\r', '\n'])
+        .filter(|line| !pattern.is_match(line.trim()))
+        .collect::<Vec<&str>>()
+        .join("\n")
+}
+
+/// Tokeniza la consulta plegada (criterio `normalizeQuery` del front).
+fn normalize_search_query(query: &str) -> Vec<String> {
+    fold_text(query)
+        .split_whitespace()
+        .map(|token| token.to_string())
+        .collect()
+}
+
+/// Conteo de apariciones de `needle` en `haystack` con tope `cap` (criterio
+/// `countOccurrences` con `MAX_COUNT_PER_TOKEN = 20`).
+fn count_folded_occurrences(haystack: &str, needle: &str, cap: usize) -> usize {
+    let mut count = 0;
+    let mut offset = 0;
+    while count < cap {
+        let Some(found) = haystack[offset..].find(needle) else {
+            break;
+        };
+        count += 1;
+        offset += found + needle.len();
+    }
+    count
+}
+
+/// Índices plegados en unidades de código UTF-16: el front compara las pos
+/// con `locateMatch` sobre strings JS, así que el servidor convierte el
+/// desplazamiento en bytes del plegado Rust a code units.
+fn folded_bytes_to_utf16_index(folded: &str, byte_index: usize) -> usize {
+    folded[..byte_index].chars().map(char::len_utf16).sum()
+}
+
+/// Recorre el árbol de bloques y devuelve el nodo cuyo id coincide (para
+/// servir el "best block" de un hit sin otra pasada del front).
+fn find_block_by_id<'local>(nodes: &'local [BlockNode], id: &str) -> Option<&'local BlockNode> {
+    for node in nodes {
+        if node.id == id {
+            return Some(node);
+        }
+        if let Some(found) = find_block_by_id(&node.children, id) {
+            return Some(found);
+        }
+    }
+    None
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SkippedEntry {
@@ -878,6 +1001,24 @@ async fn read_pages_cached(
         return Err("read_pages_cached requiere bóveda local con caché activa.".to_string());
     };
     Ok(runtime.read_pages_cached(&paths))
+}
+
+/// FASE 4-B: búsqueda de contenido desde Rust. Mantén los criterios del
+/// índice del front (`search` de `content-search.ts`): bloques donde
+/// aparecen TODOS los tokens plegados, el mejor bloque por nota y el orden
+/// por apariciones descendente. El frente solo pinta y salta al cursor.
+#[tauri::command]
+async fn search_content(
+    query: String,
+    limit: Option<usize>,
+    state: tauri::State<'_, ActiveVault>,
+    cache_state: tauri::State<'_, VaultCacheState>,
+) -> Result<Vec<ContentSearchHit>, String> {
+    let _vault_path = active_root(&state)?;
+    let Some(runtime) = cache_state.current() else {
+        return Err("search_content requiere bóveda local con caché activa.".to_string());
+    };
+    Ok(runtime.search_content(&query, limit.unwrap_or(25)))
 }
 
 /// Carpeta interna del vault para datos administrados por la app. Las carpetas
@@ -1543,6 +1684,14 @@ struct VaultCacheRuntime {
     /// Serializa apéndices del diario y compacciones del archivo maestro
     /// (la persistencia O(delta) corre en hilos de `update_paths`).
     persist_lock: Mutex<()>,
+    /// FASE 4-B: índice de contenido plegado (nota => bloques visibles con
+    /// `id` + texto plegado) para `search_content`. Lento en construir (una
+    /// vez, al primer uso) pero O(notas tocadas) en mantenimiento.
+    content_index: RwLock<Option<HashMap<String, FoldedNoteEntry>>>,
+    /// Notas cuyo contenido cambió desde la última construcción del índice
+    /// (`update_paths`). En cada búsqueda se drena: upsert la entrada, o
+    /// la borra si la nota ya no vive.
+    content_dirty: Mutex<BTreeSet<String>>,
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     pending: Mutex<BTreeSet<PathBuf>>,
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -1607,6 +1756,14 @@ impl VaultCacheRuntime {
 
         if changed.is_empty() && removed.is_empty() {
             return;
+        }
+
+        // FASE 4-B: el índice de contenido quedó inefectivo para estas notas;
+        // la próxima `search_content` sube las entradas nuevas o baja las
+        // muertas antes de puntuar.
+        if let Ok(mut dirty) = self.content_dirty.lock() {
+            dirty.extend(changed.iter().cloned());
+            dirty.extend(removed.iter().cloned());
         }
 
         // El payload para el frontend se construye desde las entradas del
@@ -1747,6 +1904,169 @@ impl VaultCacheRuntime {
         metadata_cache::relative_note_path(&self.root, &absolute).map(|_| absolute)
     }
 
+    /// FASE 4-B: entradas plegadas de una nota (criterio `buildPageEntries`
+    /// del front: bloques con contenido visible, sin imágenes hoja).
+    fn fold_note_entries(note: &metadata_cache::CachedNote) -> FoldedNoteEntry {
+        let mut blocks = Vec::new();
+        fn walk(nodes: &[BlockNode], out: &mut Vec<FoldedBlockEntry>) {
+            for node in nodes {
+                if node.block_type != "image" && !node.content.trim().is_empty() {
+                    let visible = visible_block_text(&node.content);
+                    if !visible.trim().is_empty() {
+                        out.push(FoldedBlockEntry {
+                            id: node.id.clone(),
+                            folded: fold_text(&visible),
+                        });
+                    }
+                }
+                walk(&node.children, out);
+            }
+        }
+        walk(&note.blocks, &mut blocks);
+        FoldedNoteEntry { blocks }
+    }
+
+    /// Sincroniza el índice de contenido con el estado del cache: la primera
+    /// llamada construye TODO el índice (una vez por vault activo); luego
+    /// solo sube/baja las notas marcadas en `content_dirty`.
+    fn refresh_content_index(&self) -> bool {
+        // (a) Drenar el set de inefectivos antes de tocar el cache, para no
+        // romper el orden de bloqueo cache => content_dirty de `update_paths`.
+        let dirty = match self.content_dirty.lock() {
+            // `std::mem::take` en el guard: BTreeSet::drain exige rango y
+            // esta es la forma clara de drenar el set completo.
+            Ok(mut pending) => std::mem::take(&mut *pending),
+            Err(_) => BTreeSet::new(),
+        };
+        let mut index_write = match self.content_index.write() {
+            Ok(index) => index,
+            Err(_) => return false,
+        };
+        let Ok(cache) = self.cache.lock() else {
+            return false;
+        };
+        match index_write.as_mut() {
+            None => {
+                let mut built: HashMap<String, FoldedNoteEntry> = HashMap::new();
+                for (relative, note) in &cache.entries {
+                    built.insert(relative.clone(), Self::fold_note_entries(note));
+                }
+                *index_write = Some(built);
+            }
+            Some(map) => {
+                for relative in dirty {
+                    match cache.entries.get(&relative) {
+                        Some(note) => {
+                            map.insert(relative, Self::fold_note_entries(note));
+                        }
+                        None => {
+                            map.remove(&relative);
+                        }
+                    }
+                }
+            }
+        }
+        true
+    }
+
+    /// FASE 4-B: búsqueda de contenido desde Rust (criterio `search` del
+    /// índice del front: bloques donde aparecen TODOS los tokens, el mejor
+    /// bloque por nota, orden por apariciones descendente).
+    fn search_content(self: &Arc<Self>, query: &str, limit: usize) -> Vec<ContentSearchHit> {
+        let tokens = normalize_search_query(query);
+        if tokens.is_empty() || limit == 0 {
+            return Vec::new();
+        }
+        if !self.refresh_content_index() {
+            return Vec::new();
+        }
+        let index_read = match self.content_index.read() {
+            Ok(index) => index,
+            Err(_) => return Vec::new(),
+        };
+        let Some(map) = index_read.as_ref() else {
+            return Vec::new();
+        };
+
+        // Puntuación: mejor bloque por nota, plegado en memoria (sin tocar
+        // el cache con lock durante el scan).
+        let mut candidates: Vec<(String, ContentSearchCandidate)> = Vec::new();
+        for (relative, entry) in map {
+            let mut best: Option<ContentSearchCandidate> = None;
+            for block in &entry.blocks {
+                let mut total = 0;
+                // (desplazamiento en bytes del plegado, longitud del token en unidades UTF-16)
+                let mut first: Option<(usize, usize)> = None;
+                let mut all_present = true;
+                for token in &tokens {
+                    let count = count_folded_occurrences(&block.folded, token, 20);
+                    if count == 0 {
+                        all_present = false;
+                        break;
+                    }
+                    total += count;
+                    if let Some(found) = block.folded.find(token.as_str()) {
+                        let earlier = first.is_none_or(|(best_found, _)| found < best_found);
+                        if earlier {
+                            first = Some((found, token.chars().map(char::len_utf16).sum()));
+                        }
+                    }
+                }
+                if !all_present {
+                    continue;
+                }
+                let Some((found_bytes, match_length)) = first else {
+                    continue;
+                };
+                let candidate = ContentSearchCandidate {
+                    block_id: block.id.clone(),
+                    count: total,
+                    index: folded_bytes_to_utf16_index(&block.folded, found_bytes),
+                    match_length,
+                };
+                if best.as_ref().is_none_or(|current| current.count < candidate.count) {
+                    best = Some(candidate);
+                }
+            }
+            if let Some(candidate) = best {
+                candidates.push((relative.clone(), candidate));
+            }
+        }
+        drop(index_read);
+
+        // Orden estable: más apariciones primero, desempate alfabético.
+        candidates.sort_by(|left, right| {
+            right
+                .1
+                .count
+                .cmp(&left.1.count)
+                .then_with(|| left.0.cmp(&right.0))
+        });
+        candidates.truncate(limit);
+
+        // Servido: page (metadata) + bloque ganador desde el cache.
+        let mut hits = Vec::with_capacity(candidates.len());
+        let Ok(cache) = self.cache.lock() else {
+            return hits;
+        };
+        for (relative, candidate) in candidates {
+            let Some(note) = cache.entries.get(&relative) else {
+                continue;
+            };
+            let Some(block) = find_block_by_id(&note.blocks, &candidate.block_id) else {
+                continue;
+            };
+            hits.push(ContentSearchHit {
+                page: note.to_page_data_metadata(&self.root),
+                block: block.clone(),
+                count: candidate.count,
+                index: candidate.index,
+                match_length: candidate.match_length,
+            });
+        }
+        hits
+    }
+
     fn find_backlinks(&self, page_title: &str) -> Vec<Backlink> {
         match self.cache.lock() {
             Ok(cache) => metadata_cache::find_cached_backlinks(&cache, &self.root, page_title),
@@ -1857,6 +2177,8 @@ impl VaultCacheState {
             revision: AtomicU64::new(0),
             pending_delta_records: AtomicU64::new(0),
             persist_lock: Mutex::new(()),
+            content_index: RwLock::new(None),
+            content_dirty: Mutex::new(BTreeSet::new()),
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             pending: Mutex::new(BTreeSet::new()),
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -5073,6 +5395,7 @@ pub fn run() {
             load_vault,
             vault_sync_state,
             read_pages_cached,
+            search_content,
             pick_vault_root,
             list_system_fonts,
             resolve_image_path,

@@ -1,8 +1,11 @@
 # CHECKLIST · Rendimiento a escala (14k notas × 200 bullets) + estado de trabajo pendiente
 
-Última actualización: 2026-10-31 (reanudación tras corte).
-Estado base tras la reanudación: temas/contraste/zoom + FASE 1 de perf
-(**COMMITTED** en `d017826`). FASE 2 en adelante: sin empezar.
+Última actualización: 2026-10-31 (reanudación tras 2.º corte, revisión de
+integridad de la FASE 4-B).
+Estado base tras la reanudación: temas/contraste/zoom + FASES 1-3 de perf
+(**COMMITTED**) y FASE 4-A (**COMMITTED** en `422238c`).
+FASE 4-B: lado Rust completo en el árbol (sin commit al retomar); lado front
+(sin empezar).
 Si se interrumpe el trabajo a mitad de una fase, esta guía dice qué está completo,
 qué queda a medias (y qué síntomas de código roto esperar) y cómo continuar.
 
@@ -26,6 +29,33 @@ qué queda a medias (y qué síntomas de código roto esperar) y cómo continuar
 > resuelta con el índice incremental del front (decisión documentada en la
 > FASE 3; "Rust-first" se reevalúa en la FASE 4, cuando los bloques salgan de
 > memoria). Validación: `npx tsc --noEmit` 0 y `npm test` 33/319.
+>
+> **Bitácora FASE 4-A (2026-10-31, COMMITTED `422238c`):** primitivas de
+> bloques bajo demanda. Rust: `PageData.blocks_loaded`/`block_count`,
+> `to_page_data_metadata`, `load_vault { metadata_only }` (solo bóvedas
+> locales) y comando `read_pages_cached` (rehidratación por lotes desde
+> caché). Front: `ensurePageLoaded` + `loadPagesCached` (LRU ~120 con
+> pin/unpin) en `vault.ts`; boot con flag `sinnotas-metadata-boot` **OFF por
+> defecto hasta 4-E**. Validación completa (`cargo test` 55, clippy 0,
+> `tsc` 0, `npm test` 33/319). Cableado de consumidores en 4-B/4-C/4-D.
+>
+> **Bitácora FASE 4-B (2026-10-31, tras 2.º corte):** el lado RUST quedó
+> completo en el árbol cuando se fue la luz. Contenido (todo en `lib.rs`):
+> comando `search_content { query, limit }` (invocable solo con caché
+> activa), índice de contenido plegado con mantenimiento incremental
+> (`content_index` + `content_dirty` drenado en cada búsqueda, upsert/lower
+> desde `update_paths`), plegado lowercase+NFD sin marcas (criterio `fold`
+> del front), posiciones convertidas a unidades UTF-16 para `locateMatch`,
+> propiedad `clave:: valor` filtrada como `visibleBlockText`, hit = variante
+> `to_page_data_metadata` + bloque ganador completo (salta al cursor sin otra
+> ronda IPC), orden por apariciones descendente con desempate alfabético.
+> Revisión de integridad tras el corte: `cargo check` ✓, `cargo test` 55 ✓
+> (0 nuevos; sin test unitario aún), clippy 0 avisos (se corrigió
+> `map_or→is_none_or`), `npx tsc --noEmit` 0 y `npm test` 33/319 ✓ (el front
+> no se tocó). PENDIENTE en 4-B: tests unitarios Rust (`fold_text`,
+> `visible_block_text`, `count_folded_occurrences`, búsqueda e índice
+> incremental) y MIGRACIÓN DEL FRONT (`content-search.ts`/omnibar →
+> `search_content` con fallback JS solo-web conservado).
 
 ---
 
@@ -160,7 +190,23 @@ Decisiones de diseño (desviaciones razonadas del texto original del plan):
 - [x] 3.2 Búsqueda de contenido: **se queda el índice incremental del front** (implantado en FASE 1: `ContentSearchIndex` con epochs por nota; omnibar usa `vault.getVersionView()`). Motivo: con los bloques aún en memoria (FASE 4 pendiente), mantener un índice plegado DUPLICADO en Rust solo añade memoria/formateo sin ganar nada; el camino "Rust-first" se vuelve obligatorio y natural en FASE 4, cuando los bloques salgan de la memoria del front (`blocks: null`). Queda escrita la decisión para esa fase.
 - [x] 3.3 `updateWikilinkAutocomplete`: índice pre-ordenado y pre-minúsculas de títulos (`ensureWikilinkTitleIndex`), regenerado SOLO en cambios estructurales (`bumpMutationVersion`: crear/borrar/renombrar/volcado completo), no en cada tecla; el per-key queda un bucle O(títulos) con `includes()` sin sort ni allocs (corta al conseguir 8 + detecta match exacto).
 
-### FASE 4 — Arranque con metadatos + bloques bajo demanda — 🔴 NO EMPEZADA ☐ (la grande)
+### FASE 4 — Arranque con metadatos + bloques bajo demanda — 🟡 EN CURSO
+
+**Sub-4-A** (primitivas bajo demanda) — ✅ COMMITTED `422238c` (ver bitácora).
+
+**Sub-4-B** (búsqueda de contenido Rust-first) — 🟡 mitad: Rust completo en el
+árbol (ver bitácora), front pendiente.
+
+- [x] 4.B-Rust `search_content`: comando + índice plegado incremental
+  (`content_index`/`content_dirty`), hit con página metadata + bloque
+  ganador, criterios idénticos al `search` del front. *(Falta test
+  unitario Rust.)*
+- [ ] 4.B-Tests unitarios Rust del plegado/búsqueda/índice.
+- [ ] 4.B-Front: el omnibar consume `invoke("search_content")`; el índice JS
+  (`ContentSearchIndex`) queda SOLO como fallback modo web (mismo patrón que
+  los retroenlaces de FASE 3). Cuidar: conteo/posiciones plegadas ya llegan
+  en unidades UTF-16, el hit trae `blocksLoaded: false` (rehidratar con
+  `read_pages_cached` al saltar al bloque).
 
 - [ ] 4.1 Cambiar el payload del arranque: nuevo comando (o flag `metadata_only` en `load_vault`) que devuelva títulos/fechas/frontmatter/resumen flashcards, SIN árboles de bloques.
 - [ ] 4.2 `vault.replaceVault` construye páginas con `blocks: null` (indicador "no cargada"); todas las APIs de lectura pasan por `ensurePageLoaded(path) → invoke("read_page")` con cache LRU de ~50-100 notas cargadas (liberar las menos recientes).
