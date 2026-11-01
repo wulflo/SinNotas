@@ -389,6 +389,31 @@ local; SAF queda full). `updateBlockContent` rehidrata antes de tocar el
 - [ ] 5.3 Quitar el DFS por tecla del input handler (desktop.ts:5616-5619): resolver la ubicación en `keydown`/`focus` y cachearla mientras el bloque no se mueve.
 - [ ] 5.4 Code-split de `desktop.ts` (558 KB / 14.468 líneas, un solo chunk en vite.config.ts:52-57) por vistas (flashcards/all-pages/graph).
 
+### FASE 6 — Arranque perezoso por vista (Android-first) — 🔴 PROPUESTA 2026-10-31 (motivada por uso real) ☐
+
+**Observación del usuario:** en Android entrada a modo repaso primero ⇒ arranque
+mucho más rápido que editor-primero (el backend porteado no era el héroe: el
+modo repaso monta menos árboles). Mecanismos concretos identificados en el front:
+
+- [ ] 6.1 **Recordar la última vista y arrancar en ella** (desktop.ts siempre
+  hace `switchView("editor")` tras `load_vault`): si la última vista era
+  repaso/kanban/grafo, montar SOLO esa vista. El editor se construye cuando se
+  entra, no en el boot.
+- [ ] 6.2 **Saltar `normalizeBlockTypes` del vault completo en Tauri**
+  (vault.ts:621 se ejecuta por CADA página del payload en cada cambio de
+  bóveda): el parse de Rust ya produce `block_type` normalizado (payload
+  metadata Y SAF salen de `parse_markdown_with_frontmatter`). Dejar la
+  normalización solo para datos legacy (web/localStorage, restore de
+  snapshots). O(vault) en el hilo principal → 0 en arranques Tauri.
+- [ ] 6.3 **Montaje perezoso del editor**: la nota inicial (page[0]) bajo
+  metadata boot ya se rehidrata vía `read_pages_cached`; el build del árbol en
+  el editor debe diferirse al primer `switchView("editor")` (el historial/
+  documentHistory se seedea en ese momento, no antes).
+- [ ] 6.4 Criterio de éxito: Android con bóveda grande, arranque a repaso
+  sin tocar `flag` (la 4-E aplica igual) — comparar tiempos perceptibles
+  editor-primero vs. repaso-primero antes/después.
+
+
 ---
 
 ## 3. Protocolo de reanudación tras corte (como pides: "saber de dónde continuar")
