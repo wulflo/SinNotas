@@ -46,7 +46,9 @@ interface LoadTask {
   preserve?: { cardId: string; revealed: boolean };
   progressListeners: Set<(progress: FlashcardLoadProgress) => void>;
   doneListeners: Set<(cards: readonly Flashcard[]) => void>;
-  timer: number | null;
+  /** Id del `setTimeout` del turno actual (número en navegador; el tipo
+   * exacto depende del global del entorno de test, así que se deja inferir). */
+  timer: ReturnType<typeof setTimeout> | null;
   generation: number;
   chunkSize: number;
 }

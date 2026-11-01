@@ -618,7 +618,15 @@ export class VaultStore {
   }
 
   public replaceVault(pages: PageData[], rootPath: string, vaultName: string): void {
-    pages.forEach((page) => normalizeBlockTypes(page.blocks));
+    // FASE 6.2: el pase O(vault) en el hilo principal solo hace falta para
+    // datos legacy del modo web: en Tauri el payload SIEMPRE sale del parse
+    // de Rust (parse_markdown_with_frontmatter), que entrega block_type
+    // canónicos ("text"/"image" + image_alt) — con SAF además los árboles
+    // viajan completos, así que renormalizar aquí pagaba el vault entero en
+    // cada arranque y cada sync.
+    if (!isTauri()) {
+      pages.forEach((page) => normalizeBlockTypes(page.blocks));
+    }
     // Las rutas de las notas deben ser relativas al vault. En algunos vaults
     // (especialmente SAF en Android) el frontend pudo haber guardado rutas
     // absolutas o prefijadas con la raíz; las normalizamos aquí para que el

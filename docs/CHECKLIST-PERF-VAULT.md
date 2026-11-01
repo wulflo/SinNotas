@@ -389,29 +389,34 @@ local; SAF queda full). `updateBlockContent` rehidrata antes de tocar el
 - [ ] 5.3 Quitar el DFS por tecla del input handler (desktop.ts:5616-5619): resolver la ubicación en `keydown`/`focus` y cachearla mientras el bloque no se mueve.
 - [ ] 5.4 Code-split de `desktop.ts` (558 KB / 14.468 líneas, un solo chunk en vite.config.ts:52-57) por vistas (flashcards/all-pages/graph).
 
-### FASE 6 — Arranque perezoso por vista (Android-first) — 🔴 PROPUESTA 2026-10-31 (motivada por uso real) ☐
+### FASE 6 — Arranque perezoso por vista (Android-first) — ✅ IMPLEMENTADA 2026-10-31 (6.1/6.3 ya existían) ✔
 
 **Observación del usuario:** en Android entrada a modo repaso primero ⇒ arranque
 mucho más rápido que editor-primero (el backend porteado no era el héroe: el
-modo repaso monta menos árboles). Mecanismos concretos identificados en el front:
+modo repaso monta menos árboles). Al auditar el boot: parte del ticket YA
+EXISTÍA — lo nuevo era 6.2.
 
-- [ ] 6.1 **Recordar la última vista y arrancar en ella** (desktop.ts siempre
-  hace `switchView("editor")` tras `load_vault`): si la última vista era
-  repaso/kanban/grafo, montar SOLO esa vista. El editor se construye cuando se
-  entra, no en el boot.
-- [ ] 6.2 **Saltar `normalizeBlockTypes` del vault completo en Tauri**
-  (vault.ts:621 se ejecuta por CADA página del payload en cada cambio de
-  bóveda): el parse de Rust ya produce `block_type` normalizado (payload
-  metadata Y SAF salen de `parse_markdown_with_frontmatter`). Dejar la
-  normalización solo para datos legacy (web/localStorage, restore de
-  snapshots). O(vault) en el hilo principal → 0 en arranques Tauri.
-- [ ] 6.3 **Montaje perezoso del editor**: la nota inicial (page[0]) bajo
-  metadata boot ya se rehidrata vía `read_pages_cached`; el build del árbol en
-  el editor debe diferirse al primer `switchView("editor")` (el historial/
-  documentHistory se seedea en ese momento, no antes).
-- [ ] 6.4 Criterio de éxito: Android con bóveda grande, arranque a repaso
-  sin tocar `flag` (la 4-E aplica igual) — comparar tiempos perceptibles
-  editor-primero vs. repaso-primero antes/después.
+- [x] 6.1 **Recordar la última vista y arrancar en ella** — ✔ YA EXISTÍA:
+  `readLastNavigation` restaura vista+nota (`LAST_VIEW_STORAGE_KEY`) y el boot
+  solo llama `renderEditor()` si la última vista era editor; si era repaso/
+  kanban/grafo hace `switchView(esa)`. La observación del usuario era este
+  comportamiento ya vivo (el editor no se monta si repasaste primero).
+- [x] 6.2 **Saltar `normalizeBlockTypes` del vault completo en Tauri** — ✔
+  IMPLEMENTADA (`vault.ts`): el pase O(vault) en el hilo principal solo corre
+  en modo web (datos legacy). En Tauri el payload SIEMPRE sale del parse de
+  Rust (`parse_markdown_with_frontmatter`, lib.rs:1415), que detecta imágenes
+  (`markdown_image_parts` → `block_type: "image"` + `image_alt`) y emite
+  "text" en el resto: renormalizar era un no-op que pagaba el vault entero en
+  cada boot/sync (con SAF los árboles viajan completos Android). Test:
+  `vault-replace.test.ts` (web normaliza, Tauri respeta el payload).
+- [x] 6.3 **Montaje perezoso del editor** — ✔ YA EXISTÍA por la misma vía del
+  restore (renderEditor solo si lastNav.view === "editor"); las vistas
+  ocultas se precalientan en idle (schedulePrewarmHiddenViews sin editor).
+- [ ] 6.4 Criterio de éxito: PENDIENTE — Android con bóveda grande,
+  comparar tiempos perceptibles editor-primero vs. repaso-primero tras la
+  6.2 (esperado: la brecha ya casi desaparece porque el pase O(vault) que
+  pagaba TODO boot con árboles completos desapareció en ambos caminos).
+
 
 
 ---
