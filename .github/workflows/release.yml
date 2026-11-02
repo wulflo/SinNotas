@@ -430,6 +430,20 @@ jobs:
       - name: Install dependencies (ignore scripts for security)
         run: npm ci --ignore-scripts
 
+      # PDFium se descarga antes del build y se empaqueta como recurso. El job
+      # universal de macOS necesita las dos arquitecturas.
+      - name: Fetch PDFium
+        shell: bash
+        run: |
+          if [[ "${{ matrix.name }}" == "macos-universal" ]]; then
+            PDFIUM_TARGET=macos-x86_64 bash scripts/fetch-pdfium.sh
+            PDFIUM_TARGET=macos-aarch64 bash scripts/fetch-pdfium.sh
+          elif [[ "${{ matrix.name }}" == "windows" ]]; then
+            PDFIUM_TARGET=windows-x86_64 bash scripts/fetch-pdfium.sh
+          else
+            bash scripts/fetch-pdfium.sh
+          fi
+
       # Solo se expone un booleano derivado: la clave real se inyecta únicamente
       # en los pasos que compilan y firman los artefactos del updater.
       - name: Verify updater signing key is present

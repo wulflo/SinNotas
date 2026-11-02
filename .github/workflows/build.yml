@@ -75,6 +75,19 @@ jobs:
       - name: Install dependencies (ignore scripts for security)
         run: npm ci --ignore-scripts
 
+      # PDFium no se versiona. Se descarga la variante exacta de cada job antes
+      # de empaquetar para que el lector de documentos funcione también en los
+      # instaladores generados por CI.
+      - name: Fetch PDFium
+        shell: bash
+        run: |
+          case "${{ matrix.name }}" in
+            macOS-AppleSilicon) PDFIUM_TARGET=macos-aarch64 bash scripts/fetch-pdfium.sh ;;
+            macOS-Intel) PDFIUM_TARGET=macos-x86_64 bash scripts/fetch-pdfium.sh ;;
+            Windows) PDFIUM_TARGET=windows-x86_64 bash scripts/fetch-pdfium.sh ;;
+            *) bash scripts/fetch-pdfium.sh ;;
+          esac
+
       # Regenerar los iconos del ejecutable/instalador desde el logo actual
       # antes de empaquetar, para que Windows/macOS/Linux usen el icono nuevo.
       - name: Generate app icons

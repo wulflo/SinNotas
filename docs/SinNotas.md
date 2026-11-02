@@ -1,6 +1,6 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.2.9 · **Fecha:** 2026-10-26
+**Versión:** 0.4.2 · **Fecha:** 2026-11-01
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
@@ -27,8 +27,9 @@ Rutas principales:
 | `.github/workflows/` | CI, APK firmada y publicación de releases. |
 
 Dentro de la bóveda, la app solo escribe datos administrados en
-`.sinnotas/`: los snapshots viven en `.sinnotas/chronos/` y el diario de
-repasos en `.sinnotas/progress/reviews.json`. Las carpetas antiguas `chronos/`
+`.sinnotas/`: los snapshots viven en `.sinnotas/chronos/`, el diario de
+repasos en `.sinnotas/progress/reviews.json` y el registro de documentos
+enlazados en `.sinnotas/documents/links.json`. Las carpetas antiguas `chronos/`
 y `progress/` se migran automáticamente al cargar la bóveda. El diario de
 repasos conserva como máximo 4.000 entradas, 5 MB y 365 días; los repasos más
 antiguos se descartan para que el archivo no crezca indefinidamente.
@@ -37,6 +38,11 @@ antiguos se descartan para que el archivo no crezca indefinidamente.
 
 - Editor outliner con bullets jerárquicos, arrastre, selección múltiple, atajos,
   deshacer/rehacer y snapshots.
+- Búsqueda dentro de la nota abierta con `Ctrl/Cmd+F`: resalta coincidencias,
+  muestra el contador y permite saltar con `Enter`, `Shift+Enter` o las flechas.
+- En notas más altas que el área visible aparecen botones flotantes para volver
+  al inicio o saltar al final; se ocultan en notas cortas y respetan el scroll
+  real del editor normal o dividido.
 - Los bullets de una misma jerarquía conservan la alineación aunque tengan
   propiedades; el indicador de propiedades usa el espacio del handle sin
   desplazar el bullet.
@@ -49,6 +55,45 @@ antiguos se descartan para que el archivo no crezca indefinidamente.
 - Interfaz en español, inglés y chino, temas claro/oscuro y varios acentos.
 - Sincronización mediante el servicio de archivos que el usuario prefiera; la
   app no impone nube propia.
+
+## Documentos y lector PDF nativo (Fases 1–4)
+
+- Motor **PDFium** mediante `pdfium-render` 0.9.5, cargado dinámicamente y de
+  forma perezosa. No se usa PDF.js ni se descarga nada en tiempo de ejecución.
+- La sección **Documentos** de la barra lateral lista la biblioteca, abre un
+  documento y renderiza sus páginas como PNG. El binario no viaja por JSON:
+  Tauri devuelve una respuesta binaria.
+- **La importación no copia el PDF**: enlaza el archivo desde su ubicación
+  original y guarda el registro en `.sinnotas/documents/links.json`. El archivo
+  original nunca se modifica ni se duplica. Los PDFs que ya estén en
+  `assets/pdfs/` se siguen mostrando por compatibilidad.
+- Los documentos enlazados se pueden quitar de la biblioteca sin borrar el
+  archivo original. Si el original desaparece, la entrada queda marcada como
+  «Archivo original no encontrado».
+- Límite de importación: 250 MB. Se valida la extensión, la cabecera `%PDF-` y,
+  para los PDFs del vault, que la ruta esté dentro de la raíz.
+- **Gestión de la biblioteca:** los enlaces se pueden quitar sin borrar el
+  original y los PDFs copiados en `assets/pdfs/` se pueden eliminar del vault
+  (solo esa carpeta). Cada enlace admite una caducidad opcional (1, 7, 30 o 90
+  días; «siempre» por defecto); al caducar desaparece de la biblioteca sin tocar
+  el archivo original.
+- **Capa de texto seleccionable:** PDFium extrae los segmentos de texto de la
+  página y el lector pinta una capa HTML transparente sobre el PNG. La selección
+  se puede copiar o insertar como bullet en la nota activa con la propiedad
+  `pdf-source::`.
+- **Capturas:** se puede arrastrar un rectángulo sobre la página para guardarlo
+  como PNG en `assets/pdf-captures/` e insertarlo en la nota, opcionalmente
+  abriendo el editor de oclusiones.
+- Comandos Rust: `pdf_list`, `pdf_open`, `pdf_render_page`, `pdf_import`,
+  `pdf_unlink`, `pdf_page_text`, `pdf_set_expiry`, `pdf_delete` y
+  `pdf_save_capture`.
+- La librería nativa vive en `src-tauri/resources/pdfium/<os>-<arch>/` y se
+  obtiene con `scripts/fetch-pdfium.sh`. Los binarios no se versionan.
+- **Pendiente de fases posteriores:** búsqueda, TOC, enlaces, anotaciones,
+  miniaturas y pruebas con PDFs de varias columnas o texto rotado.
+
+El plan detallado, las reglas de reanudación tras una interrupción y el estado
+exacto por fase viven en [`docs/CHECKLIST-PDF.md`](CHECKLIST-PDF.md).
 
 ## FSRS y repaso
 
@@ -378,7 +423,7 @@ sobre el commit correcto y se empuja de nuevo.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Última release publicada: `0.2.8` (`versionCode 2008`)
+- Última release publicada: `0.4.2` (`versionCode 4002`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):
@@ -410,9 +455,12 @@ sobre el commit correcto y se empuja de nuevo.
 ## Verificación actual
 
 - `npx tsc --noEmit`: correcto.
-- `npm test`: **271 pruebas en 29 archivos**; incluye los pesos oficiales de
+- `npm test`: **331 pruebas en 35 archivos**; incluye los pesos oficiales de
   FSRS-4.5, las regresiones de oclusión y las pruebas de mazos jerárquicos.
 - `cargo check --manifest-path src-tauri/Cargo.toml --lib`: correcto.
+- Lector PDF Fases 1–4: 12 pruebas Rust (`cargo test ... pdf`), incluidas la
+  carga de PDFium, el render PNG, la extracción de texto, las capturas y la
+  caducidad/borrado de documentos.
 - CI de `master`: lint/test, APK debug y APK release firmada.
 - Safe area del editor completo: estilos computados en navegador con inset
   superior 24 px e inferior 16 px; `.headbar` mide 72 px, el cajón lateral y el
@@ -453,5 +501,10 @@ sobre el commit correcto y se empuja de nuevo.
 
 ## Política de documentación
 
-Toda la documentación técnica y de estado vive en este único archivo:
-`docs/SinNotas.md`. El README de la raíz es el punto de entrada y enlaza aquí.
+La documentación técnica y de estado vive en este archivo: `docs/SinNotas.md`.
+El README de la raíz es el punto de entrada y enlaza aquí.
+
+Las fases largas que pueden interrumpirse mantienen además un checklist
+operativo en `docs/CHECKLIST-*.md`, con el estado exacto, los archivos tocados y
+las reglas para reanudar sin borrar código parcial. Este documento enlaza cada
+checklist; el lector PDF usa `docs/CHECKLIST-PDF.md`.

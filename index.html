@@ -210,6 +210,15 @@
             </svg>
             <span>Todas las páginas</span>
           </a>
+          <a class="nav-item" id="nav-pdf">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <path d="M8 13h2.5a1.5 1.5 0 0 1 0 3H8v-3z"></path>
+              <path d="M8 16v3"></path>
+            </svg>
+            <span>Documentos</span>
+          </a>
         </nav>
 
         <div class="sidebar-section-title">Páginas recientes</div>
@@ -418,6 +427,32 @@
                 </div>
 
                 <div class="settings-subpanel active" data-flashcard-settings-content="general">
+                <div class="settings-section-title">Mazos incluidos en el repaso</div>
+                <p class="settings-help">Cada nota actúa como un mazo que contiene sus flashcards. Usa <code>→</code> en el título para crear mazos y submazos, por ejemplo <code>Salud mental → Ansiedad → Tema 1</code>. También se acepta <code>::</code> al escribir: se convertirá en <code>→</code> porque los dos puntos no son válidos en nombres de archivo en Windows. Marca un mazo para incluir todas sus notas hijas y pulsa "Guardar selección".</p>
+                <div class="sync-box" id="flashcard-pages-container">
+                  <div class="flashcard-pages-controls">
+                    <input type="text" id="flashcard-pages-search" placeholder="Buscar mazo o nota..." aria-label="Filtrar mazos y notas por título" />
+                    <select id="flashcard-pages-sort" aria-label="Orden de la lista de mazos">
+                      <option value="title-asc">Nombre A-Z</option>
+                      <option value="title-desc">Nombre Z-A</option>
+                      <option value="created-desc">Creación (más reciente)</option>
+                      <option value="created-asc">Creación (más antigua)</option>
+                    </select>
+                    <button type="button" class="font-option-btn" id="btn-flashcard-pages-select-all">Marcar todo</button>
+                    <button type="button" class="font-option-btn" id="btn-flashcard-pages-select-none">Ninguna</button>
+                    <button type="button" class="font-option-btn flashcard-pages-save" id="btn-flashcard-pages-save" disabled>Guardar selección</button>
+                    <span class="flashcard-pages-status" id="flashcard-pages-status" role="status" aria-live="polite"></span>
+                  </div>
+                  <div class="flashcard-pages-list" id="flashcard-pages-list" role="tree" aria-multiselectable="true" aria-label="Mazos y notas con flashcards">
+                    <!-- Se renderiza un árbol: mazos raíz, submazos y notas -->
+                  </div>
+                  <div class="flashcard-pages-pagination" id="flashcard-pages-pagination" hidden>
+                    <button class="btn-pagination" id="flashcard-pages-prev" type="button" disabled>← Anterior</button>
+                    <span class="pagination-info" id="flashcard-pages-page-info">Página 1 de 1</span>
+                    <button class="btn-pagination" id="flashcard-pages-next" type="button" disabled>Siguiente →</button>
+                  </div>
+                </div>
+
                 <div class="settings-section-title">Orden de repaso</div>
                 <p class="settings-help">Elige qué tarjetas quieres ver primero al iniciar una sesión de repaso.</p>
                 <div class="sync-box">
@@ -447,32 +482,6 @@
                     <button class="font-option-btn" id="btn-flashcard-recalc" type="button">Aplicar recálculo</button>
                   </div>
                   <div class="settings-help" id="flashcard-recalc-status" role="status" aria-live="polite"></div>
-                </div>
-
-                <div class="settings-section-title">Mazos incluidos en el repaso</div>
-                <p class="settings-help">Cada nota actúa como un mazo que contiene sus flashcards. Usa <code>→</code> en el título para crear mazos y submazos, por ejemplo <code>Salud mental → Ansiedad → Tema 1</code>. También se acepta <code>::</code> al escribir: se convertirá en <code>→</code> porque los dos puntos no son válidos en nombres de archivo en Windows. Marca un mazo para incluir todas sus notas hijas y pulsa "Guardar selección".</p>
-                <div class="sync-box" id="flashcard-pages-container">
-                  <div class="flashcard-pages-controls">
-                    <input type="text" id="flashcard-pages-search" placeholder="Buscar mazo o nota..." aria-label="Filtrar mazos y notas por título" />
-                    <select id="flashcard-pages-sort" aria-label="Orden de la lista de mazos">
-                      <option value="title-asc">Nombre A-Z</option>
-                      <option value="title-desc">Nombre Z-A</option>
-                      <option value="created-desc">Creación (más reciente)</option>
-                      <option value="created-asc">Creación (más antigua)</option>
-                    </select>
-                    <button type="button" class="font-option-btn" id="btn-flashcard-pages-select-all">Marcar todo</button>
-                    <button type="button" class="font-option-btn" id="btn-flashcard-pages-select-none">Ninguna</button>
-                    <button type="button" class="font-option-btn flashcard-pages-save" id="btn-flashcard-pages-save" disabled>Guardar selección</button>
-                    <span class="flashcard-pages-status" id="flashcard-pages-status" role="status" aria-live="polite"></span>
-                  </div>
-                  <div class="flashcard-pages-list" id="flashcard-pages-list" role="tree" aria-multiselectable="true" aria-label="Mazos y notas con flashcards">
-                    <!-- Se renderiza un árbol: mazos raíz, submazos y notas -->
-                  </div>
-                  <div class="flashcard-pages-pagination" id="flashcard-pages-pagination" hidden>
-                    <button class="btn-pagination" id="flashcard-pages-prev" type="button" disabled>← Anterior</button>
-                    <span class="pagination-info" id="flashcard-pages-page-info">Página 1 de 1</span>
-                    <button class="btn-pagination" id="flashcard-pages-next" type="button" disabled>Siguiente →</button>
-                  </div>
                 </div>
                 </div>
 
@@ -567,7 +576,7 @@
 
                 <div class="settings-subpanel" data-flashcard-settings-content="pomodoro" hidden>
                   <div class="settings-section-title">Pomodoro</div>
-                  <p class="settings-help">Configura los tiempos de enfoque y descanso, y cuántas sesiones completar antes de un descanso largo.</p>
+                  <p class="settings-help">Configura los tiempos de enfoque y descanso, cuántas sesiones completar antes de un descanso largo y si el contador avanza o retrocede.</p>
                   <div class="sync-box">
                     <div class="settings-row">
                       <label for="pomodoro-focus-duration">Tiempo de enfoque (minutos)</label>
@@ -584,6 +593,10 @@
                     <div class="settings-row">
                       <label for="pomodoro-sessions-before-long-break">Sesiones antes del descanso largo</label>
                       <select id="pomodoro-sessions-before-long-break"></select>
+                    </div>
+                    <div class="settings-row">
+                      <label for="pomodoro-count-up">Contador progresivo (cuenta el tiempo transcurrido)</label>
+                      <input type="checkbox" id="pomodoro-count-up" />
                     </div>
                     <div class="settings-row">
                       <label for="pomodoro-show-headbar">Mostrar en la barra superior</label>
@@ -671,6 +684,12 @@
             <div class="canvas-wrapper">
               <div class="page-title-row">
                 <h1 class="page-title" id="page-title-heading" contenteditable="true" spellcheck="false">Welcome to SinNotas</h1>
+                <button class="btn-icon page-title-action" id="btn-note-find-open" type="button" title="Buscar en esta nota" aria-label="Buscar en esta nota" aria-keyshortcuts="Control+F Meta+F">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <circle cx="11" cy="11" r="7"></circle>
+                    <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
+                  </svg>
+                </button>
                 <button class="btn-icon page-title-action" id="btn-shortcuts" type="button" title="Atajos de teclado" aria-label="Atajos de teclado">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="12" cy="12" r="10"></circle>
@@ -756,6 +775,19 @@
               <div class="reference-slots" id="reference-slots"></div>
             </aside>
           </div>
+
+          <nav class="note-scroll-nav" id="note-scroll-nav" aria-label="Navegación de la nota" hidden>
+            <button class="note-scroll-nav-button" id="btn-note-scroll-top" type="button" title="Ir al inicio de la nota" aria-label="Ir al inicio de la nota">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m18 15-6-6-6 6"></path>
+              </svg>
+            </button>
+            <button class="note-scroll-nav-button" id="btn-note-scroll-bottom" type="button" title="Ir al final de la nota" aria-label="Ir al final de la nota">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m6 9 6 6 6-6"></path>
+              </svg>
+            </button>
+          </nav>
         </section>
 
         <!-- VIEW 2: JOURNALS (DIARIOS) -->
@@ -1243,6 +1275,90 @@
             </div>
           </div>
         </section>
+
+        <!-- VIEW 7: DOCUMENTS (PDF READER) -->
+        <section class="view-panel" id="view-pdf">
+          <div class="pdf-view-shell">
+            <aside class="pdf-library" aria-label="Biblioteca de documentos">
+              <header class="pdf-library-header">
+                <div>
+                  <span class="pdf-kicker">Lectura</span>
+                  <h2>Documentos</h2>
+                </div>
+                <div class="pdf-library-actions">
+                  <label class="pdf-retention-label" for="pdf-retention" title="Cuánto tiempo se conserva el enlace al importar">Conservar</label>
+                  <select class="pdf-retention-select" id="pdf-retention" aria-label="Tiempo de conservación del enlace">
+                    <option value="">Siempre</option>
+                    <option value="1">1 día</option>
+                    <option value="7">7 días</option>
+                    <option value="30">30 días</option>
+                    <option value="90">90 días</option>
+                  </select>
+                  <button class="pdf-import-button" id="pdf-import" type="button">
+                    Enlazar PDF
+                  </button>
+                </div>
+              </header>
+              <div class="pdf-library-list" id="pdf-list"></div>
+              <p class="pdf-library-empty" id="pdf-library-empty">
+                Aún no hay documentos en el vault.
+              </p>
+            </aside>
+
+            <div class="pdf-reader">
+              <header class="pdf-reader-toolbar">
+                <div class="pdf-reader-heading">
+                  <span class="pdf-current-title" id="pdf-current-title">Ningún documento abierto</span>
+                  <span class="pdf-current-meta" id="pdf-current-meta"></span>
+                </div>
+                <div class="pdf-reader-actions">
+                  <button class="pdf-tool-button" id="pdf-prev" type="button" title="Página anterior" aria-label="Página anterior" disabled>←</button>
+                  <span class="pdf-page-indicator" id="pdf-page-indicator">— / —</span>
+                  <button class="pdf-tool-button" id="pdf-next" type="button" title="Página siguiente" aria-label="Página siguiente" disabled>→</button>
+                  <button class="pdf-fit-button" id="pdf-fit" type="button" disabled>Ajustar al ancho</button>
+                  <button class="pdf-fit-button" id="pdf-toggle-text" type="button" aria-pressed="false" title="Seleccionar texto de la página" aria-label="Seleccionar texto de la página" disabled>Texto</button>
+                  <button class="pdf-fit-button" id="pdf-capture" type="button" title="Capturar una región de la página" aria-label="Capturar una región de la página" disabled>Capturar</button>
+                  <select class="pdf-retention-select pdf-current-retention" id="pdf-current-retention" aria-label="Caducidad del enlace del documento actual" title="Caducidad del enlace" disabled>
+                    <option value="">Enlace siempre</option>
+                    <option value="1">1 día</option>
+                    <option value="7">7 días</option>
+                    <option value="30">30 días</option>
+                    <option value="90">90 días</option>
+                  </select>
+                  <button class="pdf-fit-button pdf-split-button" id="pdf-toggle-editor" type="button" aria-pressed="false" title="Mostrar el editor al lado" aria-label="Mostrar el editor al lado">Editor al lado</button>
+                </div>
+              </header>
+
+              <div class="pdf-stage" id="pdf-stage">
+                <div class="pdf-stage-empty" id="pdf-stage-empty">
+                  <strong>Abre un documento de la lista o enlaza un PDF.</strong>
+                  <span>El PDF se enlaza desde su ubicación original; no se copia dentro del vault.</span>
+                </div>
+                <div class="pdf-page" id="pdf-page" hidden>
+                  <img id="pdf-page-image" alt="" draggable="false" />
+                  <div class="pdf-text-layer" id="pdf-text-layer" hidden></div>
+                  <div class="pdf-capture-layer" id="pdf-capture-layer" hidden>
+                    <div class="pdf-capture-selection" id="pdf-capture-selection" hidden></div>
+                  </div>
+                </div>
+                <div class="pdf-floating-actions" id="pdf-selection-actions" hidden>
+                  <span class="pdf-floating-label">Texto seleccionado</span>
+                  <button type="button" class="pdf-action-primary" id="pdf-insert-selection">Insertar en la nota</button>
+                  <button type="button" id="pdf-copy-selection">Copiar</button>
+                  <button type="button" class="pdf-action-icon" id="pdf-clear-selection" title="Cerrar" aria-label="Cerrar">×</button>
+                </div>
+                <div class="pdf-floating-actions" id="pdf-capture-actions" hidden>
+                  <span class="pdf-floating-label" id="pdf-capture-label">Región capturada</span>
+                  <button type="button" id="pdf-insert-capture">Insertar imagen</button>
+                  <button type="button" class="pdf-action-primary" id="pdf-insert-occlusion">Crear oclusión</button>
+                  <button type="button" class="pdf-action-icon" id="pdf-cancel-capture" title="Cancelar" aria-label="Cancelar">×</button>
+                </div>
+              </div>
+
+              <div class="pdf-status" id="pdf-status" role="status" aria-live="polite"></div>
+            </div>
+          </div>
+        </section>
       </main>
     </div>
 
@@ -1352,6 +1468,7 @@
 
           <section class="shortcuts-group" aria-labelledby="shortcuts-editor-title">
             <h3 class="shortcuts-group-title" id="shortcuts-editor-title">Editor</h3>
+            <div class="shortcut-row"><span>Buscar dentro de la nota</span><kbd>Ctrl/Cmd+F</kbd></div>
             <div class="shortcut-row"><span>Crear un bullet nuevo</span><kbd>Enter</kbd></div>
             <div class="shortcut-row"><span>Salto de línea dentro del bullet</span><kbd>Shift+Enter</kbd></div>
             <div class="shortcut-row"><span>Sangrar bullet</span><kbd>Tab / Alt+→</kbd></div>

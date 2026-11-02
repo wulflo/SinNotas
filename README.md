@@ -25,6 +25,7 @@ The current frontend uses neither React nor Tailwind CSS.
 - **Flashcards:** basic, Cloze and image occlusion cards with FSRS-4.5 scheduling; includes focus mode, a Pomodoro timer, review statistics and a progress visualization that grows with your practice. New cards go through a learning phase (short fixed steps: 1 min, 10 min) before graduating to FSRS review, avoiding wide initial interval jumps that act as false positives; the learning state is persisted so a card does not jump back to Review after reloading. From the Flashcards settings, reviews can be filtered by hierarchical deck: use `→` in note titles (for example `Salud mental → Ansiedad → Tema 1`) to nest decks, select a parent to include all its child notes, and keep the draft selection while searching or paging.
 - **Image occlusion:** draw rectangles, ellipses and polygons, move, resize and rotate areas, add hints, and keep those transformations in the block's Markdown metadata.
 - **Images:** supports PNG, JPG/JPEG, WebP, SVG, GIF and BMP. Inserted images are saved to the vault's `assets/` folder.
+- **Documents / PDF:** the **Documents** section lists a native PDF library rendered with PDFium. Importing a PDF links the original file without copying it into the vault, supports optional link expiry, selectable text, region captures and image-occlusion cards. Linked documents can be removed without touching the original; PDFs stored in `assets/pdfs/` can also be deleted from the vault.
 - **Kanban tasks:** sort tasks as pending, in progress or completed; move them between columns and hide the completed ones.
 - **Concept map / Graph:** graph view with a custom force-directed physics model, navigation and visualization of relationships between pages. Interaction stays alive indefinitely —selection with alternating clicks, click on the background to clear, node dragging, panning (middle/right button), wheel zoom and double-click to reset— and custom node colors propagate to neighbors by influence. See [docs/SinNotas.md#grafo-y-mapa-conceptual](docs/SinNotas.md#grafo-y-mapa-conceptual).
 - **Version history (snapshots):** save and restore page snapshots; settings let you delete all snapshots at once. Snapshots live in `.sinnotas/chronos/` and legacy `chronos/` folders are migrated automatically.
@@ -51,6 +52,7 @@ The current frontend uses neither React nor Tailwind CSS.
 - **Ctrl/Cmd + Z:** undo. **Ctrl/Cmd + Y** (or **Ctrl/Cmd + Shift + Z**): redo.
 - **Ctrl/Cmd + B:** collapse / expand the sidebar.
 - **Ctrl/Cmd + K:** quick search and quick page creation (omnibar).
+- **Ctrl/Cmd + F:** search inside the current note; `Enter` / `Shift + Enter` or the arrows move between matches and `Escape` closes the search.
 - **Up / Down arrows:** move the caret between blocks when it is at the start/end of the current block.
 - **Botón ? (Ayuda):** abre el modal con todos los atajos de teclado desde el encabezado del editor.
 
@@ -153,15 +155,22 @@ latest published release data and known limitations.
 
 ## Tauri application
 
-From the project root:
+From the project root, download the PDFium library once for the current
+platform and then start the app:
 
 ```bash
+scripts/fetch-pdfium.sh
 npm run tauri dev
 ```
+
+PDFium is not committed to the repository. The release workflows download the
+matching library for Linux, Windows and both macOS architectures before
+packaging.
 
 ## Build the AppImage (Linux)
 
 ```bash
+scripts/fetch-pdfium.sh
 npm run tauri -- build --bundles appimage
 ```
 
@@ -187,11 +196,13 @@ Prerequisites:
 - [Rust](https://www.rust-lang.org/tools/install) with `rustup` (adds the MSVC target)
 - [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (Visual Studio Build Tools with "Desktop development with C++")
 - [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) (usually present on modern Windows 10/11)
+- [Git for Windows](https://gitforwindows.org/) (Git Bash, needed by `scripts/fetch-pdfium.sh`)
 
 From PowerShell or CMD in the project root:
 
 ```bash
 npm install
+bash scripts/fetch-pdfium.sh
 npm run tauri build
 ```
 
@@ -200,6 +211,7 @@ This generates the `.msi` and/or `.exe` (NSIS) installer under `src-tauri/target
 For Windows development:
 ```bash
 npm install
+bash scripts/fetch-pdfium.sh
 npm run tauri dev
 ```
 

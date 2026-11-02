@@ -158,7 +158,62 @@ export interface KanbanTask {
 
 export type TypographyType = "sans" | "serif" | "mono" | "dyslexic" | "custom" | "system";
 
-export type ViewType = "editor" | "journals" | "flashcards" | "graph" | "kanban" | "all-pages";
+export type ViewType = "editor" | "journals" | "flashcards" | "graph" | "kanban" | "all-pages" | "pdf";
+
+/** Documento PDF dentro de `assets/pdfs/` o enlazado desde fuera del vault. */
+export interface PdfListItem {
+  /** Ruta relativa al vault o enlace interno (`link:<uuid>`). */
+  relativePath: string;
+  title: string;
+  fileSize: number;
+  /** Milisegundos desde Unix epoch. */
+  modified: number;
+  /** `true` si el documento vive fuera del vault y se accede por enlace. */
+  linked: boolean;
+  /** `true` si el archivo enlazado ya no existe en su ubicación original. */
+  missing: boolean;
+  /** Ruta absoluta del original cuando es un documento enlazado. */
+  sourcePath?: string | null;
+  /** Milisegundos desde Unix epoch; ausente/`null` significa sin caducidad. */
+  expiresAt?: number | null;
+}
+
+export interface PdfPageInfo {
+  index: number;
+  widthPoints: number;
+  heightPoints: number;
+  label: string | null;
+}
+
+export interface PdfDocumentInfo {
+  relativePath: string;
+  title: string;
+  pageCount: number;
+  pages: PdfPageInfo[];
+  fileSize: number;
+  modified: number;
+  /** `true` si el documento se abrió desde un enlace externo. */
+  linked: boolean;
+  /** Ruta absoluta del original cuando es un documento enlazado. */
+  sourcePath?: string | null;
+  /** Milisegundos desde Unix epoch; ausente/`null` significa sin caducidad. */
+  expiresAt?: number | null;
+}
+
+/** Fragmento de texto de una página en coordenadas normalizadas (0..1). */
+export interface PdfTextRun {
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PdfTextPage {
+  widthPoints: number;
+  heightPoints: number;
+  runs: PdfTextRun[];
+}
 
 export interface GraphNode {
   id: string;

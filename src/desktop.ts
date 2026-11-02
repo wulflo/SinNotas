@@ -13,12 +13,14 @@ import {
   SnapshotActiveNote,
   VaultCacheDelta,
   Backlink,
+  PdfListItem,
 } from "./types";
 import "katex/dist/katex.min.css";
 import "./style.css";
 import "./material-aero.css";
 import "./theme-lino.css";
 import "./theme-dracula.css";
+import "./pdf.css";
 import { hideAppSplash } from "./splash";
 import { requestReviewMode } from "./app-mode";
 import {
@@ -103,6 +105,7 @@ import {
 import { FlashcardsManager, type FlashcardReviewOrder } from "./views/flashcards-manager";
 import { FlashcardLoader, type FlashcardLoadProgress } from "./views/flashcard-loader";
 import { KanbanManager } from "./views/kanban-view";
+import { PdfReaderView } from "./views/pdf-view";
 import {
   filterAllPages,
   formatPageDate,
@@ -128,6 +131,10 @@ import { renderMarkdownToHtml, sanitizeHtml, stripCardTag, stripSystemProperties
 import { isAllowedRemoteImageUrl } from "./editor/url-safety";
 import { sanitizePastedHtmlToMarkdown } from "./editor/paste-sanitizer";
 import { findMatchesInBlocks, type NoteMatch } from "./editor/note-search";
+import {
+  installNoteScrollNav,
+  type NoteScrollNavController,
+} from "./editor/note-scroll-nav";
 import {
   editMarkdownTable,
   escapeTableCell,
@@ -531,6 +538,9 @@ let pomodoroIsLongBreak = false;
 let pomodoroPaused = false;
 let pomodoroHeadbarVisible = true;
 let pomodoroSoundEnabled = true;
+// Contador progresivo: en lugar de mostrar el tiempo restante, muestra el
+// tiempo transcurrido del bloque actual (00:00 → duración configurada).
+let pomodoroCountUp = false;
 let pomodoroAudioContextRef: AudioContext | null = null;
 interface FlashcardProgressStats {
   date: string;
@@ -597,6 +607,13 @@ const noteFindCount = document.getElementById("note-find-count") as HTMLSpanElem
 const btnNoteFindPrev = document.getElementById("btn-note-find-prev") as HTMLButtonElement | null;
 const btnNoteFindNext = document.getElementById("btn-note-find-next") as HTMLButtonElement | null;
 const btnNoteFindClose = document.getElementById("btn-note-find-close") as HTMLButtonElement | null;
+const btnNoteFindOpen = document.getElementById("btn-note-find-open") as HTMLButtonElement | null;
+const noteScrollNavEl = document.getElementById("note-scroll-nav") as HTMLElement | null;
+const btnNoteScrollTop = document.getElementById("btn-note-scroll-top") as HTMLButtonElement | null;
+const btnNoteScrollBottom = document.getElementById(
+  "btn-note-scroll-bottom"
+) as HTMLButtonElement | null;
+let noteScrollNav: NoteScrollNavController | null = null;
 const btnSplitView = document.getElementById("btn-split-view") as HTMLButtonElement | null;
 const referencePane = document.getElementById("reference-pane") as HTMLElement | null;
 const referencePaneCount = document.getElementById("reference-pane-count") as HTMLSpanElement | null;
@@ -685,6 +702,7 @@ const pomodoroFocusDurationInput = document.getElementById("pomodoro-focus-durat
 const pomodoroBreakDurationInput = document.getElementById("pomodoro-break-duration") as HTMLSelectElement;
 const pomodoroLongBreakDurationInput = document.getElementById("pomodoro-long-break-duration") as HTMLSelectElement;
 const pomodoroSessionsBeforeLongBreakInput = document.getElementById("pomodoro-sessions-before-long-break") as HTMLSelectElement;
+const pomodoroCountUpInput = document.getElementById("pomodoro-count-up") as HTMLInputElement;
 const pomodoroShowHeadbarInput = document.getElementById("pomodoro-show-headbar") as HTMLInputElement;
 const pomodoroSoundInput = document.getElementById("pomodoro-sound") as HTMLInputElement;
 const headbarPomodoro = document.getElementById("headbar-pomodoro") as HTMLDivElement;
@@ -813,6 +831,7 @@ const navFlashcards = document.getElementById("nav-flashcards") as HTMLElement;
 const navGraph = document.getElementById("nav-graph") as HTMLElement;
 const navKanban = document.getElementById("nav-kanban") as HTMLElement;
 const navAllPages = document.getElementById("nav-all-pages") as HTMLElement;
+const navPdf = document.getElementById("nav-pdf") as HTMLElement;
 const btnHistoryBack = document.getElementById("btn-history-back") as HTMLButtonElement;
 const btnHistoryForward = document.getElementById("btn-history-forward") as HTMLButtonElement;
 
@@ -831,6 +850,13 @@ const graphPreviewOpenButton = document.getElementById("graph-preview-open") as 
 const graphPreviewCloseButton = document.getElementById("graph-preview-close") as HTMLButtonElement;
 const viewKanban = document.getElementById("view-kanban") as HTMLElement;
 const viewAllPages = document.getElementById("view-all-pages") as HTMLElement;
+const viewPdf = document.getElementById("view-pdf") as HTMLElement;
+const pdfView = new PdfReaderView(viewPdf, {
+  insertText: insertPdfTextIntoEditor,
+  insertCapture: insertPdfCaptureIntoEditor,
+  confirmDelete: confirmPdfDeletion,
+});
+const btnPdfToggleEditor = document.getElementById("pdf-toggle-editor") as HTMLButtonElement | null;
 const kanbanHideCompleted = document.getElementById("kanban-hide-completed") as HTMLInputElement;
 let draggedKanbanTask: KanbanTask | null = null;
 kanbanHideCompleted.checked = localStorage.getItem("sinnotas-kanban-hide-completed") === "true";
@@ -1241,12 +1267,14 @@ function initThemeAndTypography() {
   pomodoroSessionsBeforeLongBreak = Math.max(1, Math.min(12, savedSessionsBeforeLongBreak));
   pomodoroHeadbarVisible = localStorage.getItem("sinnotas-pomodoro-headbar") !== "false";
   pomodoroSoundEnabled = localStorage.getItem("sinnotas-pomodoro-sound") !== "false";
+  pomodoroCountUp = localStorage.getItem("sinnotas-pomodoro-count-up") === "true";
   setupPomodoroSelect(pomodoroFocusDurationInput, [5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 60, 90, 120], " min", pomodoroFocusMinutes);
   setupPomodoroSelect(pomodoroBreakDurationInput, [1, 3, 5, 10, 15, 20, 30, 45, 60], " min", pomodoroBreakMinutes);
   setupPomodoroSelect(pomodoroLongBreakDurationInput, [5, 10, 15, 20, 25, 30, 45, 60, 90, 120], " min", pomodoroLongBreakMinutes);
   setupPomodoroSelect(pomodoroSessionsBeforeLongBreakInput, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], "", pomodoroSessionsBeforeLongBreak);
   pomodoroShowHeadbarInput.checked = pomodoroHeadbarVisible;
   pomodoroSoundInput.checked = pomodoroSoundEnabled;
+  pomodoroCountUpInput.checked = pomodoroCountUp;
   pomodoroRemainingSeconds = pomodoroFocusMinutes * 60;
 
   flashcardKeyAgain.value = localStorage.getItem("sinnotas-flashcard-key-again") || "1";
@@ -2532,6 +2560,12 @@ pomodoroSoundInput.addEventListener("change", () => {
   if (pomodoroSoundEnabled) void pomodoroAudio();
 });
 
+pomodoroCountUpInput.addEventListener("change", () => {
+  pomodoroCountUp = pomodoroCountUpInput.checked;
+  localStorage.setItem("sinnotas-pomodoro-count-up", String(pomodoroCountUp));
+  renderPomodoro();
+});
+
 function clearBlockProperties(blocks: BlockNode[]): number {
   let removed = 0;
   blocks.forEach((block) => {
@@ -3249,6 +3283,7 @@ function readLastNavigation(): { view: ViewType; pageId: string } | null {
       "graph",
       "kanban",
       "all-pages",
+      "pdf",
     ];
     if (!validViews.includes(view as ViewType)) return null;
     return { view: view as ViewType, pageId };
@@ -3330,19 +3365,27 @@ function switchView(view: ViewType) {
   if (view !== "flashcards") clearFlashcardDueRecheck();
   if (view !== "editor") closeNoteFind(false);
   if (view !== "graph") closeGraphPreview();
+
+  // El lector PDF puede compartir pantalla con el editor. La preferencia se
+  // conserva aunque el usuario visite otras vistas; solo se aplica al volver
+  // al PDF o al editor.
+  const splitActive =
+    pdfEditorSplitPreferred() && (view === "pdf" || view === "editor");
+  document.body.classList.toggle("pdf-editor-split-active", splitActive);
+  updatePdfEditorSplitButton();
   currentView = view;
 
-  // Solo el editor tiene una nota abierta. En el resto de vistas limpiamos el
-  // breadcrumb y ocultamos las acciones de página para no arrastrar la última
-  // nota visitada.
-  const hasOpenPage = view === "editor";
+  // El editor (y el PDF cuando comparte pantalla) mantienen una nota abierta.
+  // En el resto de vistas limpiamos el breadcrumb y ocultamos las acciones de
+  // página para no arrastrar la última nota visitada.
+  const hasOpenPage = view === "editor" || (view === "pdf" && splitActive);
   if (!hasOpenPage) setHeadbarTitle("");
   document.body.classList.toggle("no-active-page", !hasOpenPage);
 
-  const navItems = [navEditor, navJournals, navFlashcards, navGraph, navKanban, navAllPages];
+  const navItems = [navEditor, navJournals, navFlashcards, navGraph, navKanban, navAllPages, navPdf];
   navItems.forEach((item) => item.classList.remove("active"));
 
-  const panels = [viewEditor, viewJournals, viewFlashcards, viewGraph, viewKanban, viewAllPages];
+  const panels = [viewEditor, viewJournals, viewFlashcards, viewGraph, viewKanban, viewAllPages, viewPdf];
   panels.forEach((p) => p.classList.remove("active-view"));
 
   if (view === "editor") {
@@ -3354,6 +3397,11 @@ function switchView(view: ViewType) {
     // final de switchView ya ve la lista actualizada.
     touchRecentPage(currentPage);
     renderEditor();
+    if (splitActive) {
+      viewPdf.classList.add("active-view");
+      navPdf.classList.add("active");
+      void pdfView.onActivate();
+    }
   } else if (view === "journals") {
     navJournals.classList.add("active");
     viewJournals.classList.add("active-view");
@@ -3383,10 +3431,21 @@ function switchView(view: ViewType) {
     viewAllPages.classList.add("active-view");
     graphView?.stopSimulation();
     renderAllPagesView();
+  } else if (view === "pdf") {
+    navPdf.classList.add("active");
+    viewPdf.classList.add("active-view");
+    graphView?.stopSimulation();
+    if (splitActive) {
+      viewEditor.classList.add("active-view");
+      navEditor.classList.add("active");
+      setHeadbarTitle(currentPage.title);
+    }
+    void pdfView.onActivate();
   }
 
   renderSidebar();
   recordNavigationHistory();
+  noteScrollNav?.refresh();
 }
 
 navEditor.addEventListener("click", () => switchView("editor"));
@@ -3397,6 +3456,87 @@ navKanban.addEventListener("click", () => switchView("kanban"));
 navAllPages.addEventListener("click", () => {
   allPagesCurrentPage = 1;
   switchView("all-pages");
+});
+navPdf.addEventListener("click", () => switchView("pdf"));
+
+/* ==================== PDF + EDITOR EN PARALELO ==================== */
+const PDF_EDITOR_SPLIT_KEY = "sinnotas-pdf-editor-split";
+
+function pdfEditorSplitPreferred(): boolean {
+  try {
+    return localStorage.getItem(PDF_EDITOR_SPLIT_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function pdfEditorSplitVisible(): boolean {
+  return document.body.classList.contains("pdf-editor-split-active");
+}
+
+function updatePdfEditorSplitButton(): void {
+  if (!btnPdfToggleEditor) return;
+  const active = pdfEditorSplitVisible();
+  const label = translate(active ? "Ocultar editor" : "Editor al lado");
+  const description = translate(
+    active ? "Ocultar el editor lateral" : "Mostrar el editor al lado"
+  );
+  btnPdfToggleEditor.setAttribute("aria-pressed", String(active));
+  btnPdfToggleEditor.classList.toggle("active", active);
+  btnPdfToggleEditor.textContent = label;
+  btnPdfToggleEditor.title = description;
+  btnPdfToggleEditor.setAttribute("aria-label", description);
+}
+
+function applyPdfEditorSplit(active: boolean): void {
+  if (active) {
+    // El panel de notas de referencia y el PDF comparten el mismo costado y
+    // no deben intentar ocupar el ancho del editor a la vez.
+    if (document.body.classList.contains("editor-split-active")) {
+      closeReferencePane();
+    }
+    document.body.classList.add("pdf-editor-split-active");
+    viewEditor.classList.add("active-view");
+    viewPdf.classList.add("active-view");
+    navEditor.classList.add("active");
+    navPdf.classList.add("active");
+    document.body.classList.remove("no-active-page");
+    setHeadbarTitle(currentPage.title);
+  } else {
+    document.body.classList.remove("pdf-editor-split-active");
+    if (currentView === "pdf") {
+      viewEditor.classList.remove("active-view");
+      navEditor.classList.remove("active");
+      document.body.classList.add("no-active-page");
+      setHeadbarTitle("");
+    } else if (currentView === "editor") {
+      viewPdf.classList.remove("active-view");
+      navPdf.classList.remove("active");
+    }
+  }
+  updatePdfEditorSplitButton();
+  noteScrollNav?.refresh();
+}
+
+function setPdfEditorSplitPreference(active: boolean): void {
+  try {
+    localStorage.setItem(PDF_EDITOR_SPLIT_KEY, String(active));
+  } catch {
+    // La preferencia solo afecta a la sesión si localStorage no está disponible.
+  }
+  applyPdfEditorSplit(active);
+}
+
+btnPdfToggleEditor?.addEventListener("click", () => {
+  const active = !pdfEditorSplitVisible();
+  if (active) {
+    // La vista PDF puede haberse abierto antes de que el editor se pintara.
+    if (currentView !== "editor") renderEditor();
+    setPdfEditorSplitPreference(true);
+    void pdfView.onActivate();
+  } else {
+    setPdfEditorSplitPreference(false);
+  }
 });
 
 document.getElementById("all-pages-prev")?.addEventListener("click", () => {
@@ -4801,6 +4941,89 @@ async function insertImageFile(file: File, blockId: string, openOcclusionAfterIn
   }
 }
 
+async function insertPdfTextIntoEditor(text: string, source: string): Promise<void> {
+  const cleaned = text.replace(/\s+/g, " ").trim();
+  if (!cleaned) return;
+
+  const cursorBlockId = cursorState?.blockId;
+  const targetBlockId = cursorBlockId && findNodeLocation(currentPage.blocks, cursorBlockId)
+    ? cursorBlockId
+    : getAllBlocksFlat(currentPage.blocks).slice(-1)[0]?.id;
+  if (!targetBlockId) {
+    throw new Error("No hay ningún bloque en la nota activa.");
+  }
+
+  const safeSource = source.replace(/\s+/g, " ").trim();
+  const block: BlockNode = {
+    id: generateId(),
+    type: "text",
+    content: `${cleaned}\npdf-source:: ${safeSource}`,
+    children: [],
+    collapsed: false,
+  };
+  const previousTree = currentPage.blocks;
+  const newTree = insertBlocksAfter(previousTree, targetBlockId, [block]);
+  if (!newTree) throw new Error("No se encontró el bloque donde insertar el texto.");
+
+  currentPage.blocks = newTree;
+  try {
+    await vault.savePage(currentPage, true);
+    renderBlocksTree();
+    showToast("Texto del PDF insertado en la nota.");
+  } catch (error) {
+    currentPage.blocks = previousTree;
+    renderBlocksTree();
+    throw error;
+  }
+}
+
+async function insertPdfCaptureIntoEditor(
+  bytes: Uint8Array,
+  fileName: string,
+  openOcclusion: boolean,
+): Promise<void> {
+  const cursorBlockId = cursorState?.blockId;
+  const targetBlockId = cursorBlockId && findNodeLocation(currentPage.blocks, cursorBlockId)
+    ? cursorBlockId
+    : getAllBlocksFlat(currentPage.blocks).slice(-1)[0]?.id;
+  if (!targetBlockId) {
+    throw new Error("No hay ningún bloque en la nota activa.");
+  }
+
+  const savedImage = await invoke<SavedImagePath>("pdf_save_capture", {
+    fileName,
+    bytes: Array.from(bytes),
+  });
+  resolvedImagePaths.set(savedImage.relativePath, savedImage.absolutePath);
+  const insertedBlockId = await insertImageBlock(
+    savedImage.relativePath,
+    fileName,
+    targetBlockId,
+    currentPage,
+  );
+  showToast(
+    openOcclusion
+      ? "Captura insertada. Dibuja las áreas que quieras ocultar."
+      : "Captura del PDF insertada en la nota.",
+  );
+  if (openOcclusion && insertedBlockId) {
+    openImageOcclusionEditor(insertedBlockId, savedImage.relativePath);
+  }
+}
+
+function confirmPdfDeletion(item: PdfListItem): Promise<boolean> {
+  if (item.linked) {
+    const message = item.missing
+      ? `El enlace a «${item.title}» apunta a un archivo que ya no existe. ¿Quitar el enlace?`
+      : `Se quitará «${item.title}» de Documentos. El PDF original seguirá en su ubicación y no se borrará.`;
+    return confirmAction(message, "Quitar enlace");
+  }
+  return confirmAction(
+    `Se eliminará «${item.title}» de la biblioteca del vault. Esta acción no se puede deshacer.`,
+    "Eliminar PDF",
+  );
+}
+
 async function insertDroppedImagePath(sourcePath: string, blockId: string, page?: PageData): Promise<void> {
   const targetPage = page || findPageForBlock(blockId) || currentPage;
   const fileName = sourcePath.split(/[\\/]/).pop() || "";
@@ -6117,6 +6340,45 @@ function applyBoxSelection(x: number, y: number): void {
  * `.content-scroll`: en algunas vistas el scroll lo hace el panel o una capa
  * intermedia, y el auto-scroll debe funcionar igualmente.
  */
+/** Encuentra el contenedor que scrollea la nota en el modo actual.
+ *
+ * En el editor normal es `.content-scroll`; al abrir el panel de referencias
+ * pasa a ser `.canvas-wrapper`. Se resuelve en cada actualización para que los
+ * botones sigan al contenedor correcto sin reconfigurar listeners. */
+function findNoteScrollRoot(): HTMLElement | null {
+  if (!viewEditor.classList.contains("active-view")) return null;
+  let current: HTMLElement | null = blocksContainer;
+  while (current && current !== viewEditor) {
+    const { overflowY } = getComputedStyle(current);
+    if (/(auto|scroll|overlay)/.test(overflowY)) return current;
+    current = current.parentElement;
+  }
+  return null;
+}
+
+function initNoteScrollNav(): void {
+  if (!noteScrollNavEl || !btnNoteScrollTop || !btnNoteScrollBottom) return;
+  const canvas = viewEditor.querySelector<HTMLElement>(".canvas-wrapper");
+  const titleRow = viewEditor.querySelector<HTMLElement>(".page-title-row");
+  const references = document.getElementById("references-section");
+  const observe = [
+    blocksContainer,
+    pagePropertiesContainer,
+    canvas,
+    titleRow,
+    references,
+  ].filter((element): element is HTMLElement => element !== null);
+
+  noteScrollNav = installNoteScrollNav({
+    nav: noteScrollNavEl,
+    topButton: btnNoteScrollTop,
+    bottomButton: btnNoteScrollBottom,
+    getScrollRoot: findNoteScrollRoot,
+    isActive: () => viewEditor.classList.contains("active-view"),
+    observe,
+  });
+}
+
 function findScrollableAncestor(root: HTMLElement | null): HTMLElement | null {
   let current: HTMLElement | null = root;
   while (current) {
@@ -7240,6 +7502,7 @@ function renderEditor() {
   }
   renderBlocksTree();
   scheduleRenderBacklinks();
+  noteScrollNav?.refresh();
   // Si la barra de búsqueda interna está abierta, sus coincidencias dependen
   // del contenido de la nota: recalcularlas al abrir otra página (T20).
   if (noteFindBar && !noteFindBar.hidden) runNoteFind(true);
@@ -10374,11 +10637,24 @@ function playPomodoroChime(kind: "focus-end" | "break-end"): void {
   });
 }
 
+function pomodoroActiveDurationSeconds(): number {
+  if (pomodoroMode === "break") {
+    return (pomodoroIsLongBreak ? pomodoroLongBreakMinutes : pomodoroBreakMinutes) * 60;
+  }
+  return pomodoroFocusMinutes * 60;
+}
+
 function renderPomodoro(): void {
-  const minutes = Math.floor(pomodoroRemainingSeconds / 60);
-  const seconds = pomodoroRemainingSeconds % 60;
+  const totalSeconds = Math.max(1, pomodoroActiveDurationSeconds());
+  const elapsedSeconds = Math.max(0, Math.min(totalSeconds, totalSeconds - pomodoroRemainingSeconds));
+  const displayedSeconds = pomodoroCountUp ? elapsedSeconds : Math.max(0, pomodoroRemainingSeconds);
+  const minutes = Math.floor(displayedSeconds / 60);
+  const seconds = displayedSeconds % 60;
   const timeString = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   pomodoroClock.textContent = timeString;
+  pomodoroClock.title = pomodoroCountUp
+    ? `Tiempo transcurrido de ${Math.round(totalSeconds / 60)} min`
+    : `Tiempo restante de ${Math.round(totalSeconds / 60)} min`;
   pomodoroModeLabel.textContent = pomodoroMode === "focus"
     ? "Enfoque"
     : pomodoroIsLongBreak ? "Descanso largo" : "Descanso corto";
@@ -11188,6 +11464,7 @@ function updateFlashcardUI() {
 onLanguageChange(() => {
   renderSidebar();
   renderFlashcardRecalcControls();
+  updatePdfEditorSplitButton();
   if (currentView === "flashcards") {
     renderFlashcardExplorer();
     updateFlashcardUI();
@@ -13689,9 +13966,14 @@ function moveNoteFind(delta: number): void {
   showNoteFindMatch(next);
 }
 
+/** La búsqueda interna solo tiene sentido si el panel del editor está visible. */
+function noteFindAvailable(): boolean {
+  return viewEditor.classList.contains("active-view");
+}
+
 /** Abre Ctrl/Cmd+F solo dentro del editor y sin robar el buscar del navegador. */
 function openNoteFind(): void {
-  if (!noteFindBar || !noteFindInput || currentView !== "editor") return;
+  if (!noteFindBar || !noteFindInput || !noteFindAvailable()) return;
   if (!noteFindBar.hidden) {
     // Ya estaba abierta: no sustituir el foco previo por el propio input.
     noteFindInput.focus();
@@ -13783,6 +14065,7 @@ noteFindBar?.addEventListener("keydown", (event: KeyboardEvent) => {
 btnNoteFindPrev?.addEventListener("click", () => moveNoteFind(-1));
 btnNoteFindNext?.addEventListener("click", () => moveNoteFind(1));
 btnNoteFindClose?.addEventListener("click", () => closeNoteFind());
+btnNoteFindOpen?.addEventListener("click", () => openNoteFind());
 
 
 /* ==================== VISTA DIVIDIDA: PANEL DE REFERENCIA (T7, fase 1) ==================== */
@@ -14140,12 +14423,15 @@ function renderReferencePane(title?: string): void {
 
 function openReferencePane(title?: string): void {
   if (!splitViewEnabled() || !referencePane) return;
+  // El PDF lateral ya ocupa el costado del editor.
+  if (document.body.classList.contains("pdf-editor-split-active")) return;
   document.body.classList.add("editor-split-active");
   referencePane.hidden = false;
   btnSplitView?.classList.add("active");
   btnSplitView?.setAttribute("aria-pressed", "true");
   localStorage.setItem(SPLIT_OPEN_KEY, "true");
   renderReferencePane(title);
+  noteScrollNav?.refresh();
 }
 
 function closeReferencePane(): void {
@@ -14155,6 +14441,7 @@ function closeReferencePane(): void {
   btnSplitView?.classList.remove("active");
   btnSplitView?.setAttribute("aria-pressed", "false");
   localStorage.setItem(SPLIT_OPEN_KEY, "false");
+  noteScrollNav?.refresh();
 }
 
 /** Restaura el panel tras recargar; solo si el flag sigue activo. */
@@ -14239,15 +14526,16 @@ window.addEventListener("click", (e) => {
 
 /* ==================== GLOBAL KEYBOARD SHORTCUTS ==================== */
 window.addEventListener("keydown", (e: KeyboardEvent) => {
-  if ((e.ctrlKey || e.metaKey) && (e.key === "f" || e.key === "F")) {
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "f") {
     const target = e.target instanceof HTMLElement ? e.target : null;
     const inAnotherField =
       target !== null &&
       target !== noteFindInput &&
       (target.matches("input, textarea, select") ||
         (target.isContentEditable && !target.closest("#view-editor")));
-    if (currentView === "editor" && !hasMountedModal() && !inAnotherField) {
+    if (noteFindAvailable() && !hasMountedModal() && !inAnotherField) {
       e.preventDefault();
+      e.stopPropagation();
       openNoteFind();
       return;
     }
@@ -14674,6 +14962,7 @@ function schedulePrewarmHiddenViews(): void {
 
 async function initializeDesktopApp(): Promise<void> {
   initThemeAndTypography();
+  initNoteScrollNav();
   initUpdateSettings();
   loadFlashcardProgressStats();
   scheduleFlashcardDailyReset();
@@ -14715,13 +15004,22 @@ async function initializeDesktopApp(): Promise<void> {
     if (page) {
       currentPage = page;
       restored = true;
-      if (lastNavigation.view === "editor") renderEditor();
-      else switchView(lastNavigation.view);
+      if (lastNavigation.view === "editor") {
+        renderEditor();
+      } else {
+        // Si el PDF recuerda el modo de edición en paralelo, el editor debe
+        // estar pintado antes de mostrar ambos paneles.
+        if (lastNavigation.view === "pdf" && pdfEditorSplitPreferred()) {
+          renderEditor();
+        }
+        switchView(lastNavigation.view);
+      }
     }
   }
   if (!restored) renderEditor();
   recordNavigationHistory();
   restoreEditorSplitView();
+  updatePdfEditorSplitButton();
 
   const first = blocksContainer.querySelector<HTMLElement>(".block-editor");
   if (currentView === "editor") first?.focus();

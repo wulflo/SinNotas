@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sanitizeStyleAttributeValue, renderMarkdownToHtml } from "./markdown";
+import { sanitizeStyleAttributeValue, renderMarkdownToHtml, stripSystemProperties } from "./markdown";
 
 describe("renderMarkdownToHtml math", () => {
   it("renders inline math with KaTeX without turning it into a block", () => {
@@ -115,6 +115,13 @@ describe("sanitizeStyleAttributeValue", () => {
     expect(sanitizeStyleAttributeValue("z-index:999")).toBe("");
     expect(sanitizeStyleAttributeValue("top:-3em;background:black;")).toBe("top:-3em");
     expect(sanitizeStyleAttributeValue("")).toBe("");
+  });
+});
+
+describe("stripSystemProperties", () => {
+  it("hides pdf-source metadata lines", () => {
+    const visible = stripSystemProperties("Texto del PDF\npdf-source:: Libro · página 3");
+    expect(visible).toBe("Texto del PDF");
   });
 });
 

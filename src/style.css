@@ -1840,8 +1840,23 @@ select {
   outline: none;
 }
 
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  padding: 2px;
+  flex: 0 0 auto;
+  accent-color: var(--ls-accent);
+  cursor: pointer;
+}
+
 .settings-row input[type="checkbox"] {
-  width: auto;
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  padding: 3px;
   flex: 0 0 auto;
   accent-color: var(--ls-accent);
 }
@@ -2290,12 +2305,93 @@ select {
 }
 
 /* ==================== CANVAS & OUTLINER ==================== */
+#view-editor {
+  position: relative;
+}
+
 .content-scroll {
   flex: 1;
   overflow-y: auto;
   padding: 36px 48px 100px;
   display: flex;
   justify-content: center;
+}
+
+/* Navegación flotante para notas que superan el alto visible. */
+.note-scroll-nav {
+  position: absolute;
+  right: max(20px, env(safe-area-inset-right, 0px));
+  bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--ls-border-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ls-bg-tertiary) 90%, transparent);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(14px);
+}
+
+.note-scroll-nav[hidden] {
+  display: none;
+}
+
+.note-scroll-nav-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ls-text-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+}
+
+.note-scroll-nav-button[hidden] {
+  display: none;
+}
+
+.note-scroll-nav-button:hover {
+  background: var(--ls-accent-subtle);
+  color: var(--ls-accent);
+}
+
+.note-scroll-nav-button:focus-visible {
+  outline: 2px solid var(--ls-accent);
+  outline-offset: 2px;
+}
+
+.note-scroll-nav-button:active {
+  transform: scale(0.92);
+}
+
+/* El panel de referencias ocupa el costado derecho: la navegación se queda
+   sobre el lienzo principal, no encima de las notas de referencia. */
+body.editor-split-active .note-scroll-nav {
+  right: calc(clamp(320px, 44%, 620px) + max(20px, env(safe-area-inset-right, 0px)));
+}
+
+@media (max-width: 1100px) {
+  body.editor-split-active .note-scroll-nav {
+    right: max(20px, env(safe-area-inset-right, 0px));
+  }
+}
+
+body.mobile-full-editor .note-scroll-nav {
+  right: max(14px, var(--mobile-full-safe-right, 0px));
+  bottom: max(14px, var(--mobile-full-safe-bottom, 0px));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .note-scroll-nav-button {
+    transition: none;
+  }
 }
 
 .canvas-wrapper {

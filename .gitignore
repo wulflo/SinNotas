@@ -37,6 +37,12 @@ permissions.txt
 manifest-dump.xml
 zipalign.txt
 
+# Binarios nativos de PDFium (se obtienen con scripts/fetch-pdfium.sh).
+# Se empaquetan como recurso, pero no se versionan para no inflar el repo.
+src-tauri/resources/pdfium/*/libpdfium.so
+src-tauri/resources/pdfium/*/libpdfium.dylib
+src-tauri/resources/pdfium/*/pdfium.dll
+
 # IDEs
 .cursor/
 .vscode/

@@ -26,11 +26,15 @@ grep -A1 'name = "sin-notas"' src-tauri/Cargo.lock
 ## 2. Validar localmente
 
 ```bash
+scripts/fetch-pdfium.sh
 npm ci --ignore-scripts
 npx tsc --noEmit
 npm test
 npm run build
 ```
+
+El workflow de release descarga PDFium automáticamente para Linux, Windows y
+las dos arquitecturas de macOS antes de empaquetar.
 
 ## 3. Commit y tag
 

@@ -140,7 +140,7 @@ if (typeof DOMPurify.addHook === "function") {
 }
 
 const systemPropertyPattern =
-  /^(?:card-[a-z-]+|last-reviewed|interval-days|ease-factor|due-date|created-at|image-occlusions|task-due|completion-rewarded|doing-started-at|done-at|doing-duration-seconds|heading|color|background-color)::/i;
+  /^(?:card-[a-z-]+|last-reviewed|interval-days|ease-factor|due-date|created-at|image-occlusions|pdf-source|task-due|completion-rewarded|doing-started-at|done-at|doing-duration-seconds|heading|color|background-color)::/i;
 
 export function stripTaskStatus(text: string): string {
   return text.replace(/^(?:TODO|LATER|DOING|NOW|DONE)\s+/i, "");

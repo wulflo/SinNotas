@@ -27,6 +27,7 @@ use uuid::Uuid;
 use walkdir::WalkDir;
 
 pub mod metadata_cache;
+pub mod pdf;
 #[cfg(test)]
 mod perf_e2e_tests;
 
@@ -1673,7 +1674,7 @@ pub(crate) fn resolve_note_path(root: &Path, requested_path: &str) -> Result<Pat
     ))
 }
 
-fn resolve_vault_path(root: &Path, requested_path: &str) -> Result<PathBuf, String> {
+pub(crate) fn resolve_vault_path(root: &Path, requested_path: &str) -> Result<PathBuf, String> {
     // Para rutas genéricas (imágenes, assets, etc.) se mantiene la validación
     // original sin exigir .md ni rechazar carpetas reservadas, ya que assets/
     // puede vivir junto a `.sinnotas/`. Las validaciones de seguridad
@@ -4256,7 +4257,7 @@ fn read_text_bounded<R: Read>(reader: R, max_bytes: usize) -> Result<String, Str
 /// destino nunca queda a medias si el proceso se interrumpe. Si alguna de las
 /// dos operaciones falla, se limpia el temporal para no dejar basura.
 /// Sirve para texto arbitrario (markdown de notas, JSON de revisiones, etc.).
-fn write_file_atomically(path: &Path, contents: &str) -> Result<(), String> {
+pub(crate) fn write_file_atomically(path: &Path, contents: &str) -> Result<(), String> {
     let Some(parent) = path.parent() else {
         return Err("La ruta de la nota no es válida.".to_string());
     };
@@ -4821,7 +4822,7 @@ fn svg_has_active_content(content: &str) -> bool {
     false
 }
 
-fn validate_image_file(file_name: &str, bytes: &[u8]) -> Result<(), String> {
+pub(crate) fn validate_image_file(file_name: &str, bytes: &[u8]) -> Result<(), String> {
     if bytes.is_empty() || bytes.len() > 5 * 1024 * 1024 {
         return Err("La imagen debe tener un tamaño máximo de 5 MB.".to_string());
     }
@@ -4901,6 +4902,115 @@ fn store_image_in_vault(
     }
 
     Err("No se pudo encontrar un nombre único para la imagen.".to_string())
+}
+
+#[tauri::command]
+fn pdf_list(
+    state: tauri::State<'_, ActiveVault>,
+) -> Result<Vec<pdf::PdfListItem>, String> {
+    let root = active_root(&state)?;
+    pdf::list(&root)
+}
+
+#[tauri::command(async)]
+fn pdf_open(
+    app: AppHandle,
+    path: String,
+    state: tauri::State<'_, ActiveVault>,
+) -> Result<pdf::PdfDocumentInfo, String> {
+    let root = active_root(&state)?;
+    pdf::open(&app, &root, &path)
+}
+
+#[tauri::command(async)]
+fn pdf_render_page(
+    app: AppHandle,
+    path: String,
+    page_index: u32,
+    target_width: u32,
+    state: tauri::State<'_, ActiveVault>,
+) -> Result<tauri::ipc::Response, String> {
+    let root = active_root(&state)?;
+    let png = pdf::render_page(&app, &root, &path, page_index, target_width)?;
+    Ok(tauri::ipc::Response::new(png))
+}
+
+#[tauri::command(async)]
+fn pdf_import(
+    app: AppHandle,
+    keep_days: Option<u32>,
+    state: tauri::State<'_, ActiveVault>,
+) -> Result<Option<pdf::PdfDocumentInfo>, String> {
+    let root = active_root(&state)?;
+
+    #[cfg(desktop)]
+    {
+        let Some(picked) = app
+            .dialog()
+            .file()
+            .add_filter("PDF", &["pdf"])
+            .blocking_pick_file()
+        else {
+            return Ok(None);
+        };
+        let source = picked.into_path().map_err(|error| error.to_string())?;
+        pdf::import_path(&app, &root, &source, keep_days).map(Some)
+    }
+
+    #[cfg(not(desktop))]
+    {
+        let _ = (app, root, keep_days);
+        Err("Enlazar un PDF desde el selector del sistema estará disponible en Android en una fase posterior.".to_string())
+    }
+}
+
+#[tauri::command(async)]
+fn pdf_page_text(
+    app: AppHandle,
+    path: String,
+    page_index: u32,
+    state: tauri::State<'_, ActiveVault>,
+) -> Result<pdf::PdfTextPage, String> {
+    let root = active_root(&state)?;
+    pdf::page_text(&app, &root, &path, page_index)
+}
+
+#[tauri::command(async)]
+fn pdf_set_expiry(
+    path: String,
+    keep_days: Option<u32>,
+    state: tauri::State<'_, ActiveVault>,
+) -> Result<bool, String> {
+    let root = active_root(&state)?;
+    pdf::set_expiry(&root, &path, keep_days)
+}
+
+#[tauri::command(async)]
+fn pdf_delete(
+    path: String,
+    state: tauri::State<'_, ActiveVault>,
+) -> Result<bool, String> {
+    let root = active_root(&state)?;
+    pdf::delete_document(&root, &path)
+}
+
+#[tauri::command(async)]
+fn pdf_save_capture(
+    file_name: String,
+    bytes: Vec<u8>,
+    state: tauri::State<'_, ActiveVault>,
+) -> Result<SavedImagePath, String> {
+    let root = active_root(&state)?;
+    pdf::save_capture(&root, &file_name, &bytes)
+}
+
+#[tauri::command(async)]
+fn pdf_unlink(
+    path: String,
+    state: tauri::State<'_, ActiveVault>,
+) -> Result<bool, String> {
+    let root = active_root(&state)?;
+    pdf::unlink(&root, &path)
 }
 
 #[tauri::command]
@@ -5500,6 +5610,15 @@ pub fn run() {
             restore_snapshot,
             migrate_legacy_snapshots,
             export_page_text,
+            pdf_list,
+            pdf_open,
+            pdf_render_page,
+            pdf_import,
+            pdf_unlink,
+            pdf_page_text,
+            pdf_set_expiry,
+            pdf_delete,
+            pdf_save_capture,
             save_image,
             save_dropped_image,
             delete_unused_attachments,
