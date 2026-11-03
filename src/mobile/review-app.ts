@@ -12,8 +12,22 @@ import { sanitizeHtml } from "../editor/markdown";
 import { findNodeLocation } from "../editor/tree-engine";
 import { initialVaultPages, VaultStore } from "../store/vault";
 import { ReviewProgressStore, type ReviewProgressEvent } from "../store/review-progress";
+import {
+  addFlashcardDeck,
+  deleteFlashcardDeck,
+  emptyFlashcardDeckFile,
+  findFlashcardDeck,
+  mergeFlashcardDeckSelection,
+  normalizeFlashcardDeckName,
+  resolveFlashcardDeckPageTitles,
+  updateFlashcardDeck,
+  validateFlashcardDeckName,
+  type FlashcardDeck,
+  type FlashcardDeckFile,
+} from "../store/flashcard-decks";
+import { FlashcardDeckRepository } from "../store/flashcard-deck-storage";
 import type { BlockNode, Flashcard, FlashcardType, ImageOcclusionRegion, PageData } from "../types";
-import { FlashcardsManager } from "../views/flashcards-manager";
+import { FlashcardsManager, type FlashcardPageStats } from "../views/flashcards-manager";
 import {
   buildDeckTree,
   collectDeckPageTitles,
@@ -155,6 +169,25 @@ const MOBILE_ICONS = {
       <path d="M8 12h8"></path>
       <path d="M8 16h5"></path>
     </svg>`,
+  decks: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="3" y="8" width="13" height="11" rx="2.2"></rect>
+      <path d="M7 5.5h10.5A2.5 2.5 0 0 1 20 8v8"></path>
+      <path d="M6.5 13h6"></path>
+      <path d="M6.5 16h4"></path>
+    </svg>`,
+  plus: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M12 5v14"></path>
+      <path d="M5 12h14"></path>
+    </svg>`,
+
+  trash: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 7h16"></path>
+      <path d="M9 7V4h6v3"></path>
+      <path d="m6 7 1 13h10l1-13"></path>
+    </svg>`,
   editor: `
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M12 20h9"></path>
@@ -260,6 +293,15 @@ class MobileReviewApp {
   private notesCurrentPage = 1;
   private notesTotalPages = 1;
   private notesRenderToken = 0;
+  private readonly deckRepository = new FlashcardDeckRepository();
+  private deckFile: FlashcardDeckFile = emptyFlashcardDeckFile();
+  private activeDeckId: string | null = null;
+  private deckEditorId: string | null = null;
+  private deckEditorIsNew = false;
+  /** ¿El usuario ya escribió en el nombre? Evita el error de campo vacío al abrir un mazo nuevo. */
+  private deckNameTouched = false;
+  private pendingDeckDeleteId: string | null = null;
+  private deckLoadToken = 0;
   private toastTimer: number | null = null;
   private busy = false;
   private learningMode = false;
@@ -294,6 +336,14 @@ class MobileReviewApp {
     refreshButton: HTMLButtonElement;
     notesButton: HTMLButtonElement;
     notesBadge: HTMLElement;
+    activeDeckName: HTMLElement;
+    decksBadge: HTMLElement;
+    decksSheet: HTMLElement;
+    decksList: HTMLElement;
+    deckNameInput: HTMLInputElement;
+    deckNameError: HTMLElement;
+    notesTitle: HTMLElement;
+    applyNotesButton: HTMLButtonElement;
     themeOptions: HTMLElement;
     notesSheet: HTMLElement;
     notesSearchInput: HTMLInputElement;
@@ -353,6 +403,10 @@ class MobileReviewApp {
           </div>
         </button>
         <div class="mobile-header-actions">
+          <button class="mobile-deck-chip" type="button" data-action="decks" aria-label="Mazos de repaso" title="Mazos de repaso">
+            <span class="mobile-deck-chip-icon" aria-hidden="true">${MOBILE_ICONS.decks}</span>
+            <span class="mobile-deck-chip-name" data-active-deck-name>Todos</span>
+          </button>
           <button class="mobile-icon-button mobile-history-button" type="button" data-action="undo" aria-label="Deshacer" title="Deshacer" disabled>${MOBILE_ICONS.undo}</button>
           <button class="mobile-icon-button mobile-history-button" type="button" data-action="redo" aria-label="Rehacer" title="Rehacer" disabled>${MOBILE_ICONS.redo}</button>
         </div>
@@ -515,9 +569,14 @@ class MobileReviewApp {
       <div class="mobile-editor-scrim" data-notes-sheet hidden>
         <section class="mobile-editor mobile-notes-editor" role="dialog" aria-modal="true" aria-labelledby="mobile-notes-title">
           <header class="mobile-editor-header">
-            <h2 id="mobile-notes-title">Mazos del repaso</h2>
-            <button class="mobile-icon-button" type="button" data-action="close-notes" aria-label="Cerrar selector de mazos">${MOBILE_ICONS.close}</button>
+            <h2 id="mobile-notes-title" data-notes-title>Notas del mazo</h2>
+            <button class="mobile-icon-button" type="button" data-action="close-notes" aria-label="Cerrar editor de mazo">${MOBILE_ICONS.close}</button>
           </header>
+          <label class="mobile-deck-name-field">
+            <span>Nombre del mazo</span>
+            <input type="text" data-deck-name maxlength="80" placeholder="Nombre del mazo" autocomplete="off" spellcheck="false" aria-label="Nombre del mazo">
+          </label>
+          <p class="mobile-deck-name-error" data-deck-name-error role="status" aria-live="polite"></p>
           <div class="mobile-notes-toolbar">
             <input class="mobile-notes-search" type="search" data-notes-search placeholder="Buscar mazo o nota…" autocomplete="off" spellcheck="false" aria-label="Filtrar mazos y notas">
             <div class="mobile-notes-bulk-actions">
@@ -534,7 +593,22 @@ class MobileReviewApp {
           <p class="mobile-editor-hint">Usa <code>→</code> en el título para crear mazos y submazos (también acepta <code>::</code>). Marca un mazo para incluir todas sus notas hijas. La búsqueda no cambia la selección.</p>
           <footer class="mobile-editor-actions">
             <button class="mobile-secondary" type="button" data-action="close-notes">Cancelar</button>
-            <button class="mobile-primary" type="button" data-action="apply-notes">Aplicar selección</button>
+            <button class="mobile-primary" type="button" data-action="apply-notes" data-apply-notes>Guardar mazo</button>
+          </footer>
+        </section>
+      </div>
+
+      <div class="mobile-editor-scrim" data-decks-sheet hidden>
+        <section class="mobile-editor mobile-decks-editor" role="dialog" aria-modal="true" aria-labelledby="mobile-decks-title">
+          <header class="mobile-editor-header">
+            <h2 id="mobile-decks-title">Mazos de repaso</h2>
+            <button class="mobile-icon-button" type="button" data-action="close-decks" aria-label="Cerrar mazos">${MOBILE_ICONS.close}</button>
+          </header>
+          <p class="mobile-editor-hint">Solo un mazo está activo a la vez. Los mazos se guardan en la bóveda y se sincronizan; el mazo activo es una preferencia de este dispositivo.</p>
+          <div class="mobile-decks-list" data-decks-list role="list" aria-label="Mazos de repaso"></div>
+          <footer class="mobile-editor-actions mobile-decks-actions">
+            <button class="mobile-secondary" type="button" data-action="close-decks">Cerrar</button>
+            <button class="mobile-primary" type="button" data-action="new-deck">+ Nuevo mazo</button>
           </footer>
         </section>
       </div>
@@ -574,10 +648,16 @@ class MobileReviewApp {
               <small>Repasa sin guardar el progreso FSRS</small>
               <span class="mobile-switch" aria-hidden="true"></span>
             </button>
+            <button class="mobile-drawer-action mobile-decks-button" type="button" data-action="decks">
+              <span aria-hidden="true">${MOBILE_ICONS.decks}</span>
+              <strong>Mazos</strong>
+              <small>Elegir, crear o editar mazos de repaso</small>
+              <span class="mobile-filter-badge" data-decks-badge hidden></span>
+            </button>
             <button class="mobile-drawer-action mobile-notes-button" type="button" data-action="notes">
               <span aria-hidden="true">${MOBILE_ICONS.notes}</span>
-              <strong>Repasar notas</strong>
-              <small>Elegir qué notas aportan tarjetas</small>
+              <strong>Notas del mazo</strong>
+              <small>Editar las notas que aportan tarjetas</small>
               <span class="mobile-filter-badge" data-notes-badge hidden></span>
             </button>
             <button class="mobile-drawer-action" type="button" data-action="full-editor">
@@ -632,6 +712,14 @@ class MobileReviewApp {
       refreshButton: requireElement(this.root, "[data-action='refresh']"),
       notesButton: requireElement(this.root, "[data-action='notes']"),
       notesBadge: requireElement(this.root, "[data-notes-badge]"),
+      activeDeckName: requireElement(this.root, "[data-active-deck-name]"),
+      decksBadge: requireElement(this.root, "[data-decks-badge]"),
+      decksSheet: requireElement(this.root, "[data-decks-sheet]"),
+      decksList: requireElement(this.root, "[data-decks-list]"),
+      deckNameInput: requireElement(this.root, "[data-deck-name]"),
+      deckNameError: requireElement(this.root, "[data-deck-name-error]"),
+      notesTitle: requireElement(this.root, "[data-notes-title]"),
+      applyNotesButton: requireElement(this.root, "[data-apply-notes]"),
       themeOptions: requireElement(this.root, "[data-theme-options]"),
       notesSheet: requireElement(this.root, "[data-notes-sheet]"),
       notesSearchInput: requireElement(this.root, "[data-notes-search]"),
@@ -790,9 +878,16 @@ class MobileReviewApp {
         this.openSettings();
       } else if (action === "close-settings") {
         this.closeSettings();
+      } else if (action === "decks") {
+        this.closeDrawer();
+        this.openDecks();
+      } else if (action === "close-decks") {
+        this.closeDecks();
+      } else if (action === "new-deck") {
+        this.openNewDeckEditor();
       } else if (action === "notes") {
         this.closeDrawer();
-        this.openNotes();
+        this.openActiveDeckEditor();
       } else if (action === "close-notes") {
         this.closeNotes();
       } else if (action === "notes-all") {
@@ -810,7 +905,7 @@ class MobileReviewApp {
           this.renderNotesList({ resetScroll: true });
         }
       } else if (action === "apply-notes") {
-        this.applyNotesSelection();
+        void this.saveDeckFromEditor();
       } else if (action === "set-theme") {
         const option = target.dataset.themeOption;
         if (option === "light" || option === "dark") {
@@ -862,6 +957,22 @@ class MobileReviewApp {
     this.refs.notesSheet.addEventListener("click", (event) => {
       if (event.target === this.refs.notesSheet) this.closeNotes();
     });
+    this.refs.decksSheet.addEventListener("click", (event) => {
+      if (event.target === this.refs.decksSheet) this.closeDecks();
+    });
+    this.refs.decksList.addEventListener("click", (event) => {
+      const target = (event.target as HTMLElement).closest<HTMLElement>("[data-deck-action]");
+      if (!target || this.busy) return;
+      const deckId = target.dataset.deckId ?? null;
+      const action = target.dataset.deckAction;
+      if (action === "activate") void this.activateDeck(deckId);
+      else if (action === "edit" && deckId) this.openDeckEditor(deckId);
+      else if (action === "delete" && deckId) void this.deleteDeck(deckId);
+    });
+    this.refs.deckNameInput.addEventListener("input", () => {
+      this.deckNameTouched = true;
+      this.validateDeckEditorName();
+    });
     this.refs.fontSizeInput.addEventListener("input", () => {
       const size = writeFontSize("ui", Number(this.refs.fontSizeInput.value));
       this.applyStoredFontSizes();
@@ -898,6 +1009,10 @@ class MobileReviewApp {
       }
       if (!this.refs.settingsSheet.hidden) {
         if (event.key === "Escape") this.closeSettings();
+        return;
+      }
+      if (!this.refs.decksSheet.hidden) {
+        if (event.key === "Escape") this.closeDecks();
         return;
       }
       if (!this.refs.notesSheet.hidden) {
@@ -960,7 +1075,7 @@ class MobileReviewApp {
       const wasRevealed = this.manager.isRevealed();
       const snapshot = await this.loadVault(rootPath);
       await this.reviewProgress.load(snapshot.rootPath !== previousRoot);
-      this.applySnapshot(
+      await this.applySnapshot(
         snapshot,
         activeCardId ? { cardId: activeCardId, revealed: wasRevealed } : undefined
       );
@@ -1006,6 +1121,7 @@ class MobileReviewApp {
       !this.refs.editor.hidden ||
       !this.refs.occlusionEditor.hidden ||
       !this.refs.notesSheet.hidden ||
+      !this.refs.decksSheet.hidden ||
       !this.refs.settingsSheet.hidden ||
       !this.refs.drawer.hidden
     ) {
@@ -1022,12 +1138,16 @@ class MobileReviewApp {
       await this.vault.flushPendingFileOperations();
       const snapshot = await this.loadVault(this.vault.getActiveRootPath());
       this.lastDiskSyncAt = Date.now();
-      if (JSON.stringify(snapshot.pages) === JSON.stringify(this.pages)) return;
+      if (JSON.stringify(snapshot.pages) === JSON.stringify(this.pages)) {
+        // Las notas no cambiaron, pero otro equipo pudo editar los mazos.
+        await this.refreshDecksFromDisk();
+        return;
+      }
 
       const activeCardId = this.manager.getCurrentCard()?.id || null;
       const wasRevealed = this.manager.isRevealed();
       await this.reviewProgress.load(true);
-      this.applySnapshot(snapshot);
+      await this.applySnapshot(snapshot);
       if (activeCardId) {
         const refreshed = this.manager.refreshCard(
           this.pages,
@@ -1078,18 +1198,33 @@ class MobileReviewApp {
     return snapshot;
   }
 
-  private applySnapshot(
+  private async applySnapshot(
     snapshot: VaultSnapshot,
     preserve?: { cardId: string; revealed: boolean }
-  ): void {
+  ): Promise<void> {
     this.hideVaultGate();
     this.pages = snapshot.pages;
     this.vault.replaceVault(snapshot.pages, snapshot.rootPath, snapshot.vaultName);
     this.history.clearAll();
     this.historySeeded.clear();
-    this.manager.setPageFilter(this.readStoredPageFilter());
+    // Los mazos viven en la bóveda: cargarlos antes de aplicar el filtro. Si es
+    // el primer arranque tras actualizar, la selección antigua se migra a un
+    // mazo "Selección anterior" y queda activa.
+    await this.loadDecksForVault(snapshot.rootPath, this.readStoredPageFilter());
+    const deck = this.activeDeck();
+    // Resolver contra las páginas recién cargadas, no contra las tarjetas del
+    // manager (todavía pertenecen a la bóveda anterior).
+    this.manager.setPageFilter(
+      deck
+        ? resolveFlashcardDeckPageTitles(
+            deck,
+            this.pages.map((page) => page.title)
+          )
+        : null
+    );
     this.manager.scanVault(this.pages, "new-first", preserve);
     this.reconcilePageFilter();
+    this.writeStoredPageFilter(this.manager.getPageFilter());
     this.refs.vaultName.textContent = snapshot.vaultName;
     this.refs.vaultButton.title = snapshot.rootPath;
     this.refs.vaultButton.setAttribute("aria-label", `Bóveda actual: ${snapshot.vaultName}`);
@@ -1123,12 +1258,23 @@ class MobileReviewApp {
   /** Descarta del filtro notas que ya no existen o no tienen tarjetas, y
    * resuelve alias de separador (`::`) al título exacto que hay en la bóveda. */
   private reconcilePageFilter(): void {
+    const pages = this.manager.getPagesWithCards();
+    const deck = this.activeDeck();
+    if (deck) {
+      // Un mazo vacío significa "ninguna nota", nunca "todas".
+      const current = this.manager.getPageFilter() ?? [];
+      const resolved = resolveFlashcardDeckPageTitles(deck, pages);
+      if (sameStringArray(current, resolved)) return;
+      this.manager.setPageFilter(resolved);
+      this.manager.scanVault(this.pages, "new-first");
+      this.writeStoredPageFilter(resolved);
+      return;
+    }
+
     const current = this.manager.getPageFilter();
     if (current === null) return;
     const pageByNormalizedTitle = new Map(
-      this.manager
-        .getPagesWithCards()
-        .map((title) => [normalizeDeckTitle(title).toLowerCase(), title])
+      pages.map((title) => [normalizeDeckTitle(title).toLowerCase(), title])
     );
     const valid = [
       ...new Set(
@@ -1147,37 +1293,329 @@ class MobileReviewApp {
   }
 
   private updateFilterIndicator(): void {
+    this.updateDeckIndicators();
+    const deck = this.activeDeck();
+    const active = Boolean(deck);
     const filter = this.manager.getPageFilter();
-    const active = filter !== null;
+    const count = filter?.length ?? deck?.pageTitles.length ?? 0;
     this.refs.notesButton.classList.toggle("is-active", active);
     this.refs.notesBadge.hidden = !active;
-    this.refs.notesBadge.textContent = active ? String(filter.length) : "";
+    this.refs.notesBadge.textContent = active ? String(count) : "";
     if (!active) {
-      this.refs.notesButton.setAttribute("aria-label", "Seleccionar notas para repasar");
-      this.refs.notesButton.title = "Seleccionar notas";
-    } else if (filter.length === 0) {
-      this.refs.notesButton.setAttribute("aria-label", "Ninguna nota seleccionada");
-      this.refs.notesButton.title = "Ninguna nota seleccionada";
+      this.refs.notesButton.setAttribute(
+        "aria-label",
+        "Editar el mazo de repaso o crear uno nuevo"
+      );
+      this.refs.notesButton.title = "Notas del mazo";
+    } else if (count === 0) {
+      this.refs.notesButton.setAttribute("aria-label", "El mazo activo no tiene notas");
+      this.refs.notesButton.title = "El mazo activo no tiene notas";
     } else {
-      const label = `${filter.length} ${filter.length === 1 ? "nota seleccionada" : "notas seleccionadas"}`;
+      const label = `${count} ${translate(
+        count === 1 ? "nota seleccionada" : "notas seleccionadas"
+      )}`;
       this.refs.notesButton.setAttribute("aria-label", label);
       this.refs.notesButton.title = label;
     }
   }
 
-  private openNotes(): void {
-    if (this.busy) return;
-    const pages = this.manager.getPagesWithCards();
-    const active = this.manager.getPageFilter();
-    this.notesDraft = new Map(
-      pages.map((title) => [title, active === null || active.includes(title)])
+  /* ==================== MAZOS: CARGA Y FILTRO ==================== */
+
+  private activeDeck(): FlashcardDeck | null {
+    return findFlashcardDeck(this.deckFile, this.activeDeckId);
+  }
+
+  /** Notas del mazo resueltas contra las notas que existen en este momento. */
+  private deckPages(deck: FlashcardDeck): string[] {
+    const available = this.manager.getPagesWithCards();
+    return available.length > 0
+      ? resolveFlashcardDeckPageTitles(deck, available)
+      : deck.pageTitles;
+  }
+
+  private async loadDecksForVault(
+    rootPath: string | null,
+    legacyFilter: readonly string[] | null
+  ): Promise<void> {
+    const token = ++this.deckLoadToken;
+    try {
+      const loaded = await this.deckRepository.loadWithMigration(rootPath, legacyFilter);
+      if (token !== this.deckLoadToken) return;
+      this.deckFile = loaded.file;
+      this.activeDeckId = loaded.activeDeckId;
+    } catch (error) {
+      if (token !== this.deckLoadToken) return;
+      console.warn("No se pudieron cargar los mazos de repaso:", error);
+      this.deckFile = emptyFlashcardDeckFile();
+      this.activeDeckId = null;
+    }
+  }
+
+  /** Recarga los mazos de disco (por ejemplo al abrir la hoja o volver a la app). */
+  private async refreshDecksFromDisk(): Promise<void> {
+    const token = ++this.deckLoadToken;
+    const previousActive = this.activeDeckId;
+    const previousFile = JSON.stringify(this.deckFile);
+    try {
+      const loaded = await this.deckRepository.loadWithMigration(
+        this.vault.getActiveRootPath(),
+        this.readStoredPageFilter()
+      );
+      if (token !== this.deckLoadToken) return;
+      this.deckFile = loaded.file;
+      this.activeDeckId = loaded.activeDeckId;
+      if (
+        loaded.activeDeckId !== previousActive ||
+        JSON.stringify(loaded.file) !== previousFile
+      ) {
+        this.applyActiveDeckFilter();
+        this.render();
+      }
+      this.renderDecksList();
+      this.updateDeckIndicators();
+    } catch (error) {
+      console.warn("No se pudieron actualizar los mazos:", error);
+    }
+  }
+
+  /**
+   * Aplica al repaso el mazo activo (o todas las notas si no hay mazo).
+   * Mantiene `sinnotas-flashcard-pages` sincronizado por compatibilidad.
+   */
+  private applyActiveDeckFilter(): void {
+    const deck = this.activeDeck();
+    const filter = deck ? this.deckPages(deck) : null;
+    this.manager.setPageFilter(filter);
+    this.manager.scanVault(this.pages, "new-first");
+    this.writeStoredPageFilter(filter);
+    this.reconcilePageFilter();
+    this.updateFilterIndicator();
+    this.updateDeckIndicators();
+  }
+
+  private async activateDeck(deckId: string | null): Promise<void> {
+    if (deckId !== null && !findFlashcardDeck(this.deckFile, deckId)) return;
+    this.activeDeckId = deckId;
+    this.deckRepository.setActiveDeckId(this.vault.getActiveRootPath(), deckId);
+    this.applyActiveDeckFilter();
+    this.renderDecksList();
+    this.render();
+    this.showToast(
+      deckId ? `Repasando «${this.activeDeck()?.name ?? "mazo"}»` : "Repasando todas las notas"
     );
+  }
+
+  /* ==================== MAZOS: HOJA DE GESTIÓN ==================== */
+
+  private openDecks(): void {
+    if (this.busy) return;
+    this.pendingDeckDeleteId = null;
+    this.renderDecksList();
+    this.refs.decksSheet.hidden = false;
+    this.syncOverlayState();
+    void this.refreshDecksFromDisk();
+  }
+
+  private closeDecks(): void {
+    this.pendingDeckDeleteId = null;
+    this.refs.decksSheet.hidden = true;
+    this.syncOverlayState();
+  }
+
+  private deckStatsLabel(stats: FlashcardPageStats): string {
+    if (stats.total === 0) return translate("Sin tarjetas");
+    const cards = translate(stats.total === 1 ? "tarjeta" : "tarjetas");
+    const pending = translate(stats.due === 1 ? "pendiente" : "pendientes");
+    return `${stats.total} ${cards} · ${stats.due} ${pending}`;
+  }
+
+  private allDeckStats(statsByPage: ReadonlyMap<string, FlashcardPageStats>): FlashcardPageStats {
+    let total = 0;
+    let due = 0;
+    let newCards = 0;
+    for (const entry of statsByPage.values()) {
+      total += entry.total;
+      due += entry.due;
+      newCards += entry.new;
+    }
+    return { total, due, new: newCards };
+  }
+
+  private createDeckCard(
+    deck: FlashcardDeck | null,
+    stats: FlashcardPageStats,
+    active: boolean
+  ): HTMLElement {
+    const name = deck?.name ?? "Todos";
+    const card = document.createElement("div");
+    card.className = "mobile-deck-card";
+    card.classList.toggle("is-active", active);
+    card.setAttribute("role", "listitem");
+
+    const main = document.createElement("button");
+    main.type = "button";
+    main.className = "mobile-deck-card-main";
+    main.dataset.deckAction = "activate";
+    if (deck) main.dataset.deckId = deck.id;
+    main.setAttribute(
+      "aria-label",
+      active ? `${name}, mazo activo` : `Activar el mazo ${name}`
+    );
+
+    const title = document.createElement("span");
+    title.className = "mobile-deck-card-title";
+    const titleText = document.createElement("span");
+    titleText.textContent = name;
+    title.appendChild(titleText);
+    if (active) {
+      const badge = document.createElement("span");
+      badge.className = "mobile-deck-card-badge";
+      badge.textContent = translate("ACTIVO");
+      title.appendChild(badge);
+    }
+    main.appendChild(title);
+
+    const detail = document.createElement("small");
+    detail.className = "mobile-deck-card-stats";
+    detail.textContent = this.deckStatsLabel(stats);
+    main.appendChild(detail);
+    card.appendChild(main);
+
+    if (deck) {
+      const actions = document.createElement("div");
+      actions.className = "mobile-deck-card-actions";
+
+      const edit = document.createElement("button");
+      edit.type = "button";
+      edit.className = "mobile-deck-card-action";
+      edit.dataset.deckAction = "edit";
+      edit.dataset.deckId = deck.id;
+      edit.textContent = translate("Editar");
+      actions.appendChild(edit);
+
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "mobile-deck-card-action is-danger";
+      remove.dataset.deckAction = "delete";
+      remove.dataset.deckId = deck.id;
+      remove.textContent =
+        this.pendingDeckDeleteId === deck.id
+          ? translate("Confirmar")
+          : translate("Eliminar");
+      actions.appendChild(remove);
+
+      card.appendChild(actions);
+    }
+
+    return card;
+  }
+
+  private renderDecksList(): void {
+    const statsByPage = this.manager.getCardStatsByPage();
+    const available = this.manager.getPagesWithCards();
+    const decks = [...this.deckFile.decks].sort((left, right) =>
+      left.name.localeCompare(right.name, "es", { sensitivity: "base" })
+    );
+
+    this.refs.decksList.replaceChildren();
+    this.refs.decksList.appendChild(
+      this.createDeckCard(null, this.allDeckStats(statsByPage), this.activeDeckId === null)
+    );
+    for (const deck of decks) {
+      this.refs.decksList.appendChild(
+        this.createDeckCard(
+          deck,
+          FlashcardsManager.sumCardStats(
+            available.length > 0
+              ? resolveFlashcardDeckPageTitles(deck, available)
+              : deck.pageTitles,
+            statsByPage
+          ),
+          this.activeDeckId === deck.id
+        )
+      );
+    }
+
+    if (decks.length === 0) {
+      const empty = document.createElement("p");
+      empty.className = "mobile-notes-empty";
+      empty.textContent = translate(
+        "Todavía no hay mazos personalizados. Crea uno con “+ Nuevo mazo”."
+      );
+      this.refs.decksList.appendChild(empty);
+    }
+  }
+
+  /* ==================== MAZOS: EDITOR DE NOTAS ==================== */
+
+  private openDeckEditor(deckId: string): void {
+    const deck = findFlashcardDeck(this.deckFile, deckId);
+    if (!deck) return;
+    const pages = this.manager.getPagesWithCards();
+    const selectedKeys = new Set(
+      deck.pageTitles.map((title) => normalizeDeckTitle(title).toLowerCase())
+    );
+    this.notesDraft = new Map(
+      pages.map((title) => [
+        title,
+        selectedKeys.has(normalizeDeckTitle(title).toLowerCase()),
+      ])
+    );
+    this.deckEditorId = deck.id;
+    this.deckEditorIsNew = false;
+    this.deckNameTouched = true;
     this.notesSearch = "";
     this.notesCurrentPage = 1;
     this.refs.notesSearchInput.value = "";
+    this.refs.notesTitle.textContent = translate("Editar mazo");
+    this.refs.deckNameInput.value = deck.name;
+    this.refs.deckNameError.textContent = "";
+    this.refs.applyNotesButton.textContent = translate("Guardar mazo");
     this.renderNotesList({ resetScroll: true });
+    this.validateDeckEditorName();
+    this.refs.decksSheet.hidden = true;
     this.refs.notesSheet.hidden = false;
     this.syncOverlayState();
+  }
+
+  private openNewDeckEditor(): void {
+    const pages = this.manager.getPagesWithCards();
+    this.notesDraft = new Map(pages.map((title) => [title, true]));
+    this.deckEditorId = null;
+    this.deckEditorIsNew = true;
+    this.deckNameTouched = false;
+    this.notesSearch = "";
+    this.notesCurrentPage = 1;
+    this.refs.notesSearchInput.value = "";
+    this.refs.notesTitle.textContent = translate("Nuevo mazo");
+    this.refs.deckNameInput.value = "";
+    this.refs.deckNameError.textContent = "";
+    this.refs.applyNotesButton.textContent = translate("Crear mazo");
+    this.renderNotesList({ resetScroll: true });
+    this.validateDeckEditorName();
+    this.refs.decksSheet.hidden = true;
+    this.refs.notesSheet.hidden = false;
+    this.syncOverlayState();
+  }
+
+  private openActiveDeckEditor(): void {
+    if (this.activeDeckId) this.openDeckEditor(this.activeDeckId);
+    else this.openNewDeckEditor();
+  }
+
+  private validateDeckEditorName(): string | null {
+    const name = normalizeFlashcardDeckName(this.refs.deckNameInput.value);
+    const error = validateFlashcardDeckName(
+      name,
+      this.deckFile.decks,
+      this.deckEditorIsNew ? undefined : this.deckEditorId ?? undefined
+    );
+    const pristineNewName =
+      this.deckEditorIsNew && !this.deckNameTouched && !name;
+    this.refs.deckNameError.textContent =
+      error && !pristineNewName ? translate(error) : "";
+    this.refs.applyNotesButton.disabled = Boolean(error);
+    return error;
   }
 
   private closeNotes(): void {
@@ -1185,6 +1623,133 @@ class MobileReviewApp {
     this.notesRenderToken++;
     this.refs.notesSheet.hidden = true;
     this.syncOverlayState();
+  }
+
+  private async saveDeckFromEditor(): Promise<void> {
+    if (this.busy || this.refs.notesSheet.hidden) return;
+    const name = normalizeFlashcardDeckName(this.refs.deckNameInput.value);
+    this.deckNameTouched = true;
+    const error = this.validateDeckEditorName();
+    if (error) {
+      this.refs.deckNameError.textContent = translate(error);
+      return;
+    }
+
+    const pages = this.manager.getPagesWithCards();
+    const selected = pages.filter((title) => this.notesDraft.get(title) ?? false);
+    const previousDeck = this.deckEditorIsNew
+      ? null
+      : findFlashcardDeck(this.deckFile, this.deckEditorId);
+    const existingTitles = this.pages.map((page) => page.title);
+    // Conservar notas del mazo que siguen existiendo pero no aparecen en el
+    // editor porque ahora no tienen tarjetas.
+    const pageTitles = previousDeck
+      ? mergeFlashcardDeckSelection(
+          selected,
+          resolveFlashcardDeckPageTitles(previousDeck, existingTitles),
+          existingTitles,
+          pages
+        )
+      : selected;
+    const previousFile = this.deckFile;
+    let target: FlashcardDeck;
+    if (this.deckEditorIsNew) {
+      const added = addFlashcardDeck(this.deckFile, name, pageTitles);
+      this.deckFile = added.file;
+      target = added.deck;
+    } else if (this.deckEditorId) {
+      this.deckFile = updateFlashcardDeck(this.deckFile, this.deckEditorId, {
+        name,
+        pageTitles,
+      });
+      target =
+        findFlashcardDeck(this.deckFile, this.deckEditorId) ??
+        this.deckFile.decks[this.deckFile.decks.length - 1];
+    } else {
+      return;
+    }
+
+    try {
+      this.deckFile = await this.deckRepository.save(
+        this.vault.getActiveRootPath(),
+        this.deckFile
+      );
+    } catch (saveError) {
+      this.deckFile = previousFile;
+      this.showToast(
+        saveError instanceof Error
+          ? saveError.message
+          : "No se pudo guardar el mazo."
+      );
+      return;
+    }
+
+    const saved =
+      findFlashcardDeck(this.deckFile, target.id) ??
+      this.deckFile.decks.find(
+        (deck) => normalizeDeckTitle(deck.name).toLowerCase() === normalizeDeckTitle(name).toLowerCase()
+      );
+    if (!saved) {
+      this.showToast("No se pudo guardar el mazo.");
+      return;
+    }
+
+    // Guardar un mazo lo deja activo: es la forma más directa de repasarlo.
+    this.activeDeckId = saved.id;
+    this.deckRepository.setActiveDeckId(this.vault.getActiveRootPath(), saved.id);
+    this.applyActiveDeckFilter();
+    this.deckEditorId = saved.id;
+    this.deckEditorIsNew = false;
+    this.closeNotes();
+    this.render();
+    this.showToast(`Mazo «${saved.name}» guardado`);
+  }
+
+  private async deleteDeck(deckId: string): Promise<void> {
+    const deck = findFlashcardDeck(this.deckFile, deckId);
+    if (!deck) return;
+    if (this.pendingDeckDeleteId !== deckId) {
+      this.pendingDeckDeleteId = deckId;
+      this.renderDecksList();
+      this.showToast("Pulsa «Confirmar» para eliminar el mazo.");
+      return;
+    }
+    this.pendingDeckDeleteId = null;
+
+    const previousFile = this.deckFile;
+    const wasActive = this.activeDeckId === deckId;
+    this.deckFile = deleteFlashcardDeck(this.deckFile, deckId);
+    if (wasActive) {
+      this.activeDeckId = null;
+      this.deckRepository.setActiveDeckId(this.vault.getActiveRootPath(), null);
+    }
+    try {
+      this.deckFile = await this.deckRepository.save(
+        this.vault.getActiveRootPath(),
+        this.deckFile
+      );
+    } catch (saveError) {
+      this.deckFile = previousFile;
+      if (wasActive) {
+        this.activeDeckId = deckId;
+        this.deckRepository.setActiveDeckId(this.vault.getActiveRootPath(), deckId);
+      }
+      this.renderDecksList();
+      this.showToast(
+        saveError instanceof Error
+          ? saveError.message
+          : "No se pudo eliminar el mazo."
+      );
+      return;
+    }
+
+    if (wasActive) {
+      this.applyActiveDeckFilter();
+      this.render();
+    }
+    this.renderDecksList();
+    this.updateDeckIndicators();
+    this.showToast(`Mazo «${deck.name}» eliminado`);
   }
 
   private setAllNotesSelected(selected: boolean): void {
@@ -1331,23 +1896,22 @@ class MobileReviewApp {
     this.refs.notesList.appendChild(row);
   }
 
-  private applyNotesSelection(): void {
-    const pages = this.manager.getPagesWithCards();
-    const selected = pages.filter((title) => this.notesDraft.get(title) ?? false);
-    const filter = pages.length === 0 || selected.length === pages.length ? null : selected;
-    this.manager.setPageFilter(filter);
-    this.manager.scanVault(this.pages, "new-first");
-    this.writeStoredPageFilter(filter);
-    this.closeNotes();
-    this.render();
-    this.updateFilterIndicator();
-    this.showToast(
-      filter === null
-        ? "Repasando todas las notas"
-        : selected.length === 0
-          ? "Ninguna nota seleccionada"
-          : `Repasando ${selected.length} ${selected.length === 1 ? "nota" : "notas"}`
-    );
+  private updateDeckIndicators(): void {
+    const deck = this.activeDeck();
+    const deckCount = this.deckFile.decks.length;
+    this.refs.activeDeckName.textContent = deck?.name ?? "Todos";
+    this.refs.decksBadge.hidden = deckCount === 0;
+    this.refs.decksBadge.textContent = deckCount > 0 ? String(deckCount) : "";
+    const chip = this.refs.activeDeckName.closest<HTMLElement>(".mobile-deck-chip");
+    if (chip) {
+      chip.title = deck
+        ? `Mazo activo: ${deck.name}`
+        : "Repasando todas las notas";
+      chip.setAttribute(
+        "aria-label",
+        deck ? `Mazos de repaso. Mazo activo: ${deck.name}` : "Mazos de repaso. Todas las notas"
+      );
+    }
   }
 
   private async pickVault(): Promise<void> {
@@ -1502,6 +2066,7 @@ class MobileReviewApp {
         !this.refs.settingsSheet.hidden ||
         !this.refs.drawer.hidden ||
         !this.refs.notesSheet.hidden ||
+        !this.refs.decksSheet.hidden ||
         !this.refs.occlusionEditor.hidden
     );
   }
@@ -2289,7 +2854,7 @@ class MobileReviewApp {
       if (filter && filter.length === 0) {
         this.showEmpty(
           "Sin notas seleccionadas",
-          "Abre el selector de notas con el botón ☰ y elige qué quieres repasar."
+          "Abre Mazos con el botón ☰ y elige qué quieres repasar."
         );
       } else {
         this.showEmpty(
@@ -2579,6 +3144,11 @@ class MobileReviewApp {
     this.refs.vaultButton.disabled = busy;
     this.refs.refreshButton.disabled = busy;
     this.refs.notesButton.disabled = busy;
+    this.root
+      .querySelectorAll<HTMLButtonElement>("[data-action='decks'], [data-action='new-deck']")
+      .forEach((button) => {
+        button.disabled = busy;
+      });
     this.updateHistoryButtons();
   }
 

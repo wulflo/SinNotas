@@ -1563,17 +1563,22 @@ pub(crate) fn is_safe_note_component(component: &str) -> bool {
 
 /// Archivo interno donde vive el diario de repasos.
 const REVIEW_PROGRESS_PATH: &str = ".sinnotas/progress/reviews.json";
+/// Archivo interno donde viven los mazos personalizados de flashcards.
+/// Viaja con el vault y se sincroniza entre escritorio y Android.
+const FLASHCARD_DECKS_PATH: &str = ".sinnotas/flashcards/decks.json";
 /// Límite defensivo para el diario: 5 MB y 4000 repasos como máximo.
 const REVIEW_PROGRESS_MAX_BYTES: usize = 5 * 1024 * 1024;
 const REVIEW_PROGRESS_MAX_ENTRIES: usize = 4000;
 /// Los repasos más antiguos se eliminan para que el archivo no crezca sin fin.
 const REVIEW_PROGRESS_MAX_AGE_DAYS: i64 = 365;
+/// Límite del archivo de mazos: 1 MB es de sobra para miles de selecciones.
+const FLASHCARD_DECKS_MAX_BYTES: usize = 1024 * 1024;
 
-/// Solo se permite el archivo fijo de progreso. No se aceptan rutas
+/// Solo se permiten archivos internos fijos y conocidos. No se aceptan rutas
 /// arbitrarias, `..`, URIs ni nombres temporales.
 fn validate_progress_relative_path(relative_path: &str) -> Result<(), String> {
-    if relative_path != REVIEW_PROGRESS_PATH {
-        return Err("La ruta del progreso no es válida.".to_string());
+    if relative_path != REVIEW_PROGRESS_PATH && relative_path != FLASHCARD_DECKS_PATH {
+        return Err("La ruta del archivo interno no es válida.".to_string());
     }
     Ok(())
 }
@@ -4462,6 +4467,33 @@ async fn write_review_progress(
     Ok(merged)
 }
 
+/// Lee los mazos personalizados de `.sinnotas/flashcards/decks.json`.
+#[tauri::command]
+async fn read_flashcard_decks(
+    state: tauri::State<'_, ActiveVault>,
+) -> Result<Option<String>, String> {
+    let storage = active_storage(&state)?;
+    storage.read_progress_file(FLASHCARD_DECKS_PATH).await
+}
+
+/// Guarda los mazos personalizados de forma atómica.
+///
+/// El frontend hace la fusión por `updatedAt` y lápidas; el backend solo
+/// valida el límite de tamaño y escribe en la ruta interna fija.
+#[tauri::command]
+async fn write_flashcard_decks(
+    contents: String,
+    state: tauri::State<'_, ActiveVault>,
+) -> Result<(), String> {
+    if contents.len() > FLASHCARD_DECKS_MAX_BYTES {
+        return Err("El archivo de mazos supera el límite permitido.".to_string());
+    }
+    let storage = active_storage(&state)?;
+    storage
+        .write_progress_file(FLASHCARD_DECKS_PATH, &contents)
+        .await
+}
+
 /// Devuelve las revisiones guardadas en disco de una nota.
 #[tauri::command]
 fn read_page_revisions(
@@ -5597,6 +5629,8 @@ pub fn run() {
             save_page,
             read_review_progress,
             write_review_progress,
+            read_flashcard_decks,
+            write_flashcard_decks,
             read_page_revisions,
             write_page_revisions,
             get_snapshot_state,
@@ -6847,6 +6881,27 @@ mod tests {
                 Some("{\"version\":1,\"entries\":[]}")
             );
             assert!(root.join(REVIEW_PROGRESS_PATH).is_file());
+
+            // El archivo de mazos usa el mismo almacén interno atómico.
+            assert!(storage
+                .read_progress_file(FLASHCARD_DECKS_PATH)
+                .await
+                .unwrap()
+                .is_none());
+            storage
+                .write_progress_file(FLASHCARD_DECKS_PATH, "{\"version\":1,\"decks\":[]}")
+                .await
+                .unwrap();
+            assert_eq!(
+                storage
+                    .read_progress_file(FLASHCARD_DECKS_PATH)
+                    .await
+                    .unwrap()
+                    .as_deref(),
+                Some("{\"version\":1,\"decks\":[]}")
+            );
+            assert!(root.join(FLASHCARD_DECKS_PATH).is_file());
+
             assert!(storage
                 .read_progress_file("progress/otro.json")
                 .await
@@ -6960,8 +7015,10 @@ mod tests {
         assert!(merge_review_progress_json(None, "no json").is_err());
         assert!(merge_review_progress_json(None, "{\"version\":1}").is_err());
         assert!(validate_progress_relative_path(".sinnotas/progress/reviews.json").is_ok());
+        assert!(validate_progress_relative_path(".sinnotas/flashcards/decks.json").is_ok());
         assert!(validate_progress_relative_path("../reviews.json").is_err());
         assert!(validate_progress_relative_path("progress/other.json").is_err());
+        assert!(validate_progress_relative_path(".sinnotas/flashcards/other.json").is_err());
     }
 
     #[test]

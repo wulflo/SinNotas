@@ -272,7 +272,56 @@ body.mobile-review-body {
 
 .mobile-header-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
+}
+
+.mobile-deck-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 150px;
+  min-height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--mobile-border);
+  border-radius: 14px;
+  background: var(--mobile-bg-elevated);
+  color: var(--mobile-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.mobile-deck-chip:active {
+  transform: scale(0.97);
+  background: var(--mobile-bg-soft);
+}
+
+.mobile-deck-chip:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.mobile-deck-chip-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+  color: var(--mobile-accent);
+}
+
+.mobile-deck-chip-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.mobile-deck-chip-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: calc(12px * var(--mobile-font-scale, 1));
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .mobile-notes-button {
@@ -1528,6 +1577,174 @@ body.mobile-review-body {
 
 .mobile-notes-editor {
   width: min(560px, 100%);
+}
+
+.mobile-deck-name-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+.mobile-deck-name-field > span {
+  color: var(--mobile-muted);
+  font-size: calc(11px * var(--mobile-font-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mobile-deck-name-field input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--mobile-border);
+  border-radius: 12px;
+  outline: none;
+  background: var(--mobile-bg-soft);
+  color: var(--mobile-text);
+  font: inherit;
+  font-size: calc(15px * var(--mobile-font-scale, 1));
+}
+
+.mobile-deck-name-field input:focus {
+  border-color: var(--mobile-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mobile-accent) 22%, transparent);
+}
+
+.mobile-deck-name-error {
+  min-height: 16px;
+  margin: 0 0 8px;
+  color: var(--mobile-danger);
+  font-size: calc(12px * var(--mobile-font-scale, 1));
+  font-weight: 600;
+}
+
+.mobile-decks-editor {
+  width: min(560px, 100%);
+}
+
+.mobile-decks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 110px;
+  max-height: min(52dvh, 460px);
+  margin: 10px 0;
+  padding: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
+.mobile-deck-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--mobile-border);
+  border-radius: 12px;
+  background: var(--mobile-bg-soft);
+  overflow: hidden;
+}
+
+.mobile-deck-card.is-active {
+  border-color: var(--mobile-accent);
+  background: color-mix(in srgb, var(--mobile-accent) 12%, var(--mobile-bg-soft));
+}
+
+.mobile-deck-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mobile-deck-card-main:focus-visible,
+.mobile-deck-card-action:focus-visible {
+  outline: 2px solid var(--mobile-accent);
+  outline-offset: -2px;
+}
+
+.mobile-deck-card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--mobile-title);
+  font-size: calc(14px * var(--mobile-font-scale, 1));
+  font-weight: 700;
+}
+
+.mobile-deck-card-title > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-deck-card-badge {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--mobile-accent-strong);
+  color: #fff;
+  font-size: calc(9px * var(--mobile-font-scale, 1));
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.mobile-deck-card-stats {
+  color: var(--mobile-muted);
+  font-size: calc(11px * var(--mobile-font-scale, 1));
+  font-variant-numeric: tabular-nums;
+}
+
+.mobile-deck-card-actions {
+  display: flex;
+  gap: 6px;
+  padding: 0 8px 8px;
+}
+
+.mobile-deck-card-action {
+  flex: 1 1 0;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid var(--mobile-border);
+  border-radius: 8px;
+  background: var(--mobile-bg-elevated);
+  color: var(--mobile-muted);
+  font: inherit;
+  font-size: calc(12px * var(--mobile-font-scale, 1));
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mobile-deck-card-action:active {
+  background: var(--mobile-bg);
+}
+
+.mobile-deck-card-action.is-danger {
+  color: var(--mobile-danger);
+}
+
+.mobile-decks-actions {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 420px) {
+  .mobile-deck-chip {
+    max-width: 104px;
+  }
+
+  .mobile-deck-chip-name {
+    max-width: 64px;
+  }
 }
 
 .mobile-notes-toolbar {

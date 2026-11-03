@@ -73,6 +73,22 @@ import {
   type DeckTree,
 } from "./views/flashcard-decks";
 import { ReviewProgressStore, type ReviewProgressEvent } from "./store/review-progress";
+import {
+  FLASHCARD_DECK_NAME_MAX_LENGTH,
+  addFlashcardDeck,
+  deleteFlashcardDeck,
+  emptyFlashcardDeckFile,
+  findFlashcardDeck,
+  flashcardDeckPageTitlesEqual,
+  mergeFlashcardDeckSelection,
+  normalizeFlashcardDeckName,
+  resolveFlashcardDeckPageTitles,
+  updateFlashcardDeck,
+  validateFlashcardDeckName,
+  type FlashcardDeck,
+  type FlashcardDeckFile,
+} from "./store/flashcard-decks";
+import { FlashcardDeckRepository } from "./store/flashcard-deck-storage";
 import { collectOutgoingLinks } from "./store/wikilinks";
 import { connectedPageTitles } from "./views/graph-neighborhood";
 import { selectSidebarPages } from "./store/sidebar-selection";
@@ -103,7 +119,11 @@ import {
   type GraphColorRule,
   type GraphSettings,
 } from "./views/graph-settings";
-import { FlashcardsManager, type FlashcardReviewOrder } from "./views/flashcards-manager";
+import {
+  FlashcardsManager,
+  type FlashcardReviewOrder,
+  type FlashcardPageStats,
+} from "./views/flashcards-manager";
 import { FlashcardLoader, type FlashcardLoadProgress } from "./views/flashcard-loader";
 import { KanbanManager } from "./views/kanban-view";
 import { PdfReaderView } from "./views/pdf-view";
@@ -447,14 +467,37 @@ const flashcardDeckCollapsed = new Set<string>();
 
 /** Borrador de casillas mientras el usuario navega entre páginas del
  * paginado. Sin este mapa, re-renderizar una página perdería los cambios
- * hechos en otras; persiste hasta "Guardar selección". */
+ * hechos en otras; persiste hasta guardar el mazo. */
 const flashcardPagesDraftSelection = new Map<string, boolean>();
 
-/** Estado predeterminado (sin tocar) de una nota según el filtro guardado. */
+/* ==================== MAZOS PERSONALIZADOS ==================== */
+
+const flashcardDeckRepository = new FlashcardDeckRepository();
+let flashcardDeckFile: FlashcardDeckFile = emptyFlashcardDeckFile();
+let activeFlashcardDeckId: string | null = null;
+let flashcardDecksLoadToken = 0;
+
+/** Editor del mazo abierto. Para un mazo nuevo, `editorId` es null y
+ * `editorIsNew` indica que todavía no existe en el archivo. */
+let flashcardDeckEditorOpen = false;
+let flashcardDeckEditorId: string | null = null;
+let flashcardDeckEditorIsNew = false;
+/** Notas del mazo antes de editar. Define el estado inicial de las casillas. */
+let flashcardDeckEditorBaseTitles: string[] = [];
+/** Conserva los cambios del nombre mientras se repinta el árbol. */
+let flashcardDeckEditorName = "";
+/** ¿El usuario ya tocó el nombre del mazo abierto? Evita mostrar el error de
+ * campo vacío nada más abrir el editor de un mazo nuevo. */
+let flashcardDeckEditorNameTouched = false;
+
+/** Estado predeterminado (sin tocar) de una nota según el mazo en edición. */
 function flashcardPageDefaultState(title: string): boolean {
-  if (flashcardPageFilter === null) return true;
+  const base = flashcardDeckEditorOpen
+    ? flashcardDeckEditorBaseTitles
+    : flashcardPageFilter;
+  if (base === null) return !flashcardDeckEditorOpen;
   const normalized = normalizeDeckTitle(title).toLowerCase();
-  return flashcardPageFilter.some(
+  return base.some(
     (stored) => normalizeDeckTitle(stored).toLowerCase() === normalized
   );
 }
@@ -480,6 +523,32 @@ function renameFlashcardPageReferences(oldTitle: string, newTitle: string): void
     const selected = flashcardPagesDraftSelection.get(oldTitle) as boolean;
     flashcardPagesDraftSelection.delete(oldTitle);
     flashcardPagesDraftSelection.set(newTitle, selected);
+  }
+
+  // Los mazos guardan títulos exactos: si la nota estaba en uno, migrarla.
+  const oldKey = normalizeDeckTitle(oldTitle).toLowerCase();
+  let decksChanged = false;
+  const decks = flashcardDeckFile.decks.map((deck) => {
+    const nextTitles = deck.pageTitles.map((title) =>
+      normalizeDeckTitle(title).toLowerCase() === oldKey ? newTitle : title
+    );
+    if (nextTitles.every((title, index) => title === deck.pageTitles[index])) {
+      return deck;
+    }
+    decksChanged = true;
+    return { ...deck, pageTitles: [...new Set(nextTitles)], updatedAt: Date.now() };
+  });
+  if (decksChanged) {
+    flashcardDeckFile = { ...flashcardDeckFile, decks };
+    if (
+      flashcardDeckEditorOpen &&
+      flashcardDeckEditorId &&
+      decks.some((deck) => deck.id === flashcardDeckEditorId)
+    ) {
+      const editing = findFlashcardDeck(flashcardDeckFile, flashcardDeckEditorId);
+      flashcardDeckEditorBaseTitles = editing?.pageTitles ?? [];
+    }
+    void persistFlashcardDeckFile();
   }
 }
 
@@ -796,6 +865,19 @@ const btnFlashcardPagesSave = document.getElementById("btn-flashcard-pages-save"
 const flashcardPagesStatus = document.getElementById("flashcard-pages-status") as HTMLSpanElement;
 const flashcardPagesSearch = document.getElementById("flashcard-pages-search") as HTMLInputElement | null;
 const flashcardPagesSort = document.getElementById("flashcard-pages-sort") as HTMLSelectElement | null;
+const flashcardActiveDeckSelect = document.getElementById("flashcard-active-deck") as HTMLSelectElement | null;
+const flashcardDeckSwitcher = document.getElementById("flashcard-deck-switcher") as HTMLSelectElement | null;
+const flashcardDecksGrid = document.getElementById("flashcard-decks-grid") as HTMLDivElement | null;
+const btnFlashcardDeckNew = document.getElementById("btn-flashcard-deck-new") as HTMLButtonElement | null;
+const btnFlashcardDeckEditActive = document.getElementById("btn-flashcard-deck-edit-active") as HTMLButtonElement | null;
+const btnFlashcardDeckDeleteActive = document.getElementById("btn-flashcard-deck-delete-active") as HTMLButtonElement | null;
+const btnFlashcardDeckCancel = document.getElementById("btn-flashcard-deck-cancel") as HTMLButtonElement | null;
+const flashcardDeckEditor = document.getElementById("flashcard-deck-editor") as HTMLDivElement | null;
+const flashcardDeckEditorTitle = document.getElementById("flashcard-deck-editor-title") as HTMLHeadingElement | null;
+const flashcardDeckEditorHelp = document.getElementById("flashcard-deck-editor-help") as HTMLParagraphElement | null;
+const flashcardDeckEditorEmpty = document.getElementById("flashcard-deck-editor-empty") as HTMLParagraphElement | null;
+const flashcardDeckNameInput = document.getElementById("flashcard-deck-name") as HTMLInputElement | null;
+const flashcardDeckActivateOnSave = document.getElementById("flashcard-deck-activate-on-save") as HTMLInputElement | null;
 const flashcardTextSizeInput = document.getElementById("flashcard-text-size") as HTMLInputElement | null;
 const flashcardTextSizeValue = document.getElementById("flashcard-text-size-value") as HTMLOutputElement | null;
 const cardFontDecreaseButton = document.getElementById("btn-card-font-decrease") as HTMLButtonElement | null;
@@ -1949,6 +2031,507 @@ function appendFlashcardDeckRow(
   flashcardPagesList.appendChild(row);
 }
 
+/* ==================== MAZOS PERSONALIZADOS: UI Y ESTADO ==================== */
+
+function flashcardVaultRoot(): string | null {
+  return vault.getActiveRootPath();
+}
+
+function activeFlashcardDeck(): FlashcardDeck | null {
+  return findFlashcardDeck(flashcardDeckFile, activeFlashcardDeckId);
+}
+
+function flashcardDeckPages(deck: FlashcardDeck): string[] {
+  const available = flashcardsManager.getPagesWithCards();
+  return available.length > 0
+    ? resolveFlashcardDeckPageTitles(deck, available)
+    : deck.pageTitles;
+}
+
+function flashcardDeckStats(
+  deck: FlashcardDeck,
+  statsByPage: ReadonlyMap<string, FlashcardPageStats>
+): FlashcardPageStats {
+  return FlashcardsManager.sumCardStats(flashcardDeckPages(deck), statsByPage);
+}
+
+function allFlashcardStats(
+  statsByPage: ReadonlyMap<string, FlashcardPageStats>
+): FlashcardPageStats {
+  let total = 0;
+  let due = 0;
+  let newCards = 0;
+  for (const entry of statsByPage.values()) {
+    total += entry.total;
+    due += entry.due;
+    newCards += entry.new;
+  }
+  return { total, due, new: newCards };
+}
+
+function deckStatsLabel(stats: FlashcardPageStats): string {
+  if (stats.total === 0) return "Sin tarjetas";
+  const cards = translate(stats.total === 1 ? "tarjeta" : "tarjetas");
+  const pending = translate(stats.due === 1 ? "pendiente" : "pendientes");
+  return `${stats.total} ${cards} · ${stats.due} ${pending}`;
+}
+
+function applyActiveFlashcardDeckFilter(options: {
+  restartSession: boolean;
+  renderTree: boolean;
+}): void {
+  const deck = activeFlashcardDeck();
+  // `flashcardDeckPages` resuelve alias antiguos (`::`) y descarta notas que ya
+  // no existen. Si el manager aún no ha escaneado, cae a los títulos guardados.
+  flashcardPageFilter = deck ? flashcardDeckPages(deck) : null;
+  try {
+    localStorage.setItem(
+      "sinnotas-flashcard-pages",
+      JSON.stringify(flashcardPageFilter)
+    );
+  } catch {
+    // El filtro sigue activo aunque el WebView no permita persistirlo.
+  }
+  flashcardsManager.setPageFilter(flashcardPageFilter);
+  if (options.renderTree) renderFlashcardPagesFilter(false);
+  if (options.restartSession && currentView === "flashcards") {
+    startFlashcardsSession();
+  }
+}
+
+/** Guarda el archivo de mazos en serie para no pisar escrituras rápidas. */
+let flashcardDeckSaveQueue: Promise<boolean> = Promise.resolve(true);
+
+function persistFlashcardDeckFile(): Promise<boolean> {
+  const task = flashcardDeckSaveQueue.then(async () => {
+    try {
+      flashcardDeckFile = await flashcardDeckRepository.save(
+        flashcardVaultRoot(),
+        flashcardDeckFile
+      );
+      return true;
+    } catch (error) {
+      console.error("No se pudieron guardar los mazos:", error);
+      showToast(
+        error instanceof Error
+          ? error.message
+          : "No se pudieron guardar los mazos."
+      );
+      return false;
+    }
+  });
+  flashcardDeckSaveQueue = task;
+  return task;
+}
+
+function createFlashcardDeckTile(options: {
+  id: string | null;
+  name: string;
+  stats: FlashcardPageStats;
+  active: boolean;
+  editable: boolean;
+}): HTMLElement {
+  const tile = document.createElement("article");
+  tile.className = "flashcard-deck-tile";
+  tile.classList.toggle("is-active", options.active);
+  tile.setAttribute("role", "listitem");
+
+  const main = document.createElement("button");
+  main.type = "button";
+  main.className = "flashcard-deck-tile-main";
+  main.setAttribute(
+    "aria-label",
+    options.active
+      ? `${options.name}, mazo activo`
+      : `Activar el mazo ${options.name}`
+  );
+  main.addEventListener("click", () => {
+    void activateFlashcardDeck(options.id);
+  });
+
+  const name = document.createElement("span");
+  name.className = "flashcard-deck-tile-name";
+  const nameText = document.createElement("span");
+  nameText.textContent = options.name;
+  name.appendChild(nameText);
+  if (options.active) {
+    const badge = document.createElement("span");
+    badge.className = "flashcard-deck-tile-badge";
+    badge.textContent = "ACTIVO";
+    name.appendChild(badge);
+  }
+  main.appendChild(name);
+
+  const stats = document.createElement("span");
+  stats.className = "flashcard-deck-tile-stats";
+  stats.textContent = deckStatsLabel(options.stats);
+  main.appendChild(stats);
+  tile.appendChild(main);
+
+  const deckId = options.id;
+  if (options.editable && deckId) {
+    const actions = document.createElement("div");
+    actions.className = "flashcard-deck-tile-actions";
+    const edit = document.createElement("button");
+    edit.type = "button";
+    edit.className = "flashcard-deck-tile-action";
+    edit.textContent = "Editar";
+    edit.addEventListener("click", () => {
+      void openFlashcardDeckEditorChecked(deckId, false);
+    });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "flashcard-deck-tile-action is-danger";
+    remove.textContent = "Eliminar";
+    remove.addEventListener("click", () => {
+      void removeFlashcardDeck(deckId);
+    });
+    actions.append(edit, remove);
+    tile.appendChild(actions);
+  }
+
+  return tile;
+}
+
+function renderFlashcardDecksUI(): void {
+  const statsByPage = flashcardsManager.getCardStatsByPage();
+  const decks = [...flashcardDeckFile.decks].sort((left, right) =>
+    left.name.localeCompare(right.name, "es", { sensitivity: "base" })
+  );
+
+  const fillSelect = (select: HTMLSelectElement | null): void => {
+    if (!select) return;
+    select.replaceChildren();
+    const all = document.createElement("option");
+    all.value = "";
+    all.textContent = "Todos";
+    select.appendChild(all);
+    for (const deck of decks) {
+      const option = document.createElement("option");
+      option.value = deck.id;
+      option.textContent = deck.name;
+      select.appendChild(option);
+    }
+    select.value = activeFlashcardDeckId ?? "";
+  };
+  fillSelect(flashcardActiveDeckSelect);
+  fillSelect(flashcardDeckSwitcher);
+
+  if (flashcardDecksGrid) {
+    flashcardDecksGrid.replaceChildren();
+    flashcardDecksGrid.appendChild(
+      createFlashcardDeckTile({
+        id: null,
+        name: "Todos",
+        stats: allFlashcardStats(statsByPage),
+        active: activeFlashcardDeckId === null,
+        editable: false,
+      })
+    );
+    for (const deck of decks) {
+      flashcardDecksGrid.appendChild(
+        createFlashcardDeckTile({
+          id: deck.id,
+          name: deck.name,
+          stats: flashcardDeckStats(deck, statsByPage),
+          active: activeFlashcardDeckId === deck.id,
+          editable: true,
+        })
+      );
+    }
+    const newTile = document.createElement("button");
+    newTile.type = "button";
+    newTile.className = "flashcard-deck-tile-new";
+    newTile.textContent = "+ Nuevo mazo";
+    newTile.addEventListener("click", openNewFlashcardDeckEditor);
+    flashcardDecksGrid.appendChild(newTile);
+  }
+
+  const activeDeck = activeFlashcardDeck();
+  if (btnFlashcardDeckEditActive) {
+    btnFlashcardDeckEditActive.disabled = !activeDeck;
+  }
+  if (btnFlashcardDeckDeleteActive) {
+    btnFlashcardDeckDeleteActive.disabled = !activeDeck;
+  }
+
+  if (flashcardDeckEditor) {
+    flashcardDeckEditor.hidden = !flashcardDeckEditorOpen;
+  }
+  if (flashcardDeckEditorEmpty) {
+    flashcardDeckEditorEmpty.hidden = flashcardDeckEditorOpen;
+  }
+  if (flashcardDeckEditorOpen && flashcardDeckEditorTitle) {
+    const editing = flashcardDeckEditorIsNew
+      ? null
+      : findFlashcardDeck(flashcardDeckFile, flashcardDeckEditorId);
+    flashcardDeckEditorTitle.textContent = flashcardDeckEditorIsNew
+      ? "Nuevo mazo"
+      : `Notas del mazo: ${editing?.name ?? "mazo"}`;
+  }
+  if (flashcardDeckEditorHelp) {
+    flashcardDeckEditorHelp.hidden = !flashcardDeckEditorOpen;
+  }
+  if (flashcardDeckNameInput && flashcardDeckEditorOpen) {
+    flashcardDeckNameInput.value = flashcardDeckEditorName;
+    flashcardDeckNameInput.maxLength = FLASHCARD_DECK_NAME_MAX_LENGTH;
+  }
+  if (flashcardDeckActivateOnSave && flashcardDeckEditorOpen) {
+    const editingId = flashcardDeckEditorId;
+    flashcardDeckActivateOnSave.checked =
+      flashcardDeckEditorIsNew || (editingId !== null && editingId === activeFlashcardDeckId);
+  }
+  if (btnFlashcardDeckCancel) {
+    btnFlashcardDeckCancel.hidden = !flashcardDeckEditorOpen ||
+      (!flashcardDeckEditorIsNew && flashcardDeckEditorId === activeFlashcardDeckId);
+  }
+  updateFlashcardPagesDirtyState();
+}
+
+function openFlashcardDeckEditor(
+  deckId: string,
+  isNew: boolean,
+  render = true
+): void {
+  const deck = findFlashcardDeck(flashcardDeckFile, deckId);
+  if (!deck && !isNew) return;
+  flashcardDeckEditorOpen = true;
+  flashcardDeckEditorId = deck?.id ?? null;
+  flashcardDeckEditorIsNew = isNew;
+  flashcardDeckEditorBaseTitles = deck ? [...deck.pageTitles] : [];
+  flashcardDeckEditorName = deck?.name ?? "";
+  flashcardDeckEditorNameTouched = deck ? true : false;
+  flashcardPagesDraftSelection.clear();
+  for (const title of flashcardsManager.getPagesWithCards()) {
+    // Un mazo nuevo parte de todas las notas: es más rápido desmarcar las que
+    // sobran que marcar una a una en bóvedas grandes.
+    flashcardPagesDraftSelection.set(
+      title,
+      isNew ? true : flashcardPageDefaultState(title)
+    );
+  }
+  flashcardPagesCurrentPage = 1;
+  if (render) {
+    renderFlashcardDecksUI();
+    renderFlashcardPagesFilter(false);
+    flashcardDeckEditor?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+}
+
+async function openFlashcardDeckEditorChecked(
+  deckId: string,
+  isNew: boolean
+): Promise<void> {
+  if (!(await confirmDiscardFlashcardDeckDraft(deckId, isNew))) return;
+  // Volver a abrir el mazo que ya está en el editor no debe borrar el borrador
+  // (por ejemplo, al pulsar otra vez "Editar notas").
+  if (!isNew && flashcardDeckEditorOpen && flashcardDeckEditorId === deckId) {
+    flashcardDeckEditor?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    return;
+  }
+  openFlashcardDeckEditor(deckId, isNew);
+}
+
+function openNewFlashcardDeckEditor(): void {
+  void openFlashcardDeckEditorChecked("", true);
+}
+
+function closeFlashcardDeckEditor(render = true): void {
+  flashcardDeckEditorOpen = false;
+  flashcardDeckEditorId = null;
+  flashcardDeckEditorIsNew = false;
+  flashcardDeckEditorBaseTitles = [];
+  flashcardDeckEditorName = "";
+  flashcardDeckEditorNameTouched = false;
+  flashcardPagesDraftSelection.clear();
+  if (render) {
+    renderFlashcardDecksUI();
+    renderFlashcardPagesFilter(false);
+  }
+}
+
+/** ¿El editor abierto tiene un nombre o una selección distintos a los guardados? */
+function flashcardDeckEditorHasUnsavedChanges(): boolean {
+  if (!flashcardDeckEditorOpen) return false;
+  if (flashcardDeckEditorIsNew) return true;
+  const editing = findFlashcardDeck(flashcardDeckFile, flashcardDeckEditorId);
+  if (!editing) return true;
+  const name = normalizeFlashcardDeckName(
+    flashcardDeckNameInput?.value ?? flashcardDeckEditorName
+  );
+  if (name !== editing.name) return true;
+  // Sin notas escaneadas la selección del borrador estaría vacía por defecto:
+  // no la interpretes como un cambio real.
+  if (
+    flashcardsManager.getPagesWithCards().length === 0 &&
+    editing.pageTitles.length > 0
+  ) {
+    return false;
+  }
+  return !flashcardDeckPageTitlesEqual(
+    currentFlashcardDeckEditorTitles(),
+    savedFlashcardDeckEditorTitles(editing)
+  );
+}
+
+async function confirmDiscardFlashcardDeckDraft(
+  targetId: string | null,
+  targetIsNew: boolean
+): Promise<boolean> {
+  if (!flashcardDeckEditorHasUnsavedChanges()) return true;
+  if (!targetIsNew && flashcardDeckEditorId === targetId) return true;
+  return confirmAction(
+    "Hay cambios sin guardar en el mazo. ¿Quieres descartarlos?",
+    "Descartar"
+  );
+}
+
+async function refreshFlashcardDecksFromVault(force = false): Promise<void> {
+  if (!desktopReady && !force) return;
+  // No repintar el editor mientras el usuario tiene cambios sin guardar: el
+  // refresco podría llegar al volver a Ajustes y borraría el borrador.
+  if (!force && flashcardDeckEditorHasUnsavedChanges()) return;
+  const token = ++flashcardDecksLoadToken;
+  const previousActiveId = activeFlashcardDeckId;
+  const previousFile = JSON.stringify(flashcardDeckFile);
+  try {
+    const loaded = await flashcardDeckRepository.loadWithMigration(
+      flashcardVaultRoot(),
+      flashcardPageFilter
+    );
+    if (token !== flashcardDecksLoadToken) return;
+    const decksChanged =
+      loaded.activeDeckId !== previousActiveId ||
+      JSON.stringify(loaded.file) !== previousFile;
+    flashcardDeckFile = loaded.file;
+    activeFlashcardDeckId = loaded.activeDeckId;
+    applyActiveFlashcardDeckFilter({
+      restartSession: decksChanged,
+      renderTree: false,
+    });
+    if (activeFlashcardDeckId) {
+      openFlashcardDeckEditor(activeFlashcardDeckId, false, false);
+    } else {
+      closeFlashcardDeckEditor(false);
+    }
+    renderFlashcardDecksUI();
+    renderFlashcardPagesFilter(false);
+  } catch (error) {
+    console.error("No se pudieron cargar los mazos:", error);
+    showToast(
+      error instanceof Error
+        ? error.message
+        : "No se pudieron cargar los mazos."
+    );
+  }
+}
+
+async function activateFlashcardDeck(deckId: string | null): Promise<void> {
+  if (deckId !== null && !findFlashcardDeck(flashcardDeckFile, deckId)) return;
+  if (!(await confirmDiscardFlashcardDeckDraft(deckId, false))) {
+    renderFlashcardDecksUI();
+    renderFlashcardPagesFilter(false);
+    return;
+  }
+  activeFlashcardDeckId = deckId;
+  flashcardDeckRepository.setActiveDeckId(flashcardVaultRoot(), deckId);
+  applyActiveFlashcardDeckFilter({ restartSession: true, renderTree: false });
+  if (deckId) {
+    // Si ya estamos editando ese mismo mazo, conservar el borrador (podría
+    // tener cambios sin guardar) en vez de reiniciarlo desde el archivo.
+    if (!(flashcardDeckEditorOpen && flashcardDeckEditorId === deckId)) {
+      openFlashcardDeckEditor(deckId, false, false);
+    }
+  } else {
+    closeFlashcardDeckEditor(false);
+  }
+  renderFlashcardDecksUI();
+  renderFlashcardPagesFilter(false);
+  const deck = activeFlashcardDeck();
+  showToast(deck ? `Repasando «${deck.name}»` : "Repasando todas las notas");
+}
+
+async function removeFlashcardDeck(deckId: string): Promise<void> {
+  const deck = findFlashcardDeck(flashcardDeckFile, deckId);
+  if (!deck) return;
+  const confirmed = await confirmAction(
+    `¿Eliminar el mazo «${deck.name}»? Las notas no se borrarán.`,
+    "Eliminar"
+  );
+  if (!confirmed) return;
+
+  flashcardDeckFile = deleteFlashcardDeck(flashcardDeckFile, deckId);
+  if (activeFlashcardDeckId === deckId) {
+    activeFlashcardDeckId = null;
+    flashcardDeckRepository.setActiveDeckId(flashcardVaultRoot(), null);
+  }
+  if (flashcardDeckEditorId === deckId) {
+    closeFlashcardDeckEditor(false);
+  }
+  applyActiveFlashcardDeckFilter({ restartSession: true, renderTree: false });
+  if (activeFlashcardDeckId) {
+    openFlashcardDeckEditor(activeFlashcardDeckId, false, false);
+  }
+  await persistFlashcardDeckFile();
+  renderFlashcardDecksUI();
+  renderFlashcardPagesFilter(false);
+  showToast(`Mazo «${deck.name}» eliminado`);
+}
+
+async function saveFlashcardDeckEditor(): Promise<void> {
+  if (!flashcardDeckEditorOpen || !flashcardDeckNameInput) return;
+  const name = normalizeFlashcardDeckName(flashcardDeckNameInput.value);
+  const error = validateFlashcardDeckName(
+    name,
+    flashcardDeckFile.decks,
+    flashcardDeckEditorIsNew ? undefined : flashcardDeckEditorId ?? undefined
+  );
+  if (error) {
+    if (flashcardPagesStatus) flashcardPagesStatus.textContent = error;
+    return;
+  }
+
+  const selected = currentFlashcardDeckEditorTitles();
+  const activate = flashcardDeckActivateOnSave?.checked ?? false;
+  let targetDeck: FlashcardDeck;
+  if (flashcardDeckEditorIsNew) {
+    const added = addFlashcardDeck(flashcardDeckFile, name, selected);
+    flashcardDeckFile = added.file;
+    targetDeck = added.deck;
+  } else if (flashcardDeckEditorId) {
+    flashcardDeckFile = updateFlashcardDeck(
+      flashcardDeckFile,
+      flashcardDeckEditorId,
+      { name, pageTitles: selected }
+    );
+    targetDeck =
+      findFlashcardDeck(flashcardDeckFile, flashcardDeckEditorId) ??
+      flashcardDeckFile.decks[flashcardDeckFile.decks.length - 1];
+  } else {
+    return;
+  }
+
+  if (activate) {
+    activeFlashcardDeckId = targetDeck.id;
+    flashcardDeckRepository.setActiveDeckId(flashcardVaultRoot(), targetDeck.id);
+  }
+  const shouldApply =
+    activate || activeFlashcardDeckId === targetDeck.id;
+  if (shouldApply) {
+    applyActiveFlashcardDeckFilter({ restartSession: true, renderTree: false });
+  }
+
+  flashcardDeckEditorOpen = true;
+  flashcardDeckEditorId = targetDeck.id;
+  flashcardDeckEditorIsNew = false;
+  flashcardDeckEditorBaseTitles = [...targetDeck.pageTitles];
+  flashcardDeckEditorName = targetDeck.name;
+  await persistFlashcardDeckFile();
+  renderFlashcardDecksUI();
+  renderFlashcardPagesFilter(false);
+  showToast(`Mazo «${targetDeck.name}» guardado`);
+}
+
 /** Renderiza el árbol de mazos formado por los títulos de las notas.
  * Cada nota es un mazo; `→` en el título separa mazos y submazos. La
  * selección se guarda como títulos exactos de notas, así que el árbol es solo
@@ -1985,6 +2568,15 @@ function renderFlashcardPagesFilter(_scanVault = true): void {
 
   if (!desktopReady) {
     showFlashcardPagesLoading("Preparando las notas…");
+    return;
+  }
+
+  // Sin un mazo en edición no hay árbol que pintar: la sección muestra una
+  // ayuda para elegir o crear un mazo.
+  if (!flashcardDeckEditorOpen) {
+    if (flashcardPagesContainer) flashcardPagesContainer.hidden = true;
+    if (flashcardDeckEditor) flashcardDeckEditor.hidden = true;
+    if (flashcardDeckEditorEmpty) flashcardDeckEditorEmpty.hidden = false;
     return;
   }
 
@@ -2037,10 +2629,28 @@ function renderFlashcardPagesFilter(_scanVault = true): void {
     }
   }
 
-  // Si el filtro guardado apunta a notas que ya no existen en este vault,
-  // descartar esas entradas (o volver a "todas" si no queda ninguna). También
-  // se resuelven alias antiguos (`::`) al título exacto que hay en el vault.
-  if (flashcardPageFilter !== null) {
+  // El mazo activo manda: su selección se resuelve contra las notas que existen
+  // ahora. Un mazo vacío significa "ninguna nota", nunca "todas".
+  if (activeFlashcardDeckId) {
+    const deck = activeFlashcardDeck();
+    if (deck) {
+      const resolved = resolveFlashcardDeckPageTitles(deck, pages);
+      if (!flashcardDeckPageTitlesEqual(resolved, flashcardPageFilter ?? [])) {
+        flashcardPageFilter = resolved;
+        try {
+          localStorage.setItem(
+            "sinnotas-flashcard-pages",
+            JSON.stringify(flashcardPageFilter)
+          );
+        } catch {
+          // El filtro sigue activo aunque no se pueda persistir.
+        }
+        flashcardsManager.setPageFilter(flashcardPageFilter);
+      }
+    }
+  } else if (flashcardPageFilter !== null) {
+    // Compatibilidad con el filtro antiguo (sin mazos): descartar notas que ya
+    // no existen y resolver alias de separador (`::` → `→`).
     const validFilter = [
       ...new Set(
         flashcardPageFilter
@@ -2055,7 +2665,14 @@ function renderFlashcardPagesFilter(_scanVault = true): void {
       flashcardPageFilter = flashcardPageFilter.length > 0 && validFilter.length === 0
         ? null
         : validFilter;
-      localStorage.setItem("sinnotas-flashcard-pages", JSON.stringify(flashcardPageFilter));
+      try {
+        localStorage.setItem(
+          "sinnotas-flashcard-pages",
+          JSON.stringify(flashcardPageFilter)
+        );
+      } catch {
+        // Igual que arriba: la sesión actual no depende de localStorage.
+      }
       flashcardsManager.setPageFilter(flashcardPageFilter);
     }
   }
@@ -2066,13 +2683,12 @@ function renderFlashcardPagesFilter(_scanVault = true): void {
     const empty = document.createElement("div");
     empty.className = "settings-help";
     empty.style.margin = "0";
-    empty.innerText = "No se encontraron notas con flashcards en el vault.";
+    empty.innerText = "No se encontraron notas con flashcards en el vault. El mazo se guardará vacío.";
     flashcardPagesList.appendChild(empty);
-    flashcardPagesContainer.hidden = true;
-    if (btnFlashcardPagesSave) btnFlashcardPagesSave.disabled = true;
-    if (flashcardPagesStatus) flashcardPagesStatus.textContent = "";
+    flashcardPagesContainer.hidden = false;
     const paginationEl = document.getElementById("flashcard-pages-pagination");
     if (paginationEl) paginationEl.hidden = true;
+    updateFlashcardPagesDirtyState();
     return;
   }
   flashcardPagesContainer.hidden = false;
@@ -2156,6 +2772,38 @@ btnFlashcardPagesSelectNone.addEventListener("click", () => {
 
 btnFlashcardPagesSave.addEventListener("click", saveFlashcardPagesSelection);
 
+flashcardActiveDeckSelect?.addEventListener("change", () => {
+  void activateFlashcardDeck(
+    flashcardActiveDeckSelect.value ? flashcardActiveDeckSelect.value : null
+  );
+});
+flashcardDeckSwitcher?.addEventListener("change", () => {
+  void activateFlashcardDeck(
+    flashcardDeckSwitcher.value ? flashcardDeckSwitcher.value : null
+  );
+});
+btnFlashcardDeckNew?.addEventListener("click", openNewFlashcardDeckEditor);
+btnFlashcardDeckEditActive?.addEventListener("click", () => {
+  if (activeFlashcardDeckId) {
+    void openFlashcardDeckEditorChecked(activeFlashcardDeckId, false);
+  }
+});
+btnFlashcardDeckDeleteActive?.addEventListener("click", () => {
+  if (activeFlashcardDeckId) void removeFlashcardDeck(activeFlashcardDeckId);
+});
+btnFlashcardDeckCancel?.addEventListener("click", () => {
+  if (activeFlashcardDeckId) openFlashcardDeckEditor(activeFlashcardDeckId, false);
+  else closeFlashcardDeckEditor();
+});
+flashcardDeckNameInput?.addEventListener("input", () => {
+  flashcardDeckEditorName = flashcardDeckNameInput.value;
+  flashcardDeckEditorNameTouched = true;
+  updateFlashcardPagesDirtyState();
+});
+flashcardDeckActivateOnSave?.addEventListener("change", () => {
+  updateFlashcardPagesDirtyState();
+});
+
 /** Sincroniza el valor del selector de orden con el estado persistido. */
 function syncFlashcardPagesSortValue(): void {
   if (flashcardPagesSort) flashcardPagesSort.value = flashcardPagesSortMode;
@@ -2205,47 +2853,85 @@ document.getElementById("flashcard-pages-next")?.addEventListener("click", () =>
   }
 });
 
-/** Lee la selección efectiva y devuelve el filtro equivalente
- * (null = todas las notas; array = solo esas; array vacío = ninguna).
- * Prioridad: borrador del usuario (sobrevive al paginado y a la búsqueda) >
- * estado guardado; las notas nunca tocadas quedan como estaban. */
-function readFlashcardPagesSelection(): string[] | null {
-  const pages = flashcardsManager.getPagesWithCards();
-  const effective = pages.filter((title) =>
+/** Lee la selección del editor de mazos (siempre como lista explícita). */
+function readFlashcardDeckEditorSelection(): string[] {
+  return flashcardsManager.getPagesWithCards().filter((title) =>
     flashcardPagesDraftSelection.has(title)
       ? flashcardPagesDraftSelection.get(title)
       : flashcardPageDefaultState(title)
   );
-  return effective.length === pages.length && pages.length > 0 ? null : effective;
 }
 
-/** Compara la selección actual con la guardada y habilita el botón Guardar si difiere. */
+/**
+ * Selección efectiva del editor: lo marcado más las notas que siguen en el
+ * vault pero no aparecen en el árbol por no tener tarjetas ahora mismo.
+ */
+function currentFlashcardDeckEditorTitles(): string[] {
+  const selected = readFlashcardDeckEditorSelection();
+  const editing = flashcardDeckEditorIsNew
+    ? null
+    : findFlashcardDeck(flashcardDeckFile, flashcardDeckEditorId);
+  if (!editing) return selected;
+  const existing = vault.getPages().map((page) => page.title);
+  return mergeFlashcardDeckSelection(
+    selected,
+    resolveFlashcardDeckPageTitles(editing, existing),
+    existing,
+    flashcardsManager.getPagesWithCards()
+  );
+}
+
+/** Notas guardadas del mazo, resueltas contra el vault actual. */
+function savedFlashcardDeckEditorTitles(deck: FlashcardDeck): string[] {
+  return resolveFlashcardDeckPageTitles(
+    deck,
+    vault.getPages().map((page) => page.title)
+  );
+}
+
+/** Valida el borrador y habilita el botón Guardar si hay cambios. */
 function updateFlashcardPagesDirtyState(): void {
   if (!btnFlashcardPagesSave || !flashcardPagesStatus) return;
-  const effective = readFlashcardPagesSelection();
-  const normalize = (value: string[] | null) => (value === null ? null : [...value].sort());
-  const dirty = JSON.stringify(normalize(effective)) !== JSON.stringify(normalize(flashcardPageFilter));
-  btnFlashcardPagesSave.disabled = !dirty;
-  flashcardPagesStatus.textContent = dirty ? translate("Cambios sin guardar") : "";
+  if (!flashcardDeckEditorOpen) {
+    btnFlashcardPagesSave.disabled = true;
+    flashcardPagesStatus.textContent = "";
+    return;
+  }
+
+  const name = flashcardDeckNameInput?.value ?? flashcardDeckEditorName;
+  const nameError = validateFlashcardDeckName(
+    name,
+    flashcardDeckFile.decks,
+    flashcardDeckEditorIsNew ? undefined : flashcardDeckEditorId ?? undefined
+  );
+  const selected = currentFlashcardDeckEditorTitles();
+  const editingDeck = flashcardDeckEditorIsNew
+    ? null
+    : findFlashcardDeck(flashcardDeckFile, flashcardDeckEditorId);
+  const savedTitles = editingDeck
+    ? savedFlashcardDeckEditorTitles(editingDeck)
+    : null;
+  const dirty = flashcardDeckEditorIsNew
+    ? true
+    : !editingDeck ||
+      normalizeFlashcardDeckName(name) !== editingDeck.name ||
+      !flashcardDeckPageTitlesEqual(selected, savedTitles ?? []);
+
+  btnFlashcardPagesSave.disabled = Boolean(nameError) || !dirty;
+  const pristineNewName =
+    flashcardDeckEditorIsNew &&
+    !flashcardDeckEditorNameTouched &&
+    !normalizeFlashcardDeckName(name);
+  flashcardPagesStatus.textContent = nameError && !pristineNewName
+    ? nameError
+    : dirty && !nameError
+      ? translate("Cambios sin guardar")
+      : "";
 }
 
-/** Aplica y persiste la selección de notas marcadas, y reinicia la sesión de repaso. */
+/** Guarda el mazo abierto en el editor. */
 function saveFlashcardPagesSelection(): void {
-  const effective = readFlashcardPagesSelection();
-  flashcardPageFilter = effective;
-  localStorage.setItem("sinnotas-flashcard-pages", JSON.stringify(flashcardPageFilter));
-  flashcardsManager.setPageFilter(flashcardPageFilter);
-  // La selección guardada se vuelve el "estado base"; el borrador se limpia.
-  flashcardPagesDraftSelection.clear();
-  if (currentView === "flashcards") startFlashcardsSession();
-  renderFlashcardPagesFilter(false);
-  showToast(
-    effective === null
-      ? translate("Se repasarán las tarjetas de todas las notas.")
-      : effective.length === 0
-        ? translate("No hay notas seleccionadas: no se repasará ninguna tarjeta.")
-        : translate("Se repasarán solo las tarjetas de las notas seleccionadas.")
-  );
+  void saveFlashcardDeckEditor();
 }
 
 function renderFlashcardRecalcControls(): void {
@@ -2939,7 +3625,10 @@ function openSettingsOverlay(): void {
   const activeTab = settingsDropdownMenu
     .querySelector<HTMLButtonElement>("[data-settings-tab].active")
     ?.dataset.settingsTab;
-  if (activeTab === "flashcards") renderFlashcardPagesFilter(true);
+  if (activeTab === "flashcards") {
+    renderFlashcardPagesFilter(true);
+    void refreshFlashcardDecksFromVault(false);
+  }
   if (activeTab === "appearance") ensureSystemFontsLoaded();
   if (activeTab === "graph") syncGraphSettingsUi();
 }
@@ -3438,6 +4127,8 @@ function switchView(view: ViewType) {
     viewFlashcards.classList.add("active-view");
     graphView?.stopSimulation();
     startFlashcardsSession();
+    // Refresca mazos por si otro equipo los cambió desde el último arranque.
+    void refreshFlashcardDecksFromVault(false);
     // Si otro dispositivo repasó tarjetas mientras esta vista estaba cerrada,
     // los cambios se cargan al entrar (sin interrumpir el editor).
     void synchronizeVaultFromDisk({ notify: false }).then((changed) => {
@@ -13805,6 +14496,8 @@ async function openVaultAtPath(rootPath: string): Promise<void> {
     await migrateLegacySnapshotFiles();
     currentPage = snapshot.pages[0] || vault.createPage("Nueva nota");
     loadRecentPages();
+    // Los mazos son por bóveda: recargar los del vault recién abierto.
+    await refreshFlashcardDecksFromVault(true);
     switchView("editor");
     renderFlashcardPagesFilter();
     resetNavigationHistory();
@@ -15106,6 +15799,9 @@ async function synchronizeVaultFromDisk(options: { notify?: boolean; force?: boo
     // El vault se recargó: releeer recientes para descartar rutas que dejaron
     // de existir en disco.
     loadRecentPages();
+    // Los mazos también viajan con el vault: recargarlos si otro equipo los
+    // cambió. No se pisa un editor con cambios sin guardar.
+    await refreshFlashcardDecksFromVault(false);
     await reviewProgress.load(true);
     updateReviewHistoryButtons();
     const nextPage =
@@ -15349,6 +16045,9 @@ async function initializeDesktopApp(): Promise<void> {
   // de este vault antes del primer renderSidebar().
   loadRecentPages();
   desktopReady = true;
+  // Cargar los mazos del vault antes de la primera sesión de repaso. Si es la
+  // primera vez, migra la selección antigua a un mazo "Selección anterior".
+  await refreshFlashcardDecksFromVault(true);
   updateReviewHistoryButtons();
 
   // No bloquear el primer pintado esperando el diario de repasos. Los botones

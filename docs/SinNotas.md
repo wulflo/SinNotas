@@ -189,11 +189,60 @@ usan el mismo criterio:
   marcar mazos.
 - La página móvil se pinta en **lotes de 8 filas por fotograma**; así cientos de
   notas no bloquean el WebView ni hacen colapsar el modal.
-- Los cambios solo se aplican al pulsar **Aplicar selección** en Android o
-  **Guardar selección** en escritorio.
+- Los cambios de una selección se confirman al pulsar **Guardar mazo** en
+  escritorio o Android.
 
 La lógica pura de paginado está en `src/mobile/notes-pagination.ts` y tiene
 pruebas de regresión en `src/mobile/notes-pagination.test.ts`.
+
+### Mazos personalizados
+
+Sobre la jerarquía de títulos, un **mazo personalizado** es una selección de
+notas guardada con un nombre. Sirve para preparar juegos de repaso distintos
+(exámenes, asignaturas, repasos rápidos) reutilizando las mismas notas.
+
+- Una nota puede pertenecer a varios mazos.
+- Los nombres son únicos sin distinguir mayúsculas, acentos ni espacios
+  sobrantes. Si la fusión entre equipos detecta un duplicado, añade `(2)`, `(3)`…
+- **Todos** es un mazo virtual permanente y el estado por defecto; no se puede
+  editar ni eliminar.
+- Solo hay **un mazo activo** a la vez.
+- Los mazos se guardan por bóveda y se sincronizan entre escritorio y Android.
+- El **mazo activo es local de cada dispositivo**: no viaja con la bóveda.
+- Al renombrar una nota se actualizan todos los mazos que la contenían.
+
+Persistencia y sincronización:
+
+- Definiciones: `.sinnotas/flashcards/decks.json` (versión 1), con `decks` y
+  `tombstones`. Las lápidas impiden que un mazo borrado reaparezca al fusionar
+  con la copia de otro equipo.
+- Mazo activo: `localStorage`, con una clave distinta por ruta de bóveda.
+- Compatibilidad: al activar un mazo se sigue escribiendo
+  `sinnotas-flashcard-pages` con la lista resuelta de notas, para versiones
+  anteriores.
+- La selección antigua sin mazos se migra una sola vez a un mazo llamado
+  **Selección anterior** con id estable.
+- Al guardar se relee la copia actual del vault y se fusiona por `id` y
+  `updatedAt`; una lápida gana si es igual o posterior a la última edición.
+- Al guardar un mazo se conservan las notas que siguen existiendo aunque ahora
+  no tengan tarjetas (el editor solo muestra notas con tarjetas). Las notas
+  borradas del vault se descartan.
+- Límites defensivos: 200 mazos, 80 caracteres por nombre, 10 000 notas por
+  mazo, 500 lápidas y 1 MB de archivo. El backend valida la ruta interna fija y
+  escribe de forma atómica.
+
+Interfaz:
+
+- **Escritorio:** mosaico de gestión en **Ajustes → Flashcards → General** con
+  tarjeta **Todos**, tarjetas de mazos y **+ Nuevo mazo**. Incluye editar,
+  eliminar y activar. La cabecera de la vista Flashcards tiene un selector
+  rápido de mazo activo.
+- **Android:** acción independiente **Mazos** en el menú, botón compacto en la
+  cabecera y hoja de gestión con activar, editar, eliminar y crear. El editor de
+  notas existente añade el nombre del mazo y el botón **Guardar mazo**.
+- Cambiar de mazo no reescanea la bóveda: solo aplica el filtro en memoria y
+  reconstruye la cola. Las estadísticas por nota se calculan en una sola pasada.
+- Los nombres se pintan con `textContent`, nunca como HTML.
 
 ## Safe area en Android
 

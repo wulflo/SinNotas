@@ -2116,6 +2116,209 @@ input[type="checkbox"] {
   font-weight: 600;
 }
 
+/* Selector rápido de mazo activo en la cabecera de Flashcards. */
+.flashcard-deck-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ls-text-muted);
+  font-size: calc(12px * var(--ls-font-scale, 1));
+}
+
+.flashcard-deck-switcher select {
+  max-width: 180px;
+  padding: 5px 28px 5px 9px;
+  border: 1px solid var(--ls-border-color);
+  border-radius: 7px;
+  background-color: var(--ls-bg-secondary);
+  color: var(--ls-text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Mosaico de mazos personalizados. */
+.flashcard-deck-manage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.flashcard-decks-mosaic {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+  gap: 8px;
+  margin: 10px 0 18px;
+}
+
+.flashcard-deck-tile {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid var(--ls-border-subtle);
+  border-radius: 9px;
+  background: var(--ls-bg-tertiary);
+  overflow: hidden;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.flashcard-deck-tile:hover {
+  border-color: var(--ls-text-muted);
+}
+
+.flashcard-deck-tile.is-active {
+  border-color: var(--ls-accent);
+  background: var(--ls-accent-subtle);
+}
+
+.flashcard-deck-tile-main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.flashcard-deck-tile-main:focus-visible,
+.flashcard-deck-tile-action:focus-visible,
+.flashcard-deck-tile-new:focus-visible {
+  outline: 2px solid var(--ls-accent);
+  outline-offset: 2px;
+}
+
+.flashcard-deck-tile-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--ls-text-title);
+  font-size: calc(13px * var(--ls-font-scale, 1));
+  font-weight: 700;
+}
+
+.flashcard-deck-tile-name span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.flashcard-deck-tile-badge {
+  flex: 0 0 auto;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--ls-accent);
+  color: var(--ls-bg-primary, #fff);
+  font-size: calc(10px * var(--ls-font-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.flashcard-deck-tile-stats {
+  color: var(--ls-text-muted);
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  font-variant-numeric: tabular-nums;
+}
+
+.flashcard-deck-tile-actions {
+  display: flex;
+  gap: 2px;
+  padding: 0 7px 7px;
+}
+
+.flashcard-deck-tile-action {
+  flex: 1 1 auto;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ls-text-muted);
+  font: inherit;
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  cursor: pointer;
+}
+
+.flashcard-deck-tile-action:hover {
+  background: var(--ls-bg-secondary);
+  color: var(--ls-text-primary);
+}
+
+.flashcard-deck-tile-action.is-danger:hover {
+  color: var(--ls-danger, #dc2626);
+}
+
+.flashcard-deck-tile-new {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 78px;
+  border: 1px dashed var(--ls-border-color);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ls-text-muted);
+  font: inherit;
+  font-size: calc(12px * var(--ls-font-scale, 1));
+  cursor: pointer;
+}
+
+.flashcard-deck-tile-new:hover {
+  border-color: var(--ls-accent);
+  color: var(--ls-accent);
+}
+
+/* Nombre y activación dentro del editor del mazo. */
+.flashcard-deck-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.flashcard-deck-name-row > label:first-child {
+  color: var(--ls-text-primary);
+  font-size: calc(12px * var(--ls-font-scale, 1));
+  font-weight: 600;
+}
+
+.flashcard-deck-name-row input[type="text"] {
+  flex: 1 1 180px;
+  min-width: 140px;
+  padding: 6px 10px;
+  border: 1px solid var(--ls-border-color);
+  border-radius: 8px;
+  background-color: var(--ls-bg-secondary);
+  color: var(--ls-text-primary);
+  font-size: var(--ls-font-size-ui);
+}
+
+.flashcard-deck-name-row input[type="text"]:focus {
+  border-color: var(--ls-text-muted);
+  outline: none;
+}
+
+.flashcard-deck-activate-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--ls-text-muted);
+  font-size: calc(12px * var(--ls-font-scale, 1));
+  cursor: pointer;
+}
+
+.flashcard-deck-activate-label input {
+  margin: 0;
+  accent-color: var(--ls-accent);
+  cursor: pointer;
+}
+
 .flashcard-pages-list {
   display: flex;
   flex-direction: column;

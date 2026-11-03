@@ -427,31 +427,61 @@
                 </div>
 
                 <div class="settings-subpanel active" data-flashcard-settings-content="general">
-                <div class="settings-section-title">Mazos incluidos en el repaso</div>
-                <p class="settings-help">Cada nota actúa como un mazo que contiene sus flashcards. Usa <code>→</code> en el título para crear mazos y submazos, por ejemplo <code>Salud mental → Ansiedad → Tema 1</code>. También se acepta <code>::</code> al escribir: se convertirá en <code>→</code> porque los dos puntos no son válidos en nombres de archivo en Windows. Marca un mazo para incluir todas sus notas hijas y pulsa "Guardar selección".</p>
-                <div class="sync-box" id="flashcard-pages-container">
-                  <div class="flashcard-pages-controls">
-                    <input type="text" id="flashcard-pages-search" placeholder="Buscar mazo o nota..." aria-label="Filtrar mazos y notas por título" />
-                    <select id="flashcard-pages-sort" aria-label="Orden de la lista de mazos">
-                      <option value="title-asc">Nombre A-Z</option>
-                      <option value="title-desc">Nombre Z-A</option>
-                      <option value="created-desc">Creación (más reciente)</option>
-                      <option value="created-asc">Creación (más antigua)</option>
-                    </select>
-                    <button type="button" class="font-option-btn" id="btn-flashcard-pages-select-all">Marcar todo</button>
-                    <button type="button" class="font-option-btn" id="btn-flashcard-pages-select-none">Ninguna</button>
-                    <button type="button" class="font-option-btn flashcard-pages-save" id="btn-flashcard-pages-save" disabled>Guardar selección</button>
-                    <span class="flashcard-pages-status" id="flashcard-pages-status" role="status" aria-live="polite"></span>
+                <div class="settings-section-title">Mazo activo</div>
+                <p class="settings-help">Elige qué mazo se repasará. Solo uno puede estar activo a la vez. <strong>Todos</strong> incluye todas las notas de la bóveda. El mazo activo se guarda en este dispositivo; los mazos se sincronizan con la bóveda.</p>
+                <div class="sync-box">
+                  <div class="settings-row">
+                    <label for="flashcard-active-deck">Mazo activo</label>
+                    <select id="flashcard-active-deck" aria-label="Elegir mazo activo"></select>
                   </div>
-                  <div class="flashcard-pages-list" id="flashcard-pages-list" role="tree" aria-multiselectable="true" aria-label="Mazos y notas con flashcards">
-                    <!-- Se renderiza un árbol: mazos raíz, submazos y notas -->
-                  </div>
-                  <div class="flashcard-pages-pagination" id="flashcard-pages-pagination" hidden>
-                    <button class="btn-pagination" id="flashcard-pages-prev" type="button" disabled>← Anterior</button>
-                    <span class="pagination-info" id="flashcard-pages-page-info">Página 1 de 1</span>
-                    <button class="btn-pagination" id="flashcard-pages-next" type="button" disabled>Siguiente →</button>
+                  <div class="flashcard-deck-manage-actions">
+                    <button type="button" class="font-option-btn" id="btn-flashcard-deck-new">+ Nuevo mazo</button>
+                    <button type="button" class="font-option-btn" id="btn-flashcard-deck-edit-active">Editar notas</button>
+                    <button type="button" class="font-option-btn" id="btn-flashcard-deck-delete-active">Eliminar mazo</button>
                   </div>
                 </div>
+
+                <div class="settings-section-title">Mis mazos</div>
+                <p class="settings-help">Cada mazo guarda una selección de notas. Una nota puede estar en varios mazos. Pulsa un mosaico para activarlo; usa sus botones para editar o eliminar.</p>
+                <div class="flashcard-decks-mosaic" id="flashcard-decks-grid" role="list" aria-label="Mazos personalizados"></div>
+
+                <div id="flashcard-deck-editor">
+                  <div class="settings-section-title" id="flashcard-deck-editor-title">Notas del mazo</div>
+                  <p class="settings-help" id="flashcard-deck-editor-help">Marca las notas que forman parte de este mazo. Usa <code>→</code> en el título de una nota para agruparla en submazos. Los cambios se guardan al pulsar "Guardar mazo".</p>
+                  <div class="sync-box" id="flashcard-pages-container">
+                    <div class="flashcard-deck-name-row">
+                      <label for="flashcard-deck-name">Nombre</label>
+                      <input type="text" id="flashcard-deck-name" maxlength="80" placeholder="Nombre del mazo" autocomplete="off" />
+                      <label class="flashcard-deck-activate-label" for="flashcard-deck-activate-on-save">
+                        <input type="checkbox" id="flashcard-deck-activate-on-save" />
+                        Activar al guardar
+                      </label>
+                    </div>
+                    <div class="flashcard-pages-controls">
+                      <input type="text" id="flashcard-pages-search" placeholder="Buscar mazo o nota..." aria-label="Filtrar mazos y notas por título" />
+                      <select id="flashcard-pages-sort" aria-label="Orden de la lista de mazos">
+                        <option value="title-asc">Nombre A-Z</option>
+                        <option value="title-desc">Nombre Z-A</option>
+                        <option value="created-desc">Creación (más reciente)</option>
+                        <option value="created-asc">Creación (más antigua)</option>
+                      </select>
+                      <button type="button" class="font-option-btn" id="btn-flashcard-pages-select-all">Marcar todo</button>
+                      <button type="button" class="font-option-btn" id="btn-flashcard-pages-select-none">Ninguna</button>
+                      <button type="button" class="font-option-btn flashcard-pages-save" id="btn-flashcard-pages-save" disabled>Guardar mazo</button>
+                      <button type="button" class="font-option-btn" id="btn-flashcard-deck-cancel" hidden>Cancelar edición</button>
+                      <span class="flashcard-pages-status" id="flashcard-pages-status" role="status" aria-live="polite"></span>
+                    </div>
+                    <div class="flashcard-pages-list" id="flashcard-pages-list" role="tree" aria-multiselectable="true" aria-label="Mazos y notas con flashcards">
+                      <!-- Se renderiza un árbol: mazos raíz, submazos y notas -->
+                    </div>
+                    <div class="flashcard-pages-pagination" id="flashcard-pages-pagination" hidden>
+                      <button class="btn-pagination" id="flashcard-pages-prev" type="button" disabled>← Anterior</button>
+                      <span class="pagination-info" id="flashcard-pages-page-info">Página 1 de 1</span>
+                      <button class="btn-pagination" id="flashcard-pages-next" type="button" disabled>Siguiente →</button>
+                    </div>
+                  </div>
+                </div>
+                <p class="settings-help" id="flashcard-deck-editor-empty" hidden>Selecciona un mazo personalizado para editar sus notas, o crea uno nuevo con “+ Nuevo mazo”.</p>
 
                 <div class="settings-section-title">Orden de repaso</div>
                 <p class="settings-help">Elige qué tarjetas quieres ver primero al iniciar una sesión de repaso.</p>
@@ -811,6 +841,10 @@
                 </div>
               </div>
               <div class="flashcard-header-actions">
+                <label class="flashcard-deck-switcher" for="flashcard-deck-switcher">
+                  <span>Mazo</span>
+                  <select id="flashcard-deck-switcher" aria-label="Elegir mazo activo"></select>
+                </label>
                 <button class="font-option-btn flashcard-history-button" id="btn-review-undo" type="button" aria-label="Deshacer último repaso" title="Deshacer último repaso (Ctrl+Z)" disabled>↶</button>
                 <button class="font-option-btn flashcard-history-button" id="btn-review-redo" type="button" aria-label="Rehacer repaso" title="Rehacer repaso (Ctrl+Y)" disabled>↷</button>
                 <button class="font-option-btn flashcard-sync-button" id="btn-flashcards-refresh" type="button" title="Sincronizar cambios de la bóveda" aria-label="Sincronizar cambios de la bóveda">↻</button>

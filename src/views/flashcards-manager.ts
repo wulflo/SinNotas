@@ -11,6 +11,13 @@ import { parseImageOcclusions } from "../editor/image-occlusion";
 
 export type FlashcardReviewOrder = "new-first" | "reviews-first" | "mixed";
 
+/** Resumen de tarjetas de una nota, sin aplicar el filtro de repaso activo. */
+export interface FlashcardPageStats {
+  total: number;
+  due: number;
+  new: number;
+}
+
 /** Texto plano normalizado para buscar dentro de una tarjeta. */
 function normalizeCardSearchText(value: string): string {
   return value
@@ -170,6 +177,46 @@ export class FlashcardsManager {
   /** Devuelve la cantidad de flashcards detectadas en una nota dada (sin filtrar). */
   public getCardCountForPage(pageTitle: string): number {
     return this.allCards.filter((card) => card.pageTitle === pageTitle).length;
+  }
+
+  /**
+   * Estadísticas por nota en una sola pasada.
+   *
+   * El mosaico de mazos necesita total/vencidas/nuevas de varias selecciones.
+   * Llamar a `getCardCountForPage` por cada mazo multiplicaría el coste por el
+   * número de mazos; este mapa se calcula una vez por render.
+   */
+  public getCardStatsByPage(now = new Date()): Map<string, FlashcardPageStats> {
+    const stats = new Map<string, FlashcardPageStats>();
+    for (const card of this.allCards) {
+      let entry = stats.get(card.pageTitle);
+      if (!entry) {
+        entry = { total: 0, due: 0, new: 0 };
+        stats.set(card.pageTitle, entry);
+      }
+      entry.total += 1;
+      if (this.isDue(card, now)) entry.due += 1;
+      if (!card.fsrs.lastReviewDate) entry.new += 1;
+    }
+    return stats;
+  }
+
+  /** Suma las estadísticas de las notas indicadas usando un mapa ya calculado. */
+  public static sumCardStats(
+    pageTitles: readonly string[],
+    statsByPage: ReadonlyMap<string, FlashcardPageStats>
+  ): FlashcardPageStats {
+    let total = 0;
+    let due = 0;
+    let newCards = 0;
+    for (const title of pageTitles) {
+      const entry = statsByPage.get(title);
+      if (!entry) continue;
+      total += entry.total;
+      due += entry.due;
+      newCards += entry.new;
+    }
+    return { total, due, new: newCards };
   }
 
   /** Extract FSRS metadata stored in block properties (e.g. card-s:: 2.5) */
