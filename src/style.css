@@ -5933,6 +5933,10 @@ body.is-bullet-selecting {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  /* Aire a la izquierda. El margen es necesario porque el grupo está alineado
+     a la derecha: el padding por sí solo no separa el texto del control previo. */
+  margin-left: 4px;
+  padding-left: 6px;
   color: var(--ls-text-muted);
   font-size: calc(12px * var(--ls-font-scale, 1));
   white-space: nowrap;
