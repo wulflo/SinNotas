@@ -18,6 +18,13 @@ import {
   type BibliographyType,
   type CreateBibliographyInput,
 } from "./bibliography";
+import {
+  lookupErrorCode,
+  lookupErrorMessage,
+  lookupResultToInput,
+  type BibliographyLookupMode,
+  type BibliographyLookupResult,
+} from "./bibliography-lookup";
 
 export interface BibliographyHost {
   getPages(): PageData[];
@@ -28,6 +35,7 @@ export interface BibliographyHost {
   openPage(page: PageData): void;
   uploadCover(file: File): Promise<string | null>;
   resolveImage(source: string): Promise<string | null>;
+  lookup(query: string, mode: BibliographyLookupMode): Promise<BibliographyLookupResult[]>;
   confirmDelete(item: BibliographyItem): Promise<boolean>;
   notify(message: string): void;
 }
@@ -818,6 +826,129 @@ export class BibliographyView {
       renderCoverPreview();
     });
 
+    const lookupSection = el("div", "bib-lookup");
+    const lookupHeading = el("div", "bib-lookup-heading");
+    lookupHeading.append(
+      el("span", "bib-kicker", translate("Metadatos en línea")),
+      el(
+        "p",
+        "bib-lookup-help",
+        translate(
+          "Busca por DOI, ISBN o palabras clave en Crossref y Open Library. Solo se envía el texto que escribes."
+        )
+      ),
+      el(
+        "p",
+        "bib-lookup-help bib-lookup-privacy",
+        translate(
+          "Si no hay conexión, completa los campos a mano: la búsqueda nunca bloquea el formulario."
+        )
+      )
+    );
+
+    const lookupRow = el("div", "bib-lookup-row");
+    const lookupInput = el("input", "bib-input bib-lookup-input");
+    lookupInput.type = "text";
+    lookupInput.placeholder = translate("DOI, ISBN o palabras clave");
+    lookupInput.setAttribute(
+      "aria-label",
+      translate("Buscar metadatos por DOI, ISBN o palabras clave")
+    );
+
+    const lookupMode = el("select", "bib-input bib-lookup-mode");
+    for (const [value, label] of [
+      ["auto", "Automático"],
+      ["doi", "DOI"],
+      ["isbn", "ISBN"],
+      ["keywords", "Palabras clave"],
+    ] as const) {
+      const option = el("option", undefined, translate(label));
+      option.value = value;
+      lookupMode.append(option);
+    }
+    lookupMode.setAttribute("aria-label", translate("Modo de búsqueda"));
+
+    const lookupButton = el(
+      "button",
+      "bib-secondary-button bib-lookup-button",
+      translate("Buscar en línea")
+    );
+    lookupButton.type = "button";
+    const lookupStatus = el("p", "bib-lookup-status");
+    lookupStatus.setAttribute("aria-live", "polite");
+    lookupStatus.hidden = true;
+    const lookupResults = el("div", "bib-lookup-results");
+    lookupRow.append(lookupInput, lookupMode, lookupButton);
+
+    let lookupInFlight = false;
+    const runLookup = (): void => {
+      if (lookupInFlight) return;
+      const query = lookupInput.value.trim();
+      if (!query) {
+        lookupStatus.textContent = translate("Escribe un DOI, un ISBN o palabras clave.");
+        lookupStatus.hidden = false;
+        lookupInput.focus();
+        return;
+      }
+      lookupInFlight = true;
+      lookupButton.disabled = true;
+      lookupButton.textContent = translate("Buscando metadatos…");
+      lookupStatus.textContent = translate("Buscando en Crossref y Open Library…");
+      lookupStatus.hidden = false;
+      lookupResults.replaceChildren();
+
+      void this.host
+        .lookup(query, lookupMode.value as BibliographyLookupMode)
+        .then((results) => {
+          if (results.length === 0) {
+            lookupStatus.textContent = translate(
+              "Sin resultados. Prueba otras palabras clave o revisa el identificador."
+            );
+            return;
+          }
+          lookupStatus.textContent = `${results.length} ${translate(
+            "resultados encontrados"
+          )}`;
+          this.renderLookupResults(lookupResults, results, (result) => {
+            const input = lookupResultToInput(result);
+            titleInput.value = input.title;
+            typeSelect.value = input.type;
+            authorInput.value = input.author || "";
+            yearInput.value = input.year || "";
+            totalInput.value =
+              input.total && input.total > 0 ? String(input.total) : "";
+            linkInput.value = input.link || "";
+            coverSource = input.cover || "";
+            coverInput.value = coverSource;
+            renderCoverPreview();
+            lookupStatus.textContent = translate(
+              "Datos importados. Revisa los campos y pulsa Crear recurso."
+            );
+            titleInput.focus();
+            titleInput.select();
+          });
+        })
+        .catch((lookupFailure: unknown) => {
+          lookupStatus.textContent = translate(
+            lookupErrorMessage(lookupErrorCode(lookupFailure))
+          );
+        })
+        .finally(() => {
+          lookupInFlight = false;
+          lookupButton.disabled = false;
+          lookupButton.textContent = translate("Buscar en línea");
+        });
+    };
+
+    lookupButton.addEventListener("click", runLookup);
+    lookupInput.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      runLookup();
+    });
+
+    lookupSection.append(lookupHeading, lookupRow, lookupStatus, lookupResults);
+
     const fieldsGrid = el("div", "bib-form-grid");
     fieldsGrid.append(
       this.buildFormField(translate("Título"), titleInput, true),
@@ -882,7 +1013,7 @@ export class BibliographyView {
         });
     });
 
-    dialog.append(header, form);
+    dialog.append(header, lookupSection, form);
     overlay.append(dialog);
     overlay.addEventListener("click", (event) => {
       if (event.target === overlay) this.closeAddDialog();
@@ -894,6 +1025,41 @@ export class BibliographyView {
     };
     document.addEventListener("keydown", this.addKeyHandler);
     titleInput.focus();
+  }
+
+  private renderLookupResults(
+    container: HTMLElement,
+    results: BibliographyLookupResult[],
+    onPick: (result: BibliographyLookupResult) => void
+  ): void {
+    container.replaceChildren();
+    for (const result of results) {
+      const button = el("button", "bib-lookup-result");
+      button.type = "button";
+      const main = el("span", "bib-lookup-result-main");
+      main.append(el("span", "bib-lookup-result-title", result.title));
+      const details = [
+        result.authors,
+        result.year,
+        result.container || result.publisher,
+      ].filter(Boolean);
+      if (result.subtitle) details.unshift(result.subtitle);
+      if (details.length > 0) {
+        main.append(el("span", "bib-lookup-result-meta", details.join(" · ")));
+      }
+      const side = el("span", "bib-lookup-result-side");
+      side.append(
+        el(
+          "span",
+          "bib-lookup-provider",
+          result.provider === "openlibrary" ? "Open Library" : "Crossref"
+        ),
+        el("span", "bib-lookup-kind", typeLabel(result.kind))
+      );
+      button.append(main, side);
+      button.addEventListener("click", () => onPick(result));
+      container.append(button);
+    }
   }
 
   private buildFormField(label: string, control: HTMLElement, required = false): HTMLElement {

@@ -53,7 +53,7 @@
 .bib-count-badge {
   min-width: 26px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: var(--ma-radius-sm, 6px);
   background: var(--ls-accent-subtle);
   color: var(--ls-accent);
   font-size: calc(12px * var(--ls-font-scale, 1));
@@ -94,7 +94,7 @@
   min-height: 38px;
   padding: 0 16px;
   border: 1px solid color-mix(in srgb, var(--ls-accent) 55%, var(--ls-border-color));
-  border-radius: 999px;
+  border-radius: var(--ma-radius-lg, 10px);
   background: var(--ls-accent);
   color: var(--ls-accent-foreground);
   font: inherit;
@@ -126,7 +126,7 @@
   flex: 1 1 240px;
   padding: 0 11px;
   border: 1px solid var(--ls-border-color);
-  border-radius: 10px;
+  border-radius: var(--ma-radius-lg, 10px);
   background: var(--ls-bg-secondary);
   color: var(--ls-text-muted);
 }
@@ -153,7 +153,7 @@
   gap: 4px;
   padding: 3px;
   border: 1px solid var(--ls-border-subtle);
-  border-radius: 999px;
+  border-radius: var(--ma-radius-md, 8px);
   background: color-mix(in srgb, var(--ls-bg-tertiary) 65%, transparent);
   overflow-x: auto;
   scrollbar-width: none;
@@ -167,7 +167,7 @@
   flex: 0 0 auto;
   padding: 5px 11px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--ma-radius-md, 8px);
   background: transparent;
   color: var(--ls-text-muted);
   font: inherit;
@@ -192,7 +192,7 @@
   min-height: 34px;
   padding: 0 9px;
   border: 1px solid var(--ls-border-color);
-  border-radius: 8px;
+  border-radius: var(--ma-radius-md, 8px);
   background: var(--ls-bg-secondary);
   color: var(--ls-text-title);
   font: inherit;
@@ -230,7 +230,7 @@
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--ls-border-subtle);
-  border-radius: 16px;
+  border-radius: var(--ma-radius-xl, 14px);
   background: color-mix(in srgb, var(--ls-card-bg) 92%, transparent);
   box-shadow: 0 8px 22px -20px rgba(0, 0, 0, 0.7);
   cursor: pointer;
@@ -305,7 +305,7 @@
   gap: 4px;
   padding: 3px 8px;
   border: 1px solid color-mix(in srgb, var(--ls-accent) 24%, transparent);
-  border-radius: 999px;
+  border-radius: var(--ma-radius-sm, 6px);
   background: color-mix(in srgb, var(--ls-bg-primary) 76%, transparent);
   color: var(--ls-text-title);
   font-size: calc(10.5px * var(--ls-font-scale, 1));
@@ -317,7 +317,7 @@
   display: inline-flex;
   align-items: center;
   padding: 3px 8px;
-  border-radius: 999px;
+  border-radius: var(--ma-radius-sm, 6px);
   border: 1px solid transparent;
   font-size: calc(10.5px * var(--ls-font-scale, 1));
   font-weight: 700;
@@ -397,7 +397,7 @@
   flex: 1;
   height: 5px;
   overflow: hidden;
-  border-radius: 999px;
+  border-radius: var(--ma-radius-sm, 6px);
   background: color-mix(in srgb, var(--ls-text-muted) 20%, transparent);
 }
 
@@ -443,7 +443,7 @@
   height: 64px;
   margin-bottom: 6px;
   border: 1px dashed color-mix(in srgb, var(--ls-accent) 38%, var(--ls-border-color));
-  border-radius: 20px;
+  border-radius: var(--ma-radius-2xl, 16px);
   background: var(--ls-accent-subtle);
   color: var(--ls-accent);
 }
@@ -477,7 +477,7 @@
   gap: 6px;
   min-height: 34px;
   padding: 0 13px;
-  border-radius: 8px;
+  border-radius: var(--ma-radius-md, 8px);
   font: inherit;
   font-size: calc(12.5px * var(--ls-font-scale, 1));
   font-weight: 650;
@@ -554,8 +554,13 @@
   align-items: center;
   justify-content: center;
   padding: 22px;
-  background: rgba(4, 6, 10, 0.58);
-  backdrop-filter: blur(7px);
+  /*
+   * Sin `backdrop-filter`: el modal es opaco y solo queda visible el marco de
+   * 22 px alrededor, así que desenfocar toda la ventana no aporta nada visual y
+   * provoca un tirón de ~65 ms cada vez que parpadea el cursor del formulario.
+   * Un velo algo más denso cumple la misma función a coste cero.
+   */
+  background: rgba(4, 6, 10, 0.7);
 }
 
 .bib-modal-backdrop.bib-modal-nested {
@@ -570,7 +575,7 @@
   max-height: min(88vh, 900px);
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--ls-accent) 22%, var(--ls-border-color));
-  border-radius: 20px;
+  border-radius: var(--ma-radius-2xl, 16px);
   background: var(--ls-bg-secondary);
   box-shadow: 0 32px 70px -30px rgba(0, 0, 0, 0.85);
 }
@@ -630,7 +635,7 @@
   aspect-ratio: 2 / 3;
   overflow: hidden;
   border: 1px solid var(--ls-border-subtle);
-  border-radius: 14px;
+  border-radius: var(--ma-radius-xl, 14px);
   background:
     radial-gradient(
       120% 120% at 15% 10%,
@@ -673,7 +678,7 @@
   gap: 7px;
   padding: 12px;
   border: 1px solid var(--ls-border-subtle);
-  border-radius: 12px;
+  border-radius: var(--ma-radius-lg, 10px);
   background: color-mix(in srgb, var(--ls-bg-tertiary) 52%, transparent);
 }
 
@@ -837,7 +842,7 @@
   width: 100%;
   padding: 8px 10px;
   border: 1px solid var(--ls-border-subtle);
-  border-radius: 9px;
+  border-radius: var(--ma-radius-md, 8px);
   background: transparent;
   color: var(--ls-text-primary);
   font: inherit;
@@ -904,7 +909,7 @@
   flex: 0 0 auto;
   overflow: hidden;
   border: 1px dashed var(--ls-border-color);
-  border-radius: 10px;
+  border-radius: var(--ma-radius-lg, 10px);
   background: var(--ls-bg-tertiary);
   color: var(--ls-text-muted);
 }
@@ -930,7 +935,7 @@
   margin: 0;
   padding: 8px 10px;
   border: 1px solid color-mix(in srgb, #e06c75 42%, transparent);
-  border-radius: 8px;
+  border-radius: var(--ma-radius-md, 8px);
   background: color-mix(in srgb, #e06c75 10%, transparent);
   color: #e06c75;
   font-size: calc(12px * var(--ls-font-scale, 1));
@@ -941,6 +946,132 @@
   align-items: center;
   gap: 8px;
   padding-top: 4px;
+}
+
+/* ---------- Búsqueda de metadatos ---------- */
+.bib-lookup {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--ls-border-color);
+  background: color-mix(in srgb, var(--ls-accent) 4%, transparent);
+}
+
+.bib-lookup-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.bib-lookup-help {
+  margin: 0;
+  color: var(--ls-text-muted);
+  font-size: calc(11.5px * var(--ls-font-scale, 1));
+  line-height: 1.45;
+}
+
+.bib-lookup-privacy {
+  opacity: 0.82;
+}
+
+.bib-lookup-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 150px auto;
+  gap: 8px;
+}
+
+.bib-lookup-input,
+.bib-lookup-mode {
+  min-width: 0;
+}
+
+.bib-lookup-status {
+  margin: 0;
+  color: var(--ls-text-muted);
+  font-size: calc(11.5px * var(--ls-font-scale, 1));
+  line-height: 1.4;
+}
+
+.bib-lookup-results {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 210px;
+  overflow-y: auto;
+}
+
+.bib-lookup-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--ls-border-color);
+  border-radius: var(--ma-radius-md, 8px);
+  background: var(--ls-bg-secondary);
+  color: var(--ls-text-title);
+  text-align: left;
+  cursor: pointer;
+}
+
+.bib-lookup-result:hover {
+  border-color: color-mix(in srgb, var(--ls-accent) 52%, var(--ls-border-color));
+  background: var(--ls-bg-hover);
+}
+
+.bib-lookup-result-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.bib-lookup-result-title {
+  overflow: hidden;
+  font-size: calc(12.5px * var(--ls-font-scale, 1));
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bib-lookup-result-meta {
+  overflow: hidden;
+  color: var(--ls-text-muted);
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bib-lookup-result-side {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.bib-lookup-provider {
+  padding: 1px 6px;
+  border-radius: var(--ma-radius-sm, 6px);
+  background: var(--ls-accent-subtle);
+  color: var(--ls-accent);
+  font-size: calc(10px * var(--ls-font-scale, 1));
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.bib-lookup-kind {
+  color: var(--ls-text-muted);
+  font-size: calc(10px * var(--ls-font-scale, 1));
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .bib-lookup-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 760px) {

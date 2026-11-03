@@ -4050,6 +4050,7 @@ dependencies = [
  "pdfium-render",
  "quick-xml 0.41.0",
  "regex",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tauri",
@@ -4065,6 +4066,7 @@ dependencies = [
  "tauri-plugin-updater",
  "tokio",
  "unicode-normalization",
+ "url",
  "uuid",
  "walkdir",
 ]

@@ -112,6 +112,30 @@ antiguos se descartan para que el archivo no crezca indefinidamente.
 El plan detallado, las reglas de reanudación tras una interrupción y el estado
 exacto por fase viven en [`docs/CHECKLIST-PDF.md`](CHECKLIST-PDF.md).
 
+## Bibliografía y búsqueda de metadatos
+
+- La vista **Bibliografía** gestiona recursos con frontmatter `bib-*`, portadas
+  locales o remotas validadas y notas hijas enlazadas con wikilinks saneados.
+- **Búsqueda en línea:** en «Añadir recurso» se puede pegar un DOI, un ISBN-10 o
+  ISBN-13, o escribir palabras clave. Los resultados se muestran en una lista y,
+  al pulsar uno, rellenan el formulario sin crear la nota automáticamente.
+- **Proveedores:** Crossref para DOI y artículos; Open Library para ISBN y
+  libros. Sin claves API y sin Google Books en esta versión.
+- **La red ocurre solo en Rust.** El frontend nunca construye URLs ni hace
+  `fetch` a los proveedores: invoca el comando `bibliography_lookup`, que aplica
+  HTTPS obligatorio, hosts constantes, sin redirecciones, `rustls`, timeouts
+  (5 s de conexión, 12 s total), límite de 2 MiB, `Content-Type` JSON, rate
+  limit de 750 ms, máximo 16 resultados y caché en memoria de 10 minutos.
+- Todo texto remoto se sanea antes de mostrarse; las portadas solo se aceptan de
+  `https://covers.openlibrary.org` y la CSP amplía `img-src` únicamente para ese
+  host. La búsqueda es explícita, nunca en segundo plano, y el formulario manual
+  sigue funcionando sin red.
+- La descarga de portadas al vault queda fuera de alcance en esta versión.
+
+El estado, el modelo de amenaza, la matriz de pruebas manuales y el punto de
+reanudación viven en
+[`docs/CHECKLIST-BUSQUEDA-BIBLIOGRAFIA.md`](CHECKLIST-BUSQUEDA-BIBLIOGRAFIA.md).
+
 ## FSRS y repaso
 
 - FSRS-4.5 implementado en `src/editor/fsrs.ts`.
@@ -391,6 +415,11 @@ scripts/benchmark-cache.sh
   WEBP o BMP) y se rechaza SVG. Tauri acepta SVG solo si `validate_image_file`
   confirma que no tiene contenido activo. El modo web no añade CSP en esta fase
   y no se considera un entorno soportado para bóvedas no confiables.
+- La búsqueda de metadatos de Bibliografía se ejecuta solo en Rust con hosts
+  constantes, HTTPS, sin redirecciones, `rustls`, timeouts, límite de respuesta,
+  rate limit y caché en memoria. El frontend no envía URLs ni recibe el cuerpo
+  remoto; los errores usan códigos estables y el texto remoto se sanea antes de
+  mostrarse.
 - El portapapeles pasa por una lista blanca; nunca se inyecta HTML crudo.
 - La CSP solo permite `self` e IPC. Las descargas las hacen plugins nativos.
 - Android accede solo a la carpeta que el usuario autoriza mediante el selector
@@ -408,6 +437,13 @@ scripts/benchmark-cache.sh
 - Listas virtuales para grandes volúmenes.
 - Grafo con revelado por lotes y física estable.
 - Selector de notas móvil paginado y con render escalonado.
+- Sin `backdrop-filter` en las superficies que ocupan toda la ventana
+  (`.main-container`, `.sidebar-left`) ni en los velos de modal: el fondo que
+  difuminan es un degradado suave, así que el efecto era casi invisible, pero
+  obligaba a reprocesar la ventana completa en cada repintado. Medido en
+  rasterización por software: escribir pasaba de ~100 fps a ~30 fps. Los
+  desenfoques de superficies pequeñas (cabecera, avisos, menús flotantes) se
+  mantienen.
 
 ## Requisitos y comandos
 
@@ -590,6 +626,7 @@ El README de la raíz es el punto de entrada y enlaza aquí.
 Las fases largas que pueden interrumpirse mantienen además un checklist
 operativo en `docs/CHECKLIST-*.md`, con el estado exacto, los archivos tocados y
 las reglas para reanudar sin borrar código parcial. Este documento enlaza cada
-checklist; el lector PDF usa `docs/CHECKLIST-PDF.md` y el endurecimiento de
+checklist; el lector PDF usa `docs/CHECKLIST-PDF.md`, el endurecimiento de
 Documentos/Bibliografía usa
-`docs/CHECKLIST-SEGURIDAD-DOCUMENTOS-BIBLIOGRAFIA.md`.
+`docs/CHECKLIST-SEGURIDAD-DOCUMENTOS-BIBLIOGRAFIA.md` y la búsqueda de
+metadatos usa `docs/CHECKLIST-BUSQUEDA-BIBLIOGRAFIA.md`.

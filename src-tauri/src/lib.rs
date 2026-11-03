@@ -26,6 +26,7 @@ use tauri_plugin_opener::OpenerExt;
 use uuid::Uuid;
 use walkdir::WalkDir;
 
+pub mod bibliography_lookup;
 pub mod metadata_cache;
 pub mod pdf;
 #[cfg(test)]
@@ -5620,6 +5621,7 @@ pub fn run() {
             read_pages_cached,
             search_content,
             graph_links,
+            bibliography_lookup::bibliography_lookup,
             pick_vault_root,
             list_system_fonts,
             resolve_image_path,

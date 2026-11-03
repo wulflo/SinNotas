@@ -255,8 +255,14 @@ body {
       transparent 68%
     ),
     color-mix(in srgb, var(--md-surface) 74%, transparent);
-  backdrop-filter: blur(18px) saturate(130%);
-  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  /*
+   * Sin `backdrop-filter` a propósito: esta superficie ocupa toda la ventana y
+   * el fondo que difumina es un degradado suave, así que visualmente el
+   * desenfoque es indistinguible (≈0,2 % de diferencia de píxel) pero obliga a
+   * reenfocar la ventana completa en cada repintado. Sin aceleración de GPU
+   * eso baja la escritura de ~100 fps a ~30 fps. Los desenfoques de superficies
+   * pequeñas (cabecera, avisos, menús) sí se conservan.
+   */
 }
 
 .main-container::before {
@@ -289,8 +295,7 @@ body {
   box-shadow:
     inset -1px 0 0 color-mix(in srgb, #ffffff 6%, transparent),
     18px 0 52px -40px var(--md-shadow);
-  backdrop-filter: blur(var(--ma-blur)) saturate(150%);
-  -webkit-backdrop-filter: blur(var(--ma-blur)) saturate(150%);
+  /* Mismo motivo que en `.main-container`: ocupa toda la altura de la ventana. */
 }
 
 :root:not([data-theme="light"]) .sidebar-left {

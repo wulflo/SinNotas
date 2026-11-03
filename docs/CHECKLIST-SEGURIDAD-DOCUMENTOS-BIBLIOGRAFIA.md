@@ -1,10 +1,10 @@
 # Checklist — Endurecimiento de seguridad: Documentos y Bibliografía
 
-**Estado:** Fases 1–8 implementadas y publicadas en `v0.4.3`; suite, `tsc`, `cargo check` y build en verde; matriz manual pendiente · **Última actualización:** 2026-11-03
+**Estado:** Fases 1–8 implementadas y publicadas en `v0.4.3`; B4 (búsqueda de metadatos) implementada y verificada automáticamente; matriz manual pendiente · **Última actualización:** 2026-11-03
 **Origen:** auditoría de solo lectura de Documentos/PDF y Bibliografía.
 **Rama de trabajo:** `master`
 **Documento principal:** `docs/SinNotas.md`
-**Checklist relacionado:** `docs/CHECKLIST-PDF.md`
+**Checklist relacionado:** `docs/CHECKLIST-PDF.md`, `docs/CHECKLIST-BUSQUEDA-BIBLIOGRAFIA.md`
 
 > Este documento registra la auditoría, las decisiones y la implementación. Los
 > números de línea son orientativos para la auditoría del 2026-11-02; si
@@ -12,6 +12,15 @@
 >
 > Las fases se implementaron en el orden D1 → B1 → D2 → D3 → D4 → B2 → B3 y se
 > publicaron juntas en la release `v0.4.3`; el historial no se separó por fase.
+>
+> **B4 — búsqueda de metadatos (2026-11-03):** la nueva búsqueda por DOI, ISBN y
+> palabras clave añade una superficie de red saliente. Se implementó en Rust con
+> hosts constantes, HTTPS, sin redirecciones, `rustls`, timeouts, límite de
+> respuesta, rate limit, caché en memoria y allowlist de portadas. El frontend no
+> construye URLs. El diseño completo, el modelo de amenaza y la matriz manual
+> están en [`docs/CHECKLIST-BUSQUEDA-BIBLIOGRAFIA.md`](CHECKLIST-BUSQUEDA-BIBLIOGRAFIA.md);
+> este documento solo registra que la superficie B4 no altera las invariantes
+> D1–D4 ni B1–B3.
 
 ---
 
@@ -61,6 +70,7 @@
 | D4 | Documentos | Baja | No exponer rutas absolutas de PDFs en la UI. | `[?]` |
 | B2 | Bibliografía | Baja | Evitar que títulos con `[]` o saltos de línea rompan wikilinks. | `[?]` |
 | B3 | Bibliografía | Baja | Alinear la validación de portadas del modo web con Tauri. | `[?]` |
+| B4 | Bibliografía | Media | Búsqueda de metadatos por DOI/ISBN/palabras clave solo desde Rust, con red restringida. | `[x]` |
 
 ### Hallazgos que no se corrigen en este plan
 

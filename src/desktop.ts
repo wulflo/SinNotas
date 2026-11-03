@@ -141,6 +141,7 @@ import {
   type BibliographyPatch,
   type CreateBibliographyInput,
 } from "./views/bibliography";
+import { lookupBibliography } from "./views/bibliography-lookup";
 import "./bibliography.css";
 import {
   filterAllPages,
@@ -6070,6 +6071,7 @@ function createBibliographyHost(): BibliographyHost {
     },
     uploadCover: (file) => uploadBibliographyCover(file),
     resolveImage: (source) => resolveBibliographyCover(source),
+    lookup: (query, mode) => lookupBibliography(query, mode),
     confirmDelete: (item) =>
       confirmAction(
         `${translate("Se eliminará de la bibliografía:")} «${item.page.title}». ${translate(
