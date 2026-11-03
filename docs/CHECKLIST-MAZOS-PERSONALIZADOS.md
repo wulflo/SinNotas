@@ -246,3 +246,4 @@ cd src-tauri && cargo test
 | 2026-11-03 | 7 | i18n (inglés/chino) y documentación funcional. |
 | 2026-11-03 | 8 | Verificación automática superada: 380 pruebas JS, build Vite y 87 pruebas Rust. Queda la prueba visual/manual. |
 | 2026-11-03 | 8 | Prueba manual de escritorio y Android web superada. Correcciones: la fusión ya no reintroduce notas desmarcadas; el error de nombre vacío no aparece al abrir un mazo nuevo; sufijos de nombre respetan el límite. Total: 381 pruebas JS. |
+| 2026-11-03 | 8 | Publicado en la release `v0.4.4`. |
