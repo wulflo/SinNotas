@@ -198,7 +198,10 @@ pub async fn bibliography_lookup(
 /* ==================== Validación de la consulta ==================== */
 
 fn sanitize_query(raw: &str) -> Result<String, LookupError> {
-    if raw.chars().count() > MAX_QUERY_CHARS {
+    // Cada carácter UTF-8 ocupa como máximo 4 bytes: si la cadena supera ese
+    // límite, es imposible que tenga menos de MAX_QUERY_CHARS caracteres. Se
+    // comprueba antes de recorrerla para acotar el coste de entradas enormes.
+    if raw.len() > MAX_QUERY_CHARS.saturating_mul(4) || raw.chars().count() > MAX_QUERY_CHARS {
         return Err(LookupError::invalid_query());
     }
 
@@ -979,7 +982,9 @@ fn parse_page_count(raw: &str) -> Option<u32> {
             if end < start {
                 None
             } else {
-                Some(end - start + 1)
+                // checked: evita desbordar con rangos absurdos como
+                // `0-4294967295` enviados por un proveedor comprometido.
+                end.checked_sub(start)?.checked_add(1)
             }
         }
         None => Some(1),
@@ -1387,6 +1392,8 @@ mod tests {
         assert_eq!(parse_page_count("12-10"), None);
         assert_eq!(parse_page_count("e123"), None);
         assert_eq!(parse_page_count(""), None);
+        assert_eq!(parse_page_count("0-4294967295"), None);
+        assert_eq!(parse_page_count("4294967295-4294967295"), Some(1));
     }
 
     #[test]

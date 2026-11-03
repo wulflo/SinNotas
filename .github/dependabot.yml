@@ -34,10 +34,14 @@ updates:
     open-pull-requests-limit: 10
     ignore:
       # Ignore major version updates for breaking changes (vite, vitest)
+      # Solo se ignoran las actualizaciones de versión (no las de seguridad):
+      # un CVE con parche en una versión mayor debe abrir PR igualmente.
       - dependency-name: "vite"
         update-type: "version-update:semver-major"
+        applies-to: "version-updates"
       - dependency-name: "vitest"
         update-type: "version-update:semver-major"
+        applies-to: "version-updates"
 
   # Cargo (Rust backend)
   - package-ecosystem: "cargo"

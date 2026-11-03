@@ -484,3 +484,65 @@ Tauri con una bóveda temporal:
 | 2026-11-03 | Creación: auditoría de Dependabot, diseño de seguridad, fases y punto de reanudación. |
 | 2026-11-03 | Verificación automática cerrada: Rust (99 pruebas, clippy y rustfmt), frontend (394 pruebas, `tsc`, build) y prueba de humo en vivo. Pendiente solo la matriz manual de UI. |
 | 2026-11-03 | Radios de Bibliografía tokenizados con `--ma-radius-*` y diagnóstico de rendimiento: se retira el `backdrop-filter` de las superficies de ventana completa (Aero). Medido con Playwright: ~31 fps → ~102-153 fps al escribir; diálogo estable a 60 fps. |
+| 2026-11-03 | Revisión de seguridad: Dependabot sin alertas abiertas; hardening de entrada, aritmética de páginas, saneado HTML con DOMPurify y descarga remota de portadas. Ver §10. |
+
+---
+
+## 10. Revisión de seguridad (2026-11-03)
+
+Alcance: alertas de Dependabot y superficies de la búsqueda DOI/ISBN/palabras
+clave (backend Rust, cliente TypeScript, portadas e imágenes pegadas).
+
+### Estado de dependencias
+
+- **Dependabot:** 0 alertas abiertas (15 `fixed`, 1 `dismissed`). La descartada
+  es `glib 0.18.5` (`GHSA-wrw7-89jp-8q8g` / `RUSTSEC-2024-0429`), transitiva de
+  `tauri → gtk 0.18`; no existe versión compatible que la corrija y su impacto
+  real es bajo (requiere entrada local maliciosa en GTK).
+- **`npm audit`:** 0 vulnerabilidades.
+- **Floors parcheados:** `vite ^6.4.5`, `tinypool >=2.1.2`, `esbuild >=0.25.0`.
+- **`Cargo.lock`:** `async-executor 1.14.1` y `clipboard-win 5.4.3` (ambos
+  estaban *yanked*).
+- **Dependabot ignores:** los `ignore` de `vite`/`vitest` llevan
+  `applies-to: "version-updates"` para que un aviso de seguridad con parche en
+  una versión mayor siga abriendo PR.
+
+### Búsqueda de metadatos: conclusiones
+
+- Hosts constantes y HTTPS en el backend, sin seguir redirecciones, `rustls`,
+  timeouts, límite de respuesta de 2 MiB, rate limit y caché. Sin SSRF ni
+  inyección explotable.
+- El frontend no usa `innerHTML` con datos remotos; las URLs se validan contra
+  allowlists antes de renderizar o descargar.
+- **Hardening aplicado:**
+  - `sanitize_query` rechaza entradas enormes por bytes antes de recorrerlas.
+  - `parse_page_count` usa aritmética `checked` (evita *overflow* con rangos
+    absurdos de un proveedor comprometido).
+  - `sanitizeLookupText` acota la entrada; los resultados IPC no-array,
+    no-objeto o con campos no-string se descartan sin lanzar.
+  - `paste-sanitizer` y `clipboardHtmlImageSource` usan **solo** DOMPurify; se
+    eliminan los *fallbacks* regex incompletos.
+  - La descarga de imágenes remotas usa `redirect: "error"`,
+    `credentials: "omit"`, `referrerPolicy: "no-referrer"` y un límite de
+    10 MiB (cabecera `content-length` + lectura por *stream*).
+
+### Pendiente / riesgo residual
+
+- **CodeQL:** 12 alertas altas de saneado/XSS permanecen abiertas porque el
+  análisis se ejecutó sobre el código anterior: 8
+  `js/incomplete-multi-character-sanitization`, 3 `js/bad-tag-filter` y 1
+  `js/xss` en `src/desktop.ts` y `src/editor/paste-sanitizer.ts`. Con los
+  cambios actuales (DOMPurify como única ruta) deberían cerrarse al subir y
+  reejecutar el análisis.
+- **`js/request-forgery` (crítica):** descartada como **falso positivo**. La
+  petición la hace el cliente de escritorio (Tauri), no un servidor; la URL
+  procede de HTML que el usuario pega y la respuesta solo se muestra como
+  imagen local. Además ya se bloquean hosts privados/locales y loopback, se
+  prohíben redirecciones, se omiten credenciales/referrer y se limita la
+  respuesta a 10 MiB. CodeQL no modela la validación de hostname como
+  *sanitizer*, por eso la alerta no desaparece con el endurecimiento. Queda
+  registrada como `dismissed` con esa justificación.
+- **`cargo audit`:** solo warnings informativos (`glib`, `bincode`,
+  `proc-macro-error`, `zbus_names`, `zvariant`); sin avisos accionables.
+- **`cargo fmt --check`:** falla por formato preexistente en
+  `src-tauri/src/lib.rs`, no por esta revisión.

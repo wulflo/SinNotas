@@ -1,3 +1,5 @@
+import DOMPurify from "dompurify";
+
 /**
  * Sanitización del pegado rico: HTML del portapapeles → Markdown plano.
  *
@@ -265,31 +267,21 @@ export function sanitizeDomNodeTree(root: MinimalDomNode): string {
  * grande. El llamador recurre a `text/plain` cuando el resultado es "".
  */
 function sanitizeHtmlString(html: string): string {
+  // DOMPurify es la única ruta de saneado. Si no hay DOM (tests en Node) o
+  // el motor no está soportado, se devuelve vacío y el llamador usa
+  // `text/plain`: nunca se recurre a regex caseros que CodeQL marca (con
+  // razón) como filtros incompletos.
+  if (!DOMPurify.isSupported) return "";
   try {
-    // Try to use DOMPurify if available in global/browser context
-    // @ts-ignore
-    const DOMPurifyGlobal = typeof window !== "undefined" ? (window as any).DOMPurify : undefined;
-    if (DOMPurifyGlobal && typeof DOMPurifyGlobal.sanitize === "function") {
-      return DOMPurifyGlobal.sanitize(html, {
-        ALLOWED_TAGS: ["p", "div", "br", "b", "strong", "i", "em", "u", "s", "del", "strike", "code", "pre", "ul", "ol", "li", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "table", "thead", "tbody", "tr", "th", "td", "span", "a", "img"],
-        ALLOWED_ATTR: [],
-        FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "input", "button", "select", "textarea"],
-        FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur", "onsubmit"]
-      });
-    }
+    return DOMPurify.sanitize(html, {
+      ALLOWED_TAGS: ["p", "div", "br", "b", "strong", "i", "em", "u", "s", "del", "strike", "code", "pre", "ul", "ol", "li", "blockquote", "h1", "h2", "h3", "h4", "h5", "h6", "table", "thead", "tbody", "tr", "th", "td", "span", "a", "img"],
+      ALLOWED_ATTR: [],
+      FORBID_TAGS: ["script", "style", "iframe", "object", "embed", "form", "input", "button", "select", "textarea"],
+      FORBID_ATTR: ["onerror", "onload", "onclick", "onmouseover", "onfocus", "onblur", "onsubmit"]
+    });
   } catch {
-    // ignore
+    return "";
   }
-  // Fallback regex sanitization
-  let sanitized = html.replace(/<script[\s\S]*?<\/script>/gi, "");
-  sanitized = sanitized.replace(/<style[\s\S]*?<\/style>/gi, "");
-  sanitized = sanitized.replace(/<iframe[\s\S]*?<\/iframe>/gi, "");
-  sanitized = sanitized.replace(/<object[\s\S]*?<\/object>/gi, "");
-  sanitized = sanitized.replace(/<embed[\s\S]*?>/gi, "");
-  // Remove event handlers
-  sanitized = sanitized.replace(/ on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
-  sanitized = sanitized.replace(/<([^>]+)\s+on\w+\s*=[^>]+>/gi, "<$1>");
-  return sanitized;
 }
 
 export function sanitizePastedHtmlToMarkdown(html: string): string {

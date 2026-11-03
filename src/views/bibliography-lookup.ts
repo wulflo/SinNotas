@@ -83,7 +83,11 @@ const LOOKUP_ERROR_MESSAGES: Record<BibliographyLookupErrorCode, string> = {
 /** Elimina controles, bidi y zero-width; colapsa espacios y recorta. */
 export function sanitizeLookupText(value: unknown, maxLength: number): string {
   if (typeof value !== "string") return "";
-  const clean = value
+  // Acota la entrada antes de recorrerla: el backend ya limita cada campo,
+  // pero un IPC comprometido o un cambio futuro no debe poder forzar un
+  // procesamiento desproporcionado.
+  const bounded = value.slice(0, Math.max(0, maxLength) * 16 + 64);
+  const clean = bounded
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, "")
     .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u2064\u2066-\u206F\uFEFF]/g, "")
     .replace(/\s+/g, " ")
@@ -219,13 +223,17 @@ function normalizeLookupResult(raw: BibliographyLookupResult): BibliographyLooku
     container: sanitizeLookupText(raw.container, 300),
     doi: sanitizeLookupText(raw.doi, 200),
     isbn: sanitizeLookupText(raw.isbn, 20),
-    url: isAllowedLookupUrl(raw.url) ? sanitizeLookupText(raw.url, MAX_URL_LENGTH) : "",
+    url:
+      typeof raw.url === "string" && isAllowedLookupUrl(raw.url)
+        ? sanitizeLookupText(raw.url, MAX_URL_LENGTH)
+        : "",
     pages: Number.isFinite(raw.pages)
       ? Math.max(0, Math.min(100_000, Math.trunc(raw.pages)))
       : 0,
-    coverUrl: isAllowedLookupCoverUrl(raw.coverUrl)
-      ? sanitizeLookupText(raw.coverUrl, MAX_URL_LENGTH)
-      : "",
+    coverUrl:
+      typeof raw.coverUrl === "string" && isAllowedLookupCoverUrl(raw.coverUrl)
+        ? sanitizeLookupText(raw.coverUrl, MAX_URL_LENGTH)
+        : "",
     abstractText: sanitizeLookupText(raw.abstractText, 2000),
   };
 }
@@ -257,14 +265,19 @@ export async function lookupBibliography(
   if (!isTauri()) throw new BibliographyLookupError("unsupported");
 
   try {
-    const raw = await invoke<BibliographyLookupResult[]>("bibliography_lookup", {
+    const raw = await invoke<unknown>("bibliography_lookup", {
       query: clean,
       mode,
     });
-    return raw
+    const items: unknown[] = Array.isArray(raw) ? raw : [];
+    return items
+      .slice(0, MAX_RESULTS)
+      .filter(
+        (item): item is BibliographyLookupResult =>
+          typeof item === "object" && item !== null
+      )
       .map(normalizeLookupResult)
-      .filter((result) => result.title.length > 0)
-      .slice(0, MAX_RESULTS);
+      .filter((result) => result.title.length > 0);
   } catch (error) {
     throw toLookupError(error);
   }

@@ -16,6 +16,7 @@ import {
   PdfListItem,
 } from "./types";
 import "katex/dist/katex.min.css";
+import DOMPurify from "dompurify";
 import "./style.css";
 import "./material-aero.css";
 import "./theme-lino.css";
@@ -4522,6 +4523,7 @@ function serializeEditorContent(editor: HTMLElement): string {
 }
 
 const IMAGE_EXTENSION_PATTERN = /\.(?:png|jpe?g|webp|svg|gif|bmp)$/i;
+const MAX_REMOTE_IMAGE_BYTES = 10 * 1024 * 1024;
 const IMAGE_MIME_EXTENSIONS: Record<string, string> = {
   "image/png": "png",
   "image/jpeg": "jpg",
@@ -5638,6 +5640,38 @@ function fileUrlToLocalPath(source: string): string | null {
   }
 }
 
+async function readLimitedImageBlob(response: Response): Promise<Blob> {
+  if (!response.body) {
+    const blob = await response.blob();
+    if (blob.size > MAX_REMOTE_IMAGE_BYTES) {
+      throw new Error("La imagen remota es demasiado grande.");
+    }
+    return blob;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value) continue;
+      total += value.byteLength;
+      if (total > MAX_REMOTE_IMAGE_BYTES) {
+        await reader.cancel();
+        throw new Error("La imagen remota es demasiado grande.");
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  const contentType = (response.headers.get("content-type") || "").split(";")[0].trim();
+  return new Blob(chunks as BlobPart[], { type: contentType });
+}
+
 async function imageSourceToFile(source: string): Promise<File | null> {
   const trimmed = source.trim();
   if (!trimmed) return null;
@@ -5646,9 +5680,20 @@ async function imageSourceToFile(source: string): Promise<File | null> {
     throw new Error("URL no permitida por motivos de seguridad.");
   }
 
-  const response = await fetch(trimmed);
+  const response = await fetch(trimmed, {
+    // Sin redirecciones: la validación de host se hizo sobre la URL inicial y
+    // un 3xx podría llevarla a localhost o a una IP privada.
+    redirect: "error",
+    credentials: "omit",
+    referrerPolicy: "no-referrer",
+    headers: { Accept: "image/*" },
+  });
   if (!response.ok) throw new Error(`La imagen respondió con ${response.status}.`);
-  const blob = await response.blob();
+  const declaredLength = Number(response.headers.get("content-length") || "");
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_REMOTE_IMAGE_BYTES) {
+    throw new Error("La imagen remota es demasiado grande.");
+  }
+  const blob = await readLimitedImageBlob(response);
   if (!blob.type.startsWith("image/")) {
     throw new Error(`El contenido descargado no es una imagen (${blob.type || "sin tipo"}).`);
   }
@@ -6214,25 +6259,28 @@ function clipboardImageFile(clipboard: DataTransfer | null): File | null {
 
 function clipboardHtmlImageSource(clipboard: DataTransfer | null): string | null {
   const html = clipboard?.getData("text/html");
-  if (html) {
+  if (html && DOMPurify.isSupported) {
     try {
-      let sanitizedHtml = html;
-      try {
-        const DOMPurifyModule = (window as any).DOMPurify;
-        if (DOMPurifyModule && typeof DOMPurifyModule.sanitize === "function") {
-          sanitizedHtml = DOMPurifyModule.sanitize(html, { ALLOWED_TAGS: ["img"], ALLOWED_ATTR: ["src", "srcset"], FORBID_TAGS: ["script", "iframe", "object", "embed"], FORBID_ATTR: ["onerror", "onload", "onclick"] });
-        } else {
-          sanitizedHtml = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/<[^>]+on\w+\s*=[^>]+>/gi, (m: string) => m.replace(/on\w+\s*=[^>\s]+/gi, ""));
-        }
-      } catch {
-        sanitizedHtml = html.replace(/<script[\s\S]*?<\/script>/gi, "").replace(/ on\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "");
-      }
+      // DOMPurify es la única ruta: los regex de respaldo eran incompletos y
+      // CodeQL los marcaba con razón. Solo se conserva el atributo src/srcset
+      // de un <img>; el HTML saneado nunca se inserta en el DOM.
+      const sanitizedHtml = DOMPurify.sanitize(html, {
+        ALLOWED_TAGS: ["img"],
+        ALLOWED_ATTR: ["src", "srcset"],
+      });
       const documentFragment = new DOMParser().parseFromString(sanitizedHtml, "text/html");
       const image = documentFragment.querySelector("img");
       const source = image?.getAttribute("src")?.trim()
         || image?.getAttribute("srcset")?.split(",")[0]?.trim().split(/\s+/)[0]
         || "";
-      if (source && !/^(?:javascript:|vbscript:)/i.test(source)) return source;
+      if (source) {
+        if (/^data:image\//i.test(source)) return source;
+        // Solo imágenes remotas http(s) públicas; imageSourceToFile repite la
+        // validación antes de descargar.
+        if (isAllowedRemoteImageUrl(source, window.location.href)) {
+          return new URL(source, window.location.href).href;
+        }
+      }
     } catch (error) {
       console.warn("No se pudo interpretar el HTML del portapapeles:", error);
     }
