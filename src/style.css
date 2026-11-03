@@ -8624,3 +8624,99 @@ body.editor-split-active #view-editor .canvas-wrapper {
     max-height: 42vh;
   }
 }
+
+/* ==================== SIDEBAR EN MOSAICO ==================== */
+/* Las vistas se muestran como una cuadrícula de iconos; el nombre aparece en
+   un tooltip al pasar el cursor o al enfocar con el teclado. */
+.sidebar-nav {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.sidebar-nav .nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 58px;
+  padding: 10px 6px;
+  border: 1px solid color-mix(in srgb, var(--ls-accent) 12%, var(--ls-border-subtle));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--ls-bg-tertiary) 58%, transparent);
+  color: var(--ls-text-primary);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.sidebar-nav .nav-item > svg {
+  width: 22px;
+  height: 22px;
+}
+
+.sidebar-nav .nav-item:hover,
+.sidebar-nav .nav-item:focus-visible {
+  background: var(--ls-bg-hover);
+  border-color: color-mix(in srgb, var(--ls-accent) 42%, var(--ls-border-color));
+  color: var(--ls-text-title);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px -14px color-mix(in srgb, var(--ls-accent) 75%, transparent);
+  outline: none;
+}
+
+.sidebar-nav .nav-item:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.sidebar-nav .nav-item.active {
+  border-color: color-mix(in srgb, var(--ls-accent) 58%, var(--ls-border-color));
+  background:
+    radial-gradient(
+      120% 130% at 20% 0%,
+      color-mix(in srgb, var(--ls-accent) 28%, transparent),
+      transparent 70%
+    ),
+    color-mix(in srgb, var(--ls-accent) 12%, var(--ls-bg-tertiary));
+  color: var(--ls-accent);
+  transform: none;
+}
+
+.sidebar-nav .nav-item::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 80;
+  max-width: 220px;
+  padding: 6px 10px;
+  border: 1px solid var(--ls-border-subtle);
+  border-radius: 8px;
+  background: var(--ls-bg-primary);
+  color: var(--ls-text-title);
+  font-size: calc(11.5px * var(--ls-font-scale, 1));
+  font-weight: 500;
+  line-height: 1.25;
+  white-space: nowrap;
+  box-shadow: var(--ls-menu-shadow);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+
+.sidebar-nav .nav-item:hover::after,
+.sidebar-nav .nav-item:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (max-width: 720px) {
+  .sidebar-nav .nav-item {
+    min-height: 52px;
+  }
+}

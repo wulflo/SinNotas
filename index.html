@@ -159,31 +159,28 @@
         </div>
 
         <!-- Translated Sidebar Navigation -->
-        <nav class="sidebar-nav">
-          <a class="nav-item active" id="nav-editor">
+        <nav class="sidebar-nav" aria-label="Navegación">
+          <a class="nav-item active" id="nav-editor" role="button" tabindex="0" aria-label="Editor" data-tooltip="Editor">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 20h9"></path>
               <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
             </svg>
-            <span>Editor</span>
           </a>
-          <a class="nav-item" id="nav-journals">
+          <a class="nav-item" id="nav-journals" role="button" tabindex="0" aria-label="Diarios" data-tooltip="Diarios">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
               <line x1="16" y1="2" x2="16" y2="6"></line>
               <line x1="8" y1="2" x2="8" y2="6"></line>
               <line x1="3" y1="10" x2="21" y2="10"></line>
             </svg>
-            <span>Diarios</span>
           </a>
-          <a class="nav-item" id="nav-flashcards">
+          <a class="nav-item" id="nav-flashcards" role="button" tabindex="0" aria-label="Flashcards" data-tooltip="Flashcards">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
               <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
             </svg>
-            <span>Flashcards</span>
           </a>
-          <a class="nav-item" id="nav-graph">
+          <a class="nav-item" id="nav-graph" role="button" tabindex="0" aria-label="Vista gráfica" data-tooltip="Vista gráfica">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="18" cy="5" r="3"></circle>
               <circle cx="6" cy="12" r="3"></circle>
@@ -191,33 +188,36 @@
               <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
               <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
             </svg>
-            <span>Vista gráfica</span>
           </a>
-          <a class="nav-item" id="nav-kanban">
+          <a class="nav-item" id="nav-kanban" role="button" tabindex="0" aria-label="Tareas" data-tooltip="Tareas">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="3" width="5" height="18" rx="1"></rect>
               <rect x="11" y="3" width="5" height="12" rx="1"></rect>
               <rect x="19" y="3" width="5" height="8" rx="1"></rect>
             </svg>
-            <span>Tareas</span>
           </a>
-          <a class="nav-item" id="nav-all-pages">
+          <a class="nav-item" id="nav-all-pages" role="button" tabindex="0" aria-label="Todas las páginas" data-tooltip="Todas las páginas">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
               <line x1="16" y1="13" x2="8" y2="13"></line>
               <line x1="16" y1="17" x2="8" y2="17"></line>
             </svg>
-            <span>Todas las páginas</span>
           </a>
-          <a class="nav-item" id="nav-pdf">
+          <a class="nav-item" id="nav-bibliography" role="button" tabindex="0" aria-label="Bibliografía" data-tooltip="Bibliografía">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+              <path d="M9 7h6"></path>
+            </svg>
+          </a>
+          <a class="nav-item" id="nav-pdf" role="button" tabindex="0" aria-label="Documentos" data-tooltip="Documentos">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
               <path d="M8 13h2.5a1.5 1.5 0 0 1 0 3H8v-3z"></path>
               <path d="M8 16v3"></path>
             </svg>
-            <span>Documentos</span>
           </a>
         </nav>
 
@@ -1276,7 +1276,10 @@
           </div>
         </section>
 
-        <!-- VIEW 7: DOCUMENTS (PDF READER) -->
+        <!-- VIEW 7: BIBLIOGRAFÍA (RECURSOS Y PROGRESO) -->
+        <section class="view-panel" id="view-bibliography"></section>
+
+        <!-- VIEW 8: DOCUMENTS (PDF READER) -->
         <section class="view-panel" id="view-pdf">
           <div class="pdf-view-shell">
             <aside class="pdf-library" aria-label="Biblioteca de documentos">
@@ -1359,6 +1362,20 @@
             </div>
           </div>
         </section>
+
+        <div
+          class="pdf-editor-resizer"
+          id="pdf-editor-resizer"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Ajustar el ancho entre el documento y el editor"
+          aria-controls="view-pdf view-editor"
+          aria-valuemin="30"
+          aria-valuemax="70"
+          aria-valuenow="50"
+          tabindex="0"
+          title="Arrastra para ajustar el ancho. Doble clic para restablecer"
+        ></div>
       </main>
     </div>
 

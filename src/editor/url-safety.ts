@@ -137,3 +137,34 @@ export function isAllowedRemoteImageUrl(
   if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
   return !isPrivateOrLocalHostname(parsed.hostname);
 }
+
+/** Distingue una URL remota (absoluta o protocol-relative) de una ruta local. */
+export function isRemoteImageSource(source: string): boolean {
+  return /^(?:https?:|\/\/)/i.test(source.trim());
+}
+
+/**
+ * Resuelve una fuente remota solo si es segura. Devuelve `null` para rutas
+ * locales y para URLs rechazadas; `data:image/` y `blob:` se dejan pasar
+ * porque no generan peticiones de red.
+ */
+export function resolveAllowedRemoteImageUrl(
+  source: string,
+  baseHref = "https://sinnotas.invalid/",
+): string | null {
+  const trimmed = source.trim();
+  if (!trimmed) return null;
+  if (/^data:image\//i.test(trimmed)) return trimmed;
+  if (/^blob:/i.test(trimmed)) return trimmed;
+  if (!isRemoteImageSource(trimmed)) return null;
+
+  // En Tauri la página puede usar un esquema no HTTP; para validar la URL
+  // remota usamos una base HTTPS equivalente.
+  const base = /^https?:\/\//i.test(baseHref) ? baseHref : "https://sinnotas.invalid/";
+  if (!isAllowedRemoteImageUrl(trimmed, base)) return null;
+  try {
+    return new URL(trimmed, base).href;
+  } catch {
+    return null;
+  }
+}

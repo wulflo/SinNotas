@@ -1,8 +1,9 @@
 # Checklist — Documentos y lector PDF nativo (PDFium)
 
-**Estado:** Fases 1–4 implementadas (documentos enlazados, texto, capturas y caducidad); pendiente prueba manual de la UI · **Última actualización:** 2026-11-01
-**Rama de trabajo:** `master` (cambios locales sin commit)
+**Estado:** Fases 1–4 implementadas (documentos enlazados, texto, capturas y caducidad); pendiente prueba manual de la UI · **Última actualización:** 2026-11-03
+**Rama de trabajo:** `master` (publicado en `v0.4.3`)
 **Documento principal:** `docs/SinNotas.md`
+**Endurecimiento relacionado:** `docs/CHECKLIST-SEGURIDAD-DOCUMENTOS-BIBLIOGRAFIA.md` (D1–D4)
 
 Este documento es el punto de reanudación si una sesión de trabajo se corta a
 mitad. La app debe seguir siendo MIT; el plugin de Anki
@@ -191,8 +192,8 @@ entre páginas. Sin capa de texto, sin selección y sin tarjetas.
 - [x] Crear `src/views/pdf-view.ts`.
 - [x] Crear `src/pdf.css` e importarlo desde `desktop.ts`.
 - [x] Integrar `pdfView` en `switchView`, `navItems`, `panels` y listeners.
-- [x] Cargar la lista de documentos al entrar por primera vez.
-- [x] Enlazar un PDF desde la vista y abrirlo automáticamente.
+- [x] Cargar la lista de documentos al entrar en la vista, sin abrir ninguno.
+- [x] Enlazar un PDF desde la vista; la apertura requiere un clic explícito.
 - [x] Mostrar en la biblioteca qué documentos están enlazados y cuáles faltan.
 - [x] Quitar enlaces desde la biblioteca sin borrar el archivo original.
 - [x] Navegación anterior/siguiente y contador de página.
@@ -203,6 +204,16 @@ entre páginas. Sin capa de texto, sin selección y sin tarjetas.
 - [x] Añadir selector de conservación al importar y por documento enlazado.
 - [x] Añadir botón de borrar para todos los documentos de la biblioteca.
 - [x] Añadir capa de texto, acciones flotantes y modo de captura.
+- [x] Añadir modo «Editor al lado» con PDF y editor en paralelo.
+- [x] Añadir divisor arrastrable entre PDF y editor, con límites de ancho,
+      doble clic para restablecer, control por teclado y `role="separator"`.
+- [x] Persistir la proporción del divisor en
+      `sinnotas-pdf-editor-split-ratio` y ocultar el divisor fuera del modo
+      paralelo.
+- [?] Probar manualmente el arrastre con ratón, los límites en ventanas
+      estrechas y la restauración tras reiniciar la app. En modo web ya se
+      verificaron arrastre, teclado, doble clic y persistencia; falta la app
+      Tauri con un PDF real y una ventana estrecha.
 - [x] Agrandar los checkboxes de toda la app (20 px en ajustes).
 
 #### 1.7 Verificación de Fase 1
@@ -368,8 +379,12 @@ Quita la entrada del registro. No borra ni modifica el archivo original.
 - Los documentos externos solo se resuelven por `link:<uuid>` contra el
   registro interno; el frontend nunca envía su ruta absoluta.
 - Rechazar URIs (`http:`, `file:`, `content:`), `..` y bytes nulos.
-- Rechazar archivos que no empiecen por `%PDF-`.
+- Rechazar archivos que no contengan `%PDF-` en los primeros 1024 bytes; se
+  permite un prefijo antes de la cabecera.
 - Límite de importación: 250 MB.
+- D1–D4 están detallados en
+  `docs/CHECKLIST-SEGURIDAD-DOCUMENTOS-BIBLIOGRAFIA.md`: registro/capturas,
+  autoapertura, revalidación/límites y rutas absolutas.
 - No ejecutar JavaScript embebido en el PDF.
 - No escribir en el PDF original.
 - No usar `hint` de oclusión con el texto que se quiere ocultar.
@@ -407,6 +422,8 @@ git diff -- src-tauri/src/pdf src/views/pdf-view.ts src/desktop.ts index.html sr
 | 2026-11-01 | 1 | Dependencias, motor PDFium, comandos y lector mínimo | `cargo check`; `cargo test` (5 pruebas PDF); `tsc`; `npm test` (324 pruebas) |
 | 2026-11-01 | 1 | Sección «Documentos», importación por enlace en `.sinnotas/documents/links.json`, quitar enlaces y estado de archivo ausente | `cargo check`; `cargo test` (8 pruebas PDF); `tsc`; `npm test` (324 pruebas) |
 | 2026-11-01 | 2–4 | Capa de texto seleccionable, inserción en la nota con `pdf-source::`, capturas en `assets/pdf-captures/`, borrado de documentos, caducidad de enlaces y checkboxes más grandes | `cargo check`; `cargo test --lib pdf::` (12 pruebas); `tsc`; `npm test` (325 pruebas); `npm run build` |
+| 2026-11-02 | D1–D4 | Registro/capturas con `resolve_vault_path`, sin autoapertura, revalidación y límites de render, rutas absolutas fuera de la API | `cargo test --lib` (87 pruebas); `npm test` (356 pruebas); `tsc`; `cargo check` |
+| 2026-11-03 | UI PDF | Divisor arrastrable entre PDF y editor, límites de ancho, control por teclado, doble clic para restablecer y proporción persistente | `tsc`; `npm test` (356 pruebas); `npm run build`; prueba de humo en modo web con arrastre, teclado, doble clic y recarga |
 
 ---
 

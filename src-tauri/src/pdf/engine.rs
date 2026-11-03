@@ -12,6 +12,12 @@ use walkdir::WalkDir;
 /// arranque normal de SinNotas no paga el coste de cargar PDFium.
 static PDFIUM: Mutex<Option<Pdfium>> = Mutex::new(None);
 
+const MAX_PDF_PAGES: i32 = 10_000;
+const MAX_RENDER_WIDTH: u32 = 2_400;
+const MAX_RENDER_HEIGHT: u32 = 12_000;
+const MAX_RENDER_PIXELS: u64 = 24_000_000;
+const MAX_TEXT_RUNS: usize = 50_000;
+
 fn library_name() -> &'static str {
     if cfg!(target_os = "windows") {
         "pdfium.dll"
@@ -149,11 +155,51 @@ fn open_document<'a>(pdfium: &'a Pdfium, path: &Path) -> Result<PdfDocument<'a>,
         .map_err(|error| format!("No se pudo abrir el PDF: {error}"))
 }
 
+fn ensure_page_count(page_count: i32) -> Result<(), String> {
+    if page_count > MAX_PDF_PAGES {
+        return Err(format!(
+            "El PDF tiene {page_count} páginas; el límite es {MAX_PDF_PAGES}."
+        ));
+    }
+    Ok(())
+}
+
+/// Calcula un ancho de render que respete el alto y el número de píxeles
+/// máximos. Si ni siquiera el ancho mínimo cabe, rechaza la página.
+fn safe_render_width(page_width: f32, page_height: f32, target_width: u32) -> Result<u32, String> {
+    if !page_width.is_finite()
+        || !page_height.is_finite()
+        || page_width <= 0.0
+        || page_height <= 0.0
+    {
+        return Err("La página no tiene dimensiones válidas.".to_string());
+    }
+
+    let aspect = f64::from(page_height) / f64::from(page_width);
+    let mut width = f64::from(target_width.clamp(320, MAX_RENDER_WIDTH));
+    loop {
+        let height = (width * aspect).ceil();
+        if height <= f64::from(MAX_RENDER_HEIGHT) && width * height <= MAX_RENDER_PIXELS as f64 {
+            return Ok(width as u32);
+        }
+
+        let next = (width * 0.75).floor().max(320.0);
+        if next >= width {
+            return Err(
+                "La página tiene una proporción demasiado grande para renderizarla de forma segura."
+                    .to_string(),
+            );
+        }
+        width = next;
+    }
+}
+
 pub(crate) fn inspect(app: &AppHandle, path: &Path) -> Result<(u32, Vec<PdfPageInfo>), String> {
     with_pdfium(app, |pdfium| {
         let document = open_document(pdfium, path)?;
         let pages = document.pages();
         let page_count = pages.len();
+        ensure_page_count(page_count)?;
         let mut page_infos = Vec::with_capacity(page_count.max(0) as usize);
 
         for index in 0..page_count {
@@ -178,6 +224,7 @@ fn extract_text_from_document(
 ) -> Result<PdfTextPage, String> {
     let pages = document.pages();
     let page_count = pages.len();
+    ensure_page_count(page_count)?;
     if page_index as i32 >= page_count {
         return Err(format!(
             "La página {} no existe (el PDF tiene {} páginas).",
@@ -200,6 +247,11 @@ fn extract_text_from_document(
         .map_err(|error| format!("No se pudo leer el texto de la página: {error}"))?;
     let mut runs = Vec::new();
     for segment in text.segments().iter() {
+        if runs.len() >= MAX_TEXT_RUNS {
+            return Err(format!(
+                "La página contiene demasiados fragmentos de texto (límite: {MAX_TEXT_RUNS})."
+            ));
+        }
         let value = segment.text();
         if value.trim().is_empty() {
             continue;
@@ -240,6 +292,12 @@ pub(crate) fn extract_text(
 fn encode_png(bitmap: &PdfBitmap<'_>) -> Result<Vec<u8>, String> {
     let bitmap_width = bitmap.width().max(1) as u32;
     let bitmap_height = bitmap.height().max(1) as u32;
+    if bitmap_width > MAX_RENDER_WIDTH
+        || bitmap_height > MAX_RENDER_HEIGHT
+        || u64::from(bitmap_width) * u64::from(bitmap_height) > MAX_RENDER_PIXELS
+    {
+        return Err("La página renderizada supera los límites de tamaño.".to_string());
+    }
     let rgba = bitmap.as_rgba_bytes();
     let image = ::image::RgbaImage::from_raw(bitmap_width, bitmap_height, rgba)
         .ok_or_else(|| "PDFium devolvió un búfer de imagen inválido.".to_string())?;
@@ -257,12 +315,13 @@ pub(crate) fn render_png(
     page_index: u32,
     target_width: u32,
 ) -> Result<Vec<u8>, String> {
-    let width = target_width.clamp(320, 2400) as i32;
+    let requested_width = target_width.clamp(320, MAX_RENDER_WIDTH);
 
     with_pdfium(app, |pdfium| {
         let document = open_document(pdfium, path)?;
         let pages = document.pages();
         let page_count = pages.len();
+        ensure_page_count(page_count)?;
         if page_index as i32 >= page_count {
             return Err(format!(
                 "La página {} no existe (el PDF tiene {} páginas).",
@@ -274,7 +333,8 @@ pub(crate) fn render_png(
         let page = pages
             .get(page_index as i32)
             .map_err(|error| format!("No se pudo cargar la página: {error}"))?;
-        let config = PdfRenderConfig::new().set_target_width(width);
+        let width = safe_render_width(page.width().value, page.height().value, requested_width)?;
+        let config = PdfRenderConfig::new().set_target_width(width as i32);
         let bitmap = page
             .render_with_config(&config)
             .map_err(|error| format!("No se pudo renderizar la página: {error}"))?;
@@ -285,6 +345,21 @@ pub(crate) fn render_png(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn render_width_respects_pixel_and_height_limits() {
+        assert_eq!(safe_render_width(100.0, 100.0, 2_400).unwrap(), 2_400);
+        assert_eq!(safe_render_width(100.0, 500.0, 2_400).unwrap(), 1_800);
+        assert!(safe_render_width(100.0, 5_000.0, 2_400).is_err());
+        assert!(safe_render_width(0.0, 100.0, 600).is_err());
+    }
+
+    #[test]
+    fn page_count_limit_is_enforced() {
+        assert!(ensure_page_count(1).is_ok());
+        assert!(ensure_page_count(MAX_PDF_PAGES).is_ok());
+        assert!(ensure_page_count(MAX_PDF_PAGES + 1).is_err());
+    }
 
     fn test_pdfium(library: &Path) -> Pdfium {
         match Pdfium::bind_to_library(library) {

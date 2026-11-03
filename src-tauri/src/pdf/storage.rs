@@ -9,8 +9,8 @@ use super::PdfListItem;
 use crate::{resolve_vault_path, write_file_atomically, SavedImagePath};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::io::{Read, Write};
+use std::path::{Component, Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -52,7 +52,6 @@ pub(crate) struct ResolvedDocument {
     pub relative_path: String,
     pub title: Option<String>,
     pub linked: bool,
-    pub source_path: Option<String>,
     pub expires_at: Option<i64>,
 }
 
@@ -89,6 +88,38 @@ fn is_pdf_path(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
+/// Un enlace del registro apunta a un archivo externo elegido por el usuario.
+/// Solo se aceptan rutas absolutas, sin `..`, que resuelvan a un PDF real.
+fn resolve_linked_pdf(raw_path: &str) -> Result<PathBuf, String> {
+    if raw_path.trim().is_empty() {
+        return Err("El enlace no tiene una ruta válida.".to_string());
+    }
+    if raw_path.contains('\0') {
+        return Err("La ruta del enlace contiene caracteres no permitidos.".to_string());
+    }
+
+    let requested = Path::new(raw_path);
+    if !requested.is_absolute() {
+        return Err("La ruta del enlace debe ser absoluta.".to_string());
+    }
+    if requested
+        .components()
+        .any(|part| matches!(part, Component::ParentDir))
+    {
+        return Err("La ruta del enlace no puede contener '..'.".to_string());
+    }
+
+    let path = fs::canonicalize(requested)
+        .map_err(|_| "El documento enlazado ya no está disponible.".to_string())?;
+    if !path.is_file() {
+        return Err("El documento enlazado no es un archivo.".to_string());
+    }
+    if !is_pdf_path(&path) {
+        return Err("El documento enlazado ya no es un PDF.".to_string());
+    }
+    Ok(path)
+}
+
 fn relative_from_root(root: &Path, path: &Path) -> Result<String, String> {
     path.strip_prefix(root)
         .map(|relative| relative.to_string_lossy().replace('\\', "/"))
@@ -113,12 +144,25 @@ fn link_id_from_request(requested: &str) -> Option<&str> {
     Some(id)
 }
 
+/// Ruta lógica del registro. Solo se usa en tests; las lecturas y escrituras
+/// pasan por `resolve_registry_path` para validar symlinks.
+#[cfg(test)]
 fn registry_path(root: &Path) -> PathBuf {
     root.join(LINKS_FOLDER).join(LINKS_FILE)
 }
 
+/// Resuelve una ruta interna del lector PDF sin seguir enlaces que salgan del
+/// vault. Es la única puerta para el registro y las capturas.
+fn resolve_pdf_internal_path(root: &Path, relative_path: &str) -> Result<PathBuf, String> {
+    resolve_vault_path(root, relative_path)
+}
+
+fn resolve_registry_path(root: &Path) -> Result<PathBuf, String> {
+    resolve_pdf_internal_path(root, &format!("{LINKS_FOLDER}/{LINKS_FILE}"))
+}
+
 fn load_registry(root: &Path) -> Result<LinkRegistry, String> {
-    let path = registry_path(root);
+    let path = resolve_registry_path(root)?;
     match fs::read_to_string(&path) {
         Ok(contents) => serde_json::from_str(&contents).map_err(|error| {
             format!(
@@ -137,7 +181,8 @@ fn load_registry(root: &Path) -> Result<LinkRegistry, String> {
 fn save_registry(root: &Path, registry: &LinkRegistry) -> Result<(), String> {
     let contents = serde_json::to_string_pretty(registry)
         .map_err(|error| format!("No se pudo serializar el registro de documentos: {error}"))?;
-    write_file_atomically(&registry_path(root), &contents)
+    let path = resolve_registry_path(root)?;
+    write_file_atomically(&path, &contents)
 }
 
 fn document_title(path: &Path) -> String {
@@ -190,6 +235,8 @@ fn validate_pdf_source(source: &Path) -> Result<u64, String> {
     let mut file = fs::File::open(source).map_err(|error| error.to_string())?;
     let mut header = [0_u8; 1024];
     let header_len = file.read(&mut header).map_err(|error| error.to_string())?;
+    // La especificación permite un prefijo antes de `%PDF-`; por eso se busca
+    // dentro de los primeros 1024 bytes y no solo en el byte 0.
     if header_len < 5
         || !header[..header_len]
             .windows(5)
@@ -236,7 +283,6 @@ pub(crate) fn list(root: &Path) -> Result<Vec<PdfListItem>, String> {
                 modified: modified_ms(&metadata),
                 linked: false,
                 missing: false,
-                source_path: None,
                 expires_at: None,
             });
         }
@@ -259,10 +305,8 @@ pub(crate) fn list(root: &Path) -> Result<Vec<PdfListItem>, String> {
     };
 
     for link in links {
-        let path = PathBuf::from(&link.path);
-        let metadata = fs::metadata(&path)
-            .ok()
-            .filter(|metadata| metadata.is_file());
+        let resolved = resolve_linked_pdf(&link.path).ok();
+        let metadata = resolved.as_ref().and_then(|path| fs::metadata(path).ok());
         let missing = metadata.is_none();
         items.push(PdfListItem {
             relative_path: link_relative_path(&link.id),
@@ -274,7 +318,6 @@ pub(crate) fn list(root: &Path) -> Result<Vec<PdfListItem>, String> {
             modified: metadata.as_ref().map(modified_ms).unwrap_or(link.added),
             linked: true,
             missing,
-            source_path: Some(link.path),
             expires_at: link.expires_at,
         });
     }
@@ -341,24 +384,12 @@ pub(crate) fn resolve_document(
 ) -> Result<ResolvedDocument, String> {
     if let Some(id) = link_id_from_request(requested_path) {
         let link = find_link(root, id)?;
-        let path = fs::canonicalize(Path::new(&link.path)).map_err(|_| {
-            format!(
-                "El documento enlazado ya no está disponible en {}.",
-                link.path
-            )
-        })?;
-        if !path.is_file() {
-            return Err("El documento enlazado no es un archivo.".to_string());
-        }
-        if !is_pdf_path(&path) {
-            return Err("El documento enlazado ya no es un PDF.".to_string());
-        }
+        let path = resolve_linked_pdf(&link.path)?;
         return Ok(ResolvedDocument {
             path,
             relative_path: link_relative_path(id),
             title: Some(link.title),
             linked: true,
-            source_path: Some(link.path),
             expires_at: link.expires_at,
         });
     }
@@ -369,9 +400,20 @@ pub(crate) fn resolve_document(
         relative_path,
         title: None,
         linked: false,
-        source_path: None,
         expires_at: None,
     })
+}
+
+/// Resuelve un documento y revalida el archivo antes de entregarlo a PDFium.
+/// Se usa al abrir, renderizar o extraer texto; borrar no pasa por aquí para
+/// permitir retirar copias dañadas de `assets/pdfs/`.
+pub(crate) fn resolve_document_for_open(
+    root: &Path,
+    requested_path: &str,
+) -> Result<ResolvedDocument, String> {
+    let resolved = resolve_document(root, requested_path)?;
+    validate_pdf_source(&resolved.path)?;
+    Ok(resolved)
 }
 
 /// Guarda un enlace al PDF externo sin copiarlo dentro del vault.
@@ -492,6 +534,20 @@ pub(crate) fn delete_document(root: &Path, requested_path: &str) -> Result<bool,
     Ok(true)
 }
 
+/// Crea el archivo de captura sin seguir symlinks ni sobrescribir uno existente.
+fn create_capture_file(target: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(target)?;
+    if let Err(error) = file.write_all(bytes) {
+        drop(file);
+        let _ = fs::remove_file(target);
+        return Err(error);
+    }
+    Ok(())
+}
+
 /// Guarda una captura de una región de PDF en `assets/pdf-captures/`.
 pub(crate) fn save_capture(
     root: &Path,
@@ -515,30 +571,63 @@ pub(crate) fn save_capture(
         .unwrap_or("png")
         .to_ascii_lowercase();
 
-    let folder = root.join(CAPTURE_FOLDER);
+    let folder = resolve_pdf_internal_path(root, CAPTURE_FOLDER)?;
     fs::create_dir_all(&folder)
         .map_err(|error| format!("No se pudo preparar la carpeta de capturas: {error}"))?;
 
     let base = format!("capture_{}_{}", now_ms(), stem);
-    let mut name = format!("{base}.{extension}");
-    let mut counter = 2;
-    while folder.join(&name).exists() {
-        name = format!("{base}_{counter}.{extension}");
-        counter += 1;
+    for suffix in 0..10_000 {
+        let name = if suffix == 0 {
+            format!("{base}.{extension}")
+        } else {
+            format!("{base}_{}.{extension}", suffix + 1)
+        };
+        let relative_path = format!("{CAPTURE_FOLDER}/{name}");
+        let target = resolve_pdf_internal_path(root, &relative_path)?;
+        match create_capture_file(&target, bytes) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => {
+                return Err(format!("No se pudo guardar la captura: {error}"));
+            }
+        }
+
+        let absolute_path = fs::canonicalize(&target)
+            .map_err(|error| format!("No se pudo guardar la captura: {error}"))?;
+        return Ok(SavedImagePath {
+            relative_path,
+            absolute_path: absolute_path.to_string_lossy().to_string(),
+        });
     }
 
-    let absolute_path = folder.join(&name);
-    fs::write(&absolute_path, bytes)
-        .map_err(|error| format!("No se pudo guardar la captura: {error}"))?;
-    Ok(SavedImagePath {
-        relative_path: format!("{CAPTURE_FOLDER}/{name}"),
-        absolute_path: absolute_path.to_string_lossy().to_string(),
-    })
+    Err("No se pudo encontrar un nombre único para la captura.".to_string())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const TEST_PNG: &[u8] = &[
+        0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44,
+        0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00, 0x00, 0x1F,
+        0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00,
+        0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
+        0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+    ];
+
+    fn test_dir(label: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!(
+            "sinnotas-pdf-{label}-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let _ = fs::remove_dir_all(&path);
+        fs::create_dir_all(&path).unwrap();
+        path
+    }
 
     #[test]
     fn sanitize_stem_removes_path_and_windows_characters() {
@@ -552,6 +641,103 @@ mod tests {
         assert!(resolve_pdf(&root, "assets/pdfs/libro.txt").is_err());
         assert!(resolve_pdf(&root, "../libro.pdf").is_err());
         assert!(resolve_pdf(&root, "/tmp/libro.pdf").is_err());
+    }
+
+    #[test]
+    fn linked_registry_paths_must_be_absolute_and_without_parent_dir() {
+        let base = test_dir("linked-registry-paths");
+        let vault = base.join("vault");
+        fs::create_dir_all(&vault).unwrap();
+        let source = base.join("Libro.pdf");
+        fs::write(&source, include_bytes!("test-page.pdf")).unwrap();
+        let valid = fs::canonicalize(&source).unwrap();
+        let parent_path = base.join("sub").join("..").join("Libro.pdf");
+
+        let registry = LinkRegistry {
+            links: vec![
+                LinkedDocument {
+                    id: "relative".to_string(),
+                    path: "assets/pdfs/Libro.pdf".to_string(),
+                    title: "Relativo".to_string(),
+                    added: 0,
+                    expires_at: None,
+                },
+                LinkedDocument {
+                    id: "parent".to_string(),
+                    path: parent_path.to_string_lossy().to_string(),
+                    title: "Con parent".to_string(),
+                    added: 0,
+                    expires_at: None,
+                },
+                LinkedDocument {
+                    id: "valid".to_string(),
+                    path: valid.to_string_lossy().to_string(),
+                    title: "Válido".to_string(),
+                    added: 0,
+                    expires_at: None,
+                },
+            ],
+        };
+        save_registry(&vault, &registry).unwrap();
+
+        let items = list(&vault).unwrap();
+        assert_eq!(items.len(), 3);
+        let relative = items
+            .iter()
+            .find(|item| item.relative_path == "link:relative")
+            .unwrap();
+        let parent = items
+            .iter()
+            .find(|item| item.relative_path == "link:parent")
+            .unwrap();
+        let valid_item = items
+            .iter()
+            .find(|item| item.relative_path == "link:valid")
+            .unwrap();
+        assert!(relative.missing);
+        assert!(parent.missing);
+        assert!(!valid_item.missing);
+
+        assert!(resolve_document(&vault, "link:relative").is_err());
+        assert!(resolve_document(&vault, "link:parent").is_err());
+        assert!(resolve_document(&vault, "link:valid").is_ok());
+
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn opening_revalidates_vault_and_linked_pdfs() {
+        let base = test_dir("open-validation");
+        let vault = base.join("vault");
+        let pdfs = vault.join(PDF_FOLDER);
+        fs::create_dir_all(&pdfs).unwrap();
+
+        let valid = pdfs.join("Valido.pdf");
+        fs::write(&valid, include_bytes!("test-page.pdf")).unwrap();
+        let invalid = pdfs.join("Falso.pdf");
+        fs::write(&invalid, b"no soy un pdf").unwrap();
+
+        assert!(resolve_document_for_open(&vault, "assets/pdfs/Valido.pdf").is_ok());
+        assert!(resolve_document_for_open(&vault, "assets/pdfs/Falso.pdf").is_err());
+
+        let external = base.join("Externo.pdf");
+        fs::write(&external, b"no soy un pdf").unwrap();
+        let registry = LinkRegistry {
+            links: vec![LinkedDocument {
+                id: "externo".to_string(),
+                path: fs::canonicalize(&external)
+                    .unwrap()
+                    .to_string_lossy()
+                    .to_string(),
+                title: "Externo".to_string(),
+                added: 0,
+                expires_at: None,
+            }],
+        };
+        save_registry(&vault, &registry).unwrap();
+        assert!(resolve_document_for_open(&vault, "link:externo").is_err());
+
+        fs::remove_dir_all(base).unwrap();
     }
 
     #[test]
@@ -590,7 +776,9 @@ mod tests {
         assert_eq!(items[0].title, "Mi PDF");
         assert!(items[0].linked);
         assert!(!items[0].missing);
-        assert_eq!(items[0].source_path.as_deref(), source.to_str());
+        assert!(!serde_json::to_string(&items[0])
+            .unwrap()
+            .contains("sourcePath"));
 
         let resolved = resolve_document(&vault, &relative).unwrap();
         assert_eq!(resolved.path, fs::canonicalize(&source).unwrap());
@@ -727,20 +915,88 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         fs::create_dir_all(&root).unwrap();
 
-        const PNG: &[u8] = &[
-            0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48,
-            0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
-            0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41, 0x54, 0x78,
-            0x9C, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
-            0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
-        ];
-
-        let saved = save_capture(&root, "Región.png", PNG).unwrap();
+        let saved = save_capture(&root, "Región.png", TEST_PNG).unwrap();
         assert!(saved.relative_path.starts_with("assets/pdf-captures/"));
         assert!(Path::new(&saved.absolute_path).is_file());
-        assert!(Path::new(&saved.absolute_path).starts_with(root.join(CAPTURE_FOLDER)));
+        let canonical_capture_folder = fs::canonicalize(root.join(CAPTURE_FOLDER)).unwrap();
+        assert!(Path::new(&saved.absolute_path).starts_with(canonical_capture_folder));
         assert!(save_capture(&root, "Falsa.png", b"no soy png").is_err());
 
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn registry_rejects_symlinked_internal_folder_outside_vault() {
+        use std::os::unix::fs::symlink;
+
+        let base = test_dir("registry-symlink-folder");
+        let vault = base.join("vault");
+        let outside = base.join("outside");
+        fs::create_dir_all(&vault).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        symlink(&outside, vault.join(".sinnotas")).unwrap();
+
+        assert!(load_registry(&vault).is_err());
+        assert!(save_registry(&vault, &LinkRegistry::default()).is_err());
+        assert!(!outside.join("documents").exists());
+
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn registry_rejects_symlinked_links_file_outside_vault() {
+        use std::os::unix::fs::symlink;
+
+        let base = test_dir("registry-symlink-file");
+        let vault = base.join("vault");
+        let docs = vault.join(LINKS_FOLDER);
+        fs::create_dir_all(&docs).unwrap();
+        let outside_file = base.join("outside-links.json");
+        fs::write(&outside_file, "{}").unwrap();
+        symlink(&outside_file, docs.join(LINKS_FILE)).unwrap();
+
+        assert!(load_registry(&vault).is_err());
+        assert!(save_registry(&vault, &LinkRegistry::default()).is_err());
+        assert_eq!(fs::read_to_string(&outside_file).unwrap(), "{}");
+
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn captures_reject_symlinked_folder_outside_vault() {
+        use std::os::unix::fs::symlink;
+
+        let base = test_dir("capture-symlink-folder");
+        let vault = base.join("vault");
+        let outside = base.join("outside");
+        fs::create_dir_all(vault.join("assets")).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        symlink(&outside, vault.join(CAPTURE_FOLDER)).unwrap();
+
+        assert!(save_capture(&vault, "captura.png", TEST_PNG).is_err());
+        assert_eq!(fs::read_dir(&outside).unwrap().count(), 0);
+
+        fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn capture_creation_does_not_follow_file_symlinks() {
+        use std::os::unix::fs::symlink;
+
+        let base = test_dir("capture-symlink-file");
+        let outside_file = base.join("outside.png");
+        fs::write(&outside_file, b"keep").unwrap();
+        let target = base.join("capture.png");
+        symlink(&outside_file, &target).unwrap();
+
+        let error = create_capture_file(&target, TEST_PNG).unwrap_err();
+        assert_eq!(error.kind(), std::io::ErrorKind::AlreadyExists);
+        assert_eq!(fs::read(&outside_file).unwrap(), b"keep");
+
+        fs::remove_dir_all(base).unwrap();
     }
 }

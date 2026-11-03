@@ -132,7 +132,6 @@ export class PdfReaderView {
   private lastRenderPage = -1;
   private lastRenderWidth = 0;
   private resizeTimer: number | null = null;
-  private initialized = false;
   private loading = false;
 
   private textEnabled = false;
@@ -215,15 +214,9 @@ export class PdfReaderView {
 
   /** Se llama cada vez que el usuario entra en la vista PDF. */
   async onActivate(): Promise<void> {
-    if (!this.initialized) {
-      this.initialized = true;
-      await this.refreshLibrary(true);
-      return;
-    }
-    if (!this.current && this.items.length > 0) {
-      const firstAvailable = this.items.find((item) => !item.missing);
-      if (firstAvailable) await this.open(firstAvailable.relativePath);
-    }
+    // Entrar en la vista nunca abre un PDF por sí solo: el usuario debe elegir
+    // un documento de la lista.
+    await this.refreshLibrary();
   }
 
   private setStatus(message: string): void {
@@ -334,7 +327,7 @@ export class PdfReaderView {
         button.setAttribute("aria-current", "page");
       }
       if (item.missing) button.classList.add("is-missing");
-      button.title = item.sourcePath || item.relativePath;
+      button.title = item.title || item.relativePath;
 
       const title = document.createElement("span");
       title.className = "pdf-library-item-title";
@@ -373,7 +366,7 @@ export class PdfReaderView {
     }
   }
 
-  async refreshLibrary(autoOpen: boolean): Promise<void> {
+  async refreshLibrary(): Promise<void> {
     this.setStatus("Leyendo la biblioteca de documentos…");
     try {
       this.items = await invoke<PdfListItem[]>("pdf_list");
@@ -384,13 +377,8 @@ export class PdfReaderView {
         this.closeCurrent();
       }
       this.renderLibrary();
-      const firstAvailable = this.items.find((item) => !item.missing);
-      if (autoOpen && firstAvailable && !this.current) {
-        await this.open(firstAvailable.relativePath);
-      } else {
-        this.setStatus("");
-        this.updateHeader();
-      }
+      this.setStatus("");
+      this.updateHeader();
     } catch (error) {
       this.items = [];
       this.renderLibrary();
@@ -860,7 +848,6 @@ export class PdfReaderView {
         modified: imported.modified,
         linked: imported.linked,
         missing: false,
-        sourcePath: imported.sourcePath,
         expiresAt: imported.expiresAt,
       };
       const existingIndex = this.items.findIndex(
@@ -931,7 +918,7 @@ export class PdfReaderView {
       if (this.current?.relativePath === item.relativePath) {
         this.closeCurrent();
       }
-      await this.refreshLibrary(false);
+      await this.refreshLibrary();
       this.setStatus(
         item.linked
           ? "Enlace eliminado. El archivo original no se ha modificado."

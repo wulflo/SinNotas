@@ -158,7 +158,7 @@ export interface KanbanTask {
 
 export type TypographyType = "sans" | "serif" | "mono" | "dyslexic" | "custom" | "system";
 
-export type ViewType = "editor" | "journals" | "flashcards" | "graph" | "kanban" | "all-pages" | "pdf";
+export type ViewType = "editor" | "journals" | "flashcards" | "graph" | "kanban" | "all-pages" | "bibliography" | "pdf";
 
 /** Documento PDF dentro de `assets/pdfs/` o enlazado desde fuera del vault. */
 export interface PdfListItem {
@@ -172,8 +172,6 @@ export interface PdfListItem {
   linked: boolean;
   /** `true` si el archivo enlazado ya no existe en su ubicación original. */
   missing: boolean;
-  /** Ruta absoluta del original cuando es un documento enlazado. */
-  sourcePath?: string | null;
   /** Milisegundos desde Unix epoch; ausente/`null` significa sin caducidad. */
   expiresAt?: number | null;
 }
@@ -194,8 +192,6 @@ export interface PdfDocumentInfo {
   modified: number;
   /** `true` si el documento se abrió desde un enlace externo. */
   linked: boolean;
-  /** Ruta absoluta del original cuando es un documento enlazado. */
-  sourcePath?: string | null;
   /** Milisegundos desde Unix epoch; ausente/`null` significa sin caducidad. */
   expiresAt?: number | null;
 }

@@ -30,9 +30,6 @@ pub struct PdfListItem {
     /// `true` si un documento enlazado ya no existe en su ubicación original.
     #[serde(default)]
     pub missing: bool,
-    /// Ruta absoluta del original cuando es un documento enlazado.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_path: Option<String>,
     /// Milisegundos desde Unix epoch; `None` significa sin caducidad.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<i64>,
@@ -61,9 +58,6 @@ pub struct PdfDocumentInfo {
     /// `true` si el documento se abrió desde un enlace externo.
     #[serde(default)]
     pub linked: bool,
-    /// Ruta absoluta del original cuando es un documento enlazado.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub source_path: Option<String>,
     /// Milisegundos desde Unix epoch; `None` significa sin caducidad.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expires_at: Option<i64>,
@@ -97,7 +91,7 @@ pub fn list(root: &Path) -> Result<Vec<PdfListItem>, String> {
 
 /// Abre un PDF del vault o un documento enlazado y devuelve sus páginas.
 pub fn open(app: &AppHandle, root: &Path, requested_path: &str) -> Result<PdfDocumentInfo, String> {
-    let resolved = storage::resolve_document(root, requested_path)?;
+    let resolved = storage::resolve_document_for_open(root, requested_path)?;
     let metadata = fs::metadata(&resolved.path).map_err(|error| error.to_string())?;
     let (page_count, pages) = engine::inspect(app, &resolved.path)?;
     if page_count == 0 {
@@ -121,7 +115,6 @@ pub fn open(app: &AppHandle, root: &Path, requested_path: &str) -> Result<PdfDoc
         file_size: metadata.len(),
         modified: storage::modified_ms(&metadata),
         linked: resolved.linked,
-        source_path: resolved.source_path,
         expires_at: resolved.expires_at,
     })
 }
@@ -134,7 +127,7 @@ pub fn render_page(
     page_index: u32,
     target_width: u32,
 ) -> Result<Vec<u8>, String> {
-    let resolved = storage::resolve_document(root, requested_path)?;
+    let resolved = storage::resolve_document_for_open(root, requested_path)?;
     engine::render_png(app, &resolved.path, page_index, target_width)
 }
 
@@ -156,7 +149,7 @@ pub fn page_text(
     requested_path: &str,
     page_index: u32,
 ) -> Result<PdfTextPage, String> {
-    let resolved = storage::resolve_document(root, requested_path)?;
+    let resolved = storage::resolve_document_for_open(root, requested_path)?;
     engine::extract_text(app, &resolved.path, page_index)
 }
 

@@ -1,6 +1,6 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.4.2 · **Fecha:** 2026-11-01
+**Versión:** 0.4.3 · **Fecha:** 2026-11-03
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
@@ -70,8 +70,19 @@ antiguos se descartan para que el archivo no crezca indefinidamente.
 - Los documentos enlazados se pueden quitar de la biblioteca sin borrar el
   archivo original. Si el original desaparece, la entrada queda marcada como
   «Archivo original no encontrado».
-- Límite de importación: 250 MB. Se valida la extensión, la cabecera `%PDF-` y,
-  para los PDFs del vault, que la ruta esté dentro de la raíz.
+- Límite de importación: 250 MB. Se valida la extensión, que `%PDF-` aparezca
+  en los primeros 1024 bytes y, para los PDFs del vault, que la ruta esté dentro
+  de la raíz.
+- **Apertura explícita:** entrar en Documentos solo refresca la biblioteca; no
+  abre ningún PDF automáticamente. Cada apertura, render o extracción de texto
+  vuelve a validar el archivo antes de entregarlo a PDFium. Las entradas de
+  `.sinnotas/documents/links.json` deben ser rutas absolutas, sin `..`, y
+  resolver a un PDF real.
+- **Límites de render:** 10 000 páginas por PDF, 2 400 px de ancho, 12 000 px de
+  alto, 24 000 000 de píxeles y 50 000 fragmentos de texto por página. Si una
+  página no cabe ni con el ancho mínimo, se rechaza con un error.
+- **Rutas privadas:** el frontend recibe `relativePath` o `link:<id>`, nunca la
+  ruta absoluta de un PDF enlazado.
 - **Gestión de la biblioteca:** los enlaces se pueden quitar sin borrar el
   original y los PDFs copiados en `assets/pdfs/` se pueden eliminar del vault
   (solo esa carpeta). Cada enlace admite una caducidad opcional (1, 7, 30 o 90
@@ -81,6 +92,12 @@ antiguos se descartan para que el archivo no crezca indefinidamente.
   página y el lector pinta una capa HTML transparente sobre el PNG. La selección
   se puede copiar o insertar como bullet en la nota activa con la propiedad
   `pdf-source::`.
+- **Editor al lado y divisor arrastrable:** el botón «Editor al lado» muestra
+  el PDF y la nota en paralelo. El divisor central se puede arrastrar para
+  repartir el ancho, se ajusta con las flechas cuando tiene el foco (Mayús para
+  pasos grandes), `Inicio`/`Fin` llevan a los límites, vuelve al 50 % con doble
+  clic y conserva la proporción elegida en `localStorage`. La preferencia se
+  mantiene entre sesiones sin afectar a otras vistas.
 - **Capturas:** se puede arrastrar un rectángulo sobre la página para guardarlo
   como PNG en `assets/pdf-captures/` e insertarlo en la nota, opcionalmente
   abriendo el editor de oclusiones.
@@ -308,6 +325,23 @@ scripts/benchmark-cache.sh
 - Las operaciones de archivos se limitan a la bóveda activa.
 - `resolve_vault_path` rechaza `..`, rutas absolutas fuera de la raíz, bytes NUL,
   symlinks que escapan de la bóveda y URIs `content://`, `file://` o `http://`.
+- El registro de documentos PDF y las capturas se resuelven con
+  `resolve_vault_path`; las capturas usan `create_new` para no seguir enlaces
+  existentes. Las entradas de `links.json` se validan antes de abrir.
+- Documentos no autoabre PDFs. Al abrir, renderizar o extraer texto se revalida
+  la cabecera `%PDF-` y el tamaño; el motor limita páginas, dimensiones,
+  píxeles y fragmentos de texto.
+- La API de PDF no serializa rutas absolutas: solo `relativePath`, `link:<id>`,
+  `linked` y `missing`.
+- Las portadas remotas de Bibliografía pasan por
+  `resolveAllowedRemoteImageUrl`: solo se aceptan `http(s)` públicos y se
+  rechazan hosts privados, `localhost` y URLs protocol-relative inseguras. En
+  Tauri la CSP sigue bloqueando las imágenes remotas; en modo web se permite una
+  URL pública validada.
+- En modo web las portadas subidas se validan por magic bytes (PNG, JPEG, GIF,
+  WEBP o BMP) y se rechaza SVG. Tauri acepta SVG solo si `validate_image_file`
+  confirma que no tiene contenido activo. El modo web no añade CSP en esta fase
+  y no se considera un entorno soportado para bóvedas no confiables.
 - El portapapeles pasa por una lista blanca; nunca se inyecta HTML crudo.
 - La CSP solo permite `self` e IPC. Las descargas las hacen plugins nativos.
 - Android accede solo a la carpeta que el usuario autoriza mediante el selector
@@ -423,7 +457,7 @@ sobre el commit correcto y se empuja de nuevo.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Última release publicada: `0.4.2` (`versionCode 4002`)
+- Última release publicada: `0.4.3` (`versionCode 4003`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):
@@ -507,4 +541,6 @@ El README de la raíz es el punto de entrada y enlaza aquí.
 Las fases largas que pueden interrumpirse mantienen además un checklist
 operativo en `docs/CHECKLIST-*.md`, con el estado exacto, los archivos tocados y
 las reglas para reanudar sin borrar código parcial. Este documento enlaza cada
-checklist; el lector PDF usa `docs/CHECKLIST-PDF.md`.
+checklist; el lector PDF usa `docs/CHECKLIST-PDF.md` y el endurecimiento de
+Documentos/Bibliografía usa
+`docs/CHECKLIST-SEGURIDAD-DOCUMENTOS-BIBLIOGRAFIA.md`.

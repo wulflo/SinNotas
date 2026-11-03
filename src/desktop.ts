@@ -56,6 +56,7 @@ import {
   DECK_SEPARATOR,
   hasInvalidDeckTitleCharacters,
   normalizeDeckTitle,
+  sanitizeDeckTitle,
   splitDeckTitle,
 } from "./deck-title";
 import {
@@ -106,6 +107,21 @@ import { FlashcardsManager, type FlashcardReviewOrder } from "./views/flashcards
 import { FlashcardLoader, type FlashcardLoadProgress } from "./views/flashcard-loader";
 import { KanbanManager } from "./views/kanban-view";
 import { PdfReaderView } from "./views/pdf-view";
+import { BibliographyView, type BibliographyHost } from "./views/bibliography-view";
+import {
+  applyBibliographyPatch,
+  bibliographyItemFromPage,
+  bibliographyWikilink,
+  createBibliographyFrontmatter,
+  createBibliographyNoteFrontmatter,
+  bibliographyNoteParent,
+  isBibliographyNotePage,
+  setBibliographyNoteParent,
+  type BibliographyItem,
+  type BibliographyPatch,
+  type CreateBibliographyInput,
+} from "./views/bibliography";
+import "./bibliography.css";
 import {
   filterAllPages,
   formatPageDate,
@@ -128,8 +144,13 @@ import {
   type ControllerType,
 } from "./gamepad";
 import { renderMarkdownToHtml, sanitizeHtml, stripCardTag, stripSystemProperties } from "./editor/markdown";
-import { isAllowedRemoteImageUrl } from "./editor/url-safety";
+import {
+  isAllowedRemoteImageUrl,
+  isRemoteImageSource,
+  resolveAllowedRemoteImageUrl,
+} from "./editor/url-safety";
 import { sanitizePastedHtmlToMarkdown } from "./editor/paste-sanitizer";
+import { normalizeRasterImageFile } from "./editor/image-bytes";
 import { findMatchesInBlocks, type NoteMatch } from "./editor/note-search";
 import {
   installNoteScrollNav,
@@ -831,6 +852,7 @@ const navFlashcards = document.getElementById("nav-flashcards") as HTMLElement;
 const navGraph = document.getElementById("nav-graph") as HTMLElement;
 const navKanban = document.getElementById("nav-kanban") as HTMLElement;
 const navAllPages = document.getElementById("nav-all-pages") as HTMLElement;
+const navBibliography = document.getElementById("nav-bibliography") as HTMLElement;
 const navPdf = document.getElementById("nav-pdf") as HTMLElement;
 const btnHistoryBack = document.getElementById("btn-history-back") as HTMLButtonElement;
 const btnHistoryForward = document.getElementById("btn-history-forward") as HTMLButtonElement;
@@ -850,12 +872,14 @@ const graphPreviewOpenButton = document.getElementById("graph-preview-open") as 
 const graphPreviewCloseButton = document.getElementById("graph-preview-close") as HTMLButtonElement;
 const viewKanban = document.getElementById("view-kanban") as HTMLElement;
 const viewAllPages = document.getElementById("view-all-pages") as HTMLElement;
+const viewBibliography = document.getElementById("view-bibliography") as HTMLElement;
 const viewPdf = document.getElementById("view-pdf") as HTMLElement;
 const pdfView = new PdfReaderView(viewPdf, {
   insertText: insertPdfTextIntoEditor,
   insertCapture: insertPdfCaptureIntoEditor,
   confirmDelete: confirmPdfDeletion,
 });
+const bibliographyView = new BibliographyView(viewBibliography, createBibliographyHost());
 const btnPdfToggleEditor = document.getElementById("pdf-toggle-editor") as HTMLButtonElement | null;
 const kanbanHideCompleted = document.getElementById("kanban-hide-completed") as HTMLInputElement;
 let draggedKanbanTask: KanbanTask | null = null;
@@ -3283,6 +3307,7 @@ function readLastNavigation(): { view: ViewType; pageId: string } | null {
       "graph",
       "kanban",
       "all-pages",
+      "bibliography",
       "pdf",
     ];
     if (!validViews.includes(view as ViewType)) return null;
@@ -3372,6 +3397,7 @@ function switchView(view: ViewType) {
   const splitActive =
     pdfEditorSplitPreferred() && (view === "pdf" || view === "editor");
   document.body.classList.toggle("pdf-editor-split-active", splitActive);
+  applyPdfEditorSplitRatio();
   updatePdfEditorSplitButton();
   currentView = view;
 
@@ -3382,10 +3408,10 @@ function switchView(view: ViewType) {
   if (!hasOpenPage) setHeadbarTitle("");
   document.body.classList.toggle("no-active-page", !hasOpenPage);
 
-  const navItems = [navEditor, navJournals, navFlashcards, navGraph, navKanban, navAllPages, navPdf];
+  const navItems = [navEditor, navJournals, navFlashcards, navGraph, navKanban, navAllPages, navBibliography, navPdf];
   navItems.forEach((item) => item.classList.remove("active"));
 
-  const panels = [viewEditor, viewJournals, viewFlashcards, viewGraph, viewKanban, viewAllPages, viewPdf];
+  const panels = [viewEditor, viewJournals, viewFlashcards, viewGraph, viewKanban, viewAllPages, viewBibliography, viewPdf];
   panels.forEach((p) => p.classList.remove("active-view"));
 
   if (view === "editor") {
@@ -3431,6 +3457,11 @@ function switchView(view: ViewType) {
     viewAllPages.classList.add("active-view");
     graphView?.stopSimulation();
     renderAllPagesView();
+  } else if (view === "bibliography") {
+    navBibliography.classList.add("active");
+    viewBibliography.classList.add("active-view");
+    graphView?.stopSimulation();
+    bibliographyView.onActivate();
   } else if (view === "pdf") {
     navPdf.classList.add("active");
     viewPdf.classList.add("active-view");
@@ -3457,6 +3488,7 @@ navAllPages.addEventListener("click", () => {
   allPagesCurrentPage = 1;
   switchView("all-pages");
 });
+navBibliography.addEventListener("click", () => switchView("bibliography"));
 navPdf.addEventListener("click", () => switchView("pdf"));
 
 /* ==================== PDF + EDITOR EN PARALELO ==================== */
@@ -3474,6 +3506,78 @@ function pdfEditorSplitVisible(): boolean {
   return document.body.classList.contains("pdf-editor-split-active");
 }
 
+const PDF_EDITOR_SPLIT_RATIO_KEY = "sinnotas-pdf-editor-split-ratio";
+const PDF_EDITOR_SPLIT_DEFAULT_RATIO = 50;
+const PDF_EDITOR_SPLIT_MIN_PDF_PX = 280;
+const PDF_EDITOR_SPLIT_MIN_EDITOR_PX = 300;
+const PDF_EDITOR_SPLIT_DIVIDER_PX = 8;
+
+const mainContainerEl = document.querySelector<HTMLElement>(".main-container");
+const pdfEditorResizer = document.getElementById("pdf-editor-resizer");
+
+let pdfEditorSplitRatio = readPdfEditorSplitRatio();
+
+function readPdfEditorSplitRatio(): number {
+  try {
+    const raw = localStorage.getItem(PDF_EDITOR_SPLIT_RATIO_KEY);
+    if (raw === null) return PDF_EDITOR_SPLIT_DEFAULT_RATIO;
+    const value = Number.parseFloat(raw);
+    if (!Number.isFinite(value)) return PDF_EDITOR_SPLIT_DEFAULT_RATIO;
+    return Math.min(100, Math.max(0, value));
+  } catch {
+    return PDF_EDITOR_SPLIT_DEFAULT_RATIO;
+  }
+}
+
+function persistPdfEditorSplitRatio(): void {
+  try {
+    localStorage.setItem(PDF_EDITOR_SPLIT_RATIO_KEY, String(pdfEditorSplitRatio));
+  } catch {
+    // La preferencia solo afecta a la sesión si localStorage no está disponible.
+  }
+}
+
+/**
+ * Límites relativos para que ninguno de los dos paneles quede inservible.
+ * En ventanas estrechas los porcentajes se relajan, pero nunca se permite
+ * que el divisor cruce al panel contrario.
+ */
+function pdfEditorSplitBounds(): { min: number; max: number } {
+  const width = mainContainerEl?.clientWidth ?? window.innerWidth;
+  if (!Number.isFinite(width) || width <= 0) return { min: 30, max: 70 };
+  const min = Math.min(45, Math.max(20, (PDF_EDITOR_SPLIT_MIN_PDF_PX / width) * 100));
+  const max = Math.max(
+    55,
+    Math.min(
+      80,
+      ((width - PDF_EDITOR_SPLIT_DIVIDER_PX - PDF_EDITOR_SPLIT_MIN_EDITOR_PX) / width) * 100
+    )
+  );
+  return max > min ? { min, max } : { min: 30, max: 70 };
+}
+
+function applyPdfEditorSplitRatio(): void {
+  const bounds = pdfEditorSplitBounds();
+  const effective = Math.min(bounds.max, Math.max(bounds.min, pdfEditorSplitRatio));
+  mainContainerEl?.style.setProperty("--pdf-editor-split-left", `${effective}%`);
+  if (!pdfEditorResizer) return;
+  pdfEditorResizer.setAttribute("aria-valuemin", String(Math.round(bounds.min)));
+  pdfEditorResizer.setAttribute("aria-valuemax", String(Math.round(bounds.max)));
+  pdfEditorResizer.setAttribute("aria-valuenow", String(Math.round(effective)));
+  pdfEditorResizer.setAttribute(
+    "aria-valuetext",
+    `${Math.round(effective)} % para el documento, ${Math.round(100 - effective)} % para el editor`
+  );
+}
+
+function setPdfEditorSplitRatio(value: number, persist: boolean): void {
+  const bounds = pdfEditorSplitBounds();
+  if (!Number.isFinite(value)) return;
+  pdfEditorSplitRatio = Math.min(bounds.max, Math.max(bounds.min, value));
+  applyPdfEditorSplitRatio();
+  if (persist) persistPdfEditorSplitRatio();
+}
+
 function updatePdfEditorSplitButton(): void {
   if (!btnPdfToggleEditor) return;
   const active = pdfEditorSplitVisible();
@@ -3489,6 +3593,7 @@ function updatePdfEditorSplitButton(): void {
 }
 
 function applyPdfEditorSplit(active: boolean): void {
+  applyPdfEditorSplitRatio();
   if (active) {
     // El panel de notas de referencia y el PDF comparten el mismo costado y
     // no deben intentar ocupar el ancho del editor a la vez.
@@ -3526,6 +3631,63 @@ function setPdfEditorSplitPreference(active: boolean): void {
   }
   applyPdfEditorSplit(active);
 }
+
+pdfEditorResizer?.addEventListener("pointerdown", (event) => {
+  if (!pdfEditorSplitVisible() || event.button !== 0) return;
+  event.preventDefault();
+  const resizer = event.currentTarget as HTMLElement;
+  resizer.setPointerCapture(event.pointerId);
+  resizer.classList.add("is-resizing");
+  document.body.classList.add("pdf-editor-resizing");
+
+  const onMove = (moveEvent: PointerEvent): void => {
+    const rect = mainContainerEl?.getBoundingClientRect();
+    if (!rect || rect.width <= 0) return;
+    const ratio =
+      ((moveEvent.clientX - rect.left - PDF_EDITOR_SPLIT_DIVIDER_PX / 2) / rect.width) * 100;
+    setPdfEditorSplitRatio(ratio, false);
+  };
+
+  const finish = (): void => {
+    resizer.classList.remove("is-resizing");
+    document.body.classList.remove("pdf-editor-resizing");
+    resizer.removeEventListener("pointermove", onMove);
+    resizer.removeEventListener("pointerup", finish);
+    resizer.removeEventListener("pointercancel", finish);
+    if (resizer.hasPointerCapture(event.pointerId)) {
+      resizer.releasePointerCapture(event.pointerId);
+    }
+    persistPdfEditorSplitRatio();
+  };
+
+  resizer.addEventListener("pointermove", onMove);
+  resizer.addEventListener("pointerup", finish);
+  resizer.addEventListener("pointercancel", finish);
+});
+
+pdfEditorResizer?.addEventListener("dblclick", (event) => {
+  event.preventDefault();
+  setPdfEditorSplitRatio(PDF_EDITOR_SPLIT_DEFAULT_RATIO, true);
+});
+
+pdfEditorResizer?.addEventListener("keydown", (event) => {
+  if (!pdfEditorSplitVisible()) return;
+  const bounds = pdfEditorSplitBounds();
+  const current = Math.min(bounds.max, Math.max(bounds.min, pdfEditorSplitRatio));
+  const step = event.shiftKey ? 10 : 2;
+  let next = current;
+  if (event.key === "ArrowLeft") next = current - step;
+  else if (event.key === "ArrowRight") next = current + step;
+  else if (event.key === "Home") next = bounds.min;
+  else if (event.key === "End") next = bounds.max;
+  else return;
+  event.preventDefault();
+  setPdfEditorSplitRatio(next, true);
+});
+
+window.addEventListener("resize", applyPdfEditorSplitRatio);
+
+applyPdfEditorSplitRatio();
 
 btnPdfToggleEditor?.addEventListener("click", () => {
   const active = !pdfEditorSplitVisible();
@@ -4606,8 +4768,9 @@ function imageAbsolutePath(source: string): string | null {
 }
 
 function imageSourceUrl(source: string): string | null {
-  if (/^data:image\/(?:png|jpe?g|webp|svg\+xml|gif|bmp);/i.test(source)) return source;
-  if (/^(?:https?:|blob:)/i.test(source)) return source;
+  const remote = resolveAllowedRemoteImageUrl(source, window.location.href);
+  if (remote) return remote;
+  if (isRemoteImageSource(source)) return null;
   if (/^(?:javascript:|data:|vbscript:)/i.test(source)) return null;
   if (!isTauri()) return source;
 
@@ -4617,8 +4780,9 @@ function imageSourceUrl(source: string): string | null {
 }
 
 async function resolveImageUrl(source: string): Promise<string | null> {
-  if (/^data:image\/(?:png|jpe?g|webp|svg\+xml|gif|bmp);/i.test(source)) return source;
-  if (/^(?:https?:|blob:)/i.test(source)) return source;
+  const remote = resolveAllowedRemoteImageUrl(source, window.location.href);
+  if (remote) return remote;
+  if (isRemoteImageSource(source)) return null;
   if (/^(?:javascript:|data:|vbscript:)/i.test(source)) return null;
   if (!isTauri()) return imageSourceUrl(source);
 
@@ -5023,6 +5187,209 @@ function confirmPdfDeletion(item: PdfListItem): Promise<boolean> {
     "Eliminar PDF",
   );
 }
+
+/* ==================== BIBLIOGRAFÍA ==================== */
+
+/**
+ * Cada recurso vive en `bibliografia/<título>.md`. El título de la nota es el
+ * nombre del archivo, así que se sanea y se desambigua antes de crearlo.
+ */
+function uniqueBibliographyTitle(rawTitle: string): string {
+  const safe = sanitizeDeckTitle(rawTitle) || "Sin título";
+  const pages = vault.getPages();
+  const exists = (candidate: string): boolean => {
+    const path = `bibliografia/${candidate}.md`.toLowerCase();
+    const normalized = normalizeDeckTitle(candidate).toLowerCase();
+    return pages.some(
+      (page) =>
+        page.path.toLowerCase() === path ||
+        normalizeDeckTitle(page.title).toLowerCase() === normalized
+    );
+  };
+  let title = safe;
+  let counter = 2;
+  while (exists(title)) title = `${safe} (${counter++})`;
+  return title;
+}
+
+async function createBibliographyResource(
+  input: CreateBibliographyInput
+): Promise<BibliographyItem> {
+  const title = uniqueBibliographyTitle(input.title);
+  const now = Date.now();
+  const page: PageData = {
+    id: `p-${Math.random().toString(36).slice(2, 9)}`,
+    title,
+    path: `bibliografia/${title}.md`,
+    updatedAt: new Date(now).toISOString().replace("T", " ").substring(0, 16),
+    updatedAtMs: now,
+    createdAtMs: now,
+    revisions: [],
+    frontmatter: createBibliographyFrontmatter({ ...input, title }),
+    blocks: [
+      {
+        id: generateId(),
+        type: "text",
+        content: "",
+        children: [],
+        collapsed: false,
+      },
+    ],
+  };
+  await vault.savePage(page);
+  return bibliographyItemFromPage(page);
+}
+
+async function updateBibliographyResource(
+  item: BibliographyItem,
+  patch: BibliographyPatch
+): Promise<BibliographyItem> {
+  const page = await vault.ensurePageLoaded(item.page);
+  page.frontmatter = applyBibliographyPatch(page.frontmatter, patch);
+  await vault.savePage(page);
+  return bibliographyItemFromPage(page);
+}
+
+async function deleteBibliographyResource(item: BibliographyItem): Promise<void> {
+  const wasOpen = currentPage.id === item.page.id;
+  vault.deletePage(item.page.id);
+  if (wasOpen) {
+    currentPage = vault.getPages()[0] || vault.createPage("Bienvenido");
+  }
+  renderSidebar();
+  if (currentView === "all-pages") renderAllPagesView();
+}
+
+async function createBibliographyLinkedNote(
+  item: BibliographyItem,
+  rawTitle: string
+): Promise<PageData> {
+  const title = sanitizeDeckTitle(rawTitle);
+  if (!title) throw new Error("El título de la nota no es válido.");
+  if (vault.getPageByTitle(title)) throw new Error("Ya existe una página con ese título.");
+
+  const page = vault.createPage(title);
+  page.frontmatter = createBibliographyNoteFrontmatter(item.page.title);
+  page.blocks = [
+    {
+      id: generateId(),
+      type: "text",
+      content: bibliographyWikilink(item.page.title),
+      children: [],
+      collapsed: false,
+    },
+    {
+      id: generateId(),
+      type: "text",
+      content: "",
+      children: [],
+      collapsed: false,
+    },
+  ];
+  await vault.savePage(page);
+  return page;
+}
+
+/** Mantiene el vínculo de las notas hijas cuando se renombra el recurso. */
+async function updateBibliographyNoteParents(
+  oldTitle: string,
+  newTitle: string
+): Promise<void> {
+  const notes = vault
+    .getPages()
+    .filter(
+      (page) =>
+        page.title !== newTitle &&
+        isBibliographyNotePage(page) &&
+        bibliographyNoteParent(page) === oldTitle
+    );
+  for (const note of notes) {
+    try {
+      const page = await vault.ensurePageLoaded(note);
+      page.frontmatter = setBibliographyNoteParent(page.frontmatter, newTitle);
+      await vault.savePage(page);
+    } catch (error) {
+      console.error("No se pudo actualizar la nota hija de bibliografía:", error);
+    }
+  }
+}
+
+async function uploadBibliographyCover(file: File): Promise<string | null> {
+  let uploadFile = file;
+  let extension = supportedImageExtension(uploadFile);
+  if (!isTauri()) {
+    const safeCover = await normalizeRasterImageFile(file);
+    if (!safeCover) {
+      showToast(translate("Formato de imagen no compatible. Usa PNG, JPG, WEBP, GIF o BMP."));
+      return null;
+    }
+    uploadFile = safeCover;
+  } else if (!extension) {
+    const converted = await convertImageFileToPng(file);
+    if (!converted) {
+      showToast(translate("Formato de imagen no compatible. Usa PNG, JPG, WEBP, GIF, BMP o SVG."));
+      return null;
+    }
+    uploadFile = converted;
+    extension = "png";
+  }
+  const sizeLimit = isTauri() ? 5 * 1024 * 1024 : 512 * 1024;
+  if (uploadFile.size === 0 || uploadFile.size > sizeLimit) {
+    showToast(
+      `${translate("La imagen debe pesar menos de")} ${isTauri() ? "5 MB" : "512 KB"} ${translate(
+        "en este entorno."
+      )}`
+    );
+    return null;
+  }
+  try {
+    if (!isTauri()) return await fileToDataUrl(uploadFile);
+    const bytes = Array.from(new Uint8Array(await uploadFile.arrayBuffer()));
+    const savedImage = await invoke<SavedImagePath>("save_image", {
+      fileName: timestampImageFileName(extension ?? "png"),
+      bytes,
+    });
+    resolvedImagePaths.set(savedImage.relativePath, savedImage.absolutePath);
+    return savedImage.relativePath;
+  } catch (error) {
+    console.error("No se pudo guardar la portada de la bibliografía:", error);
+    showToast(translate("No se pudo guardar la portada en el vault."));
+    return null;
+  }
+}
+
+async function resolveBibliographyCover(source: string): Promise<string | null> {
+  try {
+    return await resolveImageUrl(source);
+  } catch (error) {
+    console.error("No se pudo resolver la portada de la bibliografía:", error);
+    return null;
+  }
+}
+
+function createBibliographyHost(): BibliographyHost {
+  return {
+    getPages: () => vault.getPages(),
+    createItem: (input) => createBibliographyResource(input),
+    updateItem: (item, patch) => updateBibliographyResource(item, patch),
+    deleteItem: (item) => deleteBibliographyResource(item),
+    createLinkedNote: (item, title) => createBibliographyLinkedNote(item, title),
+    openPage: (page) => {
+      void openPage(page);
+    },
+    uploadCover: (file) => uploadBibliographyCover(file),
+    resolveImage: (source) => resolveBibliographyCover(source),
+    confirmDelete: (item) =>
+      confirmAction(
+        `${translate("Se eliminará de la bibliografía:")} «${item.page.title}». ${translate(
+          "La nota Markdown y sus datos se borrarán del vault."
+        )}`,
+        translate("Eliminar recurso")
+      ),
+    notify: (message) => showToast(message),
+  };
+}
+
 
 async function insertDroppedImagePath(sourcePath: string, blockId: string, page?: PageData): Promise<void> {
   const targetPage = page || findPageForBlock(blockId) || currentPage;
@@ -7594,6 +7961,7 @@ async function commitPageTitleRename(): Promise<void> {
   }
 
   renameFlashcardPageReferences(oldTitle, newTitle);
+  void updateBibliographyNoteParents(oldTitle, newTitle);
   lastValidPageTitle = newTitle;
   currentPage.title = newTitle;
   // El registro de recientes se guarda por ruta: si la nota estaba en la
@@ -10019,6 +10387,7 @@ document.getElementById("sctx-rename")?.addEventListener("click", async () => {
       return;
     }
     renameFlashcardPageReferences(oldTitle, newTitle);
+    void updateBibliographyNoteParents(oldTitle, newTitle);
     const newPath = vault.getPageByTitle(newTitle)?.path;
     if (currentPage.id === pageId) {
       currentPage.title = newTitle;
@@ -10031,6 +10400,7 @@ document.getElementById("sctx-rename")?.addEventListener("click", async () => {
     if (oldPath && newPath) replaceRecentPath(oldPath, newPath);
     renderSidebar();
     if (currentView === "all-pages") renderAllPagesView();
+    bibliographyView.onPagesChanged();
     showToast(`Página renombrada a "${newTitle}"`);
   }
 });
@@ -10057,6 +10427,7 @@ document.getElementById("sctx-pin")?.addEventListener("click", async () => {
   await vault.savePage(page);
   renderSidebar();
   if (currentView === "all-pages") renderAllPagesView();
+  bibliographyView.onPagesChanged();
   showToast(page.pinned ? `Página "${pageTitle}" fijada` : `Página "${pageTitle}" desfijada`);
 });
 
@@ -10075,6 +10446,7 @@ document.getElementById("sctx-delete")?.addEventListener("click", async () => {
     renderFlashcardPagesFilter(true);
     renderSidebar();
     if (currentView === "all-pages") renderAllPagesView();
+    bibliographyView.onPagesChanged();
     if (currentPage.id === pageId) {
       const remaining = vault.getPages();
       loadPage(remaining[0]?.title || "Bienvenido");
@@ -11470,6 +11842,8 @@ onLanguageChange(() => {
     updateFlashcardUI();
   } else if (currentView === "journals") {
     renderJournalsView();
+  } else if (currentView === "bibliography") {
+    bibliographyView.onActivate();
   }
   if (graphPreviewPageTitle) {
     const page = vault.getPageByTitle(graphPreviewPageTitle);

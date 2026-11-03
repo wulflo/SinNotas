@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { isAllowedRemoteImageUrl, isPrivateOrLocalHostname } from "./url-safety";
+import {
+  isAllowedRemoteImageUrl,
+  isPrivateOrLocalHostname,
+  isRemoteImageSource,
+  resolveAllowedRemoteImageUrl,
+} from "./url-safety";
 
 describe("isPrivateOrLocalHostname", () => {
   it("bloquea nombres locales y reservados", () => {
@@ -131,5 +136,63 @@ describe("isAllowedRemoteImageUrl", () => {
   it("rechaza URLs inválidas", () => {
     expect(isAllowedRemoteImageUrl("http://[::1", base)).toBe(false);
     expect(isAllowedRemoteImageUrl("", base)).toBe(false);
+  });
+});
+
+describe("resolveAllowedRemoteImageUrl", () => {
+  const base = "https://app.example/note";
+
+  it("resuelve URLs absolutas y protocol-relative permitidas", () => {
+    expect(resolveAllowedRemoteImageUrl("https://example.com/portada.png", base))
+      .toBe("https://example.com/portada.png");
+    expect(resolveAllowedRemoteImageUrl("http://example.com/portada.png", base))
+      .toBe("http://example.com/portada.png");
+    expect(resolveAllowedRemoteImageUrl("//example.com/portada.png", base))
+      .toBe("https://example.com/portada.png");
+  });
+
+  it("rechaza hosts privados y locales", () => {
+    for (const source of [
+      "http://127.0.0.1/portada.png",
+      "http://localhost/portada.png",
+      "//127.0.0.1/portada.png",
+      "//localhost/portada.png",
+      "https://192.168.0.10/portada.png",
+    ]) {
+      expect(resolveAllowedRemoteImageUrl(source, base), source).toBeNull();
+    }
+  });
+
+  it("deja pasar data:image y blob sin peticiones de red", () => {
+    const data = "data:image/png;base64,AAAA";
+    const blob = "blob:https://app.example/123";
+    expect(resolveAllowedRemoteImageUrl(data, base)).toBe(data);
+    expect(resolveAllowedRemoteImageUrl(blob, base)).toBe(blob);
+  });
+
+  it("distingue rutas locales de fuentes remotas", () => {
+    expect(resolveAllowedRemoteImageUrl("../assets/portada.png", base)).toBeNull();
+    expect(resolveAllowedRemoteImageUrl("./portada.png", base)).toBeNull();
+    expect(resolveAllowedRemoteImageUrl("assets/portada.png", base)).toBeNull();
+    expect(isRemoteImageSource("../assets/portada.png")).toBe(false);
+    expect(isRemoteImageSource("assets/portada.png")).toBe(false);
+    expect(isRemoteImageSource("https://example.com/portada.png")).toBe(true);
+    expect(isRemoteImageSource("//example.com/portada.png")).toBe(true);
+  });
+
+  it("rechaza esquemas no permitidos", () => {
+    for (const source of [
+      "javascript:alert(1)",
+      "data:text/html,<script>alert(1)</script>",
+      "ftp://example.com/portada.png",
+      "file:///etc/passwd",
+    ]) {
+      expect(resolveAllowedRemoteImageUrl(source, base), source).toBeNull();
+    }
+  });
+
+  it("usa una base HTTPS cuando la página no es HTTP", () => {
+    expect(resolveAllowedRemoteImageUrl("//example.com/portada.png", "tauri://localhost"))
+      .toBe("https://example.com/portada.png");
   });
 });
