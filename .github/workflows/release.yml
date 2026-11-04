@@ -509,6 +509,10 @@ jobs:
     name: Build Linux packages (Snap/Flatpak)
     needs: validate
     uses: ./.github/workflows/package-linux.yml
+    with:
+      # Publicación automática en la Snap Store al empujar un tag v*.
+      publish: true
+      channel: stable
     secrets:
       # Opcional: si no existe, el .snap solo se adjunta a la release.
       SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}

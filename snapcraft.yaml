@@ -10,6 +10,10 @@
 name: sin-notas
 base: core22
 version: '0.4.5'
+title: Sin Notas
+contact: https://github.com/wulflo/SinNotas/issues
+issues: https://github.com/wulflo/SinNotas/issues
+source-code: https://github.com/wulflo/SinNotas
 summary: Editor outliner local y sistema de notas personal
 description: |
   Sin Notas es un editor de notas tipo outliner, local y basado en archivos,
