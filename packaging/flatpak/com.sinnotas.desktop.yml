@@ -1,0 +1,41 @@
+# Flatpak de Sin Notas.
+#
+# Igual que el snap, se empaqueta el .deb que genera `tauri build --bundles deb`
+# (ver .github/workflows/package-linux.yml y scripts/package-linux.sh). El
+# runtime org.gnome.Platform ya incluye WebKitGTK 4.1, GTK 3 y el resto de
+# dependencias que necesita un binario de Tauri v2.
+id: com.sinnotas.desktop
+runtime: org.gnome.Platform
+runtime-version: '48'
+sdk: org.gnome.Sdk
+command: sin-notas
+
+finish-args:
+  # Ventana y renderizado WebKit.
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  # Bóvedas: la app necesita leer y escribir en el directorio personal.
+  - --filesystem=home
+  # Búsqueda de metadatos bibliográficos (DOI/ISBN) por HTTPS.
+  - --share=network
+
+modules:
+  - name: sin-notas
+    buildsystem: simple
+    sources:
+      # Raíz del .deb extraído: usr/bin, usr/lib "Sin Notas", iconos, etc.
+      - type: dir
+        path: ../linux/deb-root
+      - type: file
+        path: com.sinnotas.desktop.metainfo.xml
+    build-commands:
+      - install -Dm755 usr/bin/sin-notas /app/bin/sin-notas
+      # Tauri resuelve los recursos como <dir del ejecutable>/../lib/<productName>.
+      - mkdir -p "/app/lib/Sin Notas"
+      - cp -a "usr/lib/Sin Notas/resources" "/app/lib/Sin Notas/"
+      - install -Dm644 "usr/share/applications/Sin Notas.desktop" /app/share/applications/com.sinnotas.desktop.desktop
+      - sed -i 's/^Icon=.*/Icon=com.sinnotas.desktop/' /app/share/applications/com.sinnotas.desktop.desktop
+      - install -Dm644 usr/share/icons/hicolor/512x512/apps/sin-notas.png /app/share/icons/hicolor/512x512/apps/com.sinnotas.desktop.png
+      - install -Dm644 com.sinnotas.desktop.metainfo.xml /app/share/metainfo/com.sinnotas.desktop.metainfo.xml

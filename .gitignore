@@ -28,6 +28,10 @@ backups/
 # La pública vive en tauri.conf.json; la privada solo en GitHub Secrets.
 .tauri/
 
+# Credenciales exportadas de la Snap Store (nunca en el repo).
+snap-login.txt
+*.snapcraft-credentials
+
 # Artefactos de compilación y descargas de CI
 *.apk
 *.aab
@@ -36,6 +40,17 @@ artifacts/
 permissions.txt
 manifest-dump.xml
 zipalign.txt
+
+# Empaquetado Linux (Snap/Flatpak)
+*.snap
+*.flatpak
+packaging/linux/deb-root/
+.flatpak-builder/
+flatpak_app/
+repo/
+parts/
+stage/
+prime/
 
 # Binarios nativos de PDFium (se obtienen con scripts/fetch-pdfium.sh).
 # Se empaquetan como recurso, pero no se versionan para no inflar el repo.

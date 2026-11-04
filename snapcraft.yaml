@@ -1,0 +1,41 @@
+# Snap de Sin Notas.
+#
+# El binario, los recursos de PDFium y los iconos se toman del .deb que genera
+# `tauri build --bundles deb` (ver .github/workflows/package-linux.yml y
+# scripts/package-linux.sh). Así el snap usa exactamente el mismo ejecutable que
+# los demás instaladores de Linux y no hay que compilar Rust dentro de snapcraft.
+#
+# La extensión `gnome` aporta GTK 3, WebKitGTK 4.1 y el resto de dependencias
+# de runtime desde el snap de plataforma gnome-42-2204.
+name: sin-notas
+base: core22
+version: '0.4.5'
+summary: Editor outliner local y sistema de notas personal
+description: |
+  Sin Notas es un editor de notas tipo outliner, local y basado en archivos,
+  inspirado en Logseq. Organiza tus notas en bóvedas de Markdown y añade
+  búsqueda, flashcards, lector de PDF y gestión de bibliografía.
+
+  Todo se guarda en tu disco: sin cuentas, sin nube y sin telemetría.
+grade: stable
+confinement: strict
+compression: lzo
+license: MIT
+website: https://github.com/wulflo/SinNotas
+icon: snap/gui/sin-notas.png
+
+apps:
+  sin-notas:
+    command: usr/bin/sin-notas
+    extensions: [gnome]
+    plugs:
+      # Las bóvedas viven en el directorio personal del usuario.
+      - home
+      # Búsqueda de metadatos bibliográficos (DOI/ISBN) por HTTPS.
+      - network
+
+parts:
+  sin-notas:
+    # Contenido ya compilado: no se ejecuta ningún build aquí.
+    plugin: dump
+    source: packaging/linux/deb-root

@@ -1,0 +1,207 @@
+name: Linux packages (Snap + Flatpak)
+
+# Workflow reutilizable: lo llama release.yml para adjuntar el .snap y el
+# .flatpak a cada release. También se puede lanzar a mano desde la pestaña
+# Actions para probar los empaquetados sin crear un tag.
+on:
+  workflow_call:
+    inputs:
+      # Las releases publican en stable por defecto; se puede desactivar o
+      # cambiar de canal desde release.yml si hiciera falta.
+      publish:
+        description: "Publicar el .snap en la Snap Store"
+        type: boolean
+        default: true
+      channel:
+        description: "Canal de la Snap Store"
+        type: string
+        default: stable
+    secrets:
+      # Credencial acotada al snap y a los canales indicados, creada con
+      # `snapcraft export-login`. Es opcional: sin ella solo se publican los
+      # artefactos en la release de GitHub.
+      SNAPCRAFT_STORE_CREDENTIALS:
+        required: false
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Publicar el .snap en la Snap Store"
+        type: boolean
+        default: false
+      channel:
+        description: "Canal de la Snap Store"
+        type: choice
+        options: [beta, edge, stable]
+        default: beta
+
+permissions:
+  contents: read
+
+jobs:
+  build-deb:
+    name: Build .deb staging
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Dependencias de Linux
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install dependencies (ignore scripts for security)
+        run: npm ci --ignore-scripts
+
+      - name: Fetch PDFium
+        run: bash scripts/fetch-pdfium.sh
+
+      - name: Generate app icons
+        run: npm run tauri icon src-tauri/icons/icon-manifest.json
+
+      - name: Read app version
+        id: version
+        run: echo "version=$(node -p "require('./src-tauri/tauri.conf.json').version")" >> "$GITHUB_OUTPUT"
+
+      # El .deb es la fuente de verdad para Snap y Flatpak: contiene el binario,
+      # los recursos de PDFium, el .desktop y los iconos. Aquí no se firma nada
+      # del updater (createUpdaterArtifacts está desactivado por defecto), así
+      # que este job no necesita secretos.
+      - name: Build .deb
+        run: npm run tauri build -- --bundles deb
+
+      - name: Extract .deb for packaging
+        run: |
+          set -euo pipefail
+          deb="$(find src-tauri/target/release/bundle/deb -maxdepth 1 -type f -name '*.deb' -print -quit)"
+          if [ -z "$deb" ]; then
+            echo "ERROR: no se generó ningún .deb." >&2
+            exit 1
+          fi
+          mkdir -p packaging/linux/deb-root
+          dpkg-deb -x "$deb" packaging/linux/deb-root
+          test -x packaging/linux/deb-root/usr/bin/sin-notas
+          test -f "packaging/linux/deb-root/usr/lib/Sin Notas/resources/pdfium/linux-x86_64/libpdfium.so"
+
+      - name: Upload .deb staging
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: linux-deb-root
+          path: packaging/linux/deb-root
+          if-no-files-found: error
+          retention-days: 7
+
+  build-snap:
+    name: Build Snap
+    needs: build-deb
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Download .deb staging
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: linux-deb-root
+          path: packaging/linux/deb-root
+
+      - name: Restore executable permissions
+        run: chmod +x packaging/linux/deb-root/usr/bin/sin-notas
+
+      # Configura LXD + Snapcraft y ejecuta `snapcraft pack`. La extensión
+      # `gnome` resuelve GTK/WebKit desde el snap de plataforma gnome-42-2204.
+      - name: Build snap
+        id: snapcraft
+        uses: snapcore/action-build@3bdaa03e1ba6bf59a65f84a751d943d549a54e79 # v1
+
+      - name: Upload snap
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: release-snap
+          path: ${{ steps.snapcraft.outputs.snap }}
+          if-no-files-found: error
+          retention-days: 90
+
+      # El secreto no se puede consultar en un `if`, así que se expone solo un
+      # booleano derivado y la credencial se inyecta en el paso de publicación.
+      - name: Check Snap Store credentials
+        id: store
+        env:
+          HAS_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS != '' }}
+        run: |
+          if [ "$HAS_CREDENTIALS" = "true" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "SNAPCRAFT_STORE_CREDENTIALS no está definido; se omite la publicación en la tienda."
+          fi
+
+      - name: Publish to Snap Store
+        if: ${{ inputs.publish && steps.store.outputs.available == 'true' }}
+        uses: snapcore/action-publish@214b86e5ca036ead1668c79afb81e550e6c54d40 # v1
+        with:
+          snap: ${{ steps.snapcraft.outputs.snap }}
+          release: ${{ inputs.channel }}
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+
+  build-flatpak:
+    name: Build Flatpak
+    needs: build-deb
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    # Imagen oficial de Flathub con flatpak-builder y el SDK de GNOME 48.
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Download .deb staging
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: linux-deb-root
+          path: packaging/linux/deb-root
+
+      - name: Restore executable permissions
+        run: chmod +x packaging/linux/deb-root/usr/bin/sin-notas
+
+      - name: Build Flatpak bundle
+        uses: flatpak/flatpak-github-actions/flatpak-builder@79327416609af08178ad73b352877e51450790b3 # v6
+        with:
+          bundle: SinNotas_${{ needs.build-deb.outputs.version }}_x86_64.flatpak
+          manifest-path: packaging/flatpak/com.sinnotas.desktop.yml
+          upload-artifact: false
+
+      - name: Upload Flatpak
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: release-flatpak
+          path: SinNotas_${{ needs.build-deb.outputs.version }}_x86_64.flatpak
+          if-no-files-found: error
+          retention-days: 90

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.sinnotas.desktop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Sin Notas</name>
+  <summary>Editor outliner local y sistema de notas personal</summary>
+  <description>
+    <p>
+      Sin Notas es un editor de notas tipo outliner, local y basado en archivos,
+      inspirado en Logseq. Organiza tus notas en bóvedas de Markdown y añade
+      búsqueda, flashcards, lector de PDF y gestión de bibliografía.
+    </p>
+    <p>
+      Todo se guarda en tu disco: sin cuentas, sin nube y sin telemetría.
+    </p>
+  </description>
+  <launchable type="desktop-id">com.sinnotas.desktop.desktop</launchable>
+  <url type="homepage">https://github.com/wulflo/SinNotas</url>
+  <url type="bugtracker">https://github.com/wulflo/SinNotas/issues</url>
+  <url type="vcs-browser">https://github.com/wulflo/SinNotas</url>
+  <developer id="github.com.wulflo">
+    <name>Wulflo</name>
+  </developer>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.4.5" date="2026-11-03"/>
+  </releases>
+</component>

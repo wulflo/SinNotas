@@ -174,6 +174,21 @@ scripts/fetch-pdfium.sh
 npm run tauri -- build --bundles appimage
 ```
 
+## Build the Snap and Flatpak (Linux)
+
+Both packages wrap the same binary produced for the `.deb`:
+
+```bash
+scripts/package-linux.sh              # builds the .deb and extracts it
+snapcraft pack                        # needs snapcraft + LXD
+flatpak-builder --force-clean --repo=repo flatpak_app \
+  packaging/flatpak/com.sinnotas.desktop.yml
+```
+
+CI builds both in `.github/workflows/package-linux.yml` and attaches the `.snap`
+and `.flatpak` to every GitHub release. They update through their stores, not
+through Tauri's updater.
+
 ## Desktop updates on Linux
 
 AppImage installs use the `linux-x86_64` entry in `latest.json`. Debian/Ubuntu
