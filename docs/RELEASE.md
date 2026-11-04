@@ -62,6 +62,12 @@ Ambos se adjuntan a la release de GitHub junto al resto de instaladores. No
 necesitan secretos: `snapcraft pack` y `flatpak-builder` producen paquetes sin
 firmar y las tiendas los firman al publicarlos.
 
+El botón **Buscar actualizaciones** de Ajustes se oculta en Snap y Flatpak: el
+actualizador de Tauri instala un AppImage o un `.deb` con `dpkg`, algo que no
+puede reemplazar un paquete de solo lectura ni actualizaría la revisión de la
+tienda. La app detecta las variables `SNAP`/`FLATPAK_ID` y muestra un aviso de
+que las actualizaciones llegan desde la tienda.
+
 Para probar los empaquetados sin crear un tag, ejecuta el workflow
 **Linux packages (Snap + Flatpak)** desde la pestaña Actions
 (`workflow_dispatch`) y descarga los artefactos `release-snap` y

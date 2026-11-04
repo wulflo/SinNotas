@@ -5581,6 +5581,30 @@ fn save_android_apk(app: AppHandle) -> Result<String, String> {
     }
 }
 
+/// Indica si el ejecutable corre dentro de un paquete gestionado por una tienda.
+///
+/// El actualizador de Tauri descarga un AppImage o un `.deb` y lo instala con
+/// `dpkg`; dentro de un snap o un Flatpak eso no actualiza la instalación (el
+/// paquete es de solo lectura y la tienda es la que publica las revisiones).
+/// El frontend usa este dato para ocultar el botón de actualizar y explicar de
+/// dónde llegan las actualizaciones.
+#[tauri::command]
+fn desktop_install_kind() -> &'static str {
+    // Snap exporta SNAP/SNAP_NAME al entorno del proceso.
+    if std::env::var_os("SNAP").is_some() || std::env::var_os("SNAP_NAME").is_some() {
+        return "snap";
+    }
+
+    // Flatpak exporta FLATPAK_ID y crea /.flatpak-info dentro del sandbox.
+    if std::env::var_os("FLATPAK_ID").is_some()
+        || std::path::Path::new("/.flatpak-info").exists()
+    {
+        return "flatpak";
+    }
+
+    "native"
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[allow(unused_mut)]
@@ -5662,7 +5686,8 @@ pub fn run() {
             delete_page,
             open_note_with_default_app,
             rename_page,
-            save_android_apk
+            save_android_apk,
+            desktop_install_kind
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

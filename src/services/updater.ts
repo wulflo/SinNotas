@@ -115,7 +115,46 @@ interface DesktopDownloadEvent {
 let desktopUpdate: DesktopPendingUpdate | null = null;
 let androidRelease: ReleaseManifest | null = null;
 
-export type SupportedUpdatePlatform = "android" | "desktop" | "unsupported";
+export type SupportedUpdatePlatform = "android" | "desktop" | "store" | "unsupported";
+export type InstallKind = "native" | "snap" | "flatpak";
+
+let installKind: InstallKind | null = null;
+let installKindInFlight: Promise<InstallKind> | null = null;
+
+/**
+ * Detecta si el binario corre dentro de Snap o Flatpak. En esas variantes la
+ * tienda es la que actualiza la app: el actualizador de Tauri descargaría un
+ * AppImage/.deb e intentaría instalarlo con `dpkg`, algo imposible dentro del
+ * sandbox y que además no reemplazaría la revisión instalada.
+ */
+export async function detectInstallKind(): Promise<InstallKind> {
+  if (installKind) return installKind;
+  installKindInFlight ??= (async () => {
+    let detected: InstallKind = "native";
+    if (isTauri()) {
+      try {
+        const value = await invoke<string>("desktop_install_kind");
+        if (value === "snap" || value === "flatpak") detected = value;
+      } catch (error) {
+        console.warn("[updater] No se pudo detectar el tipo de instalación:", error);
+      }
+    }
+    installKind = detected;
+    return detected;
+  })();
+  return installKindInFlight;
+}
+
+/** Mensaje que explica de dónde se actualiza una instalación gestionada. */
+export function getStoreUpdateMessage(): string {
+  if (installKind === "snap") {
+    return "Esta versión se actualiza desde la Snap Store. No hace falta buscar actualizaciones aquí.";
+  }
+  if (installKind === "flatpak") {
+    return "Esta versión se actualiza desde Flatpak. No hace falta buscar actualizaciones aquí.";
+  }
+  return "Las actualizaciones integradas no están disponibles en esta instalación.";
+}
 
 function emit(patch: Partial<UpdateState>): UpdateState {
   state = { ...state, ...patch };
@@ -144,6 +183,7 @@ export function subscribeUpdateState(listener: Listener): () => void {
 /** Plataforma soportada por el flujo de actualización. */
 export function getUpdatePlatform(): SupportedUpdatePlatform {
   if (!isTauri()) return "unsupported";
+  if (installKind === "snap" || installKind === "flatpak") return "store";
   try {
     const value = platform();
     if (value === "android") return "android";
@@ -156,7 +196,8 @@ export function getUpdatePlatform(): SupportedUpdatePlatform {
 }
 
 export function isUpdateSupported(): boolean {
-  return getUpdatePlatform() !== "unsupported";
+  const kind = getUpdatePlatform();
+  return kind !== "unsupported" && kind !== "store";
 }
 
 /** Versión instalada de la app (cacheada). */
@@ -580,6 +621,12 @@ export async function checkForUpdates(): Promise<UpdateState> {
       return emit({
         status: "unsupported",
         message: "Las actualizaciones integradas no están disponibles en esta plataforma.",
+      });
+    }
+    if (supported === "store") {
+      return emit({
+        status: "unsupported",
+        message: getStoreUpdateMessage(),
       });
     }
 

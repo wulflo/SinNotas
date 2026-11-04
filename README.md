@@ -187,7 +187,8 @@ flatpak-builder --force-clean --repo=repo flatpak_app \
 
 CI builds both in `.github/workflows/package-linux.yml` and attaches the `.snap`
 and `.flatpak` to every GitHub release. They update through their stores, not
-through Tauri's updater.
+through Tauri's updater: the app detects `SNAP`/`FLATPAK_ID` and hides the
+built-in update controls so users update from the store instead.
 
 ## Desktop updates on Linux
 

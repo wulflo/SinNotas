@@ -46,6 +46,8 @@ const englishBySpanish: Record<string, string> = {
   // Ajustes > Avanzado: actualizaciones.
   "Actualizaciones": "Updates",
   "Sin Notas solo consulta GitHub cuando pulsás el botón. En escritorio, el paquete se verifica con la firma del actualizador antes de instalarse.": "Sin Notas only contacts GitHub when you press the button. On desktop the package is verified with the updater signature before installing.",
+  "Esta versión se actualiza desde la Snap Store. No hace falta buscar actualizaciones aquí.": "This build updates through the Snap Store. You don't need to check for updates here.",
+  "Esta versión se actualiza desde Flatpak. No hace falta buscar actualizaciones aquí.": "This build updates through Flatpak. You don't need to check for updates here.",
   "Versión instalada": "Installed version",
   "Nueva versión": "New version",
   "Buscar actualizaciones": "Check for updates",
@@ -934,6 +936,8 @@ const chineseBySpanish: Record<string, string> = {
   // Ajustes > Avanzado: actualizaciones.
   "Actualizaciones": "更新",
   "Sin Notas solo consulta GitHub cuando pulsás el botón. En escritorio, el paquete se verifica con la firma del actualizador antes de instalarse.": "Sin Notas 仅在你点击按钮时访问 GitHub。桌面版会在安装前用更新签名验证安装包。",
+  "Esta versión se actualiza desde la Snap Store. No hace falta buscar actualizaciones aquí.": "此版本通过 Snap Store 更新。无需在此检查更新。",
+  "Esta versión se actualiza desde Flatpak. No hace falta buscar actualizaciones aquí.": "此版本通过 Flatpak 更新。无需在此检查更新。",
   "Versión instalada": "已安装版本",
   "Nueva versión": "新版本",
   "Buscar actualizaciones": "检查更新",

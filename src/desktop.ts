@@ -196,7 +196,9 @@ import { renderMathToHtml } from "./editor/math";
 import { currentLanguage, initializeLocalization, onLanguageChange, translate } from "./i18n";
 import {
   checkForUpdates,
+  detectInstallKind,
   getCurrentVersion,
+  getStoreUpdateMessage,
   getUpdatePlatform,
   installAvailableUpdate,
   subscribeUpdateState,
@@ -842,6 +844,7 @@ const clearAllFlashcardsStatus = document.getElementById("clear-all-flashcards-s
 const btnDeleteAllSnapshots = document.getElementById("btn-delete-all-snapshots") as HTMLButtonElement;
 const btnReloadApp = document.getElementById("btn-reload-app") as HTMLButtonElement;
 const updateSettingsSection = document.getElementById("update-settings-section") as HTMLElement | null;
+const updateSettingsHelp = document.getElementById("update-settings-help") as HTMLElement | null;
 const updateCurrentVersion = document.getElementById("update-current-version") as HTMLElement | null;
 const updateAvailableRow = document.getElementById("update-available-row") as HTMLElement | null;
 const updateNewVersion = document.getElementById("update-new-version") as HTMLElement | null;
@@ -3559,18 +3562,35 @@ function renderUpdateState(state: UpdateState): void {
   updateNotes.textContent = state.notes;
 }
 
-function initUpdateSettings(): void {
+async function initUpdateSettings(): Promise<void> {
   if (updateSettingsReady || !updateSettingsSection) return;
   updateSettingsReady = true;
+
+  void getCurrentVersion().then((version) => {
+    if (updateCurrentVersion && version) updateCurrentVersion.textContent = version;
+  });
+
+  await detectInstallKind();
+
+  // Snap y Flatpak se actualizan desde la tienda. El actualizador de Tauri no
+  // puede reemplazar esos paquetes (son de solo lectura y no usa la tienda),
+  // así que se ocultan los botones en vez de ofrecer una acción que fallaría.
+  if (getUpdatePlatform() === "store") {
+    if (updateAvailableRow) updateAvailableRow.hidden = true;
+    if (updateProgressWrap) updateProgressWrap.hidden = true;
+    if (updateNotesWrap) updateNotesWrap.hidden = true;
+    if (btnCheckUpdates) btnCheckUpdates.hidden = true;
+    if (btnInstallUpdate) btnInstallUpdate.hidden = true;
+    const message = getStoreUpdateMessage();
+    if (updateSettingsHelp) updateSettingsHelp.textContent = message;
+    if (updateStatus) updateStatus.textContent = message;
+    return;
+  }
 
   if (getUpdatePlatform() === "unsupported") {
     updateSettingsSection.hidden = true;
     return;
   }
-
-  void getCurrentVersion().then((version) => {
-    if (updateCurrentVersion && version) updateCurrentVersion.textContent = version;
-  });
 
   subscribeUpdateState(renderUpdateState);
   btnCheckUpdates?.addEventListener("click", () => {
@@ -16083,7 +16103,7 @@ function schedulePrewarmHiddenViews(): void {
 async function initializeDesktopApp(): Promise<void> {
   initThemeAndTypography();
   initNoteScrollNav();
-  initUpdateSettings();
+  await initUpdateSettings();
   loadFlashcardProgressStats();
   scheduleFlashcardDailyReset();
   installFlashcardDailyResetWatchers();
