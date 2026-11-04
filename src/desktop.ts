@@ -8606,7 +8606,39 @@ function paintOutgoingLinks(outgoing: ReturnType<typeof collectOutgoingLinks>): 
   }
 }
 
+const pendingEditorHydrations = new Set<string>();
+
+/**
+ * FASE 4: el arranque de metadatos y el historial de navegación pueden dejar
+ * `currentPage` con `blocksLoaded === false`. `renderEditor` es sincrónico, así
+ * que la nota se vería vacía hasta que otra acción forzara un repintado.
+ * Rehidratamos en segundo plano y volvemos a pintar cuando llegan los bloques.
+ */
+function hydrateEditorPageIfNeeded(): void {
+  if (!isTauri() || currentPage.blocksLoaded !== false) return;
+  const page = currentPage;
+  if (pendingEditorHydrations.has(page.id)) return;
+  pendingEditorHydrations.add(page.id);
+  void vault
+    .ensurePageLoaded(page)
+    .then((loaded) => {
+      // Solo repintar si el usuario sigue en la misma nota y la lectura trajo
+      // los bloques; si falló, no reintentamos en bucle.
+      if (currentPage.id === page.id && loaded.blocksLoaded !== false) {
+        if (currentPage !== loaded) currentPage = loaded;
+        renderEditor();
+      }
+    })
+    .catch((error: unknown) => {
+      console.error("No se pudo rehidratar la nota abierta:", error);
+    })
+    .finally(() => {
+      pendingEditorHydrations.delete(page.id);
+    });
+}
+
 function renderEditor() {
+  hydrateEditorPageIfNeeded();
   // Establecer la línea base del historial de deshacer para esta nota.
   documentHistory.seed(currentPage.id, currentPage.blocks, currentPage.title);
   // No pisar la edición del título que el usuario pueda tener en curso.
@@ -16147,19 +16179,38 @@ async function initializeDesktopApp(): Promise<void> {
     if (page) {
       currentPage = page;
       restored = true;
-      if (lastNavigation.view === "editor") {
-        renderEditor();
-      } else {
-        // Si el PDF recuerda el modo de edición en paralelo, el editor debe
-        // estar pintado antes de mostrar ambos paneles.
-        if (lastNavigation.view === "pdf" && pdfEditorSplitPreferred()) {
-          renderEditor();
-        }
-        switchView(lastNavigation.view);
-      }
     }
   }
-  if (!restored) renderEditor();
+
+  // FASE 4: la última nota abierta puede venir del boot de metadatos sin
+  // bloques. Rehidratarla antes del primer render evita que el editor quede
+  // vacío (y que parezca que sus bullets están colapsados) hasta la primera
+  // interacción. También la dejamos pinned como hace `showEditorPage`.
+  const willRenderEditor =
+    !restored ||
+    lastNavigation?.view === "editor" ||
+    (lastNavigation?.view === "pdf" && pdfEditorSplitPreferred());
+  if (willRenderEditor && currentPage.blocksLoaded === false && isTauri()) {
+    if (pinnedEditorPagePath) vault.unpinPage(pinnedEditorPagePath);
+    pinnedEditorPagePath = currentPage.path;
+    vault.pinPage(currentPage.path);
+    currentPage = await vault.ensurePageLoaded(currentPage);
+  }
+
+  if (restored && lastNavigation) {
+    if (lastNavigation.view === "editor") {
+      renderEditor();
+    } else {
+      // Si el PDF recuerda el modo de edición en paralelo, el editor debe
+      // estar pintado antes de mostrar ambos paneles.
+      if (lastNavigation.view === "pdf" && pdfEditorSplitPreferred()) {
+        renderEditor();
+      }
+      switchView(lastNavigation.view);
+    }
+  } else {
+    renderEditor();
+  }
   recordNavigationHistory();
   restoreEditorSplitView();
   updatePdfEditorSplitButton();
