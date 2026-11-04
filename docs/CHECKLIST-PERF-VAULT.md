@@ -237,7 +237,13 @@ Si quieres limpiar el árbol, haz commit del paquete entero primero.
 
 ---
 
-## 1. Diagnóstico de rendimiento (trabajo de campo hecho — confiar en esto, no requiere red)
+## 1. Diagnóstico histórico de rendimiento (2026-10-31)
+
+> Esta sección conserva el diagnóstico previo a las FASES 4-A–4-E y no
+> describe íntegramente el código actual. En particular, el arranque metadata-only,
+> la persistencia incremental, la búsqueda Rust-first y los backlinks/grafo
+> cacheados se implementaron después. Para el estado vigente, consultar las
+> bitácoras posteriores y volver a medir antes de reutilizar estas conclusiones.
 
 Hallazgos clave de la auditoría (exploración del 2026-10-31). Referencias archivo:línea válidas a la versión actual.
 

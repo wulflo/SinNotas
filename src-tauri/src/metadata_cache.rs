@@ -29,7 +29,7 @@ use std::collections::hash_map::DefaultHasher;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::hash::{Hash, Hasher};
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Component, Path};
 use std::sync::LazyLock;
 use std::time::UNIX_EPOCH;
@@ -330,6 +330,7 @@ const CACHE_DELTA_MAGIC: &[u8; 4] = b"SND1";
 const CACHE_DELTA_FORMAT_VERSION: u32 = 1;
 /// Fold the journal back into the main cache after this many records.
 pub const CACHE_DELTA_COMPACT_RECORDS: u64 = 256;
+const MAX_CACHE_DELTA_BYTES: u64 = 256 * 1024 * 1024;
 /// Defensive cap on how old a journaled record may be.
 const MAX_CACHE_DELTA_RECORD_BYTES: usize = 64 * 1024 * 1024;
 const MAX_CACHE_DELTA_RECORDS: usize = 512_000;
@@ -425,7 +426,22 @@ pub fn append_cache_delta(
 /// `None` means "no journal / unusable header" and replay is skipped.
 pub fn load_cache_delta(root: &Path) -> Option<Vec<CacheDeltaRecord>> {
     let path = root.join(CACHE_DELTA_FILE_NAME);
-    let bytes = fs::read(&path).ok()?;
+    let metadata = fs::symlink_metadata(&path).ok()?;
+    if metadata.file_type().is_symlink()
+        || !metadata.file_type().is_file()
+        || metadata.len() > MAX_CACHE_DELTA_BYTES
+    {
+        return None;
+    }
+    let mut bytes = Vec::new();
+    fs::File::open(&path)
+        .ok()?
+        .take(MAX_CACHE_DELTA_BYTES + 1)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    if bytes.len() as u64 > MAX_CACHE_DELTA_BYTES {
+        return None;
+    }
     if bytes.len() < 8 || &bytes[..4] != CACHE_DELTA_MAGIC {
         return None;
     }
@@ -937,10 +953,11 @@ pub fn load_or_scan_vault_with_mode(
         cache_loaded: previous.is_some(),
         ..CacheScanStats::default()
     };
-    let old_entries = previous
+    let mut old_entries = previous
         .take()
         .map(|cache| cache.entries)
         .unwrap_or_default();
+    let original_entry_count = old_entries.len();
     let original_keys: BTreeSet<String> = old_entries.keys().cloned().collect();
 
     let mut entries = BTreeMap::new();
@@ -1018,15 +1035,17 @@ pub fn load_or_scan_vault_with_mode(
 
         let mtime = modified_ns(&metadata);
         let size = metadata.len();
-        let reusable = old_entries.get(&relative).filter(|cached| {
+        let reusable = old_entries.get(&relative).is_some_and(|cached| {
             cached.modified_ns == mtime
                 && cached.size == size
                 && sanitize_cached_note(&canonical_root, cached).is_ok()
         });
 
-        let note = if let Some(cached) = reusable {
+        let note = if reusable {
             stats.reused_notes += 1;
-            cached.clone()
+            old_entries
+                .remove(&relative)
+                .expect("la entrada reutilizable debe seguir presente")
         } else {
             let content = match fs::read_to_string(path) {
                 Ok(content) => content,
@@ -1072,7 +1091,7 @@ pub fn load_or_scan_vault_with_mode(
     let dirty = stats.parsed_notes > 0
         || stats.removed_entries > 0
         || !stats.cache_loaded
-        || old_entries.len() != cache.entries.len();
+        || original_entry_count != cache.entries.len();
     if dirty {
         let write_started = std::time::Instant::now();
         if write_cache_file(&canonical_root, &cache).is_ok() {
@@ -1417,6 +1436,31 @@ mod tests {
             .unwrap(),
             1
         );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn oversized_delta_journal_is_ignored_before_reading_contents() {
+        let root = test_root("delta-oversized");
+        let path = root.join(CACHE_DELTA_FILE_NAME);
+        let file = fs::File::create(&path).unwrap();
+        file.set_len(MAX_CACHE_DELTA_BYTES + 1).unwrap();
+
+        assert!(load_cache_delta(&root).is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn delta_journal_symlinks_are_ignored() {
+        use std::os::unix::fs::symlink;
+
+        let root = test_root("delta-symlink");
+        let external = root.join("external.log");
+        fs::write(&external, b"SND1\x01\x00\x00\x00").unwrap();
+        symlink(&external, root.join(CACHE_DELTA_FILE_NAME)).unwrap();
+
+        assert!(load_cache_delta(&root).is_none());
         fs::remove_dir_all(root).unwrap();
     }
 

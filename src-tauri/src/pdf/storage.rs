@@ -19,6 +19,8 @@ const CAPTURE_FOLDER: &str = "assets/pdf-captures";
 const LINKS_FOLDER: &str = ".sinnotas/documents";
 const LINKS_FILE: &str = "links.json";
 const MAX_PDF_BYTES: u64 = 250 * 1024 * 1024;
+const MAX_LINK_REGISTRY_BYTES: usize = 4 * 1024 * 1024;
+const MAX_LINKS: usize = 10_000;
 const DAY_MS: i64 = 24 * 60 * 60 * 1000;
 
 /// Serializa las escrituras del registro de enlaces para no perder altas
@@ -163,24 +165,59 @@ fn resolve_registry_path(root: &Path) -> Result<PathBuf, String> {
 
 fn load_registry(root: &Path) -> Result<LinkRegistry, String> {
     let path = resolve_registry_path(root)?;
-    match fs::read_to_string(&path) {
-        Ok(contents) => serde_json::from_str(&contents).map_err(|error| {
+    let file = match fs::File::open(&path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Ok(LinkRegistry::default());
+        }
+        Err(error) => {
+            return Err(format!(
+                "No se pudo leer el registro de documentos enlazados ({}): {error}",
+                path.display()
+            ));
+        }
+    };
+    let mut contents = String::new();
+    file.take((MAX_LINK_REGISTRY_BYTES + 1) as u64)
+        .read_to_string(&mut contents)
+        .map_err(|error| {
             format!(
                 "No se pudo leer el registro de documentos enlazados ({}): {error}",
                 path.display()
             )
-        }),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(LinkRegistry::default()),
-        Err(error) => Err(format!(
+        })?;
+    if contents.len() > MAX_LINK_REGISTRY_BYTES {
+        return Err(
+            "El registro de documentos enlazados supera el tamaño máximo permitido.".to_string(),
+        );
+    }
+    let registry: LinkRegistry = serde_json::from_str(&contents).map_err(|error| {
+        format!(
             "No se pudo leer el registro de documentos enlazados ({}): {error}",
             path.display()
-        )),
+        )
+    })?;
+    if registry.links.len() > MAX_LINKS {
+        return Err(
+            "El registro de documentos enlazados supera el número máximo de entradas.".to_string(),
+        );
     }
+    Ok(registry)
 }
 
 fn save_registry(root: &Path, registry: &LinkRegistry) -> Result<(), String> {
+    if registry.links.len() > MAX_LINKS {
+        return Err(
+            "El registro de documentos enlazados supera el número máximo de entradas.".to_string(),
+        );
+    }
     let contents = serde_json::to_string_pretty(registry)
         .map_err(|error| format!("No se pudo serializar el registro de documentos: {error}"))?;
+    if contents.len() > MAX_LINK_REGISTRY_BYTES {
+        return Err(
+            "El registro de documentos enlazados supera el tamaño máximo permitido.".to_string(),
+        );
+    }
     let path = resolve_registry_path(root)?;
     write_file_atomically(&path, &contents)
 }
@@ -627,6 +664,34 @@ mod tests {
         let _ = fs::remove_dir_all(&path);
         fs::create_dir_all(&path).unwrap();
         path
+    }
+
+    #[test]
+    fn registry_rejects_oversized_files_and_too_many_links() {
+        let root = test_dir("registry-limits");
+        let registry_file = registry_path(&root);
+        fs::create_dir_all(registry_file.parent().unwrap()).unwrap();
+        fs::write(&registry_file, vec![b' '; MAX_LINK_REGISTRY_BYTES + 1]).unwrap();
+        assert!(load_registry(&root).is_err());
+
+        let registry = LinkRegistry {
+            links: (0..=MAX_LINKS)
+                .map(|index| LinkedDocument {
+                    id: format!("link-{index}"),
+                    path: format!("/tmp/{index}.pdf"),
+                    title: format!("Documento {index}"),
+                    added: 0,
+                    expires_at: None,
+                })
+                .collect(),
+        };
+        let contents = serde_json::to_vec(&registry).unwrap();
+        assert!(contents.len() <= MAX_LINK_REGISTRY_BYTES);
+        fs::write(&registry_file, contents).unwrap();
+        assert!(load_registry(&root).is_err());
+        assert!(save_registry(&root, &registry).is_err());
+
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

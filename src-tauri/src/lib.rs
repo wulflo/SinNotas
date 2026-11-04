@@ -940,6 +940,9 @@ fn run_content_search(
     tokens: &[String],
     limit: usize,
 ) -> Vec<ContentSearchHit> {
+    if limit == 0 {
+        return Vec::new();
+    }
     // Puntuación: mejor bloque por nota, plegado en memoria (sin tocar
     // el cache con lock durante el scan).
     let mut candidates: Vec<(String, ContentSearchCandidate)> = Vec::new();
@@ -986,14 +989,19 @@ fn run_content_search(
     }
 
     // Orden estable: más apariciones primero, desempate alfabético.
-    candidates.sort_by(|left, right| {
+    let order_candidates = |left: &(String, ContentSearchCandidate),
+                           right: &(String, ContentSearchCandidate)| {
         right
             .1
             .count
             .cmp(&left.1.count)
             .then_with(|| left.0.cmp(&right.0))
-    });
-    candidates.truncate(limit);
+    };
+    if candidates.len() > limit {
+        candidates.select_nth_unstable_by(limit, order_candidates);
+        candidates.truncate(limit);
+    }
+    candidates.sort_by(order_candidates);
 
     // Servido: page (metadata) + bloque ganador desde el cache.
     let mut hits = Vec::with_capacity(candidates.len());
@@ -4856,7 +4864,7 @@ fn svg_has_active_content(content: &str) -> bool {
 }
 
 pub(crate) fn validate_image_file(file_name: &str, bytes: &[u8]) -> Result<(), String> {
-    if bytes.is_empty() || bytes.len() > 5 * 1024 * 1024 {
+    if bytes.is_empty() || bytes.len() > MAX_IMAGE_FILE_BYTES {
         return Err("La imagen debe tener un tamaño máximo de 5 MB.".to_string());
     }
     let file_path = Path::new(file_name);
@@ -5076,15 +5084,30 @@ fn save_dropped_image(
     ) {
         return Err("Solo se admiten imágenes PNG, JPG, JPEG, WebP, SVG, GIF o BMP.".to_string());
     }
-    let metadata = fs::metadata(&source).map_err(|err| err.to_string())?;
+    let bytes = read_dropped_image_bytes(&source)?;
+    store_image_in_vault(&file_name, &bytes, &state)
+}
+
+const MAX_IMAGE_FILE_BYTES: usize = 5 * 1024 * 1024;
+
+fn read_dropped_image_bytes(path: &Path) -> Result<Vec<u8>, String> {
+    let metadata = fs::metadata(path).map_err(|error| error.to_string())?;
     if !metadata.is_file() {
         return Err("El elemento arrastrado no es un archivo.".to_string());
     }
-    if metadata.len() == 0 || metadata.len() > 5 * 1024 * 1024 {
+    if metadata.len() == 0 || metadata.len() > MAX_IMAGE_FILE_BYTES as u64 {
         return Err("La imagen debe tener un tamaño máximo de 5 MB.".to_string());
     }
-    let bytes = fs::read(source).map_err(|err| err.to_string())?;
-    store_image_in_vault(&file_name, &bytes, &state)
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    fs::File::open(path)
+        .map_err(|error| error.to_string())?
+        .take(MAX_IMAGE_FILE_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|error| error.to_string())?;
+    if bytes.is_empty() || bytes.len() > MAX_IMAGE_FILE_BYTES {
+        return Err("La imagen debe tener un tamaño máximo de 5 MB.".to_string());
+    }
+    Ok(bytes)
 }
 
 #[derive(Debug, Serialize)]
@@ -5787,6 +5810,29 @@ mod tests {
         // Un PNG legítimo sigue aceptándose (no se altera el resto de formatos).
         let png = b"\x89PNG\r\n\x1a\nrest";
         assert!(validate_image_file("ok.png", png).is_ok());
+    }
+
+    #[test]
+    fn dropped_image_reader_enforces_size_limit() {
+        let root = std::env::temp_dir().join(format!(
+            "sinnotas-drop-image-test-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let small = root.join("small.png");
+        fs::write(&small, b"small image").unwrap();
+        assert_eq!(read_dropped_image_bytes(&small).unwrap(), b"small image");
+
+        let oversized = root.join("large.png");
+        let file = fs::File::create(&oversized).unwrap();
+        file.set_len(MAX_IMAGE_FILE_BYTES as u64 + 1).unwrap();
+        assert!(read_dropped_image_bytes(&oversized).is_err());
+
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

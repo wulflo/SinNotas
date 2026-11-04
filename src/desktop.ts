@@ -964,6 +964,11 @@ const viewPdf = document.getElementById("view-pdf") as HTMLElement;
 const pdfView = new PdfReaderView(viewPdf, {
   insertText: insertPdfTextIntoEditor,
   insertCapture: insertPdfCaptureIntoEditor,
+  confirmOpenLinked: (item) =>
+    confirmAction(
+      `${translate("Este PDF está enlazado desde fuera del vault. SinNotas procesará el archivo con el lector PDF. Continúa solo si reconoces y confías en él.")}\n\n${item.title}`,
+      translate("Abrir PDF")
+    ),
   confirmDelete: confirmPdfDeletion,
 });
 const bibliographyView = new BibliographyView(viewBibliography, createBibliographyHost());
@@ -9593,12 +9598,10 @@ function ensureKanbanContentLoaded(): void {
   if (!isTauri() || !isMetadataOnlyBoot()) return;
   if (kanbanContentStream) return;
   kanbanContentStream = (async () => {
-    for (;;) {
-      // La lista pendiente se recalcula a cada vuelta: deltas externos y
-      // barridos del LRU entran y salen sin invalidar el stream.
-      const pending = vault.getPages().filter((page) => page.blocksLoaded === false);
-      if (pending.length === 0 || currentView !== "kanban") break;
-      const batch = pending.slice(0, KANBAN_HYDRATION_BATCH);
+    const pending = vault.getPages().filter((page) => page.blocksLoaded === false);
+    for (let offset = 0; offset < pending.length; offset += KANBAN_HYDRATION_BATCH) {
+      if (currentView !== "kanban") break;
+      const batch = pending.slice(offset, offset + KANBAN_HYDRATION_BATCH);
       await vault.loadPagesCached(batch);
       if (currentView !== "kanban") break;
       renderKanbanBoard();

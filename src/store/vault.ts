@@ -809,15 +809,17 @@ export class VaultStore {
     if (loaded.length === 0) return;
     this.loadedTick += 1;
     const activeRoot = this.activeRootPath;
+    const pagesById = new Map(this.pages.map((page) => [page.id, page]));
+    const pagesByPath = new Map(
+      this.pages.map((page) => [normalizePathForCompare(page.path), page])
+    );
     for (const fresh of loaded) {
       if (!Array.isArray(fresh.blocks)) continue;
       normalizeBlockTypes(fresh.blocks);
       if (activeRoot) fresh.path = this.toRelativeNotePath(fresh.path, activeRoot);
-      const idx = this.pages.findIndex(
-        (candidate) => candidate.id === fresh.id || normalizePathForCompare(candidate.path) === normalizePathForCompare(fresh.path)
-      );
-      if (idx < 0) continue;
-      const existing = this.pages[idx];
+      const existing = pagesById.get(fresh.id)
+        ?? pagesByPath.get(normalizePathForCompare(fresh.path));
+      if (!existing) continue;
       existing.blocks = fresh.blocks;
       existing.blocksLoaded = true;
       existing.blockCount = fresh.blockCount;
@@ -840,13 +842,14 @@ export class VaultStore {
     const entries = [...this.loadedPageEpochs.entries()].sort(
       (left, right) => left[1] - right[1]
     );
+    const pagesByPath = new Map(
+      this.pages.map((page) => [normalizePathForCompare(page.path), page])
+    );
     let excess = this.loadedPageEpochs.size - MAX_LOADED_PAGES;
     for (const [path] of entries) {
       if (excess <= 0) break;
       if (this.pinnedLoadedPaths.has(path)) continue;
-      const page = this.pages.find(
-        (candidate) => normalizePathForCompare(candidate.path) === normalizePathForCompare(path)
-      );
+      const page = pagesByPath.get(normalizePathForCompare(path));
       if (!page || page.blocksLoaded === false) {
         this.loadedPageEpochs.delete(path);
         continue;

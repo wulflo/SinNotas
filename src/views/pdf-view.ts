@@ -20,6 +20,8 @@ export interface PdfReaderHost {
   insertText(text: string, source: string): Promise<void>;
   /** Guarda una captura y la inserta como imagen; puede abrir el editor de oclusiones. */
   insertCapture(bytes: Uint8Array, fileName: string, openOcclusion: boolean): Promise<void>;
+  /** Pide confirmación antes de procesar un PDF enlazado fuera del vault. */
+  confirmOpenLinked(item: PdfListItem): Promise<boolean>;
   /** Pide confirmación antes de borrar un documento de la biblioteca. */
   confirmDelete(item: PdfListItem): Promise<boolean>;
 }
@@ -388,6 +390,13 @@ export class PdfReaderView {
   }
 
   async open(relativePath: string): Promise<void> {
+    const item = this.items.find((entry) => entry.relativePath === relativePath);
+    if (item?.missing) {
+      this.setStatus("El archivo original no está disponible.");
+      return;
+    }
+    if (item?.linked && !(await this.host.confirmOpenLinked(item))) return;
+
     this.setStatus("Abriendo documento…");
     this.loading = true;
     this.updateButtons();

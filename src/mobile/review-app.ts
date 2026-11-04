@@ -7,6 +7,7 @@ import {
   clampImageOcclusionRegion,
   updateImageOcclusionInContent,
 } from "../editor/image-occlusion";
+import { isRemoteImageSource, resolveAllowedRemoteImageUrl } from "../editor/url-safety";
 import { DocumentHistory, type DocumentHistoryEntry } from "../editor/history";
 import { sanitizeHtml } from "../editor/markdown";
 import { findNodeLocation } from "../editor/tree-engine";
@@ -3086,9 +3087,14 @@ class MobileReviewApp {
 
   private async resolveImageUrl(source?: string): Promise<string | null> {
     if (!source) return null;
-    if (/^data:image\/(?:png|jpe?g|webp|svg\+xml|gif|bmp);/i.test(source)) return source;
-    if (/^(?:https?:|blob:)/i.test(source)) return source;
-    if (/^(?:javascript:|vbscript:|data:)/i.test(source)) return null;
+    const remoteUrl = resolveAllowedRemoteImageUrl(source);
+    if (remoteUrl) return remoteUrl;
+    if (
+      isRemoteImageSource(source) ||
+      /^(?:data:|blob:|[a-z][a-z0-9+.-]*:)/i.test(source) && !/^[a-z]:[\\/]/i.test(source)
+    ) {
+      return null;
+    }
 
     const cached = this.imageUrls.get(source);
     if (cached) return cached;

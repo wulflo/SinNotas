@@ -281,6 +281,20 @@ describe("graph-physics", () => {
       const cluster = [idxA, idxB, idxC].sort((a, b) => a - b);
       expect(cluster[2] - cluster[0]).toBe(2);
     });
+
+    it("recorre grafos grandes sin perder ni repetir nodos", () => {
+      const nodes = Array.from({ length: 2_000 }, (_, index) =>
+        createTestNode(`N${index}`, 0, 0)
+      );
+      const links = nodes.slice(1).map((node, index) =>
+        createTestLink(nodes[index].title, node.title)
+      );
+
+      const result = computeRevealOrder(nodes, links);
+
+      expect(result).toHaveLength(nodes.length);
+      expect(new Set(result.map((node) => node.title)).size).toBe(nodes.length);
+    });
   });
 
   describe("computeInitialPosition", () => {

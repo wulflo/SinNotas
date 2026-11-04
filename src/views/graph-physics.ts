@@ -471,9 +471,10 @@ export function computeRevealOrder(allNodes: GraphNode[], allLinks: GraphLink[])
     if (visited.has(node.title)) continue;
     const queue: GraphNode[] = [node];
     visited.add(node.title);
+    let queueHead = 0;
 
-    while (queue.length > 0) {
-      const current = queue.shift()!;
+    while (queueHead < queue.length) {
+      const current = queue[queueHead++];
       result.push(current);
 
       const neighbors = adjacency.get(current.title) || [];
