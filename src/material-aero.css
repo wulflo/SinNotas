@@ -232,11 +232,14 @@ body {
 
 ::-webkit-scrollbar-thumb {
   border-radius: var(--ma-radius-xs);
-  background: color-mix(in srgb, var(--md-primary) 52%, transparent);
+  background-color: color-mix(in srgb, var(--md-primary) 62%, transparent);
+  border-left: 2px solid transparent;
+  background-clip: padding-box;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: var(--md-primary);
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--md-primary);
 }
 
 /* ==================== SUPERFICIES PRINCIPALES ==================== */
@@ -586,9 +589,11 @@ body {
 .flashcard-tab,
 .settings-tab {
   border-radius: var(--ma-radius-md);
-  border: 1px solid var(--ma-glass-border);
-  background: color-mix(in srgb, var(--md-surface-container-high) 54%, transparent);
-  color: var(--md-on-surface-variant);
+  /* Borde y fondo llevan una mezcla del acento: en Dracula/Aero las
+     superficies claras dejaban estos botones casi fundidos con el panel. */
+  border: 1px solid color-mix(in srgb, var(--md-primary) 55%, var(--md-outline));
+  background: color-mix(in srgb, var(--md-primary) 9%, var(--md-surface-container-high));
+  color: var(--md-on-surface);
   box-shadow: none;
 }
 
@@ -597,8 +602,8 @@ body {
 .btn-fsrs:hover,
 .flashcard-tab:hover,
 .settings-tab:hover {
-  background: var(--md-state-hover);
-  border-color: color-mix(in srgb, var(--md-primary) 45%, var(--ma-glass-border));
+  background: color-mix(in srgb, var(--md-primary) 16%, var(--md-surface-container-high));
+  border-color: color-mix(in srgb, var(--md-primary) 70%, var(--md-outline));
   color: var(--md-on-surface);
 }
 
@@ -607,7 +612,7 @@ body {
 .flashcard-tab.active,
 .settings-tab.active {
   background: var(--md-primary-container);
-  border-color: transparent;
+  border-color: color-mix(in srgb, var(--md-primary) 60%, transparent);
   color: var(--md-on-primary-container);
   font-weight: 650;
   box-shadow: none;
@@ -1044,7 +1049,6 @@ input[type="checkbox"] {
 
 /* ==================== FLASHCARDS, KANBAN Y GRAFO ==================== */
 
-.flashcard-tab,
 .flashcard-header,
 .flashcard-review-tools {
   border-color: var(--ma-glass-border);

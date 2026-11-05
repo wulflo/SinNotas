@@ -1569,6 +1569,31 @@ function applySystemFont(fontFamily: string): void {
   graphView?.refresh();
 }
 
+let nativeScrollbarFrame = 0;
+
+/**
+ * WebKitGTK pinta las barras con el tema nativo de GTK e ignora
+ * `scrollbar-color`/`::-webkit-scrollbar` en varias versiones (Snap/Flatpak
+ * incluidos). Este comando traslada el acento activo al slider nativo; en el
+ * navegador no hace nada. Se agrupa en un frame para que encadenar
+ * tema + visual + acento no dispare tres invocaciones.
+ */
+function syncNativeScrollbarTheme(): void {
+  if (!isTauri() || nativeScrollbarFrame !== 0) return;
+  nativeScrollbarFrame = window.requestAnimationFrame(() => {
+    nativeScrollbarFrame = 0;
+    // Se lee en el frame siguiente: los atributos `data-*` ya están aplicados
+    // y `--ls-accent` contiene el valor resuelto del acento elegido.
+    const accent = getComputedStyle(document.documentElement)
+      .getPropertyValue("--ls-accent")
+      .trim();
+    if (!accent) return;
+    void invoke("set_native_scrollbar_style", { accent }).catch(() => {
+      // El CSS sigue funcionando aunque GTK no acepte el color.
+    });
+  });
+}
+
 function setTheme(isLight: boolean) {
   if (isLight) {
     document.documentElement.setAttribute("data-theme", "light");
@@ -1579,6 +1604,7 @@ function setTheme(isLight: boolean) {
     btnThemeSwitch.innerText = "Modo Oscuro Activo";
     localStorage.setItem("sinnotas-theme", "dark");
   }
+  syncNativeScrollbarTheme();
 }
 
 /**
@@ -1594,6 +1620,7 @@ function setVisual(visual: VisualTheme): void {
     button.setAttribute("aria-pressed", String(selected));
     button.classList.toggle("active", selected);
   });
+  syncNativeScrollbarTheme();
 }
 
 function setAccent(accent: AccentColor): void {
@@ -1604,6 +1631,7 @@ function setAccent(accent: AccentColor): void {
     button.setAttribute("aria-pressed", String(selected));
     button.classList.toggle("active", selected);
   });
+  syncNativeScrollbarTheme();
 }
 
 function setFont(font: TypographyType) {

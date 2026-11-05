@@ -5628,6 +5628,131 @@ fn desktop_install_kind() -> &'static str {
     "native"
 }
 
+/// Normaliza un color CSS (`#rgb`, `#rrggbb` o `rgb(...)`) a `#rrggbb`.
+/// GTK 3 no entiende `color-mix()` ni las variables CSS, así que el frontend
+/// resuelve el acento y aquí sólo se valida el valor final.
+#[cfg(target_os = "linux")]
+fn normalize_gtk_color(input: &str) -> Option<String> {
+    let value = input.trim().to_ascii_lowercase();
+    if let Some(hex) = value.strip_prefix('#') {
+        let expanded = match hex.len() {
+            3 => hex.chars().flat_map(|c| [c, c]).collect::<String>(),
+            6 => hex.to_string(),
+            _ => return None,
+        };
+        if expanded.chars().all(|c| c.is_ascii_hexdigit()) {
+            return Some(format!("#{expanded}"));
+        }
+        return None;
+    }
+
+    let rgb = value
+        .strip_prefix("rgb(")
+        .and_then(|rest| rest.strip_suffix(')'))?;
+    let parts: Vec<&str> = rgb.split(',').map(str::trim).collect();
+    if parts.len() < 3 {
+        return None;
+    }
+
+    let mut channels = [0u8; 3];
+    for (index, part) in parts.iter().take(3).enumerate() {
+        let channel = if let Some(percent) = part.strip_suffix('%') {
+            percent.parse::<f32>().ok()? * 2.55
+        } else {
+            part.parse::<f32>().ok()?
+        };
+        channels[index] = channel.round().clamp(0.0, 255.0) as u8;
+    }
+    Some(format!(
+        "#{:02x}{:02x}{:02x}",
+        channels[0], channels[1], channels[2]
+    ))
+}
+
+/// Aplica el acento activo a las barras de desplazamiento nativas de GTK.
+///
+/// WebKitGTK delega el dibujo de las barras en el tema de GTK, por lo que
+/// `scrollbar-color` y `::-webkit-scrollbar` no bastan en todas las versiones
+/// (Snap/Flatpak incluidos). El `CssProvider` se reutiliza entre llamadas para
+/// no acumular proveedores cada vez que se cambia de tema o de acento.
+#[cfg(target_os = "linux")]
+#[tauri::command]
+fn set_native_scrollbar_style(app: AppHandle, accent: String) -> Result<(), String> {
+    use std::cell::RefCell;
+
+    thread_local! {
+        // `CssProvider` no es `Send`, pero todos los accesos ocurren en el hilo
+        // principal de GTK (el closure de `run_on_main_thread`).
+        static SCROLLBAR_PROVIDER: RefCell<Option<gtk::CssProvider>> = const { RefCell::new(None) };
+    }
+
+    let color = normalize_gtk_color(&accent)
+        .ok_or_else(|| format!("Color de acento no válido: {accent}"))?;
+    let css = format!(
+        r#"
+scrollbar {{
+  background-color: transparent;
+  border: none;
+}}
+scrollbar trough {{
+  background-color: transparent;
+  background-image: none;
+  border: none;
+}}
+scrollbar slider {{
+  background-color: {color};
+  background-image: none;
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+  min-width: 10px;
+  min-height: 10px;
+}}
+scrollbar slider:hover,
+scrollbar slider:active {{
+  background-color: {color};
+}}
+scrollbar.overlay-indicator slider {{
+  background-color: {color};
+  min-width: 10px;
+  min-height: 10px;
+}}
+"#
+    );
+
+    app.run_on_main_thread(move || {
+        use gtk::prelude::CssProviderExt;
+
+        let Some(screen) = gtk::gdk::Screen::default() else {
+            return;
+        };
+        SCROLLBAR_PROVIDER.with(|slot| {
+            let mut current = slot.borrow_mut();
+            if let Some(previous) = current.take() {
+                gtk::StyleContext::remove_provider_for_screen(&screen, &previous);
+            }
+            let provider = gtk::CssProvider::new();
+            if provider.load_from_data(css.as_bytes()).is_ok() {
+                gtk::StyleContext::add_provider_for_screen(
+                    &screen,
+                    &provider,
+                    gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
+                );
+                *current = Some(provider);
+            }
+        });
+    })
+    .map_err(|error| format!("No se pudo aplicar el estilo nativo: {error}"))
+}
+
+/// En el resto de plataformas las barras no las pinta GTK: el comando existe
+/// para que el frontend pueda invocarlo sin ramas adicionales.
+#[cfg(not(target_os = "linux"))]
+#[tauri::command]
+fn set_native_scrollbar_style(_accent: String) -> Result<(), String> {
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     #[allow(unused_mut)]
@@ -5710,7 +5835,8 @@ pub fn run() {
             open_note_with_default_app,
             rename_page,
             save_android_apk,
-            desktop_install_kind
+            desktop_install_kind,
+            set_native_scrollbar_style
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

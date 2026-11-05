@@ -1649,14 +1649,30 @@ select {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--ls-accent) transparent;
+  scrollbar-color: color-mix(in srgb, var(--ls-accent) 62%, transparent) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-::-webkit-scrollbar-thumb:hover {
+/* El pulgar usa el acento desde el primer momento (no sólo al pasar el
+ * cursor). El borde transparente deja un carril libre a la izquierda para
+ * que la barra no quede pegada a los elementos de la lista. */
+::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--ls-accent) 62%, transparent);
+  border-left: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
   background-color: var(--ls-accent);
 }
 
@@ -1678,13 +1694,18 @@ select {
 .settings-dropdown-menu::-webkit-scrollbar-thumb,
 .settings-tab-panel::-webkit-scrollbar-thumb,
 .settings-tabs::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--ls-text-muted) 60%, transparent);
+  background-color: color-mix(in srgb, var(--ls-accent) 62%, transparent);
+  border-left: 2px solid transparent;
   border-radius: 999px;
+  background-clip: padding-box;
 }
 
 .settings-dropdown-menu::-webkit-scrollbar-thumb:hover,
+.settings-dropdown-menu::-webkit-scrollbar-thumb:active,
 .settings-tab-panel::-webkit-scrollbar-thumb:hover,
-.settings-tabs::-webkit-scrollbar-thumb:hover {
+.settings-tab-panel::-webkit-scrollbar-thumb:active,
+.settings-tabs::-webkit-scrollbar-thumb:hover,
+.settings-tabs::-webkit-scrollbar-thumb:active {
   background-color: var(--ls-accent);
 }
 
@@ -5608,9 +5629,9 @@ body.is-bullet-selecting {
   min-height: 0;
   overflow-x: hidden;
   overflow-y: auto;
-  /* La barra de desplazamiento ocupa su propio carril: no hace falta sumar
-   * 16px extra a la derecha (era la causa del padding asimétrico). */
-  padding-right: 4px;
+  /* En WebKitGTK la barra es una capa superpuesta: este padding evita que
+   * los atajos queden debajo de ella y deja aire a su izquierda. */
+  padding-right: 10px;
   scrollbar-gutter: stable;
 }
 
@@ -5624,11 +5645,14 @@ body.is-bullet-selecting {
 }
 
 .shortcuts-modal-body::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--ls-text-muted) 60%, transparent);
+  background-color: color-mix(in srgb, var(--ls-accent) 62%, transparent);
+  border-left: 2px solid transparent;
   border-radius: 999px;
+  background-clip: padding-box;
 }
 
-.shortcuts-modal-body::-webkit-scrollbar-thumb:hover {
+.shortcuts-modal-body::-webkit-scrollbar-thumb:hover,
+.shortcuts-modal-body::-webkit-scrollbar-thumb:active {
   background-color: var(--ls-accent);
 }
 
