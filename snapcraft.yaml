@@ -9,7 +9,7 @@
 # de runtime desde el snap de plataforma gnome-42-2204.
 name: sin-notas
 base: core22
-version: '0.4.7'
+version: '0.4.8'
 title: Sin Notas
 contact: https://github.com/wulflo/SinNotas/issues
 issues: https://github.com/wulflo/SinNotas/issues
