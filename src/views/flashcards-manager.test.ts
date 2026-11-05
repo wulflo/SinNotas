@@ -49,6 +49,36 @@ due-date:: 2026-11-23T00:00:00.000Z`;
   });
 });
 
+describe("FlashcardsManager - reprogramación FSRS", () => {
+  it("recalcula intervalo y vencimiento de tarjetas en Review", () => {
+    const content = `Pregunta :: Respuesta
+card-s:: 30
+card-d:: 5
+card-state:: 2
+last-reviewed:: 2026-10-01T00:00:00.000Z
+interval-days:: 30
+due-date:: 2026-10-31T00:00:00.000Z`;
+
+    const updated = FlashcardsManager.rescheduleFSRS(content, {
+      w: [0.4872, 1.4003, 3.7145, 13.8206, 5.1618, 1.2298, 0.8975, 0.031, 1.6474, 0.1367, 1.0461, 2.1072, 0.0793, 0.3246, 1.587, 0.2272, 2.8755],
+      requestRetention: 0.8,
+      maximumInterval: 36500,
+      learningSteps: [1 / 1440, 10 / 1440],
+      relearningSteps: [10 / 1440],
+    });
+
+    expect(updated).toContain("interval-days:: 72");
+    expect(updated).toContain("due-date:: 2026-12-12T00:00:00.000Z");
+  });
+
+  it("no modifica tarjetas Learning o Relearning", () => {
+    const content = "Pregunta :: Respuesta\ncard-s:: 5\ncard-state:: 1\nlast-reviewed:: 2026-10-01T00:00:00.000Z";
+    expect(FlashcardsManager.rescheduleFSRS(content, {
+      w: [], requestRetention: 0.9, maximumInterval: 36500, learningSteps: [], relearningSteps: [],
+    })).toBeNull();
+  });
+});
+
 describe("FlashcardsManager - siguiente tarjeta e ida a la deshecha", () => {
   const pages: PageData[] = [
     makePage("p1", "Nota A", "Pregunta A :: Respuesta A"),

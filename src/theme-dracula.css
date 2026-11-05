@@ -144,7 +144,6 @@
 
 :root[data-visual="dracula"] body {
   background: var(--visual-body-bg);
-  background-attachment: fixed;
 }
 
 :root[data-visual="dracula"] .main-container {

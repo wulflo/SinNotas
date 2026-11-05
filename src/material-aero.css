@@ -210,7 +210,6 @@ body {
       transparent 70%
     ),
     linear-gradient(155deg, var(--md-surface-container-lowest), var(--md-surface) 52%, var(--md-surface-container-low));
-  background-attachment: fixed;
 }
 
 #app {

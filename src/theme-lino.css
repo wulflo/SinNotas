@@ -147,9 +147,18 @@
  * neutro (fondo plano Simple, sin luces de acento).
  */
 
+:root[data-visual="lino"],
+:root[data-visual="lino"] body,
+:root[data-visual="lino"] #app {
+  background-color: var(--visual-body-bg);
+}
+
+/* Sin `background-attachment: fixed`: en WebKitGTK el tapiz fijo se queda
+   con mosaicos del tamaño anterior al colapsar la sidebar o el panel de
+   productividad y deja zonas oscuras sin repintar. La ventana no se
+   desplaza (body con overflow oculto), así que el resultado es idéntico. */
 :root[data-visual="lino"] body {
   background: var(--visual-body-bg);
-  background-attachment: fixed;
 }
 
 /* El tapiz debe ser plano: las decoraciones radiales con acento que aero y

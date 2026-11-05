@@ -143,9 +143,12 @@ export const CONTROLLER_TYPE_OPTIONS: Array<{ value: ControllerType | ""; label:
   { value: "generic", label: CONTROLLER_PRESETS.generic.label },
 ];
 
-/** Devuelve las etiquetas de botones para un tipo (o las genéricas si es automático). */
-export function buttonLabelsFor(type: ControllerType | ""): string[] {
-  return type === "" ? STANDARD_BUTTONS : CONTROLLER_PRESETS[type].buttons;
+/** Devuelve etiquetas para todos los botones expuestos por el mando. */
+export function buttonLabelsFor(type: ControllerType | "", buttonCount = 16): string[] {
+  const labels = [...(type === "" ? STANDARD_BUTTONS : CONTROLLER_PRESETS[type].buttons)];
+  const count = Math.max(16, Math.floor(buttonCount));
+  while (labels.length < count) labels.push(`Botón ${labels.length}`);
+  return labels;
 }
 
 /** Primer gamepad conectado, o null. */

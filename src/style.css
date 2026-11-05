@@ -38,7 +38,7 @@
   --ls-done-bg: #1e2a24;
   --ls-done-color: #a6d3b7;
 
-  --ls-kanban-card-bg: #282c34;
+  --ls-kanban-card-bg: #17191f;
   --ls-kanban-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 4px 12px rgba(0, 0, 0, 0.08);
   --ls-kanban-column-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
   
@@ -103,11 +103,11 @@
   --ls-card-bg: #ffffff;
   --ls-card-border: #e5e7eb;
   
-  --ls-todo-bg: #fbf4e9;
+  --ls-todo-bg: #fffdf9;
   --ls-todo-color: #9a5b12;
-  --ls-doing-bg: #eef5fc;
+  --ls-doing-bg: #fbfdff;
   --ls-doing-color: #2b6cb0;
-  --ls-done-bg: #eef7f1;
+  --ls-done-bg: #fbfefc;
   --ls-done-color: #2f6f55;
 
   --ls-kanban-card-bg: #ffffff;
@@ -358,9 +358,45 @@ body {
   z-index: 20;
   position: relative;
   isolation: isolate;
+  container-type: inline-size;
   box-shadow:
     inset -1px 0 0 color-mix(in srgb, var(--ls-accent) 12%, transparent),
     14px 0 38px -34px color-mix(in srgb, var(--ls-accent) 90%, transparent);
+}
+
+.sidebar-resizer {
+  position: absolute;
+  z-index: 40;
+  top: 0;
+  right: -3px;
+  width: 7px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sidebar-resizer::after {
+  content: "";
+  position: absolute;
+  inset: 0 2px;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.sidebar-resizer:hover::after,
+.sidebar-resizer:focus-visible::after,
+body.sidebar-resizing .sidebar-resizer::after {
+  background: color-mix(in srgb, var(--ls-accent) 70%, transparent);
+}
+
+.sidebar-resizer:focus-visible {
+  outline: none;
+}
+
+body.sidebar-resizing,
+body.sidebar-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 /* Glow propio de la sidebar con un tono desplazado respecto al accent. */
@@ -1380,6 +1416,10 @@ body {
   #headbar-pomodoro-clock {
     transition: none;
   }
+
+  .flashcard-progress-ring .progress-value {
+    transition: none;
+  }
 }
 
 .headbar-left {
@@ -1419,6 +1459,13 @@ body {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+
+.headbar [data-tauri-no-drag] {
+  -webkit-app-region: no-drag;
 }
 
 .btn-icon {
@@ -1476,8 +1523,6 @@ body {
   align-items: center;
   gap: 0;
   margin-left: 6px;
-  padding-left: 8px;
-  border-left: 1px solid var(--ls-border-color);
 }
 
 .btn-window-control {
@@ -1840,6 +1885,63 @@ select {
   outline: none;
 }
 
+.fsrs-retention-control {
+  display: flex;
+  flex: 0 1 320px;
+  align-items: center;
+  gap: 12px;
+  min-width: 180px;
+}
+
+.fsrs-retention-control input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 100px;
+  accent-color: var(--ls-accent);
+}
+
+.fsrs-retention-control output {
+  min-width: 3.5ch;
+  color: var(--ls-text-title);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.settings-row input.fsrs-steps-input {
+  width: min(220px, 100%);
+  max-width: 100%;
+  flex: 0 1 220px;
+  text-align: left;
+}
+
+.fsrs-advanced-settings {
+  padding-top: 8px;
+  border-top: 1px solid var(--ls-border-subtle);
+}
+
+.fsrs-advanced-settings > summary {
+  color: var(--ls-text-primary);
+  cursor: pointer;
+  font-size: calc(13px * var(--ls-font-scale, 1));
+  font-weight: 600;
+}
+
+.fsrs-advanced-settings > .settings-help {
+  margin: 8px 0;
+}
+
+.fsrs-advanced-settings textarea {
+  display: block;
+  width: 100%;
+  min-height: 72px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--ls-accent) 40%, var(--ls-border-color));
+  border-radius: 6px;
+  background: var(--ls-bg-primary);
+  color: var(--ls-text-primary);
+  font: 12px/1.5 ui-monospace, "SFMono-Regular", Consolas, monospace;
+  resize: vertical;
+}
+
 input[type="checkbox"] {
   width: 18px;
   height: 18px;
@@ -1862,10 +1964,13 @@ input[type="checkbox"] {
 }
 
 .accent-selector {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 26px);
+  justify-content: center;
   gap: 12px;
-  padding: 2px 0 6px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 12px 10px;
 }
 
 /* Selector de estilo visual (Aero · Simple · Dracula): fila con botones
@@ -3985,6 +4090,14 @@ body.is-bullet-selecting {
   transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
 }
 
+[data-theme="light"] .kanban-card {
+  background: #ffffff;
+}
+
+:root:not([data-theme="light"]) .kanban-card {
+  background: #15171c;
+}
+
 .kanban-card.has-due {
   padding-left: 10px;
   border-left: 3px solid color-mix(
@@ -5770,6 +5883,17 @@ body.is-bullet-selecting {
   cursor: default;
 }
 
+.flashcard-panel-toggle {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+}
+
+.flashcard-panel-toggle[aria-pressed="false"] {
+  background: var(--ls-accent-subtle);
+  color: var(--ls-accent);
+}
+
 .flashcard-heading {
   display: flex;
   align-items: center;
@@ -6124,9 +6248,36 @@ body.is-bullet-selecting {
 }
 
 .flashcard-progress {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: calc(13.5px * var(--ls-font-scale, 1));
   font-weight: 600;
   color: var(--ls-text-muted);
+}
+
+.flashcard-progress-ring {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  color: var(--ls-accent);
+  transform: rotate(-90deg);
+}
+
+.flashcard-progress-ring circle {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 3;
+}
+
+.flashcard-progress-ring circle:first-child {
+  opacity: 0.18;
+}
+
+.flashcard-progress-ring .progress-value {
+  stroke-dasharray: 56.55;
+  stroke-dashoffset: var(--progress-offset, 56.55);
+  transition: stroke-dashoffset 220ms ease;
 }
 
 .flashcard-box {
@@ -6176,6 +6327,10 @@ body.is-bullet-selecting {
   align-items: start;
   gap: 20px;
   max-width: 100%;
+}
+
+.flashcard-review-layout.has-hidden-tools {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .flashcard-review-layout > .flashcard-box {
@@ -6231,13 +6386,85 @@ body.is-bullet-selecting {
   font-size: calc(11px * var(--ls-font-scale, 1));
 }
 
+.focus-panel-title-group {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.focus-panel-settings {
+  width: 23px;
+  height: 23px;
+  flex: 0 0 auto;
+  color: var(--ls-text-muted);
+}
+
+.focus-panel-settings:hover,
+.focus-panel-settings:focus-visible {
+  color: var(--ls-accent);
+}
+
 .pomodoro-clock {
-  padding: 8px 0;
-  color: var(--ls-text-title);
-  font-size: calc(32px * var(--ls-font-scale, 1));
+  --pomodoro-focus-color: #a96870;
+  --pomodoro-countup-color: #668d74;
+  --pomodoro-break-color: #6685a5;
+  --pomodoro-color: var(--pomodoro-focus-color);
+  /* El relleno y la pista son tintes translúcidos para que el reloj se apoye
+     en la superficie de la tarjeta en vez de taparla con un bloque opaco. */
+  --pomodoro-fill: color-mix(in srgb, var(--pomodoro-color) 46%, transparent);
+  --pomodoro-track: color-mix(in srgb, var(--pomodoro-color) 10%, transparent);
+  display: flex;
+  width: 148px;
+  height: 54px;
+  box-sizing: border-box;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 0 12px;
+  border: 1px solid var(--ls-border-subtle);
+  border-radius: var(--ma-radius-xl, 14px);
+  background: linear-gradient(
+    to right,
+    var(--pomodoro-fill) 0%,
+    var(--pomodoro-fill) calc(var(--pomodoro-progress) * 1%),
+    var(--pomodoro-track) calc(var(--pomodoro-progress) * 1%),
+    var(--pomodoro-track) 100%
+  );
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   text-align: center;
+}
+
+[data-theme="light"] .pomodoro-clock {
+  --pomodoro-focus-color: #f0bfc2;
+  --pomodoro-countup-color: #c3dfc9;
+  --pomodoro-break-color: #bfd5eb;
+  --pomodoro-fill: color-mix(in srgb, var(--pomodoro-color) 56%, transparent);
+  --pomodoro-track: color-mix(in srgb, var(--pomodoro-color) 12%, transparent);
+}
+
+.pomodoro-clock-value {
+  z-index: 1;
+  text-shadow: 0 1px 2px color-mix(in srgb, var(--ls-bg-primary) 32%, transparent);
+  color: var(--ls-text-title);
+  font-size: calc(20px * var(--ls-font-scale, 1));
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.pomodoro-clock-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+
+.pomodoro-clock.is-break {
+  --pomodoro-color: var(--pomodoro-break-color);
+}
+
+.pomodoro-clock.is-count-up:not(.is-break) {
+  --pomodoro-color: var(--pomodoro-countup-color);
 }
 
 .pomodoro-actions {
@@ -6266,26 +6493,128 @@ body.is-bullet-selecting {
   font-size: calc(10.5px * var(--ls-font-scale, 1));
 }
 
-.focus-stats {
+.focus-heatmap-panel {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 10px;
 }
 
-.focus-stats h3 {
-  margin-bottom: 1px;
+.focus-heatmap-panel .focus-panel-heading h3 {
+  margin: 0;
 }
 
-.focus-stats > div {
+.focus-heatmap-panel .focus-panel-heading > strong {
+  color: var(--ls-text-title);
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-row input.flashcard-heatmap-date-setting {
+  width: min(220px, 100%);
+  max-width: 100%;
+  flex: 0 1 220px;
+  text-align: left;
+}
+
+.flashcard-heatmap-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 2px 0 5px;
+}
+
+.flashcard-heatmap-content {
+  width: max-content;
+}
+
+.flashcard-heatmap-months,
+.flashcard-heatmap-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 11px;
+  column-gap: 3px;
+}
+
+.flashcard-heatmap-months {
+  min-height: 15px;
+  margin-left: 20px;
+  color: var(--ls-text-muted);
+  font-size: 9px;
+  line-height: 1;
+}
+
+.flashcard-heatmap-months span {
+  overflow: visible;
+  white-space: nowrap;
+}
+
+.flashcard-heatmap-body {
+  display: flex;
+  align-items: start;
+  gap: 5px;
+}
+
+.flashcard-heatmap-weekdays {
+  display: grid;
+  grid-template-rows: repeat(7, 11px);
+  gap: 3px;
+  width: 15px;
+  color: var(--ls-text-muted);
+  font-size: 8px;
+  line-height: 11px;
+  text-align: center;
+}
+
+.flashcard-heatmap-grid {
+  --heatmap-color: var(--ls-accent);
+  grid-template-rows: repeat(7, 11px);
+  gap: 3px;
+  min-height: 95px;
+}
+
+.flashcard-heatmap-grid[data-style="classic"] {
+  --heatmap-color: #2da44e;
+}
+
+.flashcard-heatmap-cell {
+  width: 11px;
+  height: 11px;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--heatmap-color) 16%, var(--ls-border-subtle));
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--heatmap-color) 8%, var(--ls-bg-tertiary));
+}
+
+.flashcard-heatmap-cell[data-level="1"] {
+  background: color-mix(in srgb, var(--heatmap-color) 28%, var(--ls-bg-tertiary));
+}
+
+.flashcard-heatmap-cell[data-level="2"] {
+  background: color-mix(in srgb, var(--heatmap-color) 48%, var(--ls-bg-tertiary));
+}
+
+.flashcard-heatmap-cell[data-level="3"] {
+  background: color-mix(in srgb, var(--heatmap-color) 70%, var(--ls-bg-tertiary));
+}
+
+.flashcard-heatmap-cell[data-level="4"] {
+  background: color-mix(in srgb, var(--heatmap-color) 92%, var(--ls-bg-tertiary));
+}
+
+.flashcard-heatmap-cell.is-empty {
+  visibility: hidden;
+  border-color: transparent;
+  background: transparent;
+}
+
+.flashcard-heatmap-summary {
   display: flex;
   justify-content: space-between;
-  gap: 8px;
-  font-size: calc(12px * var(--ls-font-scale, 1));
-}
-
-.focus-stats strong {
-  color: var(--ls-text-title);
-  font-variant-numeric: tabular-nums;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  color: var(--ls-text-muted);
+  font-size: calc(9px * var(--ls-font-scale, 1));
 }
 
 .focus-tree-panel {
@@ -6476,6 +6805,10 @@ body.is-bullet-selecting {
   grid-template-columns: minmax(0, 1fr) 300px;
   align-items: stretch;
   margin: 0 auto;
+}
+
+#app.flashcard-focus-mode .flashcard-review-layout.has-hidden-tools {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 #app.flashcard-focus-mode .flashcard-box {
@@ -6801,6 +7134,57 @@ body.is-bullet-selecting {
   background: rgba(152, 195, 121, 0.18);
   color: #98c379;
   border: 1px solid rgba(152, 195, 121, 0.3);
+}
+
+/* En claro los tonos pastel del tema oscuro no alcanzan contraste sobre la
+   tarjeta blanca. Se mantienen los mismos cuatro colores semánticos, pero con
+   variantes oscurecidas (≥ 4.5:1) y un fondo apenas tintado. */
+[data-theme="light"] .btn-fsrs.again {
+  background: color-mix(in srgb, #b42318 10%, var(--ls-card-bg));
+  color: #b42318;
+  border-color: color-mix(in srgb, #b42318 35%, transparent);
+}
+
+[data-theme="light"] .btn-fsrs.hard {
+  background: color-mix(in srgb, #8a5a00 10%, var(--ls-card-bg));
+  color: #8a5a00;
+  border-color: color-mix(in srgb, #8a5a00 35%, transparent);
+}
+
+[data-theme="light"] .btn-fsrs.good {
+  background: color-mix(in srgb, #1d4ed8 10%, var(--ls-card-bg));
+  color: #1d4ed8;
+  border-color: color-mix(in srgb, #1d4ed8 35%, transparent);
+}
+
+[data-theme="light"] .btn-fsrs.easy {
+  background: color-mix(in srgb, #166534 10%, var(--ls-card-bg));
+  color: #166534;
+  border-color: color-mix(in srgb, #166534 35%, transparent);
+}
+
+[data-theme="light"] .btn-fsrs small {
+  opacity: 1;
+}
+
+[data-theme="light"] .btn-fsrs:hover {
+  opacity: 1;
+}
+
+[data-theme="light"] .btn-fsrs.again:hover {
+  background: color-mix(in srgb, #b42318 16%, var(--ls-card-bg));
+}
+
+[data-theme="light"] .btn-fsrs.hard:hover {
+  background: color-mix(in srgb, #8a5a00 16%, var(--ls-card-bg));
+}
+
+[data-theme="light"] .btn-fsrs.good:hover {
+  background: color-mix(in srgb, #1d4ed8 16%, var(--ls-card-bg));
+}
+
+[data-theme="light"] .btn-fsrs.easy:hover {
+  background: color-mix(in srgb, #166534 16%, var(--ls-card-bg));
 }
 
 /* ==================== GRAPH VIEW ==================== */
@@ -8923,7 +9307,28 @@ body.editor-split-active #view-editor .canvas-wrapper {
 }
 
 @media (max-width: 720px) {
+  .sidebar-resizer {
+    display: none;
+  }
+
   .sidebar-nav .nav-item {
     min-height: 52px;
+  }
+}
+
+@container (min-width: 430px) {
+  .sidebar-nav {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 5px;
+    padding-inline: 8px;
+  }
+
+  .sidebar-nav .nav-item {
+    min-height: 44px;
+  }
+
+  .sidebar-nav .nav-item > svg {
+    width: 19px;
+    height: 19px;
   }
 }

@@ -27,6 +27,13 @@ describe("gamepad presets", () => {
     expect(labels[0]).toContain("0");
   });
 
+  it("etiqueta botones adicionales cuando el mando expone más de 16", () => {
+    const labels = buttonLabelsFor("xbox", 18);
+    expect(labels).toHaveLength(18);
+    expect(labels[16]).toBe("Botón 16");
+    expect(labels[17]).toBe("Botón 17");
+  });
+
   it("PlayStation etiqueta el botón 0 como ✕ y el 3 como △", () => {
     const labels = buttonLabelsFor("playstation");
     expect(labels[0]).toContain("✕");
@@ -55,6 +62,20 @@ describe("gamepad presets", () => {
 
 describe("pressedButtonIndexes", () => {
   const axes = (values: number[]): number[] => values;
+
+  it("detecta individualmente los 16 botones estándar", () => {
+    for (let index = 0; index < 16; index += 1) {
+      const buttons = Array.from({ length: 16 }, () => fakeButton());
+      buttons[index] = fakeButton(0, true);
+      expect(pressedButtonIndexes(buttons, [], "standard")).toEqual(new Set([index]));
+    }
+  });
+
+  it("detecta índices extendidos que exponen algunos mandos", () => {
+    const buttons = Array.from({ length: 20 }, () => fakeButton());
+    buttons[19] = fakeButton(0, true);
+    expect(pressedButtonIndexes(buttons, [], "standard")).toEqual(new Set([19]));
+  });
 
   it("no interpreta el stick derecho (ejes 2/3) como gatillos", () => {
     const buttons = Array.from({ length: 8 }, () => fakeButton());

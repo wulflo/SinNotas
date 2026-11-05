@@ -1,5 +1,5 @@
 import { Flashcard, PageData, BlockNode, FlashcardType, ImageOcclusionRegion } from "../types";
-import { CardState, FSRSEngine, FSRSItem, FSRSRating } from "../editor/fsrs";
+import { CardState, FSRSEngine, FSRSItem, FSRSParameters, FSRSRating } from "../editor/fsrs";
 import {
   isSystemPropertyLine,
   renderMarkdownToHtml,
@@ -120,7 +120,7 @@ export class FlashcardsManager {
   private reviewCards: Flashcard[] = [];
   private currentIndex = 0;
   private isAnswerRevealed = false;
-  private fsrs = new FSRSEngine();
+  private fsrs: FSRSEngine;
   private allowedPages: Set<string> | null = null;
   /**
    * Cuando está activo, la cola incluye también las tarjetas que todavía no
@@ -129,7 +129,13 @@ export class FlashcardsManager {
    */
   private includeAllCards = false;
 
-  constructor() {}
+  constructor(parameters?: Partial<FSRSParameters>) {
+    this.fsrs = new FSRSEngine(parameters);
+  }
+
+  public setFSRSParameters(parameters: FSRSParameters): void {
+    this.fsrs = new FSRSEngine(parameters);
+  }
 
   /**
    * Define qué notas (páginas) pueden aportar tarjetas a la sesión de repaso.
@@ -324,6 +330,28 @@ export class FlashcardsManager {
 
     const withoutDueDate = content.replace(/\n?due-date::[^\n]*/gi, "").trimEnd();
     return `${withoutDueDate}\ndue-date:: ${dueDate}`;
+  }
+
+  /** Reprograma tarjetas en Review desde su estabilidad y retención objetivo. */
+  public static rescheduleFSRS(content: string, parameters: FSRSParameters): string | null {
+    const stateMatch = content.match(/(?:^|\n)card-state::\s*(\d+)/i);
+    if (stateMatch && Number(stateMatch[1]) !== 2) return null;
+
+    const stabilityMatch = content.match(/(?:^|\n)card-s::\s*([\d.]+)/i);
+    const reviewedMatch = content.match(/(?:^|\n)last-reviewed::\s*(\S+)/i);
+    if (!stabilityMatch || !reviewedMatch) return null;
+    const stability = Number(stabilityMatch[1]);
+    const reviewedAt = Date.parse(reviewedMatch[1]);
+    if (!Number.isFinite(stability) || stability <= 0 || !Number.isFinite(reviewedAt)) return null;
+
+    const intervalDays = new FSRSEngine(parameters).nextInterval(stability);
+    const dueDate = new Date(reviewedAt + intervalDays * 86_400_000).toISOString();
+    let updated = content.replace(/(^|\n)interval-days::[^\n]*/gi, `$1interval-days:: ${intervalDays}`);
+    if (!/(?:^|\n)interval-days::/i.test(updated)) updated += `\ninterval-days:: ${intervalDays}`;
+    updated = updated.replace(/(^|\n)card-last-interval::[^\n]*/gi, `$1card-last-interval:: ${intervalDays}`);
+    updated = updated.replace(/\n?due-date::[^\n]*/gi, "").trimEnd();
+    updated += `\ndue-date:: ${dueDate}`;
+    return updated === content ? null : updated;
   }
 
   /** Remove scheduling metadata so the block becomes a new card again. */

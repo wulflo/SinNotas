@@ -157,7 +157,14 @@ import {
 } from "./views/all-pages";
 import { VirtualList } from "./views/virtual-list";
 import { ConceptMapView } from "./views/concept-map-view";
-import { FSRSRating } from "./editor/fsrs";
+import { buildReviewHeatmap, defaultHeatmapStart } from "./views/review-heatmap";
+import { defaultFSRSParams, FSRSRating } from "./editor/fsrs";
+import {
+  formatLearningSteps,
+  loadFSRSParameters,
+  parseLearningSteps,
+  saveFSRSParameters,
+} from "./editor/fsrs-settings";
 import {
   CONTROLLER_TYPE_OPTIONS,
   buttonLabelsFor,
@@ -172,6 +179,7 @@ import {
   resolveAllowedRemoteImageUrl,
 } from "./editor/url-safety";
 import { sanitizePastedHtmlToMarkdown } from "./editor/paste-sanitizer";
+import { insertPlainTextAtSelection } from "./editor/plain-text-paste";
 import { normalizeRasterImageFile } from "./editor/image-bytes";
 import { findMatchesInBlocks, type NoteMatch } from "./editor/note-search";
 import {
@@ -399,7 +407,7 @@ function executeQuery(queryText: string): QueryResult[] {
   return results.slice(0, 10);
 }
 
-const flashcardsManager = new FlashcardsManager();
+const flashcardsManager = new FlashcardsManager(loadFSRSParameters(localStorage));
 /**
  * Escaneo por lotes + caché por versión del vault para Flashcards. Con el
  * boot de metadatos (4-E) el lote del scan hidrata sus notas viajando por la
@@ -644,6 +652,24 @@ interface FlashcardProgressStats {
   points: number;
 }
 const flashcardProgressStorageKey = "sinnotas-flashcard-progress";
+const flashcardHeatmapSettingsKey = "sinnotas-flashcard-heatmap-settings";
+type FlashcardHeatmapStyle = "accent" | "classic";
+let flashcardHeatmapStartDate = defaultHeatmapStart(currentLocalDate());
+let flashcardHeatmapStyle: FlashcardHeatmapStyle = "accent";
+try {
+  const savedHeatmapSettings = JSON.parse(localStorage.getItem(flashcardHeatmapSettingsKey) || "null") as {
+    startDate?: unknown;
+    style?: unknown;
+  } | null;
+  if (typeof savedHeatmapSettings?.startDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(savedHeatmapSettings.startDate)) {
+    flashcardHeatmapStartDate = savedHeatmapSettings.startDate;
+  }
+  if (savedHeatmapSettings?.style === "accent" || savedHeatmapSettings?.style === "classic") {
+    flashcardHeatmapStyle = savedHeatmapSettings.style;
+  }
+} catch {
+  localStorage.removeItem(flashcardHeatmapSettingsKey);
+}
 const flashcardPointDeltas: Record<FSRSRating, number> = {
   1: -2, // Otra vez
   2: 0, // Difícil
@@ -691,6 +717,7 @@ const refCountBadge = document.getElementById("ref-count") as HTMLSpanElement;
 const outgoingLinksContainer = document.getElementById("outgoing-links-list") as HTMLDivElement | null;
 const outgoingCountBadge = document.getElementById("outgoing-count") as HTMLSpanElement | null;
 const sidebarLeft = document.getElementById("sidebar-left") as HTMLElement;
+const sidebarResizer = document.getElementById("sidebar-resizer") as HTMLElement;
 const sidebarPagesList = document.getElementById("sidebar-pages-list") as HTMLDivElement;
 const sidebarSearchInput = document.getElementById("sidebar-search-input") as HTMLInputElement;
 const searchResultsDropdown = document.getElementById("search-results-dropdown") as HTMLDivElement;
@@ -782,10 +809,14 @@ const imageOcclusionAlignBottom = document.getElementById("image-occlusion-align
 const imageOcclusionDistributeHorizontal = document.getElementById("image-occlusion-distribute-horizontal") as HTMLButtonElement;
 const imageOcclusionDistributeVertical = document.getElementById("image-occlusion-distribute-vertical") as HTMLButtonElement;
 const flashcardFocusToggle = document.getElementById("btn-flashcard-focus") as HTMLButtonElement;
+const flashcardProductivityToggle = document.getElementById("btn-flashcard-productivity-panel") as HTMLButtonElement;
 const flashcardReviewUndo = document.getElementById("btn-review-undo") as HTMLButtonElement;
 const flashcardReviewRedo = document.getElementById("btn-review-redo") as HTMLButtonElement;
 const flashcardSyncButton = document.getElementById("btn-flashcards-refresh") as HTMLButtonElement;
 const flashcardReviewTools = document.getElementById("flashcard-review-tools") as HTMLElement;
+const flashcardReviewLayout = document.getElementById("flashcard-review-layout") as HTMLElement;
+const flashcardProductivityStorageKey = "sinnotas-flashcard-productivity-panel-hidden";
+let flashcardProductivityVisible = localStorage.getItem(flashcardProductivityStorageKey) !== "true";
 const pomodoroClock = document.getElementById("pomodoro-clock") as HTMLDivElement;
 const pomodoroModeLabel = document.getElementById("pomodoro-mode") as HTMLSpanElement;
 const pomodoroToggle = document.getElementById("btn-pomodoro-toggle") as HTMLButtonElement;
@@ -799,6 +830,7 @@ const pomodoroSessionsBeforeLongBreakInput = document.getElementById("pomodoro-s
 const pomodoroCountUpInput = document.getElementById("pomodoro-count-up") as HTMLInputElement;
 const pomodoroShowHeadbarInput = document.getElementById("pomodoro-show-headbar") as HTMLInputElement;
 const pomodoroSoundInput = document.getElementById("pomodoro-sound") as HTMLInputElement;
+const pomodoroClockValue = document.getElementById("pomodoro-clock-value") as HTMLSpanElement;
 const headbarPomodoro = document.getElementById("headbar-pomodoro") as HTMLDivElement;
 // El propio reloj es el botón de iniciar/pausar.
 const headbarPomodoroClock = document.getElementById("headbar-pomodoro-clock") as HTMLButtonElement;
@@ -806,9 +838,12 @@ const flashcardKeyAgain = document.getElementById("flashcard-key-again") as HTML
 const flashcardKeyHard = document.getElementById("flashcard-key-hard") as HTMLInputElement;
 const flashcardKeyGood = document.getElementById("flashcard-key-good") as HTMLInputElement;
 const flashcardKeyEasy = document.getElementById("flashcard-key-easy") as HTMLInputElement;
-const flashcardStatToday = document.getElementById("flashcard-stat-today") as HTMLElement;
-const flashcardStatTotal = document.getElementById("flashcard-stat-total") as HTMLElement;
-const flashcardStatFocus = document.getElementById("flashcard-stat-focus") as HTMLElement;
+const flashcardHeatmapStartInput = document.getElementById("flashcard-heatmap-start-setting") as HTMLInputElement;
+const flashcardHeatmapStyleSelect = document.getElementById("flashcard-heatmap-style-setting") as HTMLSelectElement;
+const flashcardHeatmapMonths = document.getElementById("flashcard-heatmap-months") as HTMLDivElement;
+const flashcardHeatmapGrid = document.getElementById("flashcard-heatmap-grid") as HTMLDivElement;
+const flashcardHeatmapTotal = document.getElementById("flashcard-heatmap-total") as HTMLElement;
+const flashcardHeatmapFocus = document.getElementById("flashcard-heatmap-focus") as HTMLElement;
 const flashcardGrowthTree = document.querySelector<SVGSVGElement>("#flashcard-growth-tree")!;
 const flashcardTreeProgress = document.getElementById("flashcard-tree-progress") as HTMLSpanElement;
 const flashcardPointsBadge = document.getElementById("flashcard-points-badge") as HTMLSpanElement;
@@ -858,6 +893,15 @@ const updateNotesWrap = document.getElementById("update-notes-wrap") as HTMLDeta
 const updateNotes = document.getElementById("update-notes") as HTMLElement | null;
 const languageSelect = document.getElementById("interface-language") as HTMLSelectElement;
 const flashcardReviewOrderSelect = document.getElementById("flashcard-review-order") as HTMLSelectElement;
+const flashcardFSRSRetention = document.getElementById("flashcard-fsrs-retention") as HTMLInputElement;
+const flashcardFSRSRetentionValue = document.getElementById("flashcard-fsrs-retention-value") as HTMLOutputElement;
+const flashcardFSRSMaximumInterval = document.getElementById("flashcard-fsrs-maximum-interval") as HTMLInputElement;
+const flashcardFSRSLearningSteps = document.getElementById("flashcard-fsrs-learning-steps") as HTMLInputElement;
+const flashcardFSRSRelearningSteps = document.getElementById("flashcard-fsrs-relearning-steps") as HTMLInputElement;
+const flashcardFSRSWeights = document.getElementById("flashcard-fsrs-weights") as HTMLTextAreaElement;
+const flashcardFSRSStatus = document.getElementById("flashcard-fsrs-status") as HTMLElement;
+const btnFlashcardFSRSSave = document.getElementById("btn-flashcard-fsrs-save") as HTMLButtonElement;
+const btnFlashcardFSRSDefaults = document.getElementById("btn-flashcard-fsrs-defaults") as HTMLButtonElement;
 const flashcardRecalcActionSelect = document.getElementById("flashcard-recalc-action") as HTMLSelectElement;
 const flashcardRecalcHelp = document.getElementById("flashcard-recalc-help") as HTMLElement;
 const flashcardRecalcStatus = document.getElementById("flashcard-recalc-status") as HTMLElement;
@@ -891,6 +935,7 @@ const cardFontSizeValue = document.getElementById("card-font-size-value") as HTM
 const btnOpenFlashcardSettings = document.getElementById("btn-open-flashcard-settings") as HTMLButtonElement | null;
 const btnOpenReviewSettings = document.getElementById("btn-open-review-settings") as HTMLButtonElement | null;
 const btnOpenPomodoroSettings = document.getElementById("btn-open-pomodoro-settings") as HTMLButtonElement | null;
+const btnOpenFlashcardHeatmapSettings = document.getElementById("btn-open-flashcard-heatmap-settings") as HTMLButtonElement | null;
 // Snapshots (activados por nota, con historial en .sinnotas/chronos/)
 const snapshotStatusText = document.getElementById("snapshot-status-text") as HTMLSpanElement;
 const snapshotStateDot = document.getElementById("snapshot-state-dot") as HTMLSpanElement;
@@ -1342,11 +1387,13 @@ function setupPomodoroSelect(
 }
 
 function initThemeAndTypography() {
-  const savedTheme = localStorage.getItem("sinnotas-theme") || "dark";
+  // Una instalación nueva arranca en claro y con el estilo visual Simple;
+  // las preferencias ya guardadas por el usuario se respetan.
+  const savedTheme = localStorage.getItem("sinnotas-theme") || "light";
   setTheme(savedTheme === "light");
 
   const savedVisual = localStorage.getItem("sinnotas-visual");
-  setVisual(visualThemes.includes(savedVisual as VisualTheme) ? (savedVisual as VisualTheme) : "aero");
+  setVisual(visualThemes.includes(savedVisual as VisualTheme) ? (savedVisual as VisualTheme) : "lino");
 
   const savedAccent = localStorage.getItem("sinnotas-accent");
   setAccent(accentColors.includes(savedAccent as AccentColor) ? savedAccent as AccentColor : "blue");
@@ -1836,6 +1883,12 @@ cardFontIncreaseButton?.addEventListener("click", () => nudgeFlashcardTextSize(0
 btnOpenFlashcardSettings?.addEventListener("click", () => openFlashcardSettings("general"));
 btnOpenReviewSettings?.addEventListener("click", () => openFlashcardSettings("review"));
 btnOpenPomodoroSettings?.addEventListener("click", () => openFlashcardSettings("pomodoro"));
+btnOpenFlashcardHeatmapSettings?.addEventListener("click", () => {
+  openFlashcardSettings("general");
+  requestAnimationFrame(() => {
+    document.getElementById("flashcard-heatmap-settings")?.scrollIntoView({ block: "center" });
+  });
+});
 
 /** Fecha de creación (ms) de una nota: diarios usan su journalDate; el resto
  * la birthtime del archivo pedida al backend. `undefined` = aún desconocida. */
@@ -2944,15 +2997,74 @@ function saveFlashcardPagesSelection(): void {
   void saveFlashcardDeckEditor();
 }
 
+function renderFSRSSettings(): void {
+  const parameters = loadFSRSParameters(localStorage);
+  flashcardFSRSRetention.value = String(parameters.requestRetention);
+  flashcardFSRSRetentionValue.value = `${Math.round(parameters.requestRetention * 100)}%`;
+  flashcardFSRSMaximumInterval.value = String(parameters.maximumInterval);
+  flashcardFSRSLearningSteps.value = formatLearningSteps(parameters.learningSteps);
+  flashcardFSRSRelearningSteps.value = formatLearningSteps(parameters.relearningSteps);
+  flashcardFSRSWeights.value = parameters.w.join(", ");
+}
+
+function saveFSRSSettings(useDefaults = false): void {
+  const current = loadFSRSParameters(localStorage);
+  const learningSteps = parseLearningSteps(flashcardFSRSLearningSteps.value);
+  const relearningSteps = parseLearningSteps(flashcardFSRSRelearningSteps.value);
+  const weights = useDefaults
+    ? [...defaultFSRSParams.w]
+    : flashcardFSRSWeights.value.split(/[,\s]+/).filter(Boolean).map(Number);
+  if (
+    !learningSteps ||
+    !relearningSteps ||
+    weights.length !== 17 ||
+    weights.some((weight) => !Number.isFinite(weight) || weight <= 0)
+  ) {
+    flashcardFSRSStatus.textContent = translate("Revisa los pasos y los 17 parámetros numéricos de FSRS.");
+    return;
+  }
+
+  const parameters = saveFSRSParameters(localStorage, {
+    ...current,
+    w: weights,
+    requestRetention: useDefaults ? defaultFSRSParams.requestRetention : flashcardFSRSRetention.valueAsNumber,
+    maximumInterval: useDefaults ? defaultFSRSParams.maximumInterval : Number(flashcardFSRSMaximumInterval.value),
+    learningSteps: useDefaults ? [...defaultFSRSParams.learningSteps] : learningSteps,
+    relearningSteps: useDefaults ? [...defaultFSRSParams.relearningSteps] : relearningSteps,
+  });
+  flashcardsManager.setFSRSParameters(parameters);
+  renderFSRSSettings();
+  flashcardFSRSStatus.textContent = translate("Configuración FSRS guardada.");
+  if (currentView === "flashcards") updateFlashcardUI();
+}
+
+flashcardFSRSRetention.addEventListener("input", () => {
+  flashcardFSRSRetentionValue.value = `${Math.round(flashcardFSRSRetention.valueAsNumber * 100)}%`;
+});
+btnFlashcardFSRSSave.addEventListener("click", () => saveFSRSSettings());
+btnFlashcardFSRSDefaults.addEventListener("click", () => {
+  renderFSRSSettings();
+  flashcardFSRSRetention.value = String(defaultFSRSParams.requestRetention);
+  flashcardFSRSMaximumInterval.value = String(defaultFSRSParams.maximumInterval);
+  flashcardFSRSLearningSteps.value = formatLearningSteps(defaultFSRSParams.learningSteps);
+  flashcardFSRSRelearningSteps.value = formatLearningSteps(defaultFSRSParams.relearningSteps);
+  flashcardFSRSWeights.value = defaultFSRSParams.w.join(", ");
+  saveFSRSSettings(true);
+});
+renderFSRSSettings();
+
 function renderFlashcardRecalcControls(): void {
   const reset = flashcardRecalcActionSelect.value === "reset";
+  const reschedule = flashcardRecalcActionSelect.value === "reschedule";
   flashcardRecalcHelp.textContent = translate(
     reset
       ? "Elimina las propiedades de programación FSRS y convierte todas las tarjetas en nuevas. Esta acción no se puede deshacer."
-      : "Recalcula la fecha de vencimiento usando la última revisión y el intervalo programado."
+      : reschedule
+        ? "Recalcula el intervalo y el vencimiento de las tarjetas en repaso usando su estabilidad y la retención FSRS configurada."
+        : "Recalcula la fecha de vencimiento usando la última revisión y el intervalo programado."
   );
   btnFlashcardRecalc.textContent = translate(
-    reset ? "Restablecer propiedades" : "Recalcular fechas"
+    reset ? "Restablecer propiedades" : reschedule ? "Reprogramar tarjetas" : "Recalcular fechas"
   );
 }
 
@@ -2963,11 +3075,17 @@ flashcardRecalcActionSelect.addEventListener("change", () => {
 renderFlashcardRecalcControls();
 
 btnFlashcardRecalc.addEventListener("click", async () => {
-  const action = flashcardRecalcActionSelect.value === "reset" ? "reset" : "due-dates";
+  const action = flashcardRecalcActionSelect.value;
   if (action === "reset") {
     const confirmed = await confirmAction(
       "Se eliminará el progreso de repaso de todas las tarjetas y volverán a contar como nuevas. ¿Continuar?",
       "Restablecer propiedades"
+    );
+    if (!confirmed) return;
+  } else if (action === "reschedule") {
+    const confirmed = await confirmAction(
+      "Se recalcularán intervalos y vencimientos de las tarjetas en repaso según la retención FSRS actual. ¿Continuar?",
+      "Reprogramar tarjetas"
     );
     if (!confirmed) return;
   }
@@ -3002,7 +3120,9 @@ btnFlashcardRecalc.addEventListener("click", async () => {
       const updatedContent =
         action === "reset"
           ? FlashcardsManager.clearFSRSProgress(block.content)
-          : FlashcardsManager.recalculateDueDate(block.content);
+          : action === "reschedule"
+            ? FlashcardsManager.rescheduleFSRS(block.content, loadFSRSParameters(localStorage))
+            : FlashcardsManager.recalculateDueDate(block.content);
       if (updatedContent === null || updatedContent === block.content) continue;
 
       block.content = updatedContent;
@@ -3064,9 +3184,17 @@ CONTROLLER_TYPE_OPTIONS.forEach((option) => {
 /** Rellena cada select de mapeo con las etiquetas del tipo de mando elegido,
  * conservando el valor guardado si sigue siendo válido. */
 function populateGamepadMappingSelects(): void {
-  const labels = buttonLabelsFor(gamepadControllerTypeSelect.value as ControllerType | "");
+  const connectedButtonCount = firstConnectedGamepad()?.buttons.length ?? 16;
+  const savedButtonCount = gamepadMappingActionKeys.reduce((count, key) => {
+    const storedIndex = Number(localStorage.getItem(key));
+    return Number.isInteger(storedIndex) && storedIndex >= 0 ? Math.max(count, storedIndex + 1) : count;
+  }, 16);
+  const labels = buttonLabelsFor(
+    gamepadControllerTypeSelect.value as ControllerType | "",
+    Math.max(connectedButtonCount, savedButtonCount)
+  );
   gamepadMappingSelects.forEach((select) => {
-    const previous = select.value;
+    const previous = select.value || localStorage.getItem(gamepadMappingActionKeys[gamepadMappingSelects.indexOf(select)]) || "";
     select.replaceChildren();
     const none = document.createElement("option");
     none.value = "";
@@ -3213,6 +3341,7 @@ btnGamepadDetect.addEventListener("click", () => {
 });
 
 window.addEventListener("gamepadconnected", () => {
+  populateGamepadMappingSelects();
   if (!gamepadEnabledCheckbox.checked) {
     gamepadEnabledCheckbox.checked = true;
     localStorage.setItem("sinnotas-gamepad-enabled", "true");
@@ -3221,7 +3350,10 @@ window.addEventListener("gamepadconnected", () => {
     updateGamepadStatus();
   }
 });
-window.addEventListener("gamepaddisconnected", updateGamepadStatus);
+window.addEventListener("gamepaddisconnected", () => {
+  populateGamepadMappingSelects();
+  updateGamepadStatus();
+});
 
 if (gamepadEnabledCheckbox.checked) startGamepadPolling();
 updateGamepadStatus();
@@ -3743,20 +3875,16 @@ function scheduleConceptMapDetailHide(): void {
 
 function openConceptMap(): void {
   conceptMapTitle.innerText = currentPage.title;
-  const count = getAllBlocksFlat(currentPage.blocks).length;
-  conceptMapSubtitle.innerText = count === 1 ? "1 bullet" : `${count} bullets`;
-  conceptMapView.onNodeClick = (nodeId, fullContent) => {
+  conceptMapSubtitle.innerText = "Haz clic en los nodos para explorar sus ramas";
+  conceptMapView.onNodeClick = (nodeId, fullContent, block) => {
     cancelConceptMapDetailHide();
-    showConceptMapNodeDetail(nodeId, fullContent);
+    showConceptMapNodeDetail(nodeId, fullContent, block);
   };
-  conceptMapView.onNodeHover = (nodeId, fullContent) => {
-    if (nodeId) {
-      cancelConceptMapDetailHide();
-      showConceptMapNodeDetail(nodeId, fullContent);
-    } else {
-      scheduleConceptMapDetailHide();
-    }
+  conceptMapView.onNodeExpand = () => {
+    cancelConceptMapDetailHide();
+    if (conceptMapNodeDetail) conceptMapNodeDetail.hidden = true;
   };
+  conceptMapView.onNodeHover = undefined;
   if (conceptMapNodeDetail) conceptMapNodeDetail.hidden = true;
   mountOverlay(conceptMapOverlay);
   conceptMapOverlay.classList.add("visible");
@@ -3764,9 +3892,8 @@ function openConceptMap(): void {
 }
 
 /** Muestra el contenido completo del bloque pulsado en el mapa conceptual. */
-function showConceptMapNodeDetail(nodeId: string, fullContent: string): void {
+function showConceptMapNodeDetail(_nodeId: string, fullContent: string, block?: BlockNode): void {
   if (!conceptMapNodeDetail || !conceptMapNodeDetailBody) return;
-  const block = getAllBlocksFlat(currentPage.blocks).find((candidate) => candidate.id === nodeId);
   if (conceptMapNodeDetailTitle) {
     conceptMapNodeDetailTitle.textContent = block?.type === "image"
       ? "Imagen"
@@ -3774,7 +3901,7 @@ function showConceptMapNodeDetail(nodeId: string, fullContent: string): void {
   }
   const text = block?.type === "image"
     ? block.imageAlt?.trim() || "Imagen sin descripción"
-    : stripCardTag(stripSystemProperties(fullContent || "")).trim();
+    : stripCardTag(stripSystemProperties(block?.content || fullContent || "")).trim();
   conceptMapNodeDetailBody.textContent = text || "(Sin contenido de texto)";
   conceptMapNodeDetail.hidden = false;
   requestAnimationFrame(() => conceptMapView.refresh());
@@ -3926,6 +4053,58 @@ supportLink.addEventListener("click", (event) => {
 });
 
 /* ==================== SIDEBAR COLLAPSE / EXPAND ==================== */
+const SIDEBAR_MIN_WIDTH = 220;
+const SIDEBAR_MAX_WIDTH = 480;
+let sidebarResizeActive = false;
+
+function setSidebarWidth(width: number, persist = false): void {
+  const maximum = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, window.innerWidth * 0.5));
+  const bounded = Math.round(Math.min(maximum, Math.max(SIDEBAR_MIN_WIDTH, width)));
+  document.documentElement.style.setProperty("--ls-sidebar-width", `${bounded}px`);
+  sidebarResizer.setAttribute("aria-valuenow", String(bounded));
+  sidebarResizer.setAttribute("aria-valuemax", String(maximum));
+  if (persist) localStorage.setItem("sinnotas-sidebar-width", String(bounded));
+}
+
+const storedSidebarWidth = Number(localStorage.getItem("sinnotas-sidebar-width"));
+if (Number.isFinite(storedSidebarWidth) && storedSidebarWidth > 0) setSidebarWidth(storedSidebarWidth);
+
+sidebarResizer.addEventListener("pointerdown", (event) => {
+  if (event.button !== 0 || sidebarLeft.classList.contains("is-collapsed")) return;
+  event.preventDefault();
+  sidebarResizeActive = true;
+  document.body.classList.add("sidebar-resizing");
+  sidebarResizer.setPointerCapture(event.pointerId);
+  setSidebarWidth(event.clientX);
+});
+
+sidebarResizer.addEventListener("pointermove", (event) => {
+  if (sidebarResizeActive) setSidebarWidth(event.clientX);
+});
+
+function finishSidebarResize(event: PointerEvent): void {
+  if (!sidebarResizeActive) return;
+  sidebarResizeActive = false;
+  document.body.classList.remove("sidebar-resizing");
+  const width = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ls-sidebar-width"));
+  setSidebarWidth(width, true);
+  if (sidebarResizer.hasPointerCapture(event.pointerId)) sidebarResizer.releasePointerCapture(event.pointerId);
+}
+
+sidebarResizer.addEventListener("pointerup", finishSidebarResize);
+sidebarResizer.addEventListener("pointercancel", finishSidebarResize);
+sidebarResizer.addEventListener("keydown", (event) => {
+  const current = Number.parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--ls-sidebar-width"));
+  const step = event.shiftKey ? 40 : 10;
+  if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+    event.preventDefault();
+    setSidebarWidth(current + (event.key === "ArrowRight" ? step : -step), true);
+  } else if (event.key === "Home" || event.key === "End") {
+    event.preventDefault();
+    setSidebarWidth(event.key === "Home" ? SIDEBAR_MIN_WIDTH : SIDEBAR_MAX_WIDTH, true);
+  }
+});
+
 function initSidebarState() {
   if (document.body.classList.contains("mobile-full-editor")) {
     sidebarLeft.classList.remove("is-collapsed", "mobile-open");
@@ -3959,6 +4138,7 @@ function toggleSidebar() {
     btnToggleSidebar.classList.remove("active");
     localStorage.setItem("sinnotas-sidebar-collapsed", "true");
   }
+  repaintMainSurface();
 }
 
 btnToggleSidebar.addEventListener("click", toggleSidebar);
@@ -4232,6 +4412,48 @@ const PDF_EDITOR_SPLIT_DIVIDER_PX = 8;
 
 const mainContainerEl = document.querySelector<HTMLElement>(".main-container");
 const pdfEditorResizer = document.getElementById("pdf-editor-resizer");
+
+let mainSurfaceRepaintFrame: number | null = null;
+let mainSurfaceRepaintTimer: number | null = null;
+
+/**
+ * WebKitGTK conserva a veces mosaicos con el ancho anterior al colapsar la
+ * sidebar o el panel de productividad, y deja zonas del fondo sin repintar.
+ * Promover la superficie principal a una capa durante un frame obliga a
+ * pintarla completa con su tamaño nuevo; después se retira para no dejar
+ * capas permanentes ni alterar el posicionamiento de diálogos.
+ */
+function pulseMainSurface(): void {
+  if (!mainContainerEl) return;
+  mainContainerEl.style.willChange = "transform";
+  mainContainerEl.style.transform = "translateZ(0)";
+  void mainContainerEl.offsetWidth;
+  mainSurfaceRepaintFrame = window.requestAnimationFrame(() => {
+    mainContainerEl.style.removeProperty("transform");
+    mainSurfaceRepaintFrame = window.requestAnimationFrame(() => {
+      mainContainerEl.style.removeProperty("will-change");
+      mainSurfaceRepaintFrame = null;
+    });
+  });
+}
+
+function repaintMainSurface(): void {
+  if (!mainContainerEl) return;
+  if (mainSurfaceRepaintFrame !== null) {
+    window.cancelAnimationFrame(mainSurfaceRepaintFrame);
+    mainSurfaceRepaintFrame = null;
+  }
+  if (mainSurfaceRepaintTimer !== null) {
+    window.clearTimeout(mainSurfaceRepaintTimer);
+  }
+  pulseMainSurface();
+  // La sidebar anima `margin-left` durante 250 ms: un segundo pulso al
+  // terminar evita que WebKitGTK conserve mosaicos del ancho intermedio.
+  mainSurfaceRepaintTimer = window.setTimeout(() => {
+    mainSurfaceRepaintTimer = null;
+    pulseMainSurface();
+  }, 320);
+}
 
 let pdfEditorSplitRatio = readPdfEditorSplitRatio();
 
@@ -8790,18 +9012,7 @@ pageTitleHeading.addEventListener("paste", (event) => {
   // HTML pegado se cuele en un elemento contentEditable.
   const singleLine = plainText.replace(/\r\n?/g, " ").replace(/[\n\t]+/g, " ").replace(/\s+/g, " ").trim();
   if (!singleLine) return;
-  const inserted = document.execCommand("insertText", false, singleLine);
-  if (!inserted) {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
-    range.deleteContents();
-    range.insertNode(document.createTextNode(singleLine));
-    range.collapse(false);
-    selection.removeAllRanges();
-    selection.addRange(range);
-    pageTitleHeading.dispatchEvent(new Event("input", { bubbles: true }));
-  }
+  insertPlainTextAtSelection(pageTitleHeading, singleLine);
 });
 
 pageTitleHeading.addEventListener("blur", () => {
@@ -11254,6 +11465,8 @@ document.getElementById("sctx-delete")?.addEventListener("click", async () => {
 
 /* ==================== FLASHCARDS SESSION (FSRS-4.5) ==================== */
 const cardProgressEl = document.getElementById("card-progress") as HTMLSpanElement;
+const cardProgressLabel = document.getElementById("card-progress-label") as HTMLSpanElement;
+const cardProgressRingValue = document.getElementById("card-progress-ring-value") as unknown as SVGCircleElement;
 const cardTypePill = document.getElementById("card-type-pill") as HTMLSpanElement;
 const cardSourceEl = document.getElementById("card-source") as HTMLSpanElement;
 const cardFsrsBadge = document.getElementById("card-fsrs-badge") as HTMLSpanElement;
@@ -11344,6 +11557,7 @@ function resetFlashcardDailyProgress(): boolean {
   flashcardProgressStats.points = 0;
   saveFlashcardProgressStats();
   updateFlashcardProgressPanel();
+  renderFlashcardHeatmap();
   return true;
 }
 
@@ -11751,14 +11965,72 @@ function updateFlashcardProgressTree(force = false): void {
 }
 
 function updateFlashcardProgressPanel(): void {
-  flashcardStatToday.textContent = String(flashcardProgressStats.reviewsToday);
-  flashcardStatTotal.textContent = String(flashcardProgressStats.totalReviews);
-  flashcardStatFocus.textContent = String(Math.floor(flashcardProgressStats.focusSeconds / 60));
+  flashcardHeatmapFocus.textContent = `${Math.floor(flashcardProgressStats.focusSeconds / 60)} min de enfoque hoy`;
   const points = Math.max(0, Math.floor(flashcardProgressStats.points));
   const pointsLabel = `${points} ${points === 1 ? "pt" : "pts"}`;
   if (flashcardPointsBadge.textContent !== pointsLabel) flashcardPointsBadge.textContent = pointsLabel;
   updateFlashcardProgressTree();
 }
+
+function saveFlashcardHeatmapSettings(): void {
+  localStorage.setItem(flashcardHeatmapSettingsKey, JSON.stringify({
+    startDate: flashcardHeatmapStartDate,
+    style: flashcardHeatmapStyle,
+  }));
+}
+
+function renderFlashcardHeatmap(): void {
+  const today = currentLocalDate();
+  const minimumDate = defaultHeatmapStart(today, 365);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(flashcardHeatmapStartDate) || flashcardHeatmapStartDate < minimumDate || flashcardHeatmapStartDate > today) {
+    flashcardHeatmapStartDate = defaultHeatmapStart(today);
+  }
+  flashcardHeatmapStartInput.min = minimumDate;
+  flashcardHeatmapStartInput.max = today;
+  flashcardHeatmapStartInput.value = flashcardHeatmapStartDate;
+  flashcardHeatmapStyleSelect.value = flashcardHeatmapStyle;
+  flashcardHeatmapGrid.dataset.style = flashcardHeatmapStyle;
+
+  const weeks = buildReviewHeatmap(reviewProgress.getEntries(), flashcardHeatmapStartDate, today);
+  flashcardHeatmapMonths.replaceChildren();
+  flashcardHeatmapGrid.replaceChildren();
+  let totalReviews = 0;
+  weeks.forEach((week) => {
+    const month = document.createElement("span");
+    month.textContent = week.monthLabel;
+    flashcardHeatmapMonths.appendChild(month);
+    week.days.forEach((day) => {
+      const cell = document.createElement("span");
+      cell.className = "flashcard-heatmap-cell";
+      if (day.date) {
+        totalReviews += day.count;
+        cell.dataset.level = String(day.level);
+        cell.title = `${day.date}: ${day.count} ${day.count === 1 ? "repaso" : "repasos"}`;
+      } else {
+        cell.classList.add("is-empty");
+        cell.setAttribute("aria-hidden", "true");
+      }
+      flashcardHeatmapGrid.appendChild(cell);
+    });
+  });
+  flashcardHeatmapTotal.textContent = `${totalReviews} ${totalReviews === 1 ? "repaso" : "repasos"}`;
+  flashcardHeatmapGrid.setAttribute(
+    "aria-label",
+    `${totalReviews} repasos entre ${flashcardHeatmapStartDate} y ${today}`
+  );
+}
+
+flashcardHeatmapStartInput.addEventListener("change", () => {
+  flashcardHeatmapStartDate = flashcardHeatmapStartInput.value || defaultHeatmapStart(currentLocalDate());
+  saveFlashcardHeatmapSettings();
+  renderFlashcardHeatmap();
+});
+
+flashcardHeatmapStyleSelect.addEventListener("change", () => {
+  flashcardHeatmapStyle = flashcardHeatmapStyleSelect.value === "classic" ? "classic" : "accent";
+  saveFlashcardHeatmapSettings();
+  renderFlashcardHeatmap();
+});
 
 /**
  * Un único AudioContext, creado de forma perezosa. Crear uno por pitido agota
@@ -11815,11 +12087,16 @@ function pomodoroActiveDurationSeconds(): number {
 function renderPomodoro(): void {
   const totalSeconds = Math.max(1, pomodoroActiveDurationSeconds());
   const elapsedSeconds = Math.max(0, Math.min(totalSeconds, totalSeconds - pomodoroRemainingSeconds));
+  const progress = elapsedSeconds / totalSeconds;
+  const fillProgress = pomodoroCountUp ? progress : 1 - progress;
   const displayedSeconds = pomodoroCountUp ? elapsedSeconds : Math.max(0, pomodoroRemainingSeconds);
   const minutes = Math.floor(displayedSeconds / 60);
   const seconds = displayedSeconds % 60;
   const timeString = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  pomodoroClock.textContent = timeString;
+  pomodoroClockValue.textContent = timeString;
+  pomodoroClock.style.setProperty("--pomodoro-progress", String(fillProgress * 100));
+  pomodoroClock.classList.toggle("is-break", pomodoroMode === "break");
+  pomodoroClock.classList.toggle("is-count-up", pomodoroCountUp);
   pomodoroClock.title = pomodoroCountUp
     ? `Tiempo transcurrido de ${Math.round(totalSeconds / 60)} min`
     : `Tiempo restante de ${Math.round(totalSeconds / 60)} min`;
@@ -11844,6 +12121,12 @@ function renderPomodoro(): void {
   headbarPomodoroClock.setAttribute("aria-label", `${timeString} · ${actionLabel}`);
   headbarPomodoroClock.classList.toggle("is-running", isRunning);
   headbarPomodoroClock.classList.toggle("is-paused", !isRunning && pomodoroPaused);
+}
+
+function renderCardProgress(text: string, current: number, total: number): void {
+  cardProgressLabel.textContent = text;
+  const progress = total > 0 ? Math.max(0, Math.min(1, current / total)) : 0;
+  cardProgressRingValue.style.setProperty("--progress-offset", String(56.55 * (1 - progress)));
 }
 
 /** Salta directamente a un descanso corto o largo y lo inicia. */
@@ -11934,7 +12217,27 @@ function setFlashcardFocusMode(enabled: boolean): void {
   flashcardFocusToggle.setAttribute("aria-pressed", String(enabled));
   flashcardFocusToggle.classList.toggle("active", enabled);
   flashcardFocusToggle.textContent = enabled ? "Salir de focus" : "Modo focus";
+  repaintMainSurface();
 }
+
+function setFlashcardProductivityVisible(visible: boolean, persist = true): void {
+  flashcardProductivityVisible = visible;
+  flashcardReviewLayout.classList.toggle("has-hidden-tools", !visible);
+  flashcardReviewTools.hidden = flashcardExplorerActive || !visible;
+  flashcardProductivityToggle.hidden = flashcardExplorerActive;
+  const action = visible ? "Ocultar" : "Mostrar";
+  const label = `${action} panel de productividad`;
+  flashcardProductivityToggle.setAttribute("aria-label", label);
+  flashcardProductivityToggle.setAttribute("title", label);
+  flashcardProductivityToggle.setAttribute("aria-pressed", String(visible));
+  if (persist) localStorage.setItem(flashcardProductivityStorageKey, String(!visible));
+  repaintMainSurface();
+}
+
+flashcardProductivityToggle.addEventListener("click", () => {
+  setFlashcardProductivityVisible(!flashcardProductivityVisible);
+});
+setFlashcardProductivityVisible(flashcardProductivityVisible, false);
 
 flashcardFocusToggle.addEventListener("click", () => {
   setFlashcardFocusMode(!document.getElementById("app")?.classList.contains("flashcard-focus-mode"));
@@ -11998,7 +12301,11 @@ function updateFlashcardLoadingState(progress: FlashcardLoadProgress): void {
   const total = Math.max(1, progress.totalPages);
   const percent = Math.min(100, Math.round((progress.scannedPages / total) * 100));
   cardProgressEl.hidden = false;
-  cardProgressEl.innerText = `Escaneando ${progress.scannedPages}/${progress.totalPages}`;
+  renderCardProgress(
+    `Escaneando ${progress.scannedPages}/${progress.totalPages}`,
+    progress.scannedPages,
+    progress.totalPages
+  );
   cardTypePill.style.display = "inline-block";
   cardTypePill.innerText = "CARGANDO";
   cardSourceEl.innerText = "Leyendo tus notas…";
@@ -12021,7 +12328,7 @@ function renderFlashcardSessionResult(): void {
     const filterActive = flashcardPageFilter !== null;
     const filterEmpty = flashcardPageFilter?.length === 0;
     cardProgressEl.hidden = false;
-    cardProgressEl.innerText = "0 de 0";
+    renderCardProgress("0 de 0", 0, 0);
     cardTypePill.style.display = "none";
     cardSourceEl.innerText =
       allCardCount === 0
@@ -12094,8 +12401,9 @@ function showFlashcardPanel(showExplorer: boolean) {
   flashcardReviewPane.hidden = showExplorer;
   flashcardExplorerPane.hidden = !showExplorer;
   cardProgressEl.hidden = showExplorer;
-  flashcardReviewTools.hidden = showExplorer;
+  flashcardReviewTools.hidden = showExplorer || !flashcardProductivityVisible;
   flashcardFocusToggle.hidden = showExplorer;
+  flashcardProductivityToggle.hidden = showExplorer;
   if (showExplorer) renderFlashcardExplorer();
 }
 
@@ -12572,7 +12880,7 @@ function updateFlashcardUI() {
   if (!card) {
     if (refreshDueFlashcardQueue()) return;
     scheduleFlashcardDueRecheck();
-    cardProgressEl.innerText = `${total} de ${total}`;
+    renderCardProgress(`${total} de ${total}`, total, total);
     cardTypePill.innerText = "FSRS";
     cardSourceEl.innerText = "🎉 ¡Completado!";
     cardFsrsBadge.innerText = "";
@@ -12592,7 +12900,7 @@ function updateFlashcardUI() {
   }
 
   clearFlashcardDueRecheck();
-  cardProgressEl.innerText = `Tarjeta ${current + 1} de ${total}`;
+  renderCardProgress(`Tarjeta ${current + 1} de ${total}`, current + 1, total);
   cardTypePill.innerText = card.cardType === "image-occlusion"
     ? "IMAGEN"
     : card.cardType === "cloze"
@@ -12830,7 +13138,10 @@ function applyFSRSRating(
               after,
             })
           )
-          .then(() => updateReviewHistoryButtons())
+          .then(() => {
+            updateReviewHistoryButtons();
+            renderFlashcardHeatmap();
+          })
           .catch((error: unknown) => {
             console.error("No se pudo guardar el repaso en .sinnotas/progress/reviews.json:", error);
           });
@@ -12913,6 +13224,7 @@ function adjustStatsForReviewEvent(event: ReviewProgressEvent, delta: 1 | -1): v
   );
   saveFlashcardProgressStats();
   updateFlashcardProgressPanel();
+  renderFlashcardHeatmap();
 }
 
 /**
@@ -14597,6 +14909,7 @@ async function openVaultAtPath(rootPath: string): Promise<void> {
     flashcardLoader.invalidate();
     await reviewProgress.load(true);
     updateReviewHistoryButtons();
+    renderFlashcardHeatmap();
     await vault.migrateLegacyRevisions();
     await migrateLegacySnapshotFiles();
     currentPage = snapshot.pages[0] || vault.createPage("Nueva nota");
@@ -15909,6 +16222,7 @@ async function synchronizeVaultFromDisk(options: { notify?: boolean; force?: boo
     await refreshFlashcardDecksFromVault(false);
     await reviewProgress.load(true);
     updateReviewHistoryButtons();
+    renderFlashcardHeatmap();
     const nextPage =
       vault.getPages().find((page) => page.path === activePagePath) ||
       vault.getPageByTitle(currentPage.title) ||
@@ -16159,7 +16473,10 @@ async function initializeDesktopApp(): Promise<void> {
   // de deshacer/rehacer se habilitan solos cuando termina la lectura.
   const reviewProgressReady = reviewProgress
     .load(true)
-    .then(() => updateReviewHistoryButtons())
+    .then(() => {
+      updateReviewHistoryButtons();
+      renderFlashcardHeatmap();
+    })
     .catch((error) => {
       console.error("No se pudo cargar el historial de repasos:", error);
     });

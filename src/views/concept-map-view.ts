@@ -9,6 +9,15 @@ interface MapNode {
   fullLabel: string;
   /** Contenido completo (sin truncar) del bloque, para expandir al hacer click. */
   fullContent: string;
+  block?: BlockNode;
+  childSource: BlockNode[];
+  childIterator?: Generator<BlockNode>;
+  expanded: boolean;
+  hasChildren: boolean;
+  showFullLabel: boolean;
+  isMore?: boolean;
+  moreParent?: MapNode;
+  displayLines: string[];
   depth: number;
   x: number;
   y: number;
@@ -35,6 +44,9 @@ const H_GAP = 74;
 const V_GAP = 12;
 const PAD_X = 12;
 const MAX_TEXT_WIDTH = 250;
+const MAX_EXPANDED_TEXT_WIDTH = 460;
+const CHILD_BATCH_SIZE = 80;
+const MAX_VISIBLE_NODES = 800;
 const CLICK_TOLERANCE = 4;
 
 /** Convierte el contenido visible de un bullet en una etiqueta corta y limpia. */
@@ -94,7 +106,8 @@ export class ConceptMapView {
   private hoverPoint: { x: number; y: number } | null = null;
   private hoveredId: string | null = null;
 
-  public onNodeClick?: (nodeId: string, fullContent: string) => void;
+  public onNodeClick?: (nodeId: string, fullContent: string, block?: BlockNode) => void;
+  public onNodeExpand?: (expanded: boolean) => void;
   /** Hover: null al salir del nodo/canvas; se llama solo cuando cambia el id. */
   public onNodeHover?: (nodeId: string | null, fullContent: string) => void;
 
@@ -160,10 +173,12 @@ export class ConceptMapView {
   public setPage(page: PageData): void {
     this.clearHover();
     this.root = this.buildTree(page);
-    this.nodes = [];
+    this.nodes = this.root ? [this.root] : [];
     this.links = [];
 
     if (this.root) {
+      this.appendNextChildren(this.root);
+      this.nodes = [];
       this.collect(this.root);
       this.remeasureAndLayout();
     }
@@ -227,11 +242,16 @@ export class ConceptMapView {
   }
 
   private buildTree(page: PageData): MapNode {
-    const root: MapNode = {
+    return {
       id: "root",
       label: page.title || "Sin título",
       fullLabel: page.title || "Sin título",
       fullContent: page.title || "Sin título",
+      childSource: page.blocks,
+      expanded: true,
+      hasChildren: page.blocks.length > 0,
+      showFullLabel: false,
+      displayLines: [],
       depth: 0,
       x: 0,
       y: 0,
@@ -239,36 +259,120 @@ export class ConceptMapView {
       height: 0,
       children: [],
     };
+  }
 
-    const addChildren = (parent: MapNode, blocks: BlockNode[], depth: number): void => {
-      blocks.forEach((block) => {
-        const label = blockLabel(block);
-        if (label === "•" && block.children.length > 0) {
-          // Bullet vacío: sus hijos suben un nivel para no dejar nodos fantasma.
-          addChildren(parent, block.children, depth);
-          return;
-        }
-        if (label === "•" && block.children.length === 0) return;
+  /** Recorre solo hijos directos, promoviendo los bullets vacíos sin crear nodos para ellos. */
+  private *renderableChildren(blocks: BlockNode[]): Generator<BlockNode> {
+    for (const block of blocks) {
+      if (blockLabel(block) === "•") {
+        if (block.children.length > 0) yield* this.renderableChildren(block.children);
+        continue;
+      }
+      yield block;
+    }
+  }
 
-        const node: MapNode = {
-          id: block.id,
-          label,
-          fullLabel: label,
-          fullContent: block.content,
-          depth,
-          x: 0,
-          y: 0,
-          width: 0,
-          height: 0,
-          children: [],
-        };
-        parent.children.push(node);
-        addChildren(node, block.children, depth + 1);
+  private appendNextChildren(parent: MapNode): void {
+    parent.childIterator ??= this.renderableChildren(parent.childSource);
+    const available = Math.max(0, MAX_VISIBLE_NODES - this.nodes.length);
+    const batchSize = Math.min(CHILD_BATCH_SIZE, available);
+    let added = 0;
+    let exhausted = false;
+
+    while (added < batchSize) {
+      const next = parent.childIterator.next();
+      if (next.done) {
+        exhausted = true;
+        break;
+      }
+      const block = next.value;
+      const label = blockLabel(block);
+      parent.children.push({
+        id: block.id,
+        label,
+        fullLabel: label,
+        fullContent: block.content,
+        block,
+        childSource: block.children,
+        expanded: false,
+        hasChildren: block.children.length > 0,
+        showFullLabel: parent.depth > 0,
+        displayLines: [],
+        depth: parent.depth + 1,
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 0,
+        children: [],
       });
-    };
+      added += 1;
+    }
 
-    addChildren(root, page.blocks, 1);
-    return root;
+    if (exhausted || added < batchSize) {
+      parent.children = parent.children.filter((child) => !child.isMore);
+      return;
+    }
+
+    const atLimit = this.nodes.length + added >= MAX_VISIBLE_NODES;
+    parent.children = parent.children.filter((child) => !child.isMore);
+    parent.children.push({
+      id: `more:${parent.id}`,
+      label: atLimit ? "Límite alcanzado · colapsa una rama" : "Mostrar más elementos",
+      fullLabel: atLimit ? "Límite alcanzado · colapsa una rama" : "Mostrar más elementos",
+      fullContent: "",
+      childSource: [],
+      expanded: false,
+      hasChildren: false,
+      showFullLabel: true,
+      isMore: true,
+      moreParent: parent,
+      displayLines: [],
+      depth: parent.depth + 1,
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      children: [],
+    });
+  }
+
+  private rebuildVisibleTree(fit = false): void {
+    if (!this.root) return;
+    this.nodes = [];
+    this.links = [];
+    this.collect(this.root);
+    this.remeasureAndLayout();
+    if (fit) this.fit();
+    else this.render();
+  }
+
+  private toggleNode(node: MapNode): void {
+    if (node.isMore && node.moreParent) {
+      node.moreParent.children = node.moreParent.children.filter((child) => child !== node);
+      this.nodes = [];
+      this.collect(this.root!);
+      this.appendNextChildren(node.moreParent);
+      this.rebuildVisibleTree(true);
+      this.onNodeExpand?.(true);
+      return;
+    }
+    if (!node.hasChildren) {
+      this.onNodeClick?.(node.id, node.fullContent, node.block);
+      return;
+    }
+
+    if (node.expanded) {
+      node.children = [];
+      node.childIterator = undefined;
+      node.expanded = false;
+    } else {
+      node.expanded = true;
+      this.nodes = [];
+      this.collect(this.root!);
+      this.appendNextChildren(node);
+    }
+    this.rebuildVisibleTree(true);
+    this.onNodeExpand?.(node.expanded);
   }
 
   private collect(node: MapNode): void {
@@ -288,17 +392,54 @@ export class ConceptMapView {
         ? mapFont(400, LEAF_FONT_SIZE, family)
         : mapFont(600, BRANCH_FONT_SIZE, family);
 
-    let label = node.fullLabel;
-    const measured = this.ctx.measureText(label).width;
-    if (measured > MAX_TEXT_WIDTH) {
-      const ratio = MAX_TEXT_WIDTH / measured;
-      label = `${label.slice(0, Math.max(3, Math.floor(label.length * ratio) - 1)).trimEnd()}…`;
+    const maxWidth = node.showFullLabel ? MAX_EXPANDED_TEXT_WIDTH : MAX_TEXT_WIDTH;
+    node.displayLines = [];
+    if (node.showFullLabel) {
+      const words = node.fullLabel.split(/\s+/);
+      let line = "";
+      for (const word of words) {
+        if (this.ctx.measureText(word).width > maxWidth) {
+          if (line) {
+            node.displayLines.push(line);
+            line = "";
+          }
+          let fragment = "";
+          for (const character of word) {
+            if (fragment && this.ctx.measureText(fragment + character).width > maxWidth) {
+              node.displayLines.push(fragment);
+              fragment = character;
+            } else {
+              fragment += character;
+            }
+          }
+          line = fragment;
+          continue;
+        }
+        const candidate = line ? `${line} ${word}` : word;
+        if (line && this.ctx.measureText(candidate).width > maxWidth) {
+          node.displayLines.push(line);
+          line = word;
+        } else {
+          line = candidate;
+        }
+      }
+      if (line) node.displayLines.push(line);
+      if (node.displayLines.length === 0) node.displayLines = [node.fullLabel];
+      node.label = node.fullLabel;
+    } else {
+      let label = node.fullLabel;
+      const measured = this.ctx.measureText(label).width;
+      if (measured > maxWidth) {
+        const ratio = maxWidth / measured;
+        label = `${label.slice(0, Math.max(3, Math.floor(label.length * ratio) - 1)).trimEnd()}…`;
+      }
+      node.label = label;
+      node.displayLines = [label];
     }
-    node.label = label;
 
-    const textWidth = Math.min(this.ctx.measureText(label).width, MAX_TEXT_WIDTH);
-    node.width = Math.ceil(textWidth + PAD_X * 2 + (isRoot ? 8 : 0));
-    node.height = isRoot ? ROOT_HEIGHT : NODE_HEIGHT;
+    const contentWidth = Math.max(...node.displayLines.map((line) => this.ctx.measureText(line).width));
+    node.width = Math.ceil(Math.min(contentWidth, maxWidth) + PAD_X * 2 + (isRoot ? 8 : node.hasChildren ? 26 : 0));
+    node.height = isRoot ? ROOT_HEIGHT : Math.max(NODE_HEIGHT, 16 * node.displayLines.length + 14);
   }
 
   private layout(root: MapNode): void {
@@ -445,7 +586,28 @@ export class ConceptMapView {
       ctx.fillStyle = isRoot ? accentForeground : textColor;
       ctx.textAlign = "left";
       ctx.textBaseline = "middle";
-      ctx.fillText(node.label, node.x + PAD_X, node.y + node.height / 2 + 0.5);
+      const lineHeight = 16;
+      const firstLineY = node.y + node.height / 2 - ((node.displayLines.length - 1) * lineHeight) / 2;
+      node.displayLines.forEach((line, index) => {
+        ctx.fillText(line, node.x + PAD_X, firstLineY + index * lineHeight);
+      });
+      if (!isRoot && node.hasChildren) {
+        const centerX = node.x + node.width - 13;
+        const centerY = node.y + node.height / 2;
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, 5, 0, Math.PI * 2);
+        ctx.strokeStyle = node.depth === 1 ? accent : borderColor;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(centerX - 2.5, centerY);
+        ctx.lineTo(centerX + 2.5, centerY);
+        if (!node.expanded) {
+          ctx.moveTo(centerX, centerY - 2.5);
+          ctx.lineTo(centerX, centerY + 2.5);
+        }
+        ctx.stroke();
+      }
     }
   }
 
@@ -533,9 +695,7 @@ export class ConceptMapView {
           const worldX = (event.clientX - rect.left - this.offsetX) / this.scale;
           const worldY = (event.clientY - rect.top - this.offsetY) / this.scale;
           const node = this.hitTestNode(worldX, worldY);
-          if (node && node.id !== "root") {
-            this.onNodeClick(node.id, node.fullContent);
-          }
+          if (node && node.id !== "root") this.toggleNode(node);
         }
       }
     });
