@@ -5609,10 +5609,18 @@ fn save_android_apk(app: AppHandle) -> Result<String, String> {
 /// El actualizador de Tauri descarga un AppImage o un `.deb` y lo instala con
 /// `dpkg`; dentro de un snap o un Flatpak eso no actualiza la instalación (el
 /// paquete es de solo lectura y la tienda es la que publica las revisiones).
-/// El frontend usa este dato para ocultar el botón de actualizar y explicar de
-/// dónde llegan las actualizaciones.
+/// Lo mismo aplica a MSIX: el binario vive en `WindowsApps`, es de solo lectura
+/// y lo actualiza Microsoft Store. El frontend usa este dato para ocultar el
+/// botón de actualizar y explicar de dónde llegan las actualizaciones.
 #[tauri::command]
 fn desktop_install_kind() -> &'static str {
+    // La build de Microsoft Store no incluye el plugin updater; el frontend
+    // debe mostrar el aviso de la tienda aunque no haya variables de entorno.
+    #[cfg(all(target_os = "windows", feature = "microsoft-store"))]
+    {
+        return "msix";
+    }
+
     // Snap exporta SNAP/SNAP_NAME al entorno del proceso.
     if std::env::var_os("SNAP").is_some() || std::env::var_os("SNAP_NAME").is_some() {
         return "snap";
@@ -5774,7 +5782,11 @@ pub fn run() {
 
     // El actualizador nativo no existe en Android/iOS: allí el frontend
     // descarga el APK con el plugin HTTP y lo guarda con el de filesystem.
-    #[cfg(desktop)]
+    //
+    // La build de Microsoft Store (`--no-default-features --features
+    // microsoft-store`) no compila el plugin: dentro de un MSIX la app es de
+    // solo lectura y las actualizaciones las instala la Store.
+    #[cfg(all(desktop, feature = "updater"))]
     {
         builder = builder
             .plugin(tauri_plugin_updater::Builder::new().build())

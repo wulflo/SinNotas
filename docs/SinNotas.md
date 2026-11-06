@@ -539,6 +539,48 @@ La comprobación con `gh run list --workflow=release.yml` es obligatoria despué
 de cada push: si no aparece el run, se borra el tag remoto, se vuelve a crear
 sobre el commit correcto y se empuja de nuevo.
 
+### Microsoft Store (MSIX)
+
+La Store firma los paquetes MSIX después de la certificación, así que este
+canal no necesita certificado de CA ni la clave del updater. La app se instala
+en `WindowsApps` (solo lectura) y las actualizaciones las gestiona la Store;
+por eso la build de tienda **no compila** `tauri-plugin-updater`.
+
+- Workflow: `.github/workflows/store-msix.yml` (solo `workflow_dispatch`).
+- Genera un `.msix` sin firmar como artifact de Actions; no toca GitHub
+  Releases ni `latest.json`.
+- Compila con `npm run build:store`, que usa
+  `--no-default-features --features microsoft-store` y
+  `src-tauri/tauri.store.conf.json`.
+- Identidad actual en Partner Center:
+  - `Package/Identity/Name`: `wulflo.SinNotas`
+  - `Package/Identity/Publisher`: `CN=7F51EF66-8407-4798-A8F4-3C4A407DA359`
+  - `Package/Properties/PublisherDisplayName`: `wulflo`
+  - `Package Family Name`: `wulflo.SinNotas_m5406cz1kxss8`
+  - Store ID: `9N9TFK88D7JK`
+- El workflow usa esos valores por defecto. Si se recrea el producto o cambia
+  la identidad, se puede sobrescribir con las variables de repositorio
+  `MS_STORE_PACKAGE_NAME` y `MS_STORE_PUBLISHER`.
+- Privacidad para la ficha de la Store:
+  `https://github.com/wulflo/SinNotas/blob/master/PRIVACY_POLICY.md`.
+
+El manifiesto MSIX se genera desde
+`packaging/windows-store/AppxManifest.template.xml` con
+`node scripts/prepare-store-msix.mjs`. La versión de `package.json` se
+convierte a cuatro componentes (`0.4.10` → `0.4.10.0`); cada envío a la Store
+debe subir ese número.
+
+Antes de enviar el paquete conviene probarlo en Windows con un certificado
+autofirmado (`Add-AppxPackage`), pero ese certificado **no** se sube a Partner
+Center. WebView2 tiene que estar instalado en el sistema (Windows 10/11 lo
+trae con Edge); si falta, la app no arranca dentro del MSIX.
+
+Con el PFN `wulflo.SinNotas_m5406cz1kxss8`, los datos que la app escriba en
+`%APPDATA%` quedan virtualizados en
+`%LOCALAPPDATA%\Packages\wulflo.SinNotas_m5406cz1kxss8\LocalCache\Roaming\`.
+Las bóvedas elegidas en Documentos siguen siendo accesibles porque el paquete
+declara `runFullTrust`.
+
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`

@@ -2,7 +2,9 @@
  * Servicio de actualizaciones híbrido.
  *
  * - Escritorio (Windows/Linux/macOS): usa el plugin nativo `updater`, que
- *   verifica la firma minisign del paquete y luego relanza la app.
+ *   verifica la firma minisign del paquete y luego relanza la app. En las
+ *   builds de Microsoft Store el plugin no se compila: el MSIX es de solo
+ *   lectura y las actualizaciones las gestiona la tienda.
  * - Android: descarga el APK desde la release de GitHub con el plugin HTTP
  *   nativo (los assets de GitHub no envían CORS), lo guarda temporalmente en la
  *   caché privada y el backend lo mueve a la carpeta pública de Descargas con
@@ -116,16 +118,16 @@ let desktopUpdate: DesktopPendingUpdate | null = null;
 let androidRelease: ReleaseManifest | null = null;
 
 export type SupportedUpdatePlatform = "android" | "desktop" | "store" | "unsupported";
-export type InstallKind = "native" | "snap" | "flatpak";
+export type InstallKind = "native" | "snap" | "flatpak" | "msix";
 
 let installKind: InstallKind | null = null;
 let installKindInFlight: Promise<InstallKind> | null = null;
 
 /**
- * Detecta si el binario corre dentro de Snap o Flatpak. En esas variantes la
- * tienda es la que actualiza la app: el actualizador de Tauri descargaría un
- * AppImage/.deb e intentaría instalarlo con `dpkg`, algo imposible dentro del
- * sandbox y que además no reemplazaría la revisión instalada.
+ * Detecta si el binario corre dentro de una tienda. En Snap, Flatpak y MSIX
+ * (Microsoft Store) la app es de solo lectura y la tienda es la que publica
+ * las actualizaciones: el actualizador de Tauri descargaría otro instalador y
+ * no reemplazaría el paquete instalado.
  */
 export async function detectInstallKind(): Promise<InstallKind> {
   if (installKind) return installKind;
@@ -134,7 +136,7 @@ export async function detectInstallKind(): Promise<InstallKind> {
     if (isTauri()) {
       try {
         const value = await invoke<string>("desktop_install_kind");
-        if (value === "snap" || value === "flatpak") detected = value;
+        if (value === "snap" || value === "flatpak" || value === "msix") detected = value;
       } catch (error) {
         console.warn("[updater] No se pudo detectar el tipo de instalación:", error);
       }
@@ -152,6 +154,9 @@ export function getStoreUpdateMessage(): string {
   }
   if (installKind === "flatpak") {
     return "Esta versión se actualiza desde Flatpak. No hace falta buscar actualizaciones aquí.";
+  }
+  if (installKind === "msix") {
+    return "Esta versión se actualiza desde Microsoft Store. No hace falta buscar actualizaciones aquí.";
   }
   return "Las actualizaciones integradas no están disponibles en esta instalación.";
 }
@@ -183,7 +188,9 @@ export function subscribeUpdateState(listener: Listener): () => void {
 /** Plataforma soportada por el flujo de actualización. */
 export function getUpdatePlatform(): SupportedUpdatePlatform {
   if (!isTauri()) return "unsupported";
-  if (installKind === "snap" || installKind === "flatpak") return "store";
+  if (installKind === "snap" || installKind === "flatpak" || installKind === "msix") {
+    return "store";
+  }
   try {
     const value = platform();
     if (value === "android") return "android";

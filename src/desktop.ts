@@ -3737,9 +3737,10 @@ async function initUpdateSettings(): Promise<void> {
 
   await detectInstallKind();
 
-  // Snap y Flatpak se actualizan desde la tienda. El actualizador de Tauri no
-  // puede reemplazar esos paquetes (son de solo lectura y no usa la tienda),
-  // así que se ocultan los botones en vez de ofrecer una acción que fallaría.
+  // Snap, Flatpak y MSIX se actualizan desde la tienda. El actualizador de
+  // Tauri no puede reemplazar esos paquetes (son de solo lectura y no usa la
+  // tienda), así que se ocultan los botones en vez de ofrecer una acción que
+  // fallaría.
   if (getUpdatePlatform() === "store") {
     if (updateAvailableRow) updateAvailableRow.hidden = true;
     if (updateProgressWrap) updateProgressWrap.hidden = true;

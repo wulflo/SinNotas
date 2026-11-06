@@ -1,0 +1,134 @@
+name: Microsoft Store (MSIX)
+
+# Build independiente para la Store: no toca GitHub Releases, no firma con la
+# clave del updater y compila la app sin tauri-plugin-updater. El MSIX se sube
+# a mano a Partner Center; Microsoft lo firma después de la certificación.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: store-msix-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  msix:
+    name: Build MSIX (Store)
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      # Package/Identity/Name de Partner Center. No es el nombre comercial y
+      # no puede contener espacios. Valor actual: wulflo.SinNotas.
+      MS_STORE_PACKAGE_NAME: ${{ vars.MS_STORE_PACKAGE_NAME || 'wulflo.SinNotas' }}
+      # Package/Identity/Publisher de Partner Center.
+      MS_STORE_PUBLISHER: ${{ vars.MS_STORE_PUBLISHER || 'CN=7F51EF66-8407-4798-A8F4-3C4A407DA359' }}
+      MS_STORE_DISPLAY_NAME: ${{ vars.MS_STORE_DISPLAY_NAME || 'Sin Notas' }}
+      MS_STORE_PUBLISHER_DISPLAY_NAME: ${{ vars.MS_STORE_PUBLISHER_DISPLAY_NAME || 'wulflo' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+
+      - name: Cache Rust dependencies
+        uses: swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Install dependencies (ignore scripts for security)
+        run: npm ci --ignore-scripts
+
+      - name: Fetch PDFium
+        shell: bash
+        env:
+          PDFIUM_TARGET: windows-x86_64
+        run: bash scripts/fetch-pdfium.sh
+
+      - name: Generate app icons
+        run: npm run tauri icon src-tauri/icons/icon-manifest.json
+
+      - name: Verify Store identity
+        shell: bash
+        run: |
+          if [ -z "${MS_STORE_PACKAGE_NAME:-}" ]; then
+            echo "::error::Falta la variable MS_STORE_PACKAGE_NAME (Settings → Secrets and variables → Actions → Variables). Copiá Package/Identity/Name desde Partner Center → Product identity."
+            exit 1
+          fi
+          if [[ "$MS_STORE_PACKAGE_NAME" == *" "* ]]; then
+            echo "::error::MS_STORE_PACKAGE_NAME no puede contener espacios. Usá el valor exacto de Package/Identity/Name."
+            exit 1
+          fi
+
+      # Compila sin updater: --no-default-features desactiva la feature
+      # `updater`, y tauri.store.conf.json excluye la capability del plugin.
+      - name: Build app without updater
+        run: npm run build:store
+
+      - name: Verify updater is not in the Store build
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          cargo tree --manifest-path src-tauri/Cargo.toml --no-default-features --features microsoft-store -i tauri-plugin-updater 2>&1 | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            throw "tauri-plugin-updater sigue en el grafo de la build de Store."
+          }
+          Write-Host "OK: tauri-plugin-updater no está en la build de Store."
+
+      - name: Stage MSIX payload
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          New-Item -ItemType Directory -Force -Path store-msix\Assets | Out-Null
+          Copy-Item src-tauri\target\release\sin-notas.exe store-msix\sin-notas.exe
+          Copy-Item -Recurse src-tauri\resources store-msix\resources
+          foreach ($asset in @("StoreLogo.png", "Square44x44Logo.png", "Square150x150Logo.png", "Square310x310Logo.png")) {
+            Copy-Item "src-tauri\icons\$asset" "store-msix\Assets\$asset"
+          }
+
+      - name: Generate AppxManifest.xml
+        run: node scripts/prepare-store-msix.mjs
+
+      - name: Pack MSIX
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $makeappx) {
+            throw "No se encontró makeappx.exe. Instalá el Windows SDK en el runner."
+          }
+
+          $version = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $output = "SinNotas_${version}_x64.msix"
+          & $makeappx.FullName pack /d store-msix /p $output /o
+          if ($LASTEXITCODE -ne 0) {
+            throw "makeappx falló con código $LASTEXITCODE"
+          }
+
+          Get-Item $output | Format-List Name, Length
+          Add-Content $env:GITHUB_STEP_SUMMARY "## MSIX para Microsoft Store"
+          Add-Content $env:GITHUB_STEP_SUMMARY ""
+          Add-Content $env:GITHUB_STEP_SUMMARY "- Archivo: ``$output``"
+          Add-Content $env:GITHUB_STEP_SUMMARY "- Identity: ``$env:MS_STORE_PACKAGE_NAME``"
+          Add-Content $env:GITHUB_STEP_SUMMARY "- Publisher: ``$env:MS_STORE_PUBLISHER``"
+          Add-Content $env:GITHUB_STEP_SUMMARY "- Firmado: no (Microsoft Store lo firma tras la certificación)"
+
+      - name: Upload MSIX artifact
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
+        with:
+          name: store-msix
+          path: "*.msix"
+          if-no-files-found: error
+          retention-days: 30

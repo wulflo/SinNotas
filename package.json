@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:store": "tauri build --no-bundle --config src-tauri/tauri.store.conf.json -- --no-default-features --features microsoft-store",
     "preview": "vite preview",
     "android:patch": "node scripts/patch-android-safe-area.mjs",
     "tauri": "tauri",

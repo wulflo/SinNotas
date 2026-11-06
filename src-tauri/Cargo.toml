@@ -54,8 +54,8 @@ gtk = "0.18"
 notify = "6.1"
 # El actualizador nativo y el relanzado solo existen en escritorio. En Android
 # la descarga del APK la hace el frontend con `fetch` + `plugin-fs`.
-tauri-plugin-updater = { git = "https://github.com/tauri-apps/plugins-workspace", rev = "ba98bfadc4c868c9a7e1a226c83af528e1f11b89" }
-tauri-plugin-process = "2"
+tauri-plugin-updater = { git = "https://github.com/tauri-apps/plugins-workspace", rev = "ba98bfadc4c868c9a7e1a226c83af528e1f11b89", optional = true }
+tauri-plugin-process = { version = "2", optional = true }
 
 [target.'cfg(target_os = "android")'.dependencies]
 # GitHub no envía cabeceras CORS en los assets de release
@@ -63,6 +63,14 @@ tauri-plugin-process = "2"
 # puede leer `latest.json` ni el APK. El plugin HTTP usa el cliente nativo y
 # respeta el scope declarado en `capabilities/android.json`.
 tauri-plugin-http = "2"
+
+[features]
+# El actualizador nativo se incluye en las builds normales (GitHub Releases).
+# Para Microsoft Store se compila con `--no-default-features --features
+# microsoft-store`: el paquete MSIX es de solo lectura y lo actualiza la Store.
+default = ["updater"]
+updater = ["dep:tauri-plugin-updater", "dep:tauri-plugin-process"]
+microsoft-store = []
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
