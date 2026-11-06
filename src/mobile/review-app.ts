@@ -1,7 +1,13 @@
 import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
 import { join } from "@tauri-apps/api/path";
 import "katex/dist/katex.min.css";
-import type { FSRSRating } from "../editor/fsrs";
+import { defaultFSRSParams, type FSRSRating } from "../editor/fsrs";
+import {
+  formatLearningSteps,
+  loadFSRSParameters,
+  parseLearningSteps,
+  saveFSRSParameters,
+} from "../editor/fsrs-settings";
 import {
   appendOcclusionMasks,
   clampImageOcclusionRegion,
@@ -203,6 +209,15 @@ const MOBILE_ICONS = {
       <path d="M10 17h10"></path>
       <circle cx="8" cy="17" r="2"></circle>
     </svg>`,
+  fsrs: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M5 20V10"></path>
+      <path d="M12 20V4"></path>
+      <path d="M19 20v-7"></path>
+      <circle cx="5" cy="7" r="2"></circle>
+      <circle cx="12" cy="14" r="2"></circle>
+      <circle cx="19" cy="10" r="2"></circle>
+    </svg>`,
   close: `
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="M18 6 6 18"></path>
@@ -335,8 +350,6 @@ class MobileReviewApp {
     vaultName: HTMLElement;
     vaultButton: HTMLButtonElement;
     refreshButton: HTMLButtonElement;
-    notesButton: HTMLButtonElement;
-    notesBadge: HTMLElement;
     activeDeckName: HTMLElement;
     decksBadge: HTMLElement;
     decksSheet: HTMLElement;
@@ -353,6 +366,14 @@ class MobileReviewApp {
     notesPrevButton: HTMLButtonElement;
     notesNextButton: HTMLButtonElement;
     notesPageInfo: HTMLElement;
+    fsrsSheet: HTMLElement;
+    fsrsRetention: HTMLInputElement;
+    fsrsRetentionValue: HTMLOutputElement;
+    fsrsMaximumInterval: HTMLInputElement;
+    fsrsLearningSteps: HTMLInputElement;
+    fsrsRelearningSteps: HTMLInputElement;
+    fsrsWeights: HTMLTextAreaElement;
+    fsrsStatus: HTMLElement;
     learningToggle: HTMLButtonElement;
     editor: HTMLElement;
     questionField: HTMLElement;
@@ -599,6 +620,46 @@ class MobileReviewApp {
         </section>
       </div>
 
+      <div class="mobile-editor-scrim" data-fsrs-sheet hidden>
+        <section class="mobile-editor mobile-fsrs-editor" role="dialog" aria-modal="true" aria-labelledby="mobile-fsrs-title">
+          <header class="mobile-editor-header">
+            <h2 id="mobile-fsrs-title">FSRS 4.5</h2>
+            <button class="mobile-icon-button" type="button" data-action="close-fsrs" aria-label="Cerrar ajustes de FSRS">${MOBILE_ICONS.close}</button>
+          </header>
+          <p class="mobile-editor-hint">Configura la retención objetivo y los intervalos usados por el planificador. Los cambios se aplican a los próximos repasos; reprograma las tarjetas por separado si quieres actualizar sus vencimientos.</p>
+          <label class="mobile-fsrs-field">
+            <span>Retención deseada</span>
+            <div class="mobile-fsrs-retention">
+              <input type="range" min="0.70" max="0.97" step="0.01" data-fsrs-retention aria-label="Retención deseada" />
+              <output data-fsrs-retention-value for="mobile-fsrs-retention">90%</output>
+            </div>
+          </label>
+          <label class="mobile-fsrs-field">
+            <span>Intervalo máximo (días)</span>
+            <input type="number" min="1" max="36500" step="1" inputmode="numeric" data-fsrs-maximum-interval aria-label="Intervalo máximo en días" />
+          </label>
+          <label class="mobile-fsrs-field">
+            <span>Pasos de aprendizaje</span>
+            <input type="text" placeholder="1m 10m" autocomplete="off" spellcheck="false" data-fsrs-learning-steps aria-label="Pasos de aprendizaje" />
+          </label>
+          <label class="mobile-fsrs-field">
+            <span>Pasos de reaprendizaje</span>
+            <input type="text" placeholder="10m" autocomplete="off" spellcheck="false" data-fsrs-relearning-steps aria-label="Pasos de reaprendizaje" />
+          </label>
+          <details class="mobile-fsrs-advanced">
+            <summary>Parámetros FSRS-4.5</summary>
+            <p class="mobile-editor-hint">17 valores numéricos separados por comas. Cambiarlos manualmente sustituye la optimización automática de Anki.</p>
+            <textarea rows="3" spellcheck="false" data-fsrs-weights aria-label="Parámetros de FSRS-4.5"></textarea>
+          </details>
+          <p class="mobile-fsrs-status" data-fsrs-status role="status" aria-live="polite"></p>
+          <footer class="mobile-editor-actions mobile-fsrs-actions">
+            <button class="mobile-secondary" type="button" data-action="fsrs-defaults">Restaurar predeterminados</button>
+            <button class="mobile-secondary" type="button" data-action="close-fsrs">Cancelar</button>
+            <button class="mobile-primary" type="button" data-action="save-fsrs">Guardar configuración</button>
+          </footer>
+        </section>
+      </div>
+
       <div class="mobile-editor-scrim" data-decks-sheet hidden>
         <section class="mobile-editor mobile-decks-editor" role="dialog" aria-modal="true" aria-labelledby="mobile-decks-title">
           <header class="mobile-editor-header">
@@ -655,11 +716,10 @@ class MobileReviewApp {
               <small>Elegir, crear o editar mazos de repaso</small>
               <span class="mobile-filter-badge" data-decks-badge hidden></span>
             </button>
-            <button class="mobile-drawer-action mobile-notes-button" type="button" data-action="notes">
-              <span aria-hidden="true">${MOBILE_ICONS.notes}</span>
-              <strong>Notas del mazo</strong>
-              <small>Editar las notas que aportan tarjetas</small>
-              <span class="mobile-filter-badge" data-notes-badge hidden></span>
+            <button class="mobile-drawer-action" type="button" data-action="fsrs">
+              <span aria-hidden="true">${MOBILE_ICONS.fsrs}</span>
+              <strong>Ajustes de FSRS</strong>
+              <small>Retención, intervalos y pasos del algoritmo</small>
             </button>
             <button class="mobile-drawer-action" type="button" data-action="full-editor">
               <span aria-hidden="true">${MOBILE_ICONS.editor}</span>
@@ -711,8 +771,6 @@ class MobileReviewApp {
       vaultName: requireElement(this.root, "[data-vault-name]"),
       vaultButton: requireElement(this.root, "[data-action='vault']"),
       refreshButton: requireElement(this.root, "[data-action='refresh']"),
-      notesButton: requireElement(this.root, "[data-action='notes']"),
-      notesBadge: requireElement(this.root, "[data-notes-badge]"),
       activeDeckName: requireElement(this.root, "[data-active-deck-name]"),
       decksBadge: requireElement(this.root, "[data-decks-badge]"),
       decksSheet: requireElement(this.root, "[data-decks-sheet]"),
@@ -729,6 +787,14 @@ class MobileReviewApp {
       notesPrevButton: requireElement(this.root, "[data-action='notes-prev']"),
       notesNextButton: requireElement(this.root, "[data-action='notes-next']"),
       notesPageInfo: requireElement(this.root, "[data-notes-page-info]"),
+      fsrsSheet: requireElement(this.root, "[data-fsrs-sheet]"),
+      fsrsRetention: requireElement(this.root, "[data-fsrs-retention]"),
+      fsrsRetentionValue: requireElement(this.root, "[data-fsrs-retention-value]"),
+      fsrsMaximumInterval: requireElement(this.root, "[data-fsrs-maximum-interval]"),
+      fsrsLearningSteps: requireElement(this.root, "[data-fsrs-learning-steps]"),
+      fsrsRelearningSteps: requireElement(this.root, "[data-fsrs-relearning-steps]"),
+      fsrsWeights: requireElement(this.root, "[data-fsrs-weights]"),
+      fsrsStatus: requireElement(this.root, "[data-fsrs-status]"),
       learningToggle: requireElement(this.root, "[data-action='toggle-learning']"),
       editor: requireElement(this.root, "[data-editor]"),
       questionField: requireElement(this.root, "[data-question-field]"),
@@ -789,6 +855,8 @@ class MobileReviewApp {
     this.applyTheme(this.readStoredTheme() ?? this.systemTheme(), false);
     this.applyAccent(this.readStoredAccent(), false);
     this.applyStoredFontSizes();
+    // Los ajustes FSRS se comparten con el escritorio a través de localStorage.
+    this.manager.setFSRSParameters(loadFSRSParameters(localStorage));
     this.learningMode = this.readStoredLearningMode();
     // El modo Aprendizaje debe incluir también las tarjetas que aún no vencen,
     // incluso si la app se abre con el interruptor ya activo.
@@ -879,6 +947,15 @@ class MobileReviewApp {
         this.openSettings();
       } else if (action === "close-settings") {
         this.closeSettings();
+      } else if (action === "fsrs") {
+        this.closeDrawer();
+        this.openFSRSSettings();
+      } else if (action === "close-fsrs") {
+        this.closeFSRSSettings();
+      } else if (action === "save-fsrs") {
+        this.saveFSRSSettings();
+      } else if (action === "fsrs-defaults") {
+        this.restoreFSRSDefaults();
       } else if (action === "decks") {
         this.closeDrawer();
         this.openDecks();
@@ -886,9 +963,6 @@ class MobileReviewApp {
         this.closeDecks();
       } else if (action === "new-deck") {
         this.openNewDeckEditor();
-      } else if (action === "notes") {
-        this.closeDrawer();
-        this.openActiveDeckEditor();
       } else if (action === "close-notes") {
         this.closeNotes();
       } else if (action === "notes-all") {
@@ -958,6 +1032,9 @@ class MobileReviewApp {
     this.refs.notesSheet.addEventListener("click", (event) => {
       if (event.target === this.refs.notesSheet) this.closeNotes();
     });
+    this.refs.fsrsSheet.addEventListener("click", (event) => {
+      if (event.target === this.refs.fsrsSheet) this.closeFSRSSettings();
+    });
     this.refs.decksSheet.addEventListener("click", (event) => {
       if (event.target === this.refs.decksSheet) this.closeDecks();
     });
@@ -978,6 +1055,11 @@ class MobileReviewApp {
       const size = writeFontSize("ui", Number(this.refs.fontSizeInput.value));
       this.applyStoredFontSizes();
       this.refs.fontSizeValue.value = `${size} px`;
+    });
+    this.refs.fsrsRetention.addEventListener("input", () => {
+      this.refs.fsrsRetentionValue.value = `${Math.round(
+        this.refs.fsrsRetention.valueAsNumber * 100
+      )}%`;
     });
     this.refs.occlusionEditor.addEventListener("click", (event) => {
       if (event.target === this.refs.occlusionEditor) this.closeOcclusionEditor();
@@ -1010,6 +1092,10 @@ class MobileReviewApp {
       }
       if (!this.refs.settingsSheet.hidden) {
         if (event.key === "Escape") this.closeSettings();
+        return;
+      }
+      if (!this.refs.fsrsSheet.hidden) {
+        if (event.key === "Escape") this.closeFSRSSettings();
         return;
       }
       if (!this.refs.decksSheet.hidden) {
@@ -1295,29 +1381,6 @@ class MobileReviewApp {
 
   private updateFilterIndicator(): void {
     this.updateDeckIndicators();
-    const deck = this.activeDeck();
-    const active = Boolean(deck);
-    const filter = this.manager.getPageFilter();
-    const count = filter?.length ?? deck?.pageTitles.length ?? 0;
-    this.refs.notesButton.classList.toggle("is-active", active);
-    this.refs.notesBadge.hidden = !active;
-    this.refs.notesBadge.textContent = active ? String(count) : "";
-    if (!active) {
-      this.refs.notesButton.setAttribute(
-        "aria-label",
-        "Editar el mazo de repaso o crear uno nuevo"
-      );
-      this.refs.notesButton.title = "Notas del mazo";
-    } else if (count === 0) {
-      this.refs.notesButton.setAttribute("aria-label", "El mazo activo no tiene notas");
-      this.refs.notesButton.title = "El mazo activo no tiene notas";
-    } else {
-      const label = `${count} ${translate(
-        count === 1 ? "nota seleccionada" : "notas seleccionadas"
-      )}`;
-      this.refs.notesButton.setAttribute("aria-label", label);
-      this.refs.notesButton.title = label;
-    }
   }
 
   /* ==================== MAZOS: CARGA Y FILTRO ==================== */
@@ -1597,11 +1660,6 @@ class MobileReviewApp {
     this.refs.decksSheet.hidden = true;
     this.refs.notesSheet.hidden = false;
     this.syncOverlayState();
-  }
-
-  private openActiveDeckEditor(): void {
-    if (this.activeDeckId) this.openDeckEditor(this.activeDeckId);
-    else this.openNewDeckEditor();
   }
 
   private validateDeckEditorName(): string | null {
@@ -2067,6 +2125,7 @@ class MobileReviewApp {
         !this.refs.settingsSheet.hidden ||
         !this.refs.drawer.hidden ||
         !this.refs.notesSheet.hidden ||
+        !this.refs.fsrsSheet.hidden ||
         !this.refs.decksSheet.hidden ||
         !this.refs.occlusionEditor.hidden
     );
@@ -2528,6 +2587,93 @@ class MobileReviewApp {
   private closeSettings(): void {
     this.refs.settingsSheet.hidden = true;
     this.syncOverlayState();
+  }
+
+  private renderFSRSSettings(): void {
+    const parameters = loadFSRSParameters(localStorage);
+    this.refs.fsrsRetention.value = String(parameters.requestRetention);
+    this.refs.fsrsRetentionValue.value = `${Math.round(parameters.requestRetention * 100)}%`;
+    this.refs.fsrsMaximumInterval.value = String(parameters.maximumInterval);
+    this.refs.fsrsLearningSteps.value = formatLearningSteps(parameters.learningSteps);
+    this.refs.fsrsRelearningSteps.value = formatLearningSteps(parameters.relearningSteps);
+    this.refs.fsrsWeights.value = parameters.w.join(", ");
+  }
+
+  private openFSRSSettings(): void {
+    if (this.busy) return;
+    this.renderFSRSSettings();
+    this.refs.fsrsStatus.textContent = "";
+    this.refs.fsrsSheet.hidden = false;
+    this.syncOverlayState();
+    window.setTimeout(() => this.refs.fsrsRetention.focus(), 30);
+  }
+
+  private closeFSRSSettings(): void {
+    this.refs.fsrsSheet.hidden = true;
+    this.syncOverlayState();
+  }
+
+  private saveFSRSSettings(useDefaults = false): void {
+    const current = loadFSRSParameters(localStorage);
+    const learningSteps = useDefaults
+      ? [...defaultFSRSParams.learningSteps]
+      : parseLearningSteps(this.refs.fsrsLearningSteps.value);
+    const relearningSteps = useDefaults
+      ? [...defaultFSRSParams.relearningSteps]
+      : parseLearningSteps(this.refs.fsrsRelearningSteps.value);
+    const weights = useDefaults
+      ? [...defaultFSRSParams.w]
+      : this.refs.fsrsWeights.value
+          .split(/[,\s]+/)
+          .filter(Boolean)
+          .map(Number);
+    if (
+      !learningSteps ||
+      !relearningSteps ||
+      weights.length !== 17 ||
+      weights.some((weight) => !Number.isFinite(weight) || weight <= 0)
+    ) {
+      this.refs.fsrsStatus.textContent = translate(
+        "Revisa los pasos y los 17 parámetros numéricos de FSRS."
+      );
+      return;
+    }
+
+    try {
+      const parameters = saveFSRSParameters(localStorage, {
+        ...current,
+        w: weights,
+        requestRetention: useDefaults
+          ? defaultFSRSParams.requestRetention
+          : this.refs.fsrsRetention.valueAsNumber,
+        maximumInterval: useDefaults
+          ? defaultFSRSParams.maximumInterval
+          : Number(this.refs.fsrsMaximumInterval.value),
+        learningSteps,
+        relearningSteps,
+      });
+      this.manager.setFSRSParameters(parameters);
+      this.renderFSRSSettings();
+      this.refs.fsrsStatus.textContent = translate("Configuración FSRS guardada.");
+      this.render();
+    } catch (error) {
+      console.error("No se pudo guardar la configuración FSRS:", error);
+      this.refs.fsrsStatus.textContent = translate(
+        "No se pudo guardar la configuración FSRS."
+      );
+    }
+  }
+
+  private restoreFSRSDefaults(): void {
+    this.refs.fsrsRetention.value = String(defaultFSRSParams.requestRetention);
+    this.refs.fsrsRetentionValue.value = `${Math.round(
+      defaultFSRSParams.requestRetention * 100
+    )}%`;
+    this.refs.fsrsMaximumInterval.value = String(defaultFSRSParams.maximumInterval);
+    this.refs.fsrsLearningSteps.value = formatLearningSteps(defaultFSRSParams.learningSteps);
+    this.refs.fsrsRelearningSteps.value = formatLearningSteps(defaultFSRSParams.relearningSteps);
+    this.refs.fsrsWeights.value = defaultFSRSParams.w.join(", ");
+    this.saveFSRSSettings(true);
   }
 
   private openOcclusionEditor(card: Flashcard): void {
@@ -3149,7 +3295,6 @@ class MobileReviewApp {
     this.root.classList.toggle("is-busy", busy);
     this.refs.vaultButton.disabled = busy;
     this.refs.refreshButton.disabled = busy;
-    this.refs.notesButton.disabled = busy;
     this.root
       .querySelectorAll<HTMLButtonElement>("[data-action='decks'], [data-action='new-deck']")
       .forEach((button) => {

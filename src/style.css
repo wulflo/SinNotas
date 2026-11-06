@@ -1649,7 +1649,7 @@ select {
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: color-mix(in srgb, var(--ls-accent) 62%, transparent) transparent;
+  scrollbar-color: var(--ls-accent) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -1665,7 +1665,7 @@ select {
  * cursor). El borde transparente deja un carril libre a la izquierda para
  * que la barra no quede pegada a los elementos de la lista. */
 ::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--ls-accent) 62%, transparent);
+  background-color: var(--ls-accent);
   border-left: 2px solid transparent;
   border-radius: 999px;
   background-clip: padding-box;
@@ -1694,7 +1694,7 @@ select {
 .settings-dropdown-menu::-webkit-scrollbar-thumb,
 .settings-tab-panel::-webkit-scrollbar-thumb,
 .settings-tabs::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--ls-accent) 62%, transparent);
+  background-color: var(--ls-accent);
   border-left: 2px solid transparent;
   border-radius: 999px;
   background-clip: padding-box;
@@ -5645,7 +5645,7 @@ body.is-bullet-selecting {
 }
 
 .shortcuts-modal-body::-webkit-scrollbar-thumb {
-  background-color: color-mix(in srgb, var(--ls-accent) 62%, transparent);
+  background-color: var(--ls-accent);
   border-left: 2px solid transparent;
   border-radius: 999px;
   background-clip: padding-box;

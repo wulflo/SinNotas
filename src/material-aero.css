@@ -222,7 +222,7 @@ body {
 }
 
 * {
-  scrollbar-color: color-mix(in srgb, var(--md-primary) 62%, transparent) transparent;
+  scrollbar-color: var(--md-primary) transparent;
 }
 
 ::-webkit-scrollbar {
@@ -232,7 +232,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
   border-radius: var(--ma-radius-xs);
-  background-color: color-mix(in srgb, var(--md-primary) 62%, transparent);
+  background-color: var(--md-primary);
   border-left: 2px solid transparent;
   background-clip: padding-box;
 }

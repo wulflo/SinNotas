@@ -180,6 +180,35 @@ html {
   background: var(--mobile-bg);
 }
 
+/* Barras de desplazamiento con el acento activo. La versión de escritorio
+ * (style.css) ya lo hace; la APK solo carga este archivo, así que replicamos
+ * aquí el mismo comportamiento para que no vuelvan al gris del sistema. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--mobile-accent) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--mobile-accent);
+  border-left: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--mobile-accent-strong);
+}
+
 body.mobile-review-body {
   margin: 0;
   min-height: 100dvh;
@@ -322,10 +351,6 @@ body.mobile-review-body {
   font-weight: 700;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.mobile-notes-button {
-  position: relative;
 }
 
 .mobile-icon-button.is-active {
@@ -1394,6 +1419,116 @@ body.mobile-review-body {
 
 .mobile-settings-editor {
   width: min(560px, 100%);
+}
+
+.mobile-fsrs-editor {
+  width: min(560px, 100%);
+}
+
+.mobile-fsrs-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 14px;
+}
+
+.mobile-fsrs-field > span {
+  color: var(--mobile-muted);
+  font-size: calc(11px * var(--mobile-font-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.mobile-fsrs-field input[type="number"],
+.mobile-fsrs-field input[type="text"],
+.mobile-fsrs-advanced textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--mobile-border);
+  border-radius: 12px;
+  outline: none;
+  background: var(--mobile-bg-soft);
+  color: var(--mobile-text);
+  font: inherit;
+  font-size: calc(15px * var(--mobile-font-scale, 1));
+}
+
+.mobile-fsrs-field input:focus,
+.mobile-fsrs-advanced textarea:focus {
+  border-color: var(--mobile-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--mobile-accent) 22%, transparent);
+}
+
+.mobile-fsrs-retention {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mobile-fsrs-retention input[type="range"] {
+  flex: 1 1 auto;
+  min-width: 0;
+  accent-color: var(--mobile-accent);
+}
+
+.mobile-fsrs-retention output {
+  min-width: 44px;
+  color: var(--mobile-title);
+  font-size: calc(14px * var(--mobile-font-scale, 1));
+  font-weight: 800;
+  text-align: right;
+}
+
+.mobile-fsrs-advanced {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--mobile-border);
+  border-radius: 12px;
+  background: var(--mobile-bg-soft);
+}
+
+.mobile-fsrs-advanced summary {
+  color: var(--mobile-title);
+  font-size: calc(13px * var(--mobile-font-scale, 1));
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mobile-fsrs-advanced .mobile-editor-hint {
+  margin: 8px 0;
+}
+
+.mobile-fsrs-advanced textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.mobile-fsrs-status {
+  min-height: 18px;
+  margin: 0 0 8px;
+  color: var(--mobile-muted);
+  font-size: calc(12px * var(--mobile-font-scale, 1));
+  font-weight: 600;
+}
+
+.mobile-fsrs-status:not(:empty) {
+  color: var(--mobile-accent);
+}
+
+.mobile-fsrs-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mobile-fsrs-actions button {
+  width: 100%;
+}
+
+.mobile-fsrs-actions button[data-action="fsrs-defaults"] {
+  grid-column: 1 / -1;
 }
 
 .mobile-settings-actions {
