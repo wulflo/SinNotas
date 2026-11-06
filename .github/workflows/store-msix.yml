@@ -84,6 +84,9 @@ jobs:
             throw "tauri-plugin-updater sigue en el grafo de la build de Store."
           }
           Write-Host "OK: tauri-plugin-updater no está en la build de Store."
+          # `cargo tree -i` sale con 1 cuando el paquete no está (lo esperado).
+          # GitHub usa el último $LASTEXITCODE como resultado del paso.
+          exit 0
 
       - name: Stage MSIX payload
         shell: pwsh
