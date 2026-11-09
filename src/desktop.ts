@@ -1045,6 +1045,14 @@ document.querySelectorAll<HTMLElement>(".kanban-column[data-kanban-status]").for
     draggedKanbanTask = null;
   });
 });
+document.querySelectorAll<HTMLButtonElement>("[data-kanban-add]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const status = button.dataset.kanbanAdd;
+    if (status === "todo" || status === "doing" || status === "done") {
+      void promptNewKanbanTask(status);
+    }
+  });
+});
 
 // History Modal Elements
 const historyModalOverlay = document.getElementById("history-modal-overlay") as HTMLDivElement;
@@ -9859,6 +9867,60 @@ async function updateTaskState(task: KanbanTask, newStatus: KanbanStatus) {
   renderKanbanBoard();
 }
 
+/**
+ * Añade una tarea al tablero escribiéndola como bullet en la nota diaria de la
+ * fecha elegida. La fecha por defecto es hoy y también se guarda como fecha de
+ * vencimiento de la tarea.
+ */
+async function promptNewKanbanTask(status: KanbanStatus): Promise<void> {
+  const text = await showTextDialog(
+    translate("Nueva tarea"),
+    translate("Título de la tarea"),
+    "",
+    { message: translate("Se añadirá a la nota diaria de la fecha indicada.") }
+  );
+  if (!text) return;
+
+  const today = localDateKey(new Date());
+  const dateValue = await showTextDialog(
+    translate("Fecha de la nota diaria"),
+    translate("Fecha"),
+    today,
+    {
+      inputType: "date",
+      allowEmpty: true,
+      message: translate("Déjalo vacío para usar la fecha de hoy."),
+    }
+  );
+  if (dateValue === null) return;
+
+  const date = dateValue || today;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    showToast(translate("Fecha no válida"));
+    return;
+  }
+
+  const prefix = status === "todo" ? "TODO" : status === "doing" ? "DOING" : "DONE";
+  const content = KanbanManager.formatBlockWithStatus(
+    `${prefix} ${text}\ntask-due:: ${date}`,
+    status
+  );
+
+  try {
+    const journal = vault.createJournal(date);
+    const saved = await vault.appendBlockToPage(journal.title, content);
+    if (!saved) {
+      showToast(translate("No se pudo añadir la tarea."));
+      return;
+    }
+    renderKanbanBoard();
+    showToast(translate("Tarea añadida a la nota diaria."));
+  } catch (error) {
+    console.error("No se pudo añadir la tarea al diario:", error);
+    showToast(translate("No se pudo añadir la tarea."));
+  }
+}
+
 /* ==================== BLOCK CONTEXT MENU ==================== */
 function closeContextSubmenu(submenu: HTMLElement): void {
   submenu.classList.remove("is-open");
@@ -14373,6 +14435,15 @@ function localDateKey(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+/** Fecha legible de un diario (sin el prefijo "Diario"). */
+function journalDateLabel(page: PageData): string {
+  if (!page.journalDate) return page.title;
+  const date = new Date(`${page.journalDate}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? page.journalDate
+    : date.toLocaleDateString(currentLanguage(), { dateStyle: "medium" });
+}
+
 /**
  * Título visible de una nota. Los diarios se identifican por su fecha (el
  * archivo es `journals/YYYY_MM_DD.md`), así que la lista muestra siempre
@@ -14380,11 +14451,7 @@ function localDateKey(date: Date): string {
  */
 function pageDisplayTitle(page: PageData): string {
   if (!page.isJournal || !page.journalDate) return page.title;
-  const date = new Date(`${page.journalDate}T00:00:00`);
-  const label = Number.isNaN(date.getTime())
-    ? page.journalDate
-    : date.toLocaleDateString(currentLanguage(), { dateStyle: "medium" });
-  return `${translate("Diario")} ${label}`;
+  return `${translate("Diario")} ${journalDateLabel(page)}`;
 }
 
 function renderJournalCalendar(container: HTMLElement, journalPages: PageData[]): void {
@@ -14394,11 +14461,13 @@ function renderJournalCalendar(container: HTMLElement, journalPages: PageData[])
   const header = document.createElement("header");
   header.className = "journal-calendar-header";
   const monthTitle = document.createElement("h2");
-  const monthLabel = journalCalendarMonth.toLocaleDateString(currentLanguage(), {
+  let monthLabel = journalCalendarMonth.toLocaleDateString(currentLanguage(), {
     month: "long",
     year: "numeric",
   });
   if (currentLanguage() === "es") {
+    // es devuelve "noviembre de 2026"; el calendario solo necesita "noviembre 2026".
+    monthLabel = monthLabel.replace(/\s+de\s+/i, " ");
     monthTitle.textContent = monthLabel.charAt(0).toLowerCase() + monthLabel.slice(1);
   } else {
     monthTitle.textContent = monthLabel;
@@ -14554,7 +14623,7 @@ function renderJournalsView() {
     button.title = `Abrir ${journal.title}`;
     const label = document.createElement("span");
     label.className = "journals-list-label";
-    label.textContent = pageDisplayTitle(journal);
+    label.textContent = journalDateLabel(journal);
     const meta = document.createElement("span");
     meta.className = "journals-list-meta";
     // FASE 4-D: bajo el boot de metadatos vale el resumen (conteo plano).

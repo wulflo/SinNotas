@@ -352,7 +352,8 @@ export class ConceptMapView {
       this.nodes = [];
       this.collect(this.root!);
       this.appendNextChildren(node.moreParent);
-      this.rebuildVisibleTree(true);
+      // Mantiene el encuadre actual al desplegar más elementos.
+      this.rebuildVisibleTree();
       this.onNodeExpand?.(true);
       return;
     }
@@ -371,7 +372,9 @@ export class ConceptMapView {
       this.collect(this.root!);
       this.appendNextChildren(node);
     }
-    this.rebuildVisibleTree(true);
+    // Abrir/cerrar un nodo no debe reencuadrar el mapa: se conserva el zoom y
+    // el desplazamiento que el usuario tenía en ese momento.
+    this.rebuildVisibleTree();
     this.onNodeExpand?.(node.expanded);
   }
 

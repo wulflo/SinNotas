@@ -1168,6 +1168,41 @@ export class VaultStore {
   }
 
   /**
+   * Añade un bullet al final de una nota. Lo usa el Kanban para volcar las
+   * tareas nuevas en la nota diaria de su fecha. FASE 4-E: si la nota aún no
+   * tiene bloques (boot de metadatos), la rehidrata antes de escribir.
+   */
+  public async appendBlockToPage(pageTitle: string, content: string): Promise<boolean> {
+    let page = this.getPageByTitle(pageTitle);
+    if (!page) return false;
+    if (page.blocksLoaded === false && isTauri()) {
+      await this.ensurePageLoaded(page, { pin: true });
+      page = this.getPageByTitle(pageTitle);
+      if (!page || page.blocksLoaded === false) return false;
+    }
+
+    const onlyEmptyBullet =
+      page.blocks.length === 1 &&
+      page.blocks[0].content.trim() === "" &&
+      (page.blocks[0].children?.length ?? 0) === 0;
+
+    if (onlyEmptyBullet) {
+      page.blocks[0].content = content;
+    } else {
+      page.blocks.push({
+        id: "b-" + Math.random().toString(36).substring(2, 9),
+        type: "text",
+        content,
+        children: [],
+        collapsed: false,
+      });
+    }
+
+    await this.savePage(page);
+    return true;
+  }
+
+  /**
    * Restaura un snapshot desde `.sinnotas/chronos/`. El backend guarda antes una copia
    * de seguridad del estado actual, de modo que la restauración también se
    * puede deshacer desde el historial.

@@ -4091,6 +4091,39 @@ body.is-bullet-selecting {
   font-weight: 700;
 }
 
+.kanban-add-task {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 2px 12px 6px;
+  padding: 8px 10px;
+  border: 1px dashed color-mix(in srgb, var(--kanban-accent) 45%, transparent);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--kanban-accent);
+  font: inherit;
+  font-size: calc(12px * var(--ls-font-scale, 1));
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.kanban-add-task > span {
+  font-size: calc(16px * var(--ls-font-scale, 1));
+  line-height: 1;
+}
+
+.kanban-add-task:hover {
+  border-color: var(--kanban-accent);
+  background: color-mix(in srgb, var(--kanban-accent) 12%, transparent);
+}
+
+.kanban-add-task:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--kanban-accent) 60%, transparent);
+  outline-offset: 2px;
+}
+
 .kanban-task-list {
   flex: 1;
   overflow-y: auto;
