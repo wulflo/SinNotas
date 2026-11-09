@@ -116,7 +116,8 @@ Publicar en las tiendas es un paso aparte y opcional:
 - El tag no coincide con las versiones declaradas: revisar los cinco archivos de la sección 1.
 - El APK no se firma o no aparece: verificar que los secretos de firma estén definidos en GitHub Actions.
 - El Snap falla con `LXD`/`snapcraft`: relanzar el job; `snapcore/action-build` configura LXD en cada ejecución y a veces tarda en arrancar.
-- El Flatpak falla al descargar el runtime: comprobar que el manifiesto usa la misma versión de GNOME que la imagen del job (`gnome-48` ↔ `runtime-version: '48'`).
+- El Flatpak falla al descargar el runtime: comprobar que el manifiesto usa la misma versión de GNOME que la imagen del job (`gnome-51` ↔ `runtime-version: '51'`).
+- El Flatpak se instala pero la app no abre: no volver a GNOME 48 ni anteriores; su WebKitGTK 2.48 mata con SIGKILL el proceso web al cargar la primera página.
 - El Flatpak no encuentra PDFium: verificar que `packaging/linux/deb-root/usr/lib/Sin Notas/resources/pdfium/linux-x86_64/libpdfium.so` existe antes de empaquetar.
 
 ## Seguridad

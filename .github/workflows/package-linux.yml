@@ -172,9 +172,11 @@ jobs:
     needs: build-deb
     runs-on: ubuntu-22.04
     timeout-minutes: 45
-    # Imagen oficial de Flathub con flatpak-builder y el SDK de GNOME 48.
+    # Imagen oficial de Flathub con flatpak-builder y el SDK de GNOME 51.
+    # Debe coincidir con `runtime-version` del manifiesto: con GNOME 48
+    # (WebKitGTK 2.48) la app moría con SIGKILL al cargar la primera página.
     container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-51
       options: --privileged
     steps:
       - name: Checkout repository
