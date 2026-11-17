@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories=Education;
+Comment=Editor outliner local y sistema de notas personal
+Exec=sin-notas
+Icon=${SNAP}/meta/gui/sin-notas.png
+Name=Sin Notas
+StartupWMClass=sin-notas
+Terminal=false
+Type=Application

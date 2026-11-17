@@ -1,0 +1,2301 @@
+export type InterfaceLanguage = "es" | "en" | "zh";
+export type LanguagePreference = "auto" | InterfaceLanguage;
+
+const englishBySpanish: Record<string, string> = {
+  "Editor": "Editor",
+  "Diarios": "Journals",
+  "Páginas": "Pages",
+  "Vista gráfica": "Graph view",
+  "Haz clic en un nodo para ver su contenido · Arrastra para mover · Doble clic para restablecer": "Click a node to preview its content · Drag to move · Double-click to reset",
+  "Cerrar vista previa": "Close preview",
+  "Navegación de la nota": "Page navigation",
+  "Ir al inicio de la nota": "Go to the beginning of the page",
+  "Ir al final de la nota": "Go to the end of the page",
+  "Contenido de la nota": "Page content",
+  "Esta nota no tiene contenido.": "This page has no content.",
+  "Imagen": "Image",
+  "Tareas": "Tasks",
+  "Todas las páginas": "All pages",
+  "Páginas recientes": "Recent pages",
+  "Buscar o crear nota...": "Search or create a page...",
+  "No hay notas coincidentes.": "No matching pages.",
+  "Crear nota": "Create page",
+  "Seleccionar una carpeta de vault": "Select a vault folder",
+  "Colapsar / Desplegar Barra Lateral (Ctrl+B)": "Collapse / expand sidebar (Ctrl+B)",
+  "Atrás": "Back",
+  "Adelante": "Forward",
+  "Historial de Versiones (Snapshots)": "Version history",
+  "Convertir en mapa conceptual": "Convert to concept map",
+  "Mapa conceptual": "Concept map",
+  "Bullets de la nota": "Page bullets",
+  "Esta nota no tiene bullets para convertir en mapa.": "This page has no bullets to turn into a map.",
+  "Arrastra para mover · Rueda del ratón para hacer zoom · Doble clic para centrar": "Drag to pan · Scroll to zoom · Double-click to center",
+  "Alejar": "Zoom out",
+  "Acercar": "Zoom in",
+  "Centrar": "Center",
+  "Cerrar": "Close",
+  "Eliminar Página Actual": "Delete current page",
+  "Ajustes y Apariencia": "Settings and appearance",
+  "Configuración": "Settings",
+  "Apariencia": "Appearance",
+  "Repaso": "Review",
+  "Progreso": "Progress",
+  "Pomodoro": "Pomodoro",
+  "Exportar": "Export",
+  "Avanzado": "Advanced",
+  // Ajustes > Avanzado: actualizaciones.
+  "Actualizaciones": "Updates",
+  "Sin Notas solo consulta GitHub cuando pulsás el botón. En escritorio, el paquete se verifica con la firma del actualizador antes de instalarse.": "Sin Notas only contacts GitHub when you press the button. On desktop the package is verified with the updater signature before installing.",
+  "Esta versión se actualiza desde la Snap Store. No hace falta buscar actualizaciones aquí.": "This build updates through the Snap Store. You don't need to check for updates here.",
+  "Esta versión se actualiza desde Flatpak. No hace falta buscar actualizaciones aquí.": "This build updates through Flatpak. You don't need to check for updates here.",
+  "Versión instalada": "Installed version",
+  "Nueva versión": "New version",
+  "Buscar actualizaciones": "Check for updates",
+  "Buscando…": "Checking…",
+  "Descargar e instalar": "Download and install",
+  "Descargar APK": "Download APK",
+  "Notas de la versión": "Release notes",
+  "Orden de repaso": "Review order",
+  "Elige qué tarjetas quieres ver primero al iniciar una sesión de repaso.": "Choose which cards you want to see first when starting a review session.",
+  "Orden de las tarjetas": "Card order",
+  "Nuevas primero": "New first",
+  "Repasos primero": "Reviews first",
+  "Orden mezclado": "Mixed order",
+  "Orden de repaso actualizado.": "Review order updated.",
+  "Recalcular propiedades": "Recalculate properties",
+  "Actualiza las propiedades de programación de todas las tarjetas del vault.": "Update the scheduling properties of every card in the vault.",
+  "Acción de recálculo": "Recalculation action",
+  "Recalcular vencimientos": "Recalculate due dates",
+  "Restablecer FSRS": "Reset FSRS",
+  "Recalcula la fecha de vencimiento usando la última revisión y el intervalo programado.": "Recalculate the due date from the last review and the scheduled interval.",
+  "Elimina las propiedades de programación FSRS y convierte todas las tarjetas en nuevas. Esta acción no se puede deshacer.": "Remove FSRS scheduling properties and turn every card into a new card. This action cannot be undone.",
+  "Aplicar recálculo": "Apply recalculation",
+  "Recalcular fechas": "Recalculate dates",
+  "Restablecer propiedades": "Reset properties",
+  "Procesando...": "Processing...",
+  "Se eliminará el progreso de repaso de todas las tarjetas y volverán a contar como nuevas. ¿Continuar?": "Review progress will be removed from every card and they will count as new again. Continue?",
+  "Tarjetas actualizadas:": "Cards updated:",
+  "No había tarjetas que actualizar.": "There were no cards to update.",
+  "No se pudieron actualizar las propiedades de las tarjetas.": "The card properties could not be updated.",
+  "Tema Visual": "Theme",
+  "Color de interfaz": "Interface color",
+  "Modo Oscuro / Claro": "Dark / light mode",
+  "Alternar Modo": "Toggle theme",
+  "Modo Claro Activo": "Light mode active",
+  "Modo Oscuro Activo": "Dark mode active",
+  "Estilo visual": "Visual style",
+  "Simple: plano, sin efectos · Dracula: oscuro distinto. Ambos siguen el color de interfaz.": "Simple: plain, no effects · Dracula: different dark. Both follow the interface color.",
+  "Tipografía del Editor": "Editor typography",
+  "Tipografía del sistema": "System typography",
+  "Selecciona cualquier tipografía instalada en tu dispositivo.": "Choose any font installed on your device.",
+  "-- Seleccionar tipografía del sistema --": "-- Select system font --",
+  "Seleccionar tipografía instalada en el sistema": "Select an installed system font",
+  "Tipografía del sistema aplicada": "System font applied",
+  "Sans (sistema)": "Sans (system)",
+  "Serif (Georgia)": "Serif (Georgia)",
+  "Mono (sistema)": "Mono (system)",
+  "Tamaño de texto": "Text size",
+  "Ajusta por separado la interfaz, el editor, los títulos y las tarjetas. Se guarda en este dispositivo y se comparte con la versión móvil.": "Adjust the interface, editor, headings and cards separately. It is saved on this device and shared with the mobile version.",
+  "Interfaz": "Interface",
+  "Texto del editor": "Editor text",
+  "Título de página": "Page title",
+  "Encabezado H1": "Heading H1",
+  "Encabezado H2": "Heading H2",
+  "Encabezado H3": "Heading H3",
+  "Encabezado H4": "Heading H4",
+  "Encabezado H5": "Heading H5",
+  "Encabezado H6": "Heading H6",
+  "Texto de tarjeta": "Card text",
+  "Restaurar tamaños": "Reset sizes",
+  "Tamaños de texto restaurados": "Text sizes reset",
+  "Ancho de página": "Page width",
+  "Atajos de teclado para Flashcards": "Flashcard keyboard shortcuts",
+  "Elige la tecla que califica cada tarjeta durante el repaso.": "Choose the key that rates each card during review.",
+  "Tecla para \"Otra vez\"": "Key for \"Again\"",
+  "Tecla para \"Difícil\"": "Key for \"Hard\"",
+  "Tecla para \"Bien\"": "Key for \"Good\"",
+  "Tecla para \"Fácil\"": "Key for \"Easy\"",
+  "Tiempo de enfoque (minutos)": "Focus time (minutes)",
+  "Descanso corto (minutos)": "Short break (minutes)",
+  "Descanso largo (minutos)": "Long break (minutes)",
+  "Sesiones antes del descanso largo": "Sessions before long break",
+  "Mostrar en la barra superior": "Show in the top bar",
+  "Configura los tiempos de enfoque y descanso, y cuántas sesiones completar antes de un descanso largo.": "Set focus and break durations and how many sessions to complete before a long break.",
+  "Enfoque": "Focus",
+  "Descanso corto": "Short break",
+  "Descanso largo": "Long break",
+  "Iniciar": "Start",
+  "Pausar": "Pause",
+  "Reiniciar": "Reset",
+  "Ciclo completado. Disfruta de un descanso largo.": "Cycle complete. Enjoy a long break.",
+  "Pomodoro completado. Tómate un descanso corto.": "Pomodoro complete. Take a short break.",
+  "Descanso completado. ¡A seguir repasando!": "Break complete. Back to reviewing!",
+  "Exportar notas": "Export notes",
+  "Exportar a PDF": "Export as PDF",
+  "Markdown (.zip)": "Markdown (.zip)",
+  "Exportar CSV": "Export CSV",
+  "Exportar JSON": "Export JSON",
+  "Mantenimiento": "Maintenance",
+  "Estas acciones no eliminan tus notas. La limpieza de adjuntos solo borra imágenes de": "These actions do not delete your notes. Attachment cleanup only removes images from",
+  "que no estén referenciadas en ninguna nota.": "that are not referenced by any note.",
+  "Borrar propiedades de los bullets": "Clear bullet properties",
+  "Borrar caché": "Clear cache",
+  "Borrar estadísticas de repaso": "Clear review statistics",
+  "Borrar estadísticas": "Clear statistics",
+  "Se borrarán las estadísticas de repaso: repasos de hoy, repasos totales, minutos de enfoque y los puntos del átomo de progreso. La programación FSRS de las tarjetas no se modificará. ¿Continuar?": "Review statistics will be cleared: today's reviews, total reviews, focus minutes and progress atom points. Card FSRS scheduling will not be changed. Continue?",
+  "Estadísticas de repaso borradas.": "Review statistics cleared.",
+  "Recargar aplicación": "Reload application",
+  // Sección "Mantenimiento" de Ajustes > Avanzado (botones y toasts).
+  "Eliminar imágenes no usadas de assets": "Remove unused asset images",
+  "Borrar todos los snapshots": "Delete all snapshots",
+  "Borrar propiedades": "Clear properties",
+  "Eliminar imágenes": "Remove images",
+  "Borrar todos": "Delete all",
+  "Recargar": "Reload",
+  "La limpieza de adjuntos requiere la aplicación de escritorio.": "Attachment cleanup requires the desktop application.",
+  "Se revisarán todas las notas y se eliminarán de assets las imágenes que no estén referenciadas en ninguna página. Esta acción no se puede deshacer. ¿Continuar?": "All pages will be scanned and images in assets that are not referenced by any page will be deleted. This action cannot be undone. Continue?",
+  "Guardando notas antes de revisar los adjuntos…": "Saving pages before scanning attachments…",
+  "Buscando imágenes no usadas…": "Scanning for unused images…",
+  "No se encontraron imágenes en la carpeta assets.": "No images found in the assets folder.",
+  "No había imágenes sin usar en assets.": "There were no unused images in assets.",
+  "No se pudo completar la limpieza de adjuntos.": "Attachment cleanup could not be completed.",
+  "No se pudieron eliminar los adjuntos sin usar. Revisa la consola.": "Could not remove unused attachments. Check the console.",
+  "Se eliminarán las propiedades de todos los bullets y el Frontmatter de las páginas del vault activo. El texto de las notas y sus archivos se conservarán. ¿Continuar?": "The properties of all bullets and the frontmatter of the active vault's pages will be removed. Page text and files will be preserved. Continue?",
+  "No se pudieron guardar todas las notas. Revisa la consola y el estado del vault.": "Could not save all pages. Check the console and the vault state.",
+  "Se borrarán los cachés web temporales y los datos de sesión de esta aplicación. Las notas, archivos y preferencias guardadas se conservarán.": "Temporary web caches and this application's session data will be cleared. Notes, files and saved preferences are preserved.",
+  "Caché temporal borrada.": "Temporary cache cleared.",
+  "No se pudo borrar toda la caché temporal. Revisa la consola para más detalles.": "Could not clear the whole temporary cache. Check the console for details.",
+  "Se borrarán todas las versiones guardadas de todas las notas en .sinnotas/chronos/. Las notas originales no se tocarán. ¿Continuar?": "All saved versions of all pages in .sinnotas/chronos/ will be deleted. The original pages will not be touched. Continue?",
+  "La interfaz se recargará. Las notas guardadas no se modificarán.": "The interface will reload. Saved pages will not be modified.",
+  "Renombrar nota": "Rename page",
+  "Nombre de la nota": "Page name",
+  "Cancelar": "Cancel",
+  "Guardar": "Save",
+  "Confirmar acción": "Confirm action",
+  "Menú": "Menu",
+  "Texto": "Text",
+  "Bullet": "Bullet",
+  "Hueco Cloze (==...==)": "Cloze deletion (==...==)",
+  "Crear Hueco Cloze (==...==)": "Create Cloze deletion (==...==)",
+  "Crear Flashcard (#card)": "Create flashcard (#card)",
+  "Convertir a Flashcard (#card)": "Convert to flashcard (#card)",
+  "Limpiar formato": "Clear formatting",
+  "Navegación": "Navigation",
+  "Menú de navegación": "Navigation menu",
+  "Crear Oclusión de Imagen": "Create image occlusion",
+  "Insertar imagen": "Insert image",
+  "Alternar Tarea (TODO / DOING / DONE)": "Toggle task (TODO / DOING / DONE)",
+  "Mover arriba": "Move up",
+  "Mover abajo": "Move down",
+  "Copiar": "Copy",
+  "Copiar selección": "Copy selection",
+  "Copiar bullet": "Copy bullet",
+  "Pegar": "Paste",
+  "Pegar selección": "Paste selection",
+  "Pegar sin formato": "Paste without formatting",
+  "No se pudo acceder al portapapeles.": "The clipboard could not be accessed.",
+  "El texto pegado era demasiado largo y se recortó.": "The pasted text was too long and was trimmed.",
+  "Copiar bullets seleccionados": "Copy selected bullets",
+  "Cortar": "Cut",
+  "Cortar selección": "Cut selection",
+  "Cortar bullet": "Cut bullet",
+  "Cortar bullets seleccionados": "Cut selected bullets",
+  "Borrar selección": "Delete selection",
+  "Borrar bullet": "Delete bullet",
+  "Borrar bullets seleccionados": "Delete selected bullets",
+  "Eliminar bullet": "Delete bullet",
+  "Abrir nota": "Open page",
+  "Renombrar": "Rename",
+  "Copiar enlace [[...]]": "Copy link [[...]]",
+  "Eliminar nota": "Delete page",
+  "Oclusión de imagen": "Image occlusion",
+  "Arrastra sobre la imagen para crear tarjetas que oculten zonas.": "Drag on the image to create cards that hide areas.",
+  "Guardar oclusiones": "Save occlusions",
+  "Flashcards": "Flashcards",
+  "Repasar": "Review",
+  "Explorador de Tarjetas": "Card browser",
+  "Explorador de tarjetas": "Card browser",
+  "Mostrar Respuesta (Espacio)": "Show answer (Space)",
+  "Reiniciar Sesión": "Restart session",
+  "Otra vez": "Again",
+  "Difícil": "Hard",
+  "Bien": "Good",
+  "Fácil": "Easy",
+  "BÁSICA": "BASIC",
+  "CLOZE": "CLOZE",
+  "IMAGEN": "IMAGE",
+  "Origen:": "Source:",
+  "Próximo repaso": "Next review",
+  "Último repaso": "Last reviewed",
+  "Creada": "Created",
+  "Sin registro": "Not recorded",
+  "Fecha no válida": "Invalid date",
+  "Fecha": "Date",
+  "Fecha de vencimiento": "Due date",
+  "Editar fecha de vencimiento": "Edit due date",
+  "Asignar fecha de vencimiento": "Set due date",
+  "Déjalo vacío para quitar la fecha.": "Leave it empty to remove the due date.",
+  "Fecha de vencimiento actualizada.": "Due date updated.",
+  "Fecha de vencimiento eliminada.": "Due date removed.",
+  "No se encontró la nota de la tarea.": "The task's page could not be found.",
+  "No se encontró la tarea.": "The task could not be found.",
+  "No se pudo guardar la fecha de vencimiento.": "The due date could not be saved.",
+  "Añadir tarea": "Add task",
+  "Nueva tarea": "New task",
+  "Título de la tarea": "Task title",
+  "Se añadirá a la nota diaria de la fecha indicada.": "It will be added to the daily note for the selected date.",
+  "Fecha de la nota diaria": "Daily note date",
+  "Déjalo vacío para usar la fecha de hoy.": "Leave it empty to use today's date.",
+  "Tarea añadida a la nota diaria.": "Task added to the daily note.",
+  "No se pudo añadir la tarea.": "The task could not be added.",
+  "Ordenar por:": "Sort by:",
+  "Vencimiento": "Due date",
+  "Creación": "Creation date",
+  "Sin tarjetas": "No cards",
+  "Sin tarjetas pendientes": "No cards due",
+  "¡Completado!": "Completed!",
+  "¡Has completado todas las tarjetas pendientes con FSRS-4.5!": "You've completed all cards due for review with FSRS-4.5!",
+  "No hay tarjetas pendientes de repaso. Vuelve cuando llegue su fecha de vencimiento.": "No cards are due for review. Come back when they are due.",
+  "No se encontraron tarjetas en las notas del vault.": "No cards were found in this vault.",
+  "Notas incluidas en el repaso": "Notes included in review",
+  "Marcar todo": "Select all",
+  "Ninguna": "None",
+  "Guardar selección": "Save selection",
+  "Mazos": "Decks",
+  "Mazos de repaso": "Review decks",
+  "Deck activo": "Active deck",
+  "Mazo activo": "Active deck",
+  "Mis mazos": "My decks",
+  "Elegir, crear o editar mazos de repaso": "Choose, create or edit review decks",
+  "Notas del mazo": "Deck notes",
+  "Editar las notas que aportan tarjetas": "Edit which notes provide cards",
+  "Nombre del mazo": "Deck name",
+  "Nombre del mazo no puede estar vacío.": "The deck name cannot be empty.",
+  "El nombre del mazo no puede estar vacío.": "The deck name cannot be empty.",
+  "Nuevo mazo": "New deck",
+  "Editar mazo": "Edit deck",
+  "Guardar mazo": "Save deck",
+  "Crear mazo": "Create deck",
+  "Editar": "Edit",
+  "Eliminar": "Delete",
+  "Confirmar": "Confirm",
+  "ACTIVO": "ACTIVE",
+  "pendiente": "pending",
+  "pendientes": "pending",
+  "nota seleccionada": "note selected",
+  "notas seleccionadas": "notes selected",
+  "Ya existe un mazo con ese nombre.": "A deck with that name already exists.",
+  "El nombre no puede superar los 80 caracteres.": "The name cannot exceed 80 characters.",
+  "Todavía no hay mazos personalizados. Crea uno con “+ Nuevo mazo”.": "There are no custom decks yet. Create one with “+ New deck”.",
+  "Solo un mazo está activo a la vez. Los mazos se guardan en la bóveda y se sincronizan; el mazo activo es una preferencia de este dispositivo.": "Only one deck is active at a time. Decks are stored in the vault and sync across devices; the active deck is a preference of this device.",
+  "Pulsa «Confirmar» para eliminar el mazo.": "Press “Confirm” to delete the deck.",
+  "El mazo activo no tiene notas": "The active deck has no notes",
+  "Editar el mazo de repaso o crear uno nuevo": "Edit the review deck or create a new one",
+  "Cambios sin guardar": "Unsaved changes",
+  "Buscar en el título...": "Search title...",
+  "Filtrar notas por palabra en el título": "Filter notes by word in the title",
+  "Orden de la lista de notas": "Note list sorting",
+  "Nombre A-Z": "Name A-Z",
+  "Nombre Z-A": "Name Z-A",
+  "Creación (más reciente)": "Created (newest first)",
+  "Creación (más antigua)": "Created (oldest first)",
+  "No hay notas cuyo título coincida con la búsqueda.": "No note titles match the search.",
+  "No hay notas seleccionadas: no se repasará ninguna tarjeta.": "No notes selected: no cards will be reviewed.",
+  "Sin tarjetas pendientes en las notas seleccionadas": "No pending cards in the selected notes",
+  "No hay tarjetas pendientes en las notas seleccionadas. Vuelve cuando llegue su fecha de vencimiento o amplía la selección de notas.": "There are no cards due in the selected notes. Come back when they are due or expand the note selection.",
+  "No hay ninguna nota seleccionada para el repaso. Marca y guarda las notas en Ajustes › Flashcards.": "No notes are selected for review. Check and save the notes in Settings › Flashcards.",
+  "No se encontraron notas con flashcards en el vault.": "No notes with flashcards were found in the vault.",
+  "Se repasarán las tarjetas de todas las notas.": "All notes' cards will be reviewed.",
+  "Se repasarán solo las tarjetas de las notas seleccionadas.": "Only the cards of the selected notes will be reviewed.",
+  "Cada nota actúa como un mazo que contiene sus flashcards. Selecciona las notas cuyas tarjetas se repasarán y pulsa \"Guardar selección\"; las desmarcadas quedarán excluidas de la sesión de repaso.": "Each note acts as a deck that contains its flashcards. Select the notes whose cards will be reviewed and press \"Save selection\"; unchecked ones will be excluded from the review session.",
+  "tarjeta": "card",
+  "tarjetas": "cards",
+  "No se pudo renombrar la nota.": "The page could not be renamed.",
+  "No hay cambios que deshacer.": "There are no changes to undo.",
+  "No hay cambios que rehacer.": "There are no changes to redo.",
+  "Cambio deshecho.": "Change undone.",
+  "Cambio rehecho.": "Change redone.",
+  "Snapshots manuales": "Manual snapshots",
+  "Snapshots por nota": "Snapshots per page",
+  "Seguimiento de snapshots activos": "Active snapshot tracking",
+  "Abrir historial de esta nota": "Open this page's history",
+  "No hay notas con snapshots activos.": "No pages have active snapshots.",
+  "Los snapshots se activan desde el historial de cada nota. Aquí puedes ver las notas que los tienen activos, cuántas versiones guardan y borrarlas. Al vencer el periodo configurado, las versiones se eliminan automáticamente y solo queda la nota original. Las copias viven en la carpeta interna .sinnotas/chronos/ dentro del vault.": "Snapshots are enabled from each page's history. Here you can see the pages that have them active, how many versions they keep, and delete them. When the configured period ends, versions are deleted automatically and only the original page remains. Copies live in the internal .sinnotas/chronos/ folder inside the vault.",
+  "Al activar se guarda una versión ahora y otra cada intervalo si la nota cambió. La ventana dura como máximo 30 días; al vencer, las versiones se eliminan y solo queda la nota original.": "Enabling saves one version now and another at each interval if the page changed. The window lasts at most 30 days; when it ends, versions are deleted and only the original page remains.",
+  "Los snapshots se guardan en .sinnotas/chronos/ mientras la nota esté activa. Al vencer el periodo o desactivarlos se eliminan.": "Snapshots are stored in .sinnotas/chronos/ while the page is active. When the period ends or they are disabled, they are deleted.",
+  "Guardado": "Saved",
+  "Snapshot automático programado": "Scheduled automatic snapshot",
+  "Snapshot inicial": "Initial snapshot",
+  "Desactivar snapshots": "Disable snapshots",
+  "Activar/Desactivar snapshots de esta nota": "Enable/disable snapshots for this page",
+  "Desactivar y eliminar": "Disable and delete",
+  "Desactivar los snapshots de esta nota eliminará todas las versiones guardadas. ¿Continuar?": "Disabling snapshots for this page will delete every saved version. Continue?",
+  "Borrar snapshots": "Delete snapshots",
+  "Snapshots eliminados.": "Snapshots deleted.",
+  "No se pudieron borrar los snapshots.": "Snapshots could not be deleted.",
+  "No se pudo cargar el seguimiento de snapshots.": "The active snapshot list could not be loaded.",
+  "Quedan": "Remaining",
+  "Cada": "Every",
+  "versión guardada": "version saved",
+  "versiones guardadas": "versions saved",
+  "SinNotas guarda cada cambio al instante en tu vault local. Los snapshots no se crean automáticamente: al activar una ventana, la aplicación registra versiones recuperables de tus notas durante ese periodo. Las copias se guardan en la carpeta interna .sinnotas/chronos/ dentro del vault.": "SinNotas saves every change instantly to your local vault. Snapshots are not created automatically: when you enable a window, the app records recoverable versions of your pages during that period. Copies live in the internal .sinnotas/chronos/ folder inside the vault.",
+  "Snapshots desactivados.": "Snapshots disabled.",
+  "Snapshots activados.": "Snapshots enabled.",
+  "Snapshots desactivados. Actívalos para registrar versiones automáticamente.": "Snapshots are off. Enable them to start recording versions automatically.",
+  "Snapshots activos": "Snapshots active",
+  "Snapshots no disponibles fuera de la aplicación.": "Snapshots are not available outside the app.",
+  "Snapshots en pausa: el reloj del sistema retrocedió.": "Snapshots paused: the system clock moved backwards.",
+  "La ventana de snapshots expiró. Actívala de nuevo para seguir registrando versiones.": "The snapshot window expired. Enable it again to keep recording versions.",
+  "La duración debe estar entre 1 y 30 días.": "Duration must be between 1 and 30 days.",
+  "El intervalo debe estar entre 1 y 168 horas.": "The interval must be between 1 and 168 hours.",
+  "El límite diario debe estar entre 1 y 96 snapshots.": "The daily limit must be between 1 and 96 snapshots.",
+  "No se pudieron activar los snapshots. Revisa el vault e inténtalo de nuevo.": "Snapshots could not be enabled. Check the vault and try again.",
+  "No se pudieron desactivar los snapshots.": "Snapshots could not be disabled.",
+  "No se pudo restaurar el snapshot.": "The snapshot could not be restored.",
+  "Activa una ventana de snapshots o espera al siguiente intervalo para registrar versiones.": "Enable a snapshot window or wait for the next interval to record versions.",
+  "Activar snapshots": "Enable snapshots",
+  "Desactivar": "Disable",
+  "Abrir historial": "Open history",
+  "Duración (días)": "Duration (days)",
+  "Intervalo (horas)": "Interval (hours)",
+  "Límite diario por nota": "Daily limit per page",
+  "La ventana dura como máximo 30 días. Solo se crea un snapshot si la nota cambió y el intervalo ya se cumplió.": "The window lasts at most 30 days. A snapshot is only created if the page changed and the interval has elapsed.",
+  "Los snapshots se guardan en .sinnotas/chronos/ solo mientras una ventana está activa.": "Snapshots are stored in .sinnotas/chronos/ only while a window is active.",
+  "Carpeta": "Folder",
+  "quedan": "remaining",
+  "cada": "every",
+  "máx.": "max.",
+  "al día": "per day",
+  "sin límite diario": "no daily limit",
+  "Snapshot": "Snapshot",
+  "Referencias vinculadas": "Linked references",
+  "Todas las Páginas": "All pages",
+  "Título": "Title",
+  "Bloques": "Blocks",
+  "Tipo": "Type",
+  "Actualizado": "Updated",
+  "Acciones": "Actions",
+  "Diario": "Journal",
+  "Página": "Page",
+  "Reciente": "Recent",
+  "Eliminar página": "Delete page",
+  "Selecciona una fecha para crear tu primer diario.": "Select a date to create your first journal.",
+  "Selecciona una versión para inspeccionar su contenido.": "Select a revision to preview its contents.",
+  "Vista previa de la versión": "Revision preview",
+  "Restaurar esta Versión": "Restore this revision",
+  "Sin snapshots previos aún.": "No previous snapshots yet.",
+  "Tareas activas": "Active tasks",
+  "Tarea completada": "Task completed",
+  "puntos para el átomo de progreso": "points for the progress atom",
+  "Por hacer": "TODO",
+  "Haciendo": "DOING",
+  "Hecho": "DONE",
+  "Área": "Area",
+  "Todavía no hay áreas ocultas. Arrastra sobre la imagen para añadir una.": "No occlusion areas yet. Drag on the image to add one.",
+  "Eliminar área": "Delete area",
+  "Cambiar tema": "Toggle theme",
+  "Idioma de la interfaz": "Interface language",
+  "Automático (Sistema)": "Automatic (system)",
+  "Español": "Spanish",
+  "Inglés": "English",
+  "Herramientas de oclusión": "Occlusion tools",
+  "Forma": "Shape",
+  "Rectángulo": "Rectangle",
+  "Elipse": "Ellipse",
+  "Polígono": "Polygon",
+  "Color": "Color",
+  "Pista / texto": "Hint / text",
+  "Escribe una pista para el área seleccionada": "Enter a hint for the selected area",
+  "Reducir al 90%": "Scale to 90%",
+  "Ampliar al 110%": "Scale to 110%",
+  "Finalizar polígono": "Finish polygon",
+  "Dibuja el polígono haciendo clic en cada punto y finalízalo con doble clic.": "Draw a polygon by clicking each point, then double-click to finish.",
+  "Buscar": "Search",
+  "Área seleccionada": "Selected area",
+  "Vault local": "Local vault",
+  "Welcome to SinNotas": "Bienvenido a SinNotas",
+  "Dyslexic": "Dislexia",
+  "Vistas de Flashcards": "Flashcard views",
+  "Cargando preguntas de tus notas...": "Loading questions from your notes...",
+  "Respuesta revelada aquí.": "Revealed answer goes here.",
+  "Tarjeta 0 de 0": "Card 0 of 0",
+  "0 tarjetas": "0 cards",
+  "0 tareas activas": "0 active tasks",
+  "0 páginas": "0 pages",
+  "Seguimiento de tareas": "Task board",
+  "Ocultar completados": "Hide completed",
+  "POR HACER (TODO / LATER)": "TO DO (TODO / LATER)",
+  "HACIENDO (DOING / NOW)": "DOING (DOING / NOW)",
+  "HECHO (DONE)": "DONE (DONE)",
+  "Mover a HACIENDO": "Move to Doing",
+  "Título de Página": "Page title",
+  "Última Actualización": "Last updated",
+  "Historial de Versiones: Nota": "Page version history",
+  "Imagen para oclusión": "Image for occlusion",
+  "No se encontró el bloque de la imagen.": "Image block not found.",
+  "No se encontró el bloque donde guardar las oclusiones.": "Could not find the block to save occlusions.",
+  "La selección de vaults requiere la aplicación de escritorio.": "Vault selection requires the desktop application.",
+  "No se pudo abrir el vault. Revisa los permisos de la carpeta e inténtalo de nuevo.": "Could not open the vault. Check folder permissions and try again.",
+  "No se pudo acceder al vault local de la aplicación.": "Could not access the application's local vault.",
+  "No se pudo activar la importación de imágenes por arrastre.": "Could not enable drag-and-drop image import.",
+  "Ocurrió un error en un diálogo. Se cerró para liberar la interfaz.": "A dialog encountered an error and was closed to restore the interface.",
+  "No se pudo cargar la imagen. Se cerró el editor de oclusiones.": "Could not load the image. The occlusion editor was closed.",
+  "No se pudo abrir la imagen. Se cerró el editor de oclusiones.": "Could not open the image. The occlusion editor was closed.",
+  "No se pudieron guardar las oclusiones. El editor se cerrará sin conservar esos cambios.": "Could not save the occlusions. The editor will close without keeping those changes.",
+  "Caché temporal borrada": "Temporary cache cleared",
+  "No se pudo exportar. Revisa la consola para más detalles.": "Export failed. See the console for details.",
+  "Abriendo vista de impresión para guardar como PDF.": "Opening print view to save as PDF.",
+  "El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes e inténtalo de nuevo.": "The browser blocked the print window. Allow pop-ups and try again.",
+  "No se pudo preparar el PDF. Revisa la consola para más detalles.": "Could not prepare the PDF. See the console for details.",
+  "No se encontró el bloque donde insertar la imagen.": "Could not find the block to insert the image.",
+  "No se pudo copiar la imagen al vault. Comprueba su formato y tamaño (máximo 5 MB).": "Could not copy the image to the vault. Check its format and size (maximum 5 MB).",
+  "No hay retroenlaces vinculados a esta página.": "No backlinks are linked to this page.",
+  "Propiedades de página": "Page properties",
+  "¿Estás seguro de que deseas eliminar permanentemente esta página?": "Are you sure you want to permanently delete this page?",
+  "Página eliminada con éxito": "Page deleted successfully",
+  "Guardado automático de cambios": "Changes saved automatically",
+  "¿Deseas restaurar la nota a esta versión?": "Restore the page to this revision?",
+  "¡Nota restaurada con éxito a la versión seleccionada!": "Page restored to the selected revision.",
+  "El portapapeles no está disponible.": "Clipboard is unavailable.",
+  "Mié": "Wed",
+  "Sáb": "Sat",
+  "Dom": "Sun",
+  "Lun": "Mon",
+  "Mar": "Tue",
+  "Jue": "Thu",
+  "Vie": "Fri",
+  "Mes anterior": "Previous month",
+  "Mes siguiente": "Next month",
+  "diario existente": "existing journal",
+  "crear diario": "create journal",
+  "Por hacer (Después)": "To Do (TODO / LATER)",
+  "En progreso (Haciendo)": "Doing (DOING / NOW)",
+  "Completado (Finalizado)": "Done (DONE)",
+  "Borrar propiedades del bullet": "Clear bullet properties",
+  "Insertar query / consulta": "Insert query / search",
+  "Mando (Joystick)": "Gamepad (Controller)",
+  "Gamepad (Mando)": "Gamepad (Controller)",
+  "Mando desactivado": "Gamepad disabled",
+  "Mando conectado": "Gamepad connected",
+  "Mando no detectado": "Gamepad not detected",
+  "Activar soporte de gamepad": "Enable gamepad support",
+  "Tipo de mando": "Controller type",
+  "Detectar mando": "Detect controller",
+  "Buscando gamepad... pulse un botón...": "Searching for gamepad... press a button...",
+  "Configura un mando Bluetooth o USB para controlar Flashcards y otras funciones.": "Set up a Bluetooth or USB controller to control Flashcards and other functions.",
+  "Fijar nota": "Pin note",
+  "Desfijar nota": "Unpin note",
+  "Asigna los botones del mando a las respuestas de FSRS (Otra vez, Difícil, Bien, Fácil).": "Assign controller buttons to the FSRS ratings (Again, Hard, Good, Easy).",
+  "Mapeo de botones para Flashcards": "Button mapping for Flashcards",
+  "Botón para": "Button for",
+  "No asignado": "Not assigned",
+  "Mapeo de botones adicionales": "Additional button mapping",
+  "Documentación de uso": "Usage guide",
+  "Panel de productividad": "Productivity panel",
+  // Ajustes > Grafo.
+  "Grafo": "Graph",
+  "Secciones de ajustes": "Settings sections",
+  "Grupos de color por nombre": "Color groups by name",
+  "Pinta los nodos cuyo título contenga el texto indicado. La regla más específica (texto más largo) tiene prioridad y los colores manuales de cada nota siguen por encima de los grupos.": "Colors nodes whose title contains the given text. The most specific rule (longest text) wins, and each page's manual color still takes precedence over the groups.",
+  "Texto del nombre (ej. Diario, Proyecto…)": "Name text (e.g. Journal, Project…)",
+  "Texto del nombre para el grupo de color": "Name text for the color group",
+  "Color del grupo": "Group color",
+  "Añadir grupo": "Add group",
+  "Fuerzas de la simulación": "Simulation forces",
+  "Repulsión": "Repulsion",
+  "Fuerza de enlaces": "Link strength",
+  "Distancia de enlaces": "Link distance",
+  "Atracción al centro": "Center attraction",
+  "Fuerza de colisión": "Collision strength",
+  "Amortiguación": "Damping",
+  "Tamaño de los nodos": "Node size",
+  "Radio base": "Base radius",
+  "Radio por conexión": "Radius per connection",
+  "Radio máximo": "Maximum radius",
+  "Líneas y títulos": "Lines and titles",
+  "Grosor de enlaces": "Link width",
+  "Grosor resaltado": "Highlight width",
+  "Zoom para mostrar títulos": "Zoom to show titles",
+  "Los títulos aparecen con fundido al acercar hasta este zoom; al pasar el cursor o seleccionar un nodo se muestran siempre.": "Node titles fade in as you zoom up to this level; hovering or selecting a node always shows them.",
+  "Restablecer valores del grafo": "Reset graph values",
+  "Ajustes del grafo restablecidos.": "Graph settings reset.",
+  "📌 Fijadas": "📌 Pinned",
+  "Recientes": "Recent",
+  "Ver todas las notas": "View all pages",
+  "Abrir con aplicación predeterminada": "Open with default app",
+  "No se pudo abrir la nota con la aplicación predeterminada.": "Could not open the page with the default application.",
+  "En el contenido": "In page content",
+  // Vista móvil de repaso (cadenas propias de review-app.ts).
+  "Seleccionar notas para repasar": "Select notes to review",
+  "Seleccionar notas": "Select notes",
+  "Cambiar idioma": "Change language",
+  "Idioma": "Language",
+  "Cambiar apariencia": "Change appearance",
+  "Actualizar tarjetas": "Refresh cards",
+  "Abrir otra bóveda": "Open another vault",
+  "Progreso del repaso": "Review progress",
+  "Todo al día": "All caught up",
+  "No hay tarjetas pendientes en esta bóveda.": "There are no cards due in this vault.",
+  "Deshacer": "Undo",
+  "Rehacer": "Redo",
+  "Deshacer último repaso": "Undo last review",
+  "Deshacer cambio": "Undo change",
+  "Rehacer repaso": "Redo review",
+  "Rehacer cambio": "Redo change",
+  "Editar tarjeta": "Edit card",
+  "Mostrar respuesta": "Show answer",
+  "Cerrar editor": "Close editor",
+  "Pregunta": "Question",
+  "Respuesta": "Answer",
+  "Texto de la tarjeta": "Card text",
+  "Solo se modifica este bloque. Se conservan las propiedades FSRS, la etiqueta #card y el resto de la nota.": "Only this block is modified. FSRS properties, the #card tag and the rest of the page are preserved.",
+  "Cerrar apariencia": "Close appearance",
+  "Tema": "Theme",
+  "Claro": "Light",
+  "Oscuro": "Dark",
+  "Elige el tema de la app. Se guarda en este dispositivo y se comparte con la versión de escritorio.": "Choose the app theme. It is saved on this device and shared with the desktop version.",
+  "Color de acento": "Accent color",
+  "Colores de acento": "Accent colors",
+  "El color se guarda en este dispositivo y se comparte con la versión de escritorio.": "The color is saved on this device and shared with the desktop version.",
+  "Más opciones": "More options",
+  "Ajustes": "Settings",
+  "Ajustes de FSRS": "FSRS settings",
+  "FSRS 4.5": "FSRS 4.5",
+  "Retención deseada": "Target retention",
+  "Intervalo máximo (días)": "Maximum interval (days)",
+  "Pasos de aprendizaje": "Learning steps",
+  "Pasos de reaprendizaje": "Relearning steps",
+  "Parámetros FSRS-4.5": "FSRS-4.5 parameters",
+  "Configura la retención objetivo y los intervalos usados por el planificador. Los cambios se aplican a los próximos repasos; reprograma las tarjetas por separado si quieres actualizar sus vencimientos.": "Configure the target retention and the intervals used by the scheduler. Changes apply to upcoming reviews; reschedule cards separately if you want to update their due dates.",
+  "17 valores numéricos separados por comas. Cambiarlos manualmente sustituye la optimización automática de Anki.": "17 comma-separated numeric values. Changing them manually overrides Anki's automatic optimization.",
+  "Guardar configuración": "Save settings",
+  "Restaurar predeterminados": "Restore defaults",
+  "Configuración FSRS guardada.": "FSRS settings saved.",
+  "No se pudo guardar la configuración FSRS.": "Could not save the FSRS settings.",
+  "Revisa los pasos y los 17 parámetros numéricos de FSRS.": "Check the steps and the 17 numeric FSRS parameters.",
+  "Cerrar ajustes de FSRS": "Close FSRS settings",
+  "Abrir menú": "Open menu",
+  "Cerrar menú": "Close menu",
+  "Menú de repaso": "Review menu",
+  "Cerrar menú de repaso": "Close review menu",
+  "Repasar notas": "Review notes",
+  "Aprendizaje": "Learning",
+  "Repasa sin guardar el progreso FSRS": "Review without saving FSRS progress",
+  "Aprendizaje · sin guardar": "Learning · not saved",
+  "Modo aprendizaje activado: los repasos no se guardan.": "Learning mode on: reviews are not saved.",
+  "Modo aprendizaje desactivado: los repasos se guardan.": "Learning mode off: reviews are saved.",
+  "Abrir páginas y editor": "Open pages and editor",
+  "Volver al repaso": "Back to review",
+  "Modo repaso": "Review mode",
+  "Abrir el modo repaso": "Open review mode",
+  "Tamaño de texto global": "Global text size",
+  "Todos los textos de la app se adaptan a este tamaño.": "All app text follows this size.",
+  "Cambiar bóveda": "Change vault",
+  "Bóveda y mantenimiento": "Vault and maintenance",
+  "El idioma se guarda en este dispositivo.": "The language is saved on this device.",
+  "Cerrar ajustes": "Close settings",
+  "Abre el selector de notas con el botón ☰ y elige qué quieres repasar.": "Open the note selector with the ☰ button and choose what to review.",
+  "Abre Mazos con el botón ☰ y elige qué quieres repasar.": "Open Decks with the ☰ button and choose what to review.",
+  "Abrir otra bóveda solo está disponible en la aplicación.": "Opening another vault is only available in the app.",
+  "Bóveda abierta": "Vault opened",
+  "Bóveda actualizada con los últimos cambios.": "Vault updated with the latest changes.",
+  "Comprueba los permisos de la carpeta e inténtalo de nuevo.": "Check the folder permissions and try again.",
+  "El texto no puede estar vacío.": "Text cannot be empty.",
+  "Esta tarjeta de imagen no tiene una oclusión editable.": "This image card has no editable occlusion.",
+  "Imagen de la tarjeta": "Card image",
+  "La nota de esta tarjeta ya no está disponible.": "This card's page is no longer available.",
+  "La nota ya no está disponible.": "The page is no longer available.",
+  "La oclusión no cambió.": "The occlusion did not change.",
+  "La pregunta no puede estar vacía.": "The question cannot be empty.",
+  "La tarjeta cambió en otro dispositivo o nota; no se puede aplicar ese repaso.": "The card changed on another device or page; that review cannot be applied.",
+  "La URL de recurso falló; se intentará leer la imagen por IPC:": "Asset URL failed; trying to read the image over IPC:",
+  "Ninguna nota coincide con la búsqueda.": "No page matches the search.",
+  "Ninguna nota seleccionada": "No pages selected",
+  "No hay notas con tarjetas en esta bóveda.": "No pages with cards in this vault.",
+  "No hay tarjetas en esta bóveda. Abre otra carpeta para repasar sus notas.": "No cards in this vault. Open another folder to review its pages.",
+  "No hay tarjetas pendientes. Vuelve más tarde o actualiza la bóveda.": "No cards due. Come back later or refresh the vault.",
+  "No se encontró el bloque de la tarjeta.": "The card block was not found.",
+  "No se encontró el bloque de la tarjeta en la nota.": "The card block was not found in the page.",
+  "No se encontró la tarjeta del último repaso.": "The card from the last review was not found.",
+  "No se pudo abrir el selector de bóvedas:": "Could not open the vault picker:",
+  "No se pudo abrir la bóveda": "Could not open the vault",
+  "No se pudo abrir otra bóveda. Selecciona una carpeta con permiso de acceso.": "Could not open another vault. Choose a folder you can access.",
+  "No se pudo actualizar la oclusión del bloque.": "Could not update the block occlusion.",
+  "No se pudo cargar la bóveda de repaso:": "Could not load the review vault:",
+  "No se pudo cargar la imagen de esta tarjeta.": "Could not load this card's image.",
+  "No se pudo cargar la imagen para editar la oclusión.": "Could not load the image to edit the occlusion.",
+  "No se pudo guardar el cambio de repaso.": "Could not save the review change.",
+  "No se pudo guardar el cambio de repaso:": "Could not save the review change:",
+  "No se pudo guardar el cambio en la bóveda.": "Could not save the change to the vault.",
+  "No se pudo guardar el repaso de la tarjeta:": "Could not save the card review:",
+  "No se pudo guardar el repaso. Revisa los permisos de la bóveda.": "Could not save the review. Check the vault permissions.",
+  "No se pudo guardar la edición de la tarjeta:": "Could not save the card edit:",
+  "No se pudo guardar la oclusión:": "Could not save the occlusion:",
+  "No se pudo guardar la oclusión. Revisa los permisos de la bóveda.": "Could not save the occlusion. Check the vault permissions.",
+  "No se pudo guardar la tarjeta. Revisa los permisos de la bóveda.": "Could not save the card. Check the vault permissions.",
+  "No se pudo leer la imagen de la tarjeta:": "Could not read the card image:",
+  "No se pudo resolver la imagen de la oclusión:": "Could not resolve the occlusion image:",
+  "No se pudo resolver la imagen de la tarjeta:": "Could not resolve the card image:",
+  "No se pudo restaurar el historial de la nota:": "Could not restore the page history:",
+  "No se pudo sincronizar la bóveda móvil desde disco:": "Could not sync the mobile vault from disk:",
+  "Oclusión guardada. Propiedades y nota intactas.": "Occlusion saved. Properties and page intact.",
+  "Repasando todas las notas": "Reviewing all pages",
+  "Repaso rehecho.": "Review redone.",
+  "Sin notas seleccionadas": "No pages selected",
+  "Tarjeta guardada. Propiedades y nota intactas.": "Card saved. Properties and page intact.",
+  "Tarjetas actualizadas": "Cards updated",
+  "Último repaso deshecho.": "Last review undone.",
+  "Notas del repaso": "Review notes",
+  "Cerrar selector de notas": "Close note selector",
+  "Filtrar notas…": "Filter notes…",
+  "Filtrar notas": "Filter notes",
+  "Todas": "All",
+  "Anterior": "Previous",
+  "Siguiente": "Next",
+  "Notas con tarjetas": "Notes with cards",
+  "Solo las notas marcadas aportan tarjetas al repaso. La búsqueda no cambia la selección.": "Only checked notes contribute cards to the review. Searching does not change the selection.",
+  "Aplicar selección": "Apply selection",
+  "Editar oclusión": "Edit occlusion",
+  "Cerrar editor de oclusión": "Close occlusion editor",
+  "Arrastra la zona resaltada para moverla. Usa el tirador inferior derecho para cambiar el tamaño.": "Drag the highlighted area to move it. Use the bottom-right handle to resize it.",
+  "Imagen de la tarjeta de oclusión": "Occlusion card image",
+  "Zona de oclusión seleccionada": "Selected occlusion area",
+  "Guardar oclusión": "Save occlusion",
+  "Azul": "Blue",
+  "Verde": "Green",
+  "Violeta": "Violet",
+  "Ámbar": "Amber",
+  "Rosa": "Rose",
+  "Cian": "Cyan",
+  "Turquesa": "Teal",
+  "Índigo": "Indigo",
+  "Naranja": "Orange",
+  "Fucsia": "Fuchsia",
+  "Tema claro activado": "Light theme enabled",
+  "Tema oscuro activado": "Dark theme enabled",
+  "Atajos de teclado": "Keyboard shortcuts",
+  "Cerrar atajos": "Close shortcuts",
+  "Abrir o cerrar esta lista": "Open or close this list",
+  "Mostrar u ocultar la barra lateral": "Show or hide the sidebar",
+  "Buscar o crear una página": "Search or create a page",
+  "Cerrar ventanas y menús": "Close dialogs and menus",
+  "Crear un bullet nuevo": "Create a new bullet",
+  "Salto de línea dentro del bullet": "Line break inside the bullet",
+  "Sangrar bullet": "Indent bullet",
+  "Desangrar bullet": "Outdent bullet",
+  "Seleccionar bullets contiguos": "Select adjacent bullets",
+  "Unir con el bullet anterior": "Merge with the previous bullet",
+  "Mostrar la respuesta": "Show the answer",
+  "Calificar la tarjeta": "Rate the card",
+  "Las teclas de calificación se configuran en Ajustes → Flashcards.": "Rating keys are configured in Settings → Flashcards.",
+  "Elige tu bóveda": "Choose your vault",
+  "Selecciona la carpeta donde están tus notas. Sin Notas recordará el permiso para las próximas veces.": "Select the folder where your notes are. Sin Notas will remember the permission for next time.",
+  "Elegir carpeta": "Choose folder",
+  "No se pudo abrir la bóveda guardada. Elige la carpeta de nuevo para renovar el permiso.": "The saved vault could not be opened. Choose the folder again to renew the permission.",
+  "Última modificación (más reciente)": "Last modified (newest first)",
+  "Última modificación (más antigua)": "Last modified (oldest first)",
+  "Todavía no hay páginas en esta bóveda.": "There are no pages in this vault yet.",
+  "Bóvedas": "Vaults",
+  "Gestionar bóvedas": "Manage vaults",
+  "Cambia entre tus bóvedas o añade una carpeta. Si eliges una carpeta vacía, se preparará como bóveda nueva. Tus notas no se mueven.": "Switch between your vaults or add a folder. If you choose an empty folder, it will be prepared as a new vault. Your pages are not moved.",
+  "Cerrar gestor de bóvedas": "Close vault manager",
+  "Añadir bóveda…": "Add vault…",
+  "Todavía no hay bóvedas registradas. Añade una carpeta para empezar.": "No vaults registered yet. Add a folder to get started.",
+  "La gestión de varias bóvedas está disponible en la aplicación de escritorio.": "Managing multiple vaults is available in the desktop app.",
+  "La gestión de varias bóvedas requiere la aplicación de escritorio.": "Managing multiple vaults requires the desktop app.",
+  "Activa": "Active",
+  "Añade una carpeta existente como bóveda.": "Add an existing folder as a vault.",
+  "Haz clic en una bóveda para abrirla.": "Click a vault to open it.",
+  "No puedes quitar la bóveda que está activa.": "You cannot remove the active vault.",
+  "Quitar": "Remove",
+  "Abriendo bóveda…": "Opening vault…",
+  "No se pudo abrir la bóveda. Revisa que la carpeta siga existiendo.": "The vault could not be opened. Check that the folder still exists.",
+  "La selección de bóvedas requiere la aplicación de escritorio.": "Vault selection requires the desktop app.",
+  "No se pudo abrir la carpeta seleccionada. Revisa los permisos e inténtalo de nuevo.": "The selected folder could not be opened. Check permissions and try again.",
+  // T20: buscar dentro de la nota.
+  "Buscar en esta nota": "Search in this note",
+  "Buscar en esta nota…": "Search in this note…",
+  "Buscar dentro de la nota": "Search within the page",
+  "Coincidencia anterior (Mayús+Enter)": "Previous match (Shift+Enter)",
+  "Coincidencia anterior": "Previous match",
+  "Siguiente coincidencia (Enter)": "Next match (Enter)",
+  "Siguiente coincidencia": "Next match",
+  "Cerrar búsqueda (Esc)": "Close search (Esc)",
+  "Cerrar búsqueda": "Close search",
+  // T21: enlaces salientes.
+  "Enlaces salientes": "Outgoing links",
+  "Esta página no enlaza a ninguna otra nota.": "This page does not link to any other page.",
+  "enlace roto": "broken link",
+  "Alias": "Alias",
+  "Creando la nota": "Creating page",
+  "línea": "line",
+  // T5: vecindad del grafo.
+  "Vecindad": "Neighborhood",
+  "Ver todo el grafo": "Show full graph",
+  "Mostrar todas las notas del grafo": "Show all pages in the graph",
+  // T7 fase 1: panel de referencia.
+  "Abrir una nota de referencia al lado": "Open a reference page beside this one",
+  "Nota de referencia": "Reference page",
+  "Notas de referencia": "Reference pages",
+  "Referencia": "Reference",
+  "Buscar nota de referencia": "Search reference page",
+  "Buscar nota de referencia…": "Search reference page…",
+  "Busca y elige una nota para verla aquí.": "Search and choose a page to view it here.",
+  "Esta nota ya no existe en la bóveda.": "This page no longer exists in the vault.",
+  "Quitar nota de referencia": "Remove reference page",
+  "Añadir otra nota de referencia": "Add another reference page",
+  "Cerrar panel de referencia": "Close reference pane",
+  "No hay otras notas": "No other pages",
+  "Elige una nota para verla aquí.": "Choose a page to view it here.",
+  // Ajustes de Flashcards: subsecciones y accesos rápidos.
+  "General": "General",
+  "Subsecciones de Flashcards": "Flashcards subsections",
+  "Ajustes de Flashcards": "Flashcards settings",
+  "Abrir ajustes de Flashcards": "Open Flashcards settings",
+  "Ajustes de repaso": "Review settings",
+  "Abrir ajustes de repaso": "Open review settings",
+  "Ajustes de Pomodoro": "Pomodoro settings",
+  "Abrir ajustes de Pomodoro": "Open Pomodoro settings",
+  "Cambiar el modo del Pomodoro": "Change Pomodoro mode",
+  // Documentos (lector PDF).
+  "Documentos": "Documents",
+  "Lectura": "Reading",
+  "Biblioteca de documentos": "Document library",
+  "Enlazar PDF": "Link PDF",
+  "Ningún documento abierto": "No document open",
+  "Aún no hay documentos en el vault.": "There are no documents in the vault yet.",
+  "Abre un documento de la lista o enlaza un PDF.": "Open a document from the list or link a PDF.",
+  "El PDF se enlaza desde su ubicación original; no se copia dentro del vault.": "The PDF is linked from its original location; it is not copied into the vault.",
+  "Archivo original no encontrado": "Original file not found",
+  "Enlazado": "Linked",
+  "Este PDF está enlazado desde fuera del vault. SinNotas procesará el archivo con el lector PDF. Continúa solo si reconoces y confías en él.": "This PDF is linked from outside the vault. SinNotas will process it with the PDF reader. Continue only if you recognize and trust this file.",
+  "Abrir PDF": "Open PDF",
+  "Quitar enlace": "Remove link",
+  "Página anterior": "Previous page",
+  "Página siguiente": "Next page",
+  "Ajustar al ancho": "Fit to width",
+  "Editor al lado": "Editor alongside",
+  "Ocultar editor": "Hide editor",
+  "Mostrar el editor al lado": "Show editor alongside",
+  "Ocultar el editor lateral": "Hide side editor",
+  "Leyendo la biblioteca de documentos…": "Reading the document library…",
+  "Abriendo documento…": "Opening document…",
+  "Renderizando página…": "Rendering page…",
+  "Enlazando PDF…": "Linking PDF…",
+  "PDF enlazado.": "PDF linked.",
+  "Enlace eliminado. El archivo original no se ha modificado.": "Link removed. The original file was not modified.",
+  "No se pudo mostrar la página renderizada.": "The rendered page could not be displayed.",
+  "Conservar": "Keep",
+  "Siempre": "Always",
+  "1 día": "1 day",
+  "7 días": "7 days",
+  "30 días": "30 days",
+  "90 días": "90 days",
+  "Enlace siempre": "Link always",
+  "Tiempo de conservación del enlace": "Link retention time",
+  "Cuánto tiempo se conserva el enlace al importar": "How long the link is kept when importing",
+  "Caducidad del enlace del documento actual": "Expiry of the current document link",
+  "Caducidad del enlace": "Link expiry",
+  "Caduca el": "Expires on",
+  "Eliminar PDF": "Delete PDF",
+  "Capturar": "Capture",
+  "Seleccionar texto de la página": "Select text on the page",
+  "Capturar una región de la página": "Capture a region of the page",
+  "Texto seleccionado": "Selected text",
+  "Insertar en la nota": "Insert into note",
+  "Región capturada": "Captured region",
+  "Crear oclusión": "Create occlusion",
+  "Texto insertado en la nota.": "Text inserted into the note.",
+  "Texto copiado al portapapeles.": "Text copied to the clipboard.",
+  "No se pudo copiar el texto.": "The text could not be copied.",
+  "Esta página no tiene texto seleccionable (puede ser un escaneo).": "This page has no selectable text (it may be a scan).",
+  "Selecciona texto sobre la página para insertarlo en la nota.": "Select text on the page to insert it into the note.",
+  "Arrastra sobre la página para capturar una región.": "Drag over the page to capture a region.",
+  "La región es demasiado pequeña. Arrastra un área mayor.": "The region is too small. Drag a larger area.",
+  "Elige si quieres insertar la captura o crear una oclusión.": "Choose whether to insert the capture or create an occlusion.",
+  "Captura insertada en la nota.": "Capture inserted into the note.",
+  "Captura insertada. Dibuja las áreas que quieras ocultar.": "Capture inserted. Draw the areas you want to hide.",
+  "PDF eliminado de la biblioteca del vault.": "PDF deleted from the vault library.",
+  "El enlace se conservará hasta que lo quites manualmente.": "The link will be kept until you remove it manually.",
+  // Pomodoro: contador progresivo.
+  "Contador progresivo (cuenta el tiempo transcurrido)": "Progressive counter (counts elapsed time)",
+  "Contador progresivo": "Progressive counter",
+  "Configura los tiempos de enfoque y descanso, cuántas sesiones completar antes de un descanso largo y si el contador avanza o retrocede.": "Configure focus and break lengths, how many sessions to complete before a long break, and whether the counter counts up or down.",
+  // Bibliografía.
+  "Biblioteca": "Library",
+  "Bibliografía": "Bibliography",
+  "Recursos": "Items",
+  "Leyendo": "Reading",
+  "Completados": "Completed",
+  "Añadir recurso": "Add item",
+  "Buscar en la biblioteca...": "Search your library...",
+  "Buscar en la biblioteca": "Search your library",
+  "Tipos de recurso": "Item types",
+  "Filtrar por estado": "Filter by status",
+  "Todos": "All",
+  "Todos los estados": "All statuses",
+  "Libro": "Book",
+  "Vídeo": "Video",
+  "Artículo": "Article",
+  "Página web": "Web page",
+  "Pendiente": "To read",
+  "Pausado": "Paused",
+  "Completado": "Completed",
+  "No hay recursos que coincidan con los filtros.": "No items match the filters.",
+  "Todavía no hay recursos en tu bibliografía.": "There are no items in your bibliography yet.",
+  "Prueba con otra búsqueda o cambia los filtros.": "Try another search or change the filters.",
+  "Añade tu primer libro, vídeo, artículo o página web.": "Add your first book, video, article or web page.",
+  "Sin progreso definido": "No progress set",
+  "Progreso actual": "Current progress",
+  "Progreso total": "Total progress",
+  "Minutos": "Minutes",
+  "Portada": "Cover",
+  "Cambiar portada": "Change cover",
+  "Quitar portada": "Remove cover",
+  "Abrir nota principal": "Open main page",
+  "Eliminar recurso": "Delete item",
+  "Estado": "Status",
+  "Valoración": "Rating",
+  "Autor": "Author",
+  "Año": "Year",
+  "Enlace": "Link",
+  "Notas vinculadas": "Linked notes",
+  "Nueva nota": "New note",
+  "Sin notas todavía. Crea una nota vinculada para desarrollar este recurso.": "No notes yet. Create a linked page to develop this item.",
+  "No se pudo guardar el cambio.": "The change could not be saved.",
+  "Recurso eliminado.": "Item deleted.",
+  "No se pudo eliminar el recurso.": "The item could not be deleted.",
+  "Nueva entrada": "New entry",
+  "Crear recurso": "Create item",
+  "Páginas totales": "Total pages",
+  "URL de portada (opcional)": "Cover URL (optional)",
+  "URL de portada": "Cover URL",
+  "Elegir portada": "Choose cover",
+  "Creando…": "Creating…",
+  "El título es obligatorio.": "Title is required.",
+  "No se pudo crear el recurso. Prueba con otro título.": "The item could not be created. Try another title.",
+  "La nota se creará como página independiente y enlazará de vuelta a este recurso.": "The page will be created independently and will link back to this item.",
+  "No se pudo crear la nota. Prueba con otro título.": "The page could not be created. Try another title.",
+  "Se eliminará de la bibliografía:": "This will be removed from the bibliography:",
+  "La nota Markdown y sus datos se borrarán del vault.": "The Markdown page and its data will be deleted from the vault.",
+  "Formato de imagen no compatible. Usa PNG, JPG, WEBP, GIF, BMP o SVG.": "Unsupported image format. Use PNG, JPG, WEBP, GIF, BMP or SVG.",
+  "No se pudo guardar la portada en el vault.": "The cover could not be saved to the vault.",
+  "La imagen debe pesar menos de": "The image must be smaller than",
+  "en este entorno.": "in this environment.",
+  "Sin título": "Untitled",
+  // Bibliografía: búsqueda de metadatos en línea.
+  "Metadatos en línea": "Online metadata",
+  "Busca por DOI, ISBN o palabras clave en Crossref y Open Library. Solo se envía el texto que escribes.": "Search by DOI, ISBN or keywords in Crossref and Open Library. Only the text you type is sent.",
+  "Si no hay conexión, completa los campos a mano: la búsqueda nunca bloquea el formulario.": "If you are offline, fill in the fields manually: the search never blocks the form.",
+  "DOI, ISBN o palabras clave": "DOI, ISBN or keywords",
+  "Buscar metadatos por DOI, ISBN o palabras clave": "Search metadata by DOI, ISBN or keywords",
+  "Modo de búsqueda": "Search mode",
+  "Automático": "Automatic",
+  "DOI": "DOI",
+  "ISBN": "ISBN",
+  "Palabras clave": "Keywords",
+  "Buscar en línea": "Search online",
+  "Buscando metadatos…": "Searching metadata…",
+  "Buscando en Crossref y Open Library…": "Searching Crossref and Open Library…",
+  "Escribe un DOI, un ISBN o palabras clave.": "Enter a DOI, an ISBN or keywords.",
+  "Sin resultados. Prueba otras palabras clave o revisa el identificador.": "No results. Try other keywords or check the identifier.",
+  "resultados encontrados": "results found",
+  "Datos importados. Revisa los campos y pulsa Crear recurso.": "Data imported. Review the fields and press Create item.",
+  "La consulta no es válida. Revisa el DOI o el ISBN.": "The query is not valid. Check the DOI or ISBN.",
+  "No se encontró ningún recurso con esa consulta.": "No item was found for that query.",
+  "Demasiadas búsquedas seguidas. Espera unos segundos.": "Too many searches in a row. Wait a few seconds.",
+  "La búsqueda tardó demasiado. Revisa tu conexión.": "The search took too long. Check your connection.",
+  "No se pudo conectar. Revisa tu conexión.": "Could not connect. Check your connection.",
+  "El servicio de metadatos no respondió. Inténtalo más tarde.": "The metadata service did not respond. Try again later.",
+  "La respuesta del servicio era demasiado grande.": "The service response was too large.",
+  "El servicio devolvió una respuesta no válida.": "The service returned an invalid response.",
+  "La búsqueda en línea solo está disponible en la aplicación.": "Online search is only available in the app.",
+  "No se pudo completar la búsqueda.": "The search could not be completed.",
+};
+
+/**
+ * Traducciones al chino simplificado. Se mantiene el español como idioma
+ * canónico: la interfaz se escribe en español y este mapa la traduce.
+ */
+const chineseBySpanish: Record<string, string> = {
+  "Editor": "编辑器",
+  "Diarios": "日记",
+  "Páginas": "页面",
+  "Vista gráfica": "图谱视图",
+  "Haz clic en un nodo para ver su contenido · Arrastra para mover · Doble clic para restablecer": "点击节点预览内容 · 拖动以移动 · 双击以重置",
+  "Cerrar vista previa": "关闭预览",
+  "Navegación de la nota": "页面导航",
+  "Ir al inicio de la nota": "转到页面开头",
+  "Ir al final de la nota": "转到页面末尾",
+  "Contenido de la nota": "页面内容",
+  "Esta nota no tiene contenido.": "此页面没有内容。",
+  "Imagen": "图片",
+  "Tareas": "任务",
+  "Todas las páginas": "所有页面",
+  "Páginas recientes": "最近页面",
+  "Buscar o crear nota...": "搜索或创建页面…",
+  "No hay notas coincidentes.": "没有匹配的页面。",
+  "Crear nota": "创建页面",
+  "Seleccionar una carpeta de vault": "选择库文件夹",
+  "Colapsar / Desplegar Barra Lateral (Ctrl+B)": "折叠/展开侧边栏 (Ctrl+B)",
+  "Atrás": "后退",
+  "Adelante": "前进",
+  "Historial de Versiones (Snapshots)": "版本历史（快照）",
+  "Convertir en mapa conceptual": "转换为概念图",
+  "Mapa conceptual": "概念图",
+  "Bullets de la nota": "页面项目符号",
+  "Esta nota no tiene bullets para convertir en mapa.": "此页面没有可转换为图谱的项目符号。",
+  "Arrastra para mover · Rueda del ratón para hacer zoom · Doble clic para centrar": "拖动以平移 · 滚轮缩放 · 双击居中",
+  "Alejar": "缩小",
+  "Acercar": "放大",
+  "Centrar": "居中",
+  "Cerrar": "关闭",
+  "Eliminar Página Actual": "删除当前页面",
+  "Ajustes y Apariencia": "设置与外观",
+  "Configuración": "设置",
+  "Apariencia": "外观",
+  "Repaso": "复习",
+  "Progreso": "进度",
+  "Pomodoro": "番茄钟",
+  "Exportar": "导出",
+  "Avanzado": "高级",
+  // Ajustes > Avanzado: actualizaciones.
+  "Actualizaciones": "更新",
+  "Sin Notas solo consulta GitHub cuando pulsás el botón. En escritorio, el paquete se verifica con la firma del actualizador antes de instalarse.": "Sin Notas 仅在你点击按钮时访问 GitHub。桌面版会在安装前用更新签名验证安装包。",
+  "Esta versión se actualiza desde la Snap Store. No hace falta buscar actualizaciones aquí.": "此版本通过 Snap Store 更新。无需在此检查更新。",
+  "Esta versión se actualiza desde Flatpak. No hace falta buscar actualizaciones aquí.": "此版本通过 Flatpak 更新。无需在此检查更新。",
+  "Versión instalada": "已安装版本",
+  "Nueva versión": "新版本",
+  "Buscar actualizaciones": "检查更新",
+  "Buscando…": "正在检查…",
+  "Descargar e instalar": "下载并安装",
+  "Descargar APK": "下载 APK",
+  "Notas de la versión": "版本说明",
+  "Orden de repaso": "复习顺序",
+  "Elige qué tarjetas quieres ver primero al iniciar una sesión de repaso.": "选择开始复习时优先显示的卡片。",
+  "Orden de las tarjetas": "卡片顺序",
+  "Nuevas primero": "新卡优先",
+  "Repasos primero": "复习卡优先",
+  "Orden mezclado": "混合顺序",
+  "Orden de repaso actualizado.": "复习顺序已更新。",
+  "Recalcular propiedades": "重新计算属性",
+  "Actualiza las propiedades de programación de todas las tarjetas del vault.": "更新库中所有卡片的调度属性。",
+  "Acción de recálculo": "重新计算操作",
+  "Recalcular vencimientos": "重新计算到期日",
+  "Restablecer FSRS": "重置 FSRS",
+  "Recalcula la fecha de vencimiento usando la última revisión y el intervalo programado.": "根据上次复习和计划间隔重新计算到期日。",
+  "Elimina las propiedades de programación FSRS y convierte todas las tarjetas en nuevas. Esta acción no se puede deshacer.": "删除 FSRS 调度属性并将所有卡片变为新卡。此操作无法撤销。",
+  "Aplicar recálculo": "应用重新计算",
+  "Recalcular fechas": "重新计算日期",
+  "Restablecer propiedades": "重置属性",
+  "Procesando...": "处理中…",
+  "Se eliminará el progreso de repaso de todas las tarjetas y volverán a contar como nuevas. ¿Continuar?": "所有卡片的复习进度将被删除并重新计为新卡。是否继续？",
+  "Tarjetas actualizadas:": "已更新卡片：",
+  "No había tarjetas que actualizar.": "没有需要更新的卡片。",
+  "No se pudieron actualizar las propiedades de las tarjetas.": "无法更新卡片属性。",
+  "Tema Visual": "主题",
+  "Color de interfaz": "界面颜色",
+  "Modo Oscuro / Claro": "深色/浅色模式",
+  "Alternar Modo": "切换主题",
+  "Modo Claro Activo": "浅色模式已启用",
+  "Modo Oscuro Activo": "深色模式已启用",
+  "Estilo visual": "视觉风格",
+  "Simple: plano, sin efectos · Dracula: oscuro distinto. Ambos siguen el color de interfaz.": "Simple：扁平无特效 · Dracula：另类深色。两者均跟随界面颜色。",
+  "Tipografía del Editor": "编辑器字体",
+  "Tipografía del sistema": "系统字体",
+  "Selecciona cualquier tipografía instalada en tu dispositivo.": "选择设备上安装的任意字体。",
+  "-- Seleccionar tipografía del sistema --": "-- 选择系统字体 --",
+  "Seleccionar tipografía instalada en el sistema": "选择系统已安装字体",
+  "Tipografía del sistema aplicada": "已应用系统字体",
+  "Sans (sistema)": "无衬线（系统）",
+  "Serif (Georgia)": "衬线（Georgia）",
+  "Mono (sistema)": "等宽（系统）",
+  "Tamaño de texto": "文字大小",
+  "Ajusta por separado la interfaz, el editor, los títulos y las tarjetas. Se guarda en este dispositivo y se comparte con la versión móvil.": "分别调整界面、编辑器、标题和卡片，并保存在此设备上供移动版共享。",
+  "Interfaz": "界面",
+  "Texto del editor": "编辑器文字",
+  "Título de página": "页面标题",
+  "Encabezado H1": "标题 H1",
+  "Encabezado H2": "标题 H2",
+  "Encabezado H3": "标题 H3",
+  "Encabezado H4": "标题 H4",
+  "Encabezado H5": "标题 H5",
+  "Encabezado H6": "标题 H6",
+  "Texto de tarjeta": "卡片文字",
+  "Restaurar tamaños": "重置文字大小",
+  "Tamaños de texto restaurados": "文字大小已重置",
+  "Ancho de página": "页面宽度",
+  "Atajos de teclado para Flashcards": "闪卡键盘快捷键",
+  "Elige la tecla que califica cada tarjeta durante el repaso.": "选择复习时给每张卡片评分的按键。",
+  "Tecla para \"Otra vez\"": "「重来」按键",
+  "Tecla para \"Difícil\"": "「困难」按键",
+  "Tecla para \"Bien\"": "「良好」按键",
+  "Tecla para \"Fácil\"": "「简单」按键",
+  "Tiempo de enfoque (minutos)": "专注时间（分钟）",
+  "Descanso corto (minutos)": "短休息（分钟）",
+  "Descanso largo (minutos)": "长休息（分钟）",
+  "Sesiones antes del descanso largo": "长休息前的专注次数",
+  "Mostrar en la barra superior": "在顶栏显示",
+  "Configura los tiempos de enfoque y descanso, y cuántas sesiones completar antes de un descanso largo.": "设置专注与休息时长，以及长休息前完成的专注次数。",
+  "Enfoque": "专注",
+  "Descanso corto": "短休息",
+  "Descanso largo": "长休息",
+  "Iniciar": "开始",
+  "Pausar": "暂停",
+  "Reiniciar": "重置",
+  "Ciclo completado. Disfruta de un descanso largo.": "周期完成。享受长休息吧。",
+  "Pomodoro completado. Tómate un descanso corto.": "番茄钟完成。休息一下吧。",
+  "Descanso completado. ¡A seguir repasando!": "休息结束。继续复习吧！",
+  "Exportar notas": "导出笔记",
+  "Exportar a PDF": "导出为 PDF",
+  "Markdown (.zip)": "Markdown (.zip)",
+  "Exportar CSV": "导出 CSV",
+  "Exportar JSON": "导出 JSON",
+  "Mantenimiento": "维护",
+  "Estas acciones no eliminan tus notas. La limpieza de adjuntos solo borra imágenes de": "这些操作不会删除你的笔记。附件清理只会删除以下目录中未被引用的图片：",
+  "que no estén referenciadas en ninguna nota.": "未被任何页面引用的图片。",
+  "Borrar propiedades de los bullets": "清除项目符号属性",
+  "Borrar caché": "清除缓存",
+  "Borrar estadísticas de repaso": "清除复习统计",
+  "Borrar estadísticas": "清除统计",
+  "Se borrarán las estadísticas de repaso: repasos de hoy, repasos totales, minutos de enfoque y los puntos del átomo de progreso. La programación FSRS de las tarjetas no se modificará. ¿Continuar?": "复习统计将被清除：今日复习、总复习、专注分钟和进度原子点数。卡片的 FSRS 调度不会改变。是否继续？",
+  "Estadísticas de repaso borradas.": "复习统计已清除。",
+  "Recargar aplicación": "重新加载应用",
+  "Eliminar imágenes no usadas de assets": "删除未使用的资源图片",
+  "Borrar todos los snapshots": "删除所有快照",
+  "Borrar propiedades": "清除属性",
+  "Eliminar imágenes": "删除图片",
+  "Borrar todos": "全部删除",
+  "Recargar": "重新加载",
+  "La limpieza de adjuntos requiere la aplicación de escritorio.": "附件清理需要桌面应用。",
+  "Se revisarán todas las notas y se eliminarán de assets las imágenes que no estén referenciadas en ninguna página. Esta acción no se puede deshacer. ¿Continuar?": "将扫描所有页面，并删除 assets 中未被任何页面引用的图片。此操作无法撤销。是否继续？",
+  "Guardando notas antes de revisar los adjuntos…": "正在保存页面以便检查附件…",
+  "Buscando imágenes no usadas…": "正在查找未使用的图片…",
+  "No se encontraron imágenes en la carpeta assets.": "assets 文件夹中没有图片。",
+  "No había imágenes sin usar en assets.": "assets 中没有未使用的图片。",
+  "No se pudo completar la limpieza de adjuntos.": "无法完成附件清理。",
+  "No se pudieron eliminar los adjuntos sin usar. Revisa la consola.": "无法删除未使用的附件。请查看控制台。",
+  "Se eliminarán las propiedades de todos los bullets y el Frontmatter de las páginas del vault activo. El texto de las notas y sus archivos se conservarán. ¿Continuar?": "当前库中所有项目符号属性和页面 Frontmatter 将被删除。笔记文本和文件会保留。是否继续？",
+  "No se pudieron guardar todas las notas. Revisa la consola y el estado del vault.": "无法保存所有页面。请查看控制台和库状态。",
+  "Se borrarán los cachés web temporales y los datos de sesión de esta aplicación. Las notas, archivos y preferencias guardadas se conservarán.": "将清除此应用的临时网页缓存和会话数据。笔记、文件和已保存的偏好会保留。",
+  "Caché temporal borrada.": "临时缓存已清除。",
+  "No se pudo borrar toda la caché temporal. Revisa la consola para más detalles.": "无法清除全部临时缓存。请查看控制台了解详情。",
+  "Se borrarán todas las versiones guardadas de todas las notas en .sinnotas/chronos/. Las notas originales no se tocarán. ¿Continuar?": "将删除 .sinnotas/chronos/ 中所有页面的已保存版本。原始笔记不会被改动。是否继续？",
+  "La interfaz se recargará. Las notas guardadas no se modificarán.": "界面将重新加载。已保存的页面不会改变。",
+  "Renombrar nota": "重命名页面",
+  "Nombre de la nota": "页面名称",
+  "Cancelar": "取消",
+  "Guardar": "保存",
+  "Confirmar acción": "确认操作",
+  "Menú": "菜单",
+  "Texto": "文本",
+  "Bullet": "项目符号",
+  "Hueco Cloze (==...==)": "填空（==…==）",
+  "Crear Hueco Cloze (==...==)": "创建填空（==…==）",
+  "Crear Flashcard (#card)": "创建闪卡（#card）",
+  "Convertir a Flashcard (#card)": "转换为闪卡（#card）",
+  "Limpiar formato": "清除格式",
+  "Navegación": "导航",
+  "Menú de navegación": "导航菜单",
+  "Crear Oclusión de Imagen": "创建图片遮挡",
+  "Insertar imagen": "插入图片",
+  "Alternar Tarea (TODO / DOING / DONE)": "切换任务状态（TODO / DOING / DONE）",
+  "Mover arriba": "上移",
+  "Mover abajo": "下移",
+  "Copiar": "复制",
+  "Copiar selección": "复制所选内容",
+  "Copiar bullet": "复制项目符号",
+  "Pegar": "粘贴",
+  "Pegar selección": "粘贴所选内容",
+  "Pegar sin formato": "粘贴为纯文本",
+  "No se pudo acceder al portapapeles.": "无法访问剪贴板。",
+  "El texto pegado era demasiado largo y se recortó.": "粘贴的文本过长，已被截断。",
+  "Copiar bullets seleccionados": "复制所选项目符号",
+  "Cortar": "剪切",
+  "Cortar selección": "剪切所选内容",
+  "Cortar bullet": "剪切项目符号",
+  "Cortar bullets seleccionados": "剪切所选项目符号",
+  "Borrar selección": "删除所选内容",
+  "Borrar bullet": "删除项目符号",
+  "Borrar bullets seleccionados": "删除所选项目符号",
+  "Eliminar bullet": "删除项目符号",
+  "Abrir nota": "打开页面",
+  "Renombrar": "重命名",
+  "Copiar enlace [[...]]": "复制链接 [[…]]",
+  "Eliminar nota": "删除页面",
+  "Oclusión de imagen": "图片遮挡",
+  "Arrastra sobre la imagen para crear tarjetas que oculten zonas.": "在图片上拖动以创建遮挡区域的卡片。",
+  "Guardar oclusiones": "保存遮挡",
+  "Flashcards": "闪卡",
+  "Repasar": "复习",
+  "Explorador de Tarjetas": "卡片浏览器",
+  "Explorador de tarjetas": "卡片浏览器",
+  "Mostrar Respuesta (Espacio)": "显示答案（空格）",
+  "Reiniciar Sesión": "重新开始复习",
+  "Otra vez": "重来",
+  "Difícil": "困难",
+  "Bien": "良好",
+  "Fácil": "简单",
+  "BÁSICA": "基础",
+  "CLOZE": "填空",
+  "IMAGEN": "图片",
+  "Origen:": "来源：",
+  "Próximo repaso": "下次复习",
+  "Último repaso": "上次复习",
+  "Creada": "创建于",
+  "Sin registro": "无记录",
+  "Fecha no válida": "无效日期",
+  "Fecha": "日期",
+  "Fecha de vencimiento": "到期日",
+  "Editar fecha de vencimiento": "编辑到期日",
+  "Asignar fecha de vencimiento": "设置到期日",
+  "Déjalo vacío para quitar la fecha.": "留空以移除日期。",
+  "Fecha de vencimiento actualizada.": "到期日已更新。",
+  "Fecha de vencimiento eliminada.": "到期日已移除。",
+  "No se encontró la nota de la tarea.": "未找到任务所属页面。",
+  "No se encontró la tarea.": "未找到任务。",
+  "No se pudo guardar la fecha de vencimiento.": "无法保存到期日。",
+  "Ordenar por:": "排序方式：",
+  "Vencimiento": "到期日",
+  "Creación": "创建日期",
+  "Sin tarjetas": "无卡片",
+  "Sin tarjetas pendientes": "没有待复习卡片",
+  "¡Completado!": "已完成！",
+  "¡Has completado todas las tarjetas pendientes con FSRS-4.5!": "你已完成 FSRS-4.5 的所有到期卡片！",
+  "No hay tarjetas pendientes de repaso. Vuelve cuando llegue su fecha de vencimiento.": "没有待复习的卡片。到期后再来吧。",
+  "No se encontraron tarjetas en las notas del vault.": "库中的页面没有卡片。",
+  "Notas incluidas en el repaso": "纳入复习的页面",
+  "Marcar todo": "全选",
+  "Ninguna": "无",
+  "Guardar selección": "保存选择",
+  "Mazos": "牌组",
+  "Mazos de repaso": "复习牌组",
+  "Deck activo": "当前牌组",
+  "Mazo activo": "当前牌组",
+  "Mis mazos": "我的牌组",
+  "Elegir, crear o editar mazos de repaso": "选择、创建或编辑复习牌组",
+  "Notas del mazo": "牌组页面",
+  "Editar las notas que aportan tarjetas": "编辑提供卡片的页面",
+  "Nombre del mazo": "牌组名称",
+  "Nombre del mazo no puede estar vacío.": "牌组名称不能为空。",
+  "El nombre del mazo no puede estar vacío.": "牌组名称不能为空。",
+  "Nuevo mazo": "新建牌组",
+  "Editar mazo": "编辑牌组",
+  "Guardar mazo": "保存牌组",
+  "Crear mazo": "创建牌组",
+  "Editar": "编辑",
+  "Eliminar": "删除",
+  "Confirmar": "确认",
+  "ACTIVO": "使用中",
+  "pendiente": "待复习",
+  "pendientes": "待复习",
+  "nota seleccionada": "个已选页面",
+  "notas seleccionadas": "个已选页面",
+  "Ya existe un mazo con ese nombre.": "已存在同名牌组。",
+  "El nombre no puede superar los 80 caracteres.": "名称不能超过 80 个字符。",
+  "Todavía no hay mazos personalizados. Crea uno con “+ Nuevo mazo”.": "还没有自定义牌组。点击「+ 新建牌组」创建一个。",
+  "Solo un mazo está activo a la vez. Los mazos se guardan en la bóveda y se sincronizan; el mazo activo es una preferencia de este dispositivo.": "同一时间只有一个牌组处于使用状态。牌组保存在库中并跨设备同步；当前牌组是本设备的偏好。",
+  "Pulsa «Confirmar» para eliminar el mazo.": "再次点击「确认」即可删除牌组。",
+  "El mazo activo no tiene notas": "当前牌组没有页面",
+  "Editar el mazo de repaso o crear uno nuevo": "编辑复习牌组或新建一个",
+  "Cambios sin guardar": "未保存的更改",
+  "Buscar en el título...": "搜索标题…",
+  "Filtrar notas por palabra en el título": "按标题中的词筛选页面",
+  "Orden de la lista de notas": "页面列表排序",
+  "Nombre A-Z": "名称 A-Z",
+  "Nombre Z-A": "名称 Z-A",
+  "Creación (más reciente)": "创建（最新）",
+  "Creación (más antigua)": "创建（最早）",
+  "No hay notas cuyo título coincida con la búsqueda.": "没有标题匹配搜索的页面。",
+  "No hay notas seleccionadas: no se repasará ninguna tarjeta.": "未选择页面：不会复习任何卡片。",
+  "Sin tarjetas pendientes en las notas seleccionadas": "所选页面没有待复习卡片",
+  "No hay tarjetas pendientes en las notas seleccionadas. Vuelve cuando llegue su fecha de vencimiento o amplía la selección de notas.": "所选页面没有到期卡片。到期后再来，或扩大页面选择范围。",
+  "No hay ninguna nota seleccionada para el repaso. Marca y guarda las notas en Ajustes › Flashcards.": "没有选择用于复习的页面。请在设置 › 闪卡中勾选并保存页面。",
+  "No se encontraron notas con flashcards en el vault.": "库中没有包含闪卡的页面。",
+  "Se repasarán las tarjetas de todas las notas.": "将复习所有页面的卡片。",
+  "Se repasarán solo las tarjetas de las notas seleccionadas.": "仅复习所选页面的卡片。",
+  "Cada nota actúa como un mazo que contiene sus flashcards. Selecciona las notas cuyas tarjetas se repasarán y pulsa \"Guardar selección\"; las desmarcadas quedarán excluidas de la sesión de repaso.": "每个页面相当于一副包含其闪卡的牌组。选择要复习的页面并点击「保存选择」；未勾选的页面将不参与复习。",
+  "tarjeta": "卡片",
+  "tarjetas": "卡片",
+  "No se pudo renombrar la nota.": "无法重命名页面。",
+  "No hay cambios que deshacer.": "没有可撤销的更改。",
+  "No hay cambios que rehacer.": "没有可重做的更改。",
+  "Cambio deshecho.": "已撤销更改。",
+  "Cambio rehecho.": "已重做更改。",
+  "Snapshots manuales": "手动快照",
+  "Snapshots por nota": "每页快照",
+  "Seguimiento de snapshots activos": "活动快照跟踪",
+  "Abrir historial de esta nota": "打开此页面的历史",
+  "No hay notas con snapshots activos.": "没有启用快照的页面。",
+  "Los snapshots se activan desde el historial de cada nota. Aquí puedes ver las notas que los tienen activos, cuántas versiones guardan y borrarlas. Al vencer el periodo configurado, las versiones se eliminan automáticamente y solo queda la nota original. Las copias viven en la carpeta interna .sinnotas/chronos/ dentro del vault.": "快照从每个页面的历史中启用。这里可以查看已启用快照的页面、保存的版本数并删除它们。配置的期限结束后，版本会自动删除，只保留原始页面。副本保存在库内的 .sinnotas/chronos/ 中。",
+  "Al activar se guarda una versión ahora y otra cada intervalo si la nota cambió. La ventana dura como máximo 30 días; al vencer, las versiones se eliminan y solo queda la nota original.": "启用时会立即保存一个版本，之后若页面有变化则按间隔保存。窗口最长持续 30 天；到期后版本会被删除，只保留原始页面。",
+  "Los snapshots se guardan en .sinnotas/chronos/ mientras la nota esté activa. Al vencer el periodo o desactivarlos se eliminan.": "页面启用期间，快照保存在 .sinnotas/chronos/ 中。期限结束或停用后会被删除。",
+  "Guardado": "已保存",
+  "Snapshot automático programado": "计划自动快照",
+  "Snapshot inicial": "初始快照",
+  "Desactivar snapshots": "停用快照",
+  "Activar/Desactivar snapshots de esta nota": "启用/停用此页面的快照",
+  "Desactivar y eliminar": "停用并删除",
+  "Desactivar los snapshots de esta nota eliminará todas las versiones guardadas. ¿Continuar?": "停用此页面的快照将删除所有已保存版本。是否继续？",
+  "Borrar snapshots": "删除快照",
+  "Snapshots eliminados.": "快照已删除。",
+  "No se pudieron borrar los snapshots.": "无法删除快照。",
+  "No se pudo cargar el seguimiento de snapshots.": "无法加载活动快照列表。",
+  "Quedan": "剩余",
+  "Cada": "每",
+  "versión guardada": "个已保存版本",
+  "versiones guardadas": "个已保存版本",
+  "SinNotas guarda cada cambio al instante en tu vault local. Los snapshots no se crean automáticamente: al activar una ventana, la aplicación registra versiones recuperables de tus notas durante ese periodo. Las copias se guardan en la carpeta interna .sinnotas/chronos/ dentro del vault.": "SinNotas 会将每次更改立即保存到本地库。快照不会自动创建：启用窗口后，应用会在该期间记录可恢复的页面版本。副本保存在库内的 .sinnotas/chronos/ 中。",
+  "Snapshots desactivados.": "快照已停用。",
+  "Snapshots activados.": "快照已启用。",
+  "Snapshots desactivados. Actívalos para registrar versiones automáticamente.": "快照已关闭。启用后可自动记录版本。",
+  "Snapshots activos": "快照已启用",
+  "Snapshots no disponibles fuera de la aplicación.": "应用外无法使用快照。",
+  "Snapshots en pausa: el reloj del sistema retrocedió.": "快照已暂停：系统时钟回退。",
+  "La ventana de snapshots expiró. Actívala de nuevo para seguir registrando versiones.": "快照窗口已过期。请重新启用以继续记录版本。",
+  "La duración debe estar entre 1 y 30 días.": "期限必须介于 1 到 30 天。",
+  "El intervalo debe estar entre 1 y 168 horas.": "间隔必须介于 1 到 168 小时。",
+  "El límite diario debe estar entre 1 y 96 snapshots.": "每日上限必须介于 1 到 96 个快照。",
+  "No se pudieron activar los snapshots. Revisa el vault e inténtalo de nuevo.": "无法启用快照。请检查库后重试。",
+  "No se pudieron desactivar los snapshots.": "无法停用快照。",
+  "No se pudo restaurar el snapshot.": "无法恢复快照。",
+  "Activa una ventana de snapshots o espera al siguiente intervalo para registrar versiones.": "启用快照窗口，或等待下一个间隔以记录版本。",
+  "Activar snapshots": "启用快照",
+  "Desactivar": "停用",
+  "Abrir historial": "打开历史",
+  "Duración (días)": "期限（天）",
+  "Intervalo (horas)": "间隔（小时）",
+  "Límite diario por nota": "每页每日上限",
+  "La ventana dura como máximo 30 días. Solo se crea un snapshot si la nota cambió y el intervalo ya se cumplió.": "窗口最长持续 30 天。仅当页面发生变化且间隔已到时才创建快照。",
+  "Los snapshots se guardan en .sinnotas/chronos/ solo mientras una ventana está activa.": "仅在窗口启用期间，快照才会保存到 .sinnotas/chronos/。",
+  "Carpeta": "文件夹",
+  "quedan": "剩余",
+  "cada": "每",
+  "máx.": "最多",
+  "al día": "每天",
+  "sin límite diario": "无每日上限",
+  "Snapshot": "快照",
+  "Referencias vinculadas": "反向链接",
+  "Todas las Páginas": "所有页面",
+  "Título": "标题",
+  "Bloques": "块",
+  "Tipo": "类型",
+  "Actualizado": "已更新",
+  "Acciones": "操作",
+  "Diario": "日记",
+  "Página": "页面",
+  "Reciente": "最近",
+  "Eliminar página": "删除页面",
+  "Selecciona una fecha para crear tu primer diario.": "选择日期以创建第一篇日记。",
+  "Selecciona una versión para inspeccionar su contenido.": "选择版本以预览其内容。",
+  "Vista previa de la versión": "版本预览",
+  "Restaurar esta Versión": "恢复此版本",
+  "Sin snapshots previos aún.": "尚无历史快照。",
+  "Tareas activas": "活动任务",
+  "Tarea completada": "任务已完成",
+  "puntos para el átomo de progreso": "进度原子点数",
+  "Añadir tarea": "添加任务",
+  "Nueva tarea": "新任务",
+  "Título de la tarea": "任务标题",
+  "Se añadirá a la nota diaria de la fecha indicada.": "将添加到所选日期的每日笔记。",
+  "Fecha de la nota diaria": "每日笔记日期",
+  "Déjalo vacío para usar la fecha de hoy.": "留空则使用今天的日期。",
+  "Tarea añadida a la nota diaria.": "任务已添加到每日笔记。",
+  "No se pudo añadir la tarea.": "无法添加任务。",
+  "Por hacer": "待办",
+  "Haciendo": "进行中",
+  "Hecho": "已完成",
+  "Área": "区域",
+  "Todavía no hay áreas ocultas. Arrastra sobre la imagen para añadir una.": "尚无遮挡区域。在图片上拖动以添加。",
+  "Eliminar área": "删除区域",
+  "Cambiar tema": "切换主题",
+  "Idioma de la interfaz": "界面语言",
+  "Automático (Sistema)": "自动（系统）",
+  "Español": "西班牙语",
+  "Inglés": "英语",
+  "Herramientas de oclusión": "遮挡工具",
+  "Forma": "形状",
+  "Rectángulo": "矩形",
+  "Elipse": "椭圆",
+  "Polígono": "多边形",
+  "Color": "颜色",
+  "Pista / texto": "提示/文本",
+  "Escribe una pista para el área seleccionada": "为所选区域输入提示",
+  "Reducir al 90%": "缩小到 90%",
+  "Ampliar al 110%": "放大到 110%",
+  "Finalizar polígono": "完成多边形",
+  "Dibuja el polígono haciendo clic en cada punto y finalízalo con doble clic.": "依次点击每个点绘制多边形，双击完成。",
+  "Buscar": "搜索",
+  "Área seleccionada": "所选区域",
+  "Vault local": "本地库",
+  "Welcome to SinNotas": "欢迎使用 SinNotas",
+  "Dyslexic": "阅读障碍",
+  "Vistas de Flashcards": "闪卡视图",
+  "Cargando preguntas de tus notas...": "正在从笔记加载问题…",
+  "Respuesta revelada aquí.": "答案将在此显示。",
+  "Tarjeta 0 de 0": "第 0 张，共 0 张",
+  "0 tarjetas": "0 张卡片",
+  "0 tareas activas": "0 个活动任务",
+  "0 páginas": "0 个页面",
+  "Seguimiento de tareas": "任务看板",
+  "Ocultar completados": "隐藏已完成",
+  "POR HACER (TODO / LATER)": "待办（TODO / LATER）",
+  "HACIENDO (DOING / NOW)": "进行中（DOING / NOW）",
+  "HECHO (DONE)": "已完成（DONE）",
+  "Mover a HACIENDO": "移至进行中",
+  "Título de Página": "页面标题",
+  "Última Actualización": "最后更新",
+  "Historial de Versiones: Nota": "页面版本历史",
+  "Imagen para oclusión": "用于遮挡的图片",
+  "No se encontró el bloque de la imagen.": "未找到图片块。",
+  "No se encontró el bloque donde guardar las oclusiones.": "未找到保存遮挡的块。",
+  "La selección de vaults requiere la aplicación de escritorio.": "选择库需要桌面应用。",
+  "No se pudo abrir el vault. Revisa los permisos de la carpeta e inténtalo de nuevo.": "无法打开库。请检查文件夹权限后重试。",
+  "No se pudo acceder al vault local de la aplicación.": "无法访问应用的本地库。",
+  "No se pudo activar la importación de imágenes por arrastre.": "无法启用拖放图片导入。",
+  "Ocurrió un error en un diálogo. Se cerró para liberar la interfaz.": "对话框发生错误，已关闭以恢复界面。",
+  "No se pudo cargar la imagen. Se cerró el editor de oclusiones.": "无法加载图片。遮挡编辑器已关闭。",
+  "No se pudo abrir la imagen. Se cerró el editor de oclusiones.": "无法打开图片。遮挡编辑器已关闭。",
+  "No se pudieron guardar las oclusiones. El editor se cerrará sin conservar esos cambios.": "无法保存遮挡。编辑器将关闭且不保留这些更改。",
+  "Caché temporal borrada": "临时缓存已清除",
+  "No se pudo exportar. Revisa la consola para más detalles.": "导出失败。请查看控制台了解详情。",
+  "Abriendo vista de impresión para guardar como PDF.": "正在打开打印视图以保存为 PDF。",
+  "El navegador bloqueó la ventana de impresión. Permite las ventanas emergentes e inténtalo de nuevo.": "浏览器阻止了打印窗口。请允许弹出窗口后重试。",
+  "No se pudo preparar el PDF. Revisa la consola para más detalles.": "无法准备 PDF。请查看控制台了解详情。",
+  "No se encontró el bloque donde insertar la imagen.": "未找到插入图片的块。",
+  "No se pudo copiar la imagen al vault. Comprueba su formato y tamaño (máximo 5 MB).": "无法将图片复制到库。请检查格式和大小（最大 5 MB）。",
+  "No hay retroenlaces vinculados a esta página.": "此页面没有反向链接。",
+  "Propiedades de página": "页面属性",
+  "¿Estás seguro de que deseas eliminar permanentemente esta página?": "确定要永久删除此页面吗？",
+  "Página eliminada con éxito": "页面已成功删除",
+  "Guardado automático de cambios": "更改已自动保存",
+  "¿Deseas restaurar la nota a esta versión?": "要将页面恢复到此版本吗？",
+  "¡Nota restaurada con éxito a la versión seleccionada!": "页面已成功恢复到所选版本！",
+  "El portapapeles no está disponible.": "剪贴板不可用。",
+  "Mié": "周三",
+  "Sáb": "周六",
+  "Dom": "周日",
+  "Lun": "周一",
+  "Mar": "周二",
+  "Jue": "周四",
+  "Vie": "周五",
+  "Mes anterior": "上个月",
+  "Mes siguiente": "下个月",
+  "diario existente": "现有日记",
+  "crear diario": "创建日记",
+  "Por hacer (Después)": "待办（稍后）",
+  "En progreso (Haciendo)": "进行中",
+  "Completado (Finalizado)": "已完成",
+  "Borrar propiedades del bullet": "清除项目符号属性",
+  "Insertar query / consulta": "插入查询",
+  "Mando (Joystick)": "手柄",
+  "Gamepad (Mando)": "手柄",
+  "Mando desactivado": "手柄已停用",
+  "Mando conectado": "手柄已连接",
+  "Mando no detectado": "未检测到手柄",
+  "Activar soporte de gamepad": "启用手柄支持",
+  "Tipo de mando": "手柄类型",
+  "Detectar mando": "检测手柄",
+  "Buscando gamepad... pulse un botón...": "正在查找手柄…请按一个按钮…",
+  "Configura un mando Bluetooth o USB para controlar Flashcards y otras funciones.": "配置蓝牙或 USB 手柄以控制闪卡和其他功能。",
+  "Fijar nota": "固定页面",
+  "Desfijar nota": "取消固定页面",
+  "Asigna los botones del mando a las respuestas de FSRS (Otra vez, Difícil, Bien, Fácil).": "将手柄按钮分配给 FSRS 评分（重来、困难、良好、简单）。",
+  "Mapeo de botones para Flashcards": "闪卡按钮映射",
+  "Botón para": "按钮用于",
+  "No asignado": "未分配",
+  "Mapeo de botones adicionales": "其他按钮映射",
+  "Documentación de uso": "使用文档",
+  "Panel de productividad": "生产力面板",
+  // Ajustes > Grafo.
+  "Grafo": "图谱",
+  "Secciones de ajustes": "设置分区",
+  "Grupos de color por nombre": "按名称分组的颜色",
+  "Pinta los nodos cuyo título contenga el texto indicado. La regla más específica (texto más largo) tiene prioridad y los colores manuales de cada nota siguen por encima de los grupos.": "为标题包含指定文本的节点着色。最具体的规则（文本最长）优先，单个页面的手动颜色仍高于分组。",
+  "Texto del nombre (ej. Diario, Proyecto…)": "名称文本（例如：日记、项目……）",
+  "Texto del nombre para el grupo de color": "颜色分组的名称文本",
+  "Color del grupo": "分组颜色",
+  "Añadir grupo": "添加分组",
+  "Fuerzas de la simulación": "模拟力",
+  "Repulsión": "排斥力",
+  "Fuerza de enlaces": "连接强度",
+  "Distancia de enlaces": "连接距离",
+  "Atracción al centro": "中心吸引力",
+  "Fuerza de colisión": "碰撞力",
+  "Amortiguación": "阻尼",
+  "Tamaño de los nodos": "节点大小",
+  "Radio base": "基础半径",
+  "Radio por conexión": "每个连接的半径",
+  "Radio máximo": "最大半径",
+  "Líneas y títulos": "连线与标题",
+  "Grosor de enlaces": "连接线宽度",
+  "Grosor resaltado": "高亮宽度",
+  "Zoom para mostrar títulos": "显示标题的缩放级别",
+  "Los títulos aparecen con fundido al acercar hasta este zoom; al pasar el cursor o seleccionar un nodo se muestran siempre.": "缩放到此级别时节点标题会淡入；悬停或选择节点时始终显示。",
+  "Restablecer valores del grafo": "重置图谱数值",
+  "Ajustes del grafo restablecidos.": "图谱设置已重置。",
+  "📌 Fijadas": "📌 已固定",
+  "Recientes": "最近",
+  "Ver todas las notas": "查看所有页面",
+  "Abrir con aplicación predeterminada": "用默认应用打开",
+  "No se pudo abrir la nota con la aplicación predeterminada.": "无法用默认应用打开页面。",
+  "En el contenido": "页面内容中",
+  // Vista móvil de repaso (cadenas propias de review-app.ts).
+  "Seleccionar notas para repasar": "选择要复习的页面",
+  "Seleccionar notas": "选择页面",
+  "Cambiar idioma": "切换语言",
+  "Idioma": "语言",
+  "Cambiar apariencia": "更改外观",
+  "Actualizar tarjetas": "刷新卡片",
+  "Abrir otra bóveda": "打开其他库",
+  "Progreso del repaso": "复习进度",
+  "Todo al día": "全部完成",
+  "No hay tarjetas pendientes en esta bóveda.": "此库中没有到期卡片。",
+  "Deshacer": "撤销",
+  "Rehacer": "重做",
+  "Deshacer último repaso": "撤销上次复习",
+  "Deshacer cambio": "撤销更改",
+  "Rehacer repaso": "重做复习",
+  "Rehacer cambio": "重做更改",
+  "Editar tarjeta": "编辑卡片",
+  "Mostrar respuesta": "显示答案",
+  "Cerrar editor": "关闭编辑器",
+  "Pregunta": "问题",
+  "Respuesta": "答案",
+  "Texto de la tarjeta": "卡片文本",
+  "Solo se modifica este bloque. Se conservan las propiedades FSRS, la etiqueta #card y el resto de la nota.": "仅修改此块。FSRS 属性、#card 标签和页面其余内容都会保留。",
+  "Cerrar apariencia": "关闭外观",
+  "Tema": "主题",
+  "Claro": "浅色",
+  "Oscuro": "深色",
+  "Elige el tema de la app. Se guarda en este dispositivo y se comparte con la versión de escritorio.": "选择应用主题。它会保存在此设备上并与桌面版共享。",
+  "Color de acento": "强调色",
+  "Colores de acento": "强调色",
+  "El color se guarda en este dispositivo y se comparte con la versión de escritorio.": "颜色会保存在此设备上并与桌面版共享。",
+  "Más opciones": "更多选项",
+  "Ajustes": "设置",
+  "Ajustes de FSRS": "FSRS 设置",
+  "FSRS 4.5": "FSRS 4.5",
+  "Retención deseada": "目标保留率",
+  "Intervalo máximo (días)": "最大间隔（天）",
+  "Pasos de aprendizaje": "学习步骤",
+  "Pasos de reaprendizaje": "重新学习步骤",
+  "Parámetros FSRS-4.5": "FSRS-4.5 参数",
+  "Configura la retención objetivo y los intervalos usados por el planificador. Los cambios se aplican a los próximos repasos; reprograma las tarjetas por separado si quieres actualizar sus vencimientos.": "配置调度器使用的目标保留率和间隔。更改会应用于后续复习；如需更新到期时间，请单独重新安排卡片。",
+  "17 valores numéricos separados por comas. Cambiarlos manualmente sustituye la optimización automática de Anki.": "17 个以逗号分隔的数值。手动修改会覆盖 Anki 的自动优化。",
+  "Guardar configuración": "保存设置",
+  "Restaurar predeterminados": "恢复默认值",
+  "Configuración FSRS guardada.": "FSRS 设置已保存。",
+  "No se pudo guardar la configuración FSRS.": "无法保存 FSRS 设置。",
+  "Revisa los pasos y los 17 parámetros numéricos de FSRS.": "请检查步骤和 17 个 FSRS 数值参数。",
+  "Cerrar ajustes de FSRS": "关闭 FSRS 设置",
+  "Abrir menú": "打开菜单",
+  "Cerrar menú": "关闭菜单",
+  "Menú de repaso": "复习菜单",
+  "Cerrar menú de repaso": "关闭复习菜单",
+  "Repasar notas": "复习页面",
+  "Aprendizaje": "学习",
+  "Repasa sin guardar el progreso FSRS": "复习但不保存 FSRS 进度",
+  "Aprendizaje · sin guardar": "学习 · 不保存",
+  "Modo aprendizaje activado: los repasos no se guardan.": "学习模式已开启：复习不会保存。",
+  "Modo aprendizaje desactivado: los repasos se guardan.": "学习模式已关闭：复习会保存。",
+  "Abrir páginas y editor": "打开页面和编辑器",
+  "Volver al repaso": "返回复习",
+  "Modo repaso": "复习模式",
+  "Abrir el modo repaso": "打开复习模式",
+  "Tamaño de texto global": "全局文字大小",
+  "Todos los textos de la app se adaptan a este tamaño.": "应用中的所有文字都会使用此大小。",
+  "Cambiar bóveda": "切换库",
+  "Bóveda y mantenimiento": "库与维护",
+  "El idioma se guarda en este dispositivo.": "语言会保存在此设备上。",
+  "Cerrar ajustes": "关闭设置",
+  "Abre el selector de notas con el botón ☰ y elige qué quieres repasar.": "使用 ☰ 按钮打开页面选择器并选择要复习的内容。",
+  "Abre Mazos con el botón ☰ y elige qué quieres repasar.": "使用 ☰ 按钮打开牌组并选择要复习的内容。",
+  "Abrir otra bóveda solo está disponible en la aplicación.": "仅在应用中才能打开其他库。",
+  "Bóveda abierta": "库已打开",
+  "Bóveda actualizada con los últimos cambios.": "库已更新为最新更改。",
+  "Comprueba los permisos de la carpeta e inténtalo de nuevo.": "请检查文件夹权限后重试。",
+  "El texto no puede estar vacío.": "文本不能为空。",
+  "Esta tarjeta de imagen no tiene una oclusión editable.": "此图片卡没有可编辑的遮挡区域。",
+  "Imagen de la tarjeta": "卡片图片",
+  "La nota de esta tarjeta ya no está disponible.": "此卡片的页面已不可用。",
+  "La nota ya no está disponible.": "页面已不可用。",
+  "La oclusión no cambió.": "遮挡区域未更改。",
+  "La pregunta no puede estar vacía.": "问题不能为空。",
+  "La tarjeta cambió en otro dispositivo o nota; no se puede aplicar ese repaso.": "卡片已在其他设备或页面更改，无法应用该复习。",
+  "La URL de recurso falló; se intentará leer la imagen por IPC:": "资源 URL 失败；将尝试通过 IPC 读取图片：",
+  "Ninguna nota coincide con la búsqueda.": "没有与搜索匹配的页面。",
+  "Ninguna nota seleccionada": "未选择页面",
+  "No hay notas con tarjetas en esta bóveda.": "此库中没有包含卡片的页面。",
+  "No hay tarjetas en esta bóveda. Abre otra carpeta para repasar sus notas.": "此库中没有卡片。请打开其他文件夹以复习其中的页面。",
+  "No hay tarjetas pendientes. Vuelve más tarde o actualiza la bóveda.": "没有到期的卡片。请稍后再来或刷新库。",
+  "No se encontró el bloque de la tarjeta.": "未找到卡片区块。",
+  "No se encontró el bloque de la tarjeta en la nota.": "页面中未找到卡片区块。",
+  "No se encontró la tarjeta del último repaso.": "未找到上次复习的卡片。",
+  "No se pudo abrir el selector de bóvedas:": "无法打开库选择器：",
+  "No se pudo abrir la bóveda": "无法打开库",
+  "No se pudo abrir otra bóveda. Selecciona una carpeta con permiso de acceso.": "无法打开其他库。请选择可访问的文件夹。",
+  "No se pudo actualizar la oclusión del bloque.": "无法更新区块遮挡区域。",
+  "No se pudo cargar la bóveda de repaso:": "无法加载复习库：",
+  "No se pudo cargar la imagen de esta tarjeta.": "无法加载此卡片的图片。",
+  "No se pudo cargar la imagen para editar la oclusión.": "无法加载用于编辑遮挡区域的图片。",
+  "No se pudo guardar el cambio de repaso.": "无法保存复习更改。",
+  "No se pudo guardar el cambio de repaso:": "无法保存复习更改：",
+  "No se pudo guardar el cambio en la bóveda.": "无法将更改保存到库。",
+  "No se pudo guardar el repaso de la tarjeta:": "无法保存卡片复习：",
+  "No se pudo guardar el repaso. Revisa los permisos de la bóveda.": "无法保存复习。请检查库权限。",
+  "No se pudo guardar la edición de la tarjeta:": "无法保存卡片编辑：",
+  "No se pudo guardar la oclusión:": "无法保存遮挡区域：",
+  "No se pudo guardar la oclusión. Revisa los permisos de la bóveda.": "无法保存遮挡区域。请检查库权限。",
+  "No se pudo guardar la tarjeta. Revisa los permisos de la bóveda.": "无法保存卡片。请检查库权限。",
+  "No se pudo leer la imagen de la tarjeta:": "无法读取卡片图片：",
+  "No se pudo resolver la imagen de la oclusión:": "无法解析遮挡区域图片：",
+  "No se pudo resolver la imagen de la tarjeta:": "无法解析卡片图片：",
+  "No se pudo restaurar el historial de la nota:": "无法恢复页面历史记录：",
+  "No se pudo sincronizar la bóveda móvil desde disco:": "无法从磁盘同步移动库：",
+  "Oclusión guardada. Propiedades y nota intactas.": "遮挡区域已保存。属性和页面保持不变。",
+  "Repasando todas las notas": "正在复习所有页面",
+  "Repaso rehecho.": "复习已重做。",
+  "Sin notas seleccionadas": "未选择页面",
+  "Tarjeta guardada. Propiedades y nota intactas.": "卡片已保存。属性和页面保持不变。",
+  "Tarjetas actualizadas": "卡片已更新",
+  "Último repaso deshecho.": "上次复习已撤销。",
+  "Notas del repaso": "复习页面",
+  "Cerrar selector de notas": "关闭页面选择器",
+  "Filtrar notas…": "筛选页面…",
+  "Filtrar notas": "筛选页面",
+  "Todas": "全部",
+  "Anterior": "上一页",
+  "Siguiente": "下一页",
+  "Notas con tarjetas": "含卡片的页面",
+  "Solo las notas marcadas aportan tarjetas al repaso. La búsqueda no cambia la selección.": "只有勾选的页面会提供复习卡片。搜索不会改变选择。",
+  "Aplicar selección": "应用选择",
+  "Editar oclusión": "编辑遮挡",
+  "Cerrar editor de oclusión": "关闭遮挡编辑器",
+  "Arrastra la zona resaltada para moverla. Usa el tirador inferior derecho para cambiar el tamaño.": "拖动高亮区域以移动，使用右下角的手柄调整大小。",
+  "Imagen de la tarjeta de oclusión": "遮挡卡片图片",
+  "Zona de oclusión seleccionada": "所选遮挡区域",
+  "Guardar oclusión": "保存遮挡",
+  "Azul": "蓝色",
+  "Verde": "绿色",
+  "Violeta": "紫色",
+  "Ámbar": "琥珀色",
+  "Rosa": "玫瑰色",
+  "Cian": "青色",
+  "Turquesa": "蓝绿色",
+  "Índigo": "靛蓝色",
+  "Naranja": "橙色",
+  "Fucsia": "紫红色",
+  "Tema claro activado": "已启用浅色主题",
+  "Tema oscuro activado": "已启用深色主题",
+  "Atajos de teclado": "键盘快捷键",
+  "Cerrar atajos": "关闭快捷键",
+  "Abrir o cerrar esta lista": "打开或关闭此列表",
+  "Mostrar u ocultar la barra lateral": "显示或隐藏侧边栏",
+  "Buscar o crear una página": "搜索或创建页面",
+  "Cerrar ventanas y menús": "关闭对话框和菜单",
+  "Crear un bullet nuevo": "新建项目符号",
+  "Salto de línea dentro del bullet": "在项目符号内换行",
+  "Sangrar bullet": "增加项目符号缩进",
+  "Desangrar bullet": "减少项目符号缩进",
+  "Seleccionar bullets contiguos": "选择相邻项目符号",
+  "Unir con el bullet anterior": "与上一个项目符号合并",
+  "Mostrar la respuesta": "显示答案",
+  "Calificar la tarjeta": "评价卡片",
+  "Las teclas de calificación se configuran en Ajustes → Flashcards.": "评分按键可在“设置 → 闪卡”中配置。",
+  "Elige tu bóveda": "选择你的知识库",
+  "Selecciona la carpeta donde están tus notas. Sin Notas recordará el permiso para las próximas veces.": "选择存放笔记的文件夹。Sin Notas 会记住权限，下次无需重新选择。",
+  "Elegir carpeta": "选择文件夹",
+  "No se pudo abrir la bóveda guardada. Elige la carpeta de nuevo para renovar el permiso.": "无法打开已保存的知识库。请重新选择文件夹以更新权限。",
+  "Última modificación (más reciente)": "最后修改（最新）",
+  "Última modificación (más antigua)": "最后修改（最早）",
+  "Todavía no hay páginas en esta bóveda.": "此知识库中还没有页面。",
+  "Bóvedas": "知识库",
+  "Gestionar bóvedas": "管理知识库",
+  "Cambia entre tus bóvedas o añade una carpeta. Si eliges una carpeta vacía, se preparará como bóveda nueva. Tus notas no se mueven.": "在知识库之间切换或添加文件夹。如果选择空文件夹，会将其准备为新的知识库。页面不会被移动。",
+  "Cerrar gestor de bóvedas": "关闭知识库管理",
+  "Añadir bóveda…": "添加知识库…",
+  "Todavía no hay bóvedas registradas. Añade una carpeta para empezar.": "尚未注册知识库。添加文件夹即可开始。",
+  "La gestión de varias bóvedas está disponible en la aplicación de escritorio.": "多知识库管理仅在桌面应用中可用。",
+  "La gestión de varias bóvedas requiere la aplicación de escritorio.": "管理多个知识库需要桌面应用。",
+  "Activa": "当前",
+  "Añade una carpeta existente como bóveda.": "添加现有文件夹作为知识库。",
+  "Haz clic en una bóveda para abrirla.": "点击知识库即可打开。",
+  "No puedes quitar la bóveda que está activa.": "无法移除当前知识库。",
+  "Quitar": "移除",
+  "Abriendo bóveda…": "正在打开知识库…",
+  "No se pudo abrir la bóveda. Revisa que la carpeta siga existiendo.": "无法打开知识库。请检查文件夹是否仍然存在。",
+  "La selección de bóvedas requiere la aplicación de escritorio.": "选择知识库需要桌面应用。",
+  "No se pudo abrir la carpeta seleccionada. Revisa los permisos e inténtalo de nuevo.": "无法打开所选文件夹。请检查权限后重试。",
+  // T20：在笔记内搜索。
+  "Buscar en esta nota": "在此笔记中搜索",
+  "Buscar en esta nota…": "在此笔记中搜索…",
+  "Buscar dentro de la nota": "在页面内搜索",
+  "Coincidencia anterior (Mayús+Enter)": "上一个匹配（Shift+Enter）",
+  "Coincidencia anterior": "上一个匹配",
+  "Siguiente coincidencia (Enter)": "下一个匹配（Enter）",
+  "Siguiente coincidencia": "下一个匹配",
+  "Cerrar búsqueda (Esc)": "关闭搜索（Esc）",
+  "Cerrar búsqueda": "关闭搜索",
+  // T21：出链。
+  "Enlaces salientes": "出链",
+  "Esta página no enlaza a ninguna otra nota.": "此页面不链接到任何其他页面。",
+  "enlace roto": "断链",
+  "Alias": "别名",
+  "Creando la nota": "正在创建页面",
+  "línea": "行",
+  // T5：图谱邻域。
+  "Vecindad": "邻域",
+  "Ver todo el grafo": "显示完整图谱",
+  "Mostrar todas las notas del grafo": "显示图谱中的所有页面",
+  // T7 第一阶段：参考面板。
+  "Abrir una nota de referencia al lado": "在旁边打开参考页面",
+  "Nota de referencia": "参考页面",
+  "Notas de referencia": "参考页面",
+  "Referencia": "参考",
+  "Buscar nota de referencia": "搜索参考页面",
+  "Buscar nota de referencia…": "搜索参考页面…",
+  "Busca y elige una nota para verla aquí.": "搜索并选择一个页面在此查看。",
+  "Esta nota ya no existe en la bóveda.": "此页面已不在库中。",
+  "Quitar nota de referencia": "移除参考页面",
+  "Añadir otra nota de referencia": "添加另一个参考页面",
+  "Cerrar panel de referencia": "关闭参考面板",
+  "No hay otras notas": "没有其他页面",
+  "Elige una nota para verla aquí.": "选择一个页面在此查看。",
+  // Flashcards 设置：子分区与快捷入口。
+  "General": "常规",
+  "Subsecciones de Flashcards": "Flashcards 子分区",
+  "Ajustes de Flashcards": "Flashcards 设置",
+  "Abrir ajustes de Flashcards": "打开 Flashcards 设置",
+  "Ajustes de repaso": "复习设置",
+  "Abrir ajustes de repaso": "打开复习设置",
+  "Ajustes de Pomodoro": "Pomodoro 设置",
+  "Abrir ajustes de Pomodoro": "打开 Pomodoro 设置",
+  "Cambiar el modo del Pomodoro": "切换 Pomodoro 模式",
+  // 文档阅读器。
+  "Documentos": "文档",
+  "Lectura": "阅读",
+  "Biblioteca de documentos": "文档库",
+  "Enlazar PDF": "链接 PDF",
+  "Ningún documento abierto": "未打开文档",
+  "Aún no hay documentos en el vault.": "库中还没有文档。",
+  "Abre un documento de la lista o enlaza un PDF.": "从列表打开文档，或链接一个 PDF。",
+  "El PDF se enlaza desde su ubicación original; no se copia dentro del vault.": "PDF 会从原始位置链接，不会复制到库中。",
+  "Archivo original no encontrado": "找不到原始文件",
+  "Enlazado": "已链接",
+  "Este PDF está enlazado desde fuera del vault. SinNotas procesará el archivo con el lector PDF. Continúa solo si reconoces y confías en él.": "此 PDF 链接到库外部。SinNotas 将使用 PDF 阅读器处理该文件。请仅在确认并信任此文件时继续。",
+  "Abrir PDF": "打开 PDF",
+  "Quitar enlace": "移除链接",
+  "Página anterior": "上一页",
+  "Página siguiente": "下一页",
+  "Ajustar al ancho": "适合宽度",
+  "Editor al lado": "侧边编辑器",
+  "Ocultar editor": "隐藏编辑器",
+  "Mostrar el editor al lado": "在侧边显示编辑器",
+  "Ocultar el editor lateral": "隐藏侧边编辑器",
+  "Leyendo la biblioteca de documentos…": "正在读取文档库…",
+  "Abriendo documento…": "正在打开文档…",
+  "Renderizando página…": "正在渲染页面…",
+  "Enlazando PDF…": "正在链接 PDF…",
+  "PDF enlazado.": "PDF 已链接。",
+  "Enlace eliminado. El archivo original no se ha modificado.": "链接已移除。原始文件未被修改。",
+  "No se pudo mostrar la página renderizada.": "无法显示渲染后的页面。",
+  "Conservar": "保留",
+  "Siempre": "始终",
+  "1 día": "1 天",
+  "7 días": "7 天",
+  "30 días": "30 天",
+  "90 días": "90 天",
+  "Enlace siempre": "始终保留链接",
+  "Tiempo de conservación del enlace": "链接保留时间",
+  "Cuánto tiempo se conserva el enlace al importar": "导入时链接保留多长时间",
+  "Caducidad del enlace del documento actual": "当前文档链接的到期时间",
+  "Caducidad del enlace": "链接到期时间",
+  "Caduca el": "到期：",
+  "Eliminar PDF": "删除 PDF",
+  "Capturar": "捕获",
+  "Seleccionar texto de la página": "选择页面文本",
+  "Capturar una región de la página": "捕获页面区域",
+  "Texto seleccionado": "已选文本",
+  "Insertar en la nota": "插入到笔记",
+  "Región capturada": "已捕获区域",
+  "Crear oclusión": "创建遮挡",
+  "Texto insertado en la nota.": "文本已插入笔记。",
+  "Texto copiado al portapapeles.": "文本已复制到剪贴板。",
+  "No se pudo copiar el texto.": "无法复制文本。",
+  "Esta página no tiene texto seleccionable (puede ser un escaneo).": "此页面没有可选择文本（可能是扫描件）。",
+  "Selecciona texto sobre la página para insertarlo en la nota.": "在页面上选择文本以插入笔记。",
+  "Arrastra sobre la página para capturar una región.": "在页面上拖动以捕获区域。",
+  "La región es demasiado pequeña. Arrastra un área mayor.": "区域太小，请拖动更大的范围。",
+  "Elige si quieres insertar la captura o crear una oclusión.": "选择插入捕获图像或创建遮挡。",
+  "Captura insertada en la nota.": "捕获图像已插入笔记。",
+  "Captura insertada. Dibuja las áreas que quieras ocultar.": "捕获图像已插入。绘制你想遮挡的区域。",
+  "PDF eliminado de la biblioteca del vault.": "PDF 已从库中删除。",
+  "El enlace se conservará hasta que lo quites manualmente.": "链接会一直保留，直到你手动移除。",
+  // Pomodoro：进度计数。
+  "Contador progresivo (cuenta el tiempo transcurrido)": "进度计数（统计已用时间）",
+  "Contador progresivo": "进度计数",
+  "Configura los tiempos de enfoque y descanso, cuántas sesiones completar antes de un descanso largo y si el contador avanza o retrocede.": "配置专注与休息时长、长休息前的会话数，以及计数器是正向还是倒计时。",
+  // 参考文献。
+  "Biblioteca": "书库",
+  "Bibliografía": "参考文献",
+  "Recursos": "资源",
+  "Leyendo": "在读",
+  "Completados": "已完成",
+  "Añadir recurso": "添加资源",
+  "Buscar en la biblioteca...": "搜索书库…",
+  "Buscar en la biblioteca": "搜索书库",
+  "Tipos de recurso": "资源类型",
+  "Filtrar por estado": "按状态筛选",
+  "Todos": "全部",
+  "Todos los estados": "所有状态",
+  "Libro": "图书",
+  "Vídeo": "视频",
+  "Artículo": "文章",
+  "Página web": "网页",
+  "Pendiente": "待读",
+  "Pausado": "已暂停",
+  "Completado": "已完成",
+  "No hay recursos que coincidan con los filtros.": "没有符合筛选条件的资源。",
+  "Todavía no hay recursos en tu bibliografía.": "你的参考文献中还没有资源。",
+  "Prueba con otra búsqueda o cambia los filtros.": "试试其他搜索或更改筛选条件。",
+  "Añade tu primer libro, vídeo, artículo o página web.": "添加你的第一本图书、视频、文章或网页。",
+  "Sin progreso definido": "未设置进度",
+  "Progreso actual": "当前进度",
+  "Progreso total": "总进度",
+  "Minutos": "分钟",
+  "Portada": "封面",
+  "Cambiar portada": "更换封面",
+  "Quitar portada": "移除封面",
+  "Abrir nota principal": "打开主页面",
+  "Eliminar recurso": "删除资源",
+  "Estado": "状态",
+  "Valoración": "评分",
+  "Autor": "作者",
+  "Año": "年份",
+  "Enlace": "链接",
+  "Notas vinculadas": "关联笔记",
+  "Nueva nota": "新笔记",
+  "Sin notas todavía. Crea una nota vinculada para desarrollar este recurso.": "还没有笔记。创建一个关联页面来展开这个资源吧。",
+  "No se pudo guardar el cambio.": "无法保存更改。",
+  "Recurso eliminado.": "资源已删除。",
+  "No se pudo eliminar el recurso.": "无法删除资源。",
+  "Nueva entrada": "新条目",
+  "Crear recurso": "创建资源",
+  "Páginas totales": "总页数",
+  "URL de portada (opcional)": "封面 URL（可选）",
+  "URL de portada": "封面 URL",
+  "Elegir portada": "选择封面",
+  "Creando…": "正在创建…",
+  "El título es obligatorio.": "标题为必填项。",
+  "No se pudo crear el recurso. Prueba con otro título.": "无法创建资源。请尝试其他标题。",
+  "La nota se creará como página independiente y enlazará de vuelta a este recurso.": "该笔记将作为独立页面创建，并链接回此资源。",
+  "No se pudo crear la nota. Prueba con otro título.": "无法创建笔记。请尝试其他标题。",
+  "Se eliminará de la bibliografía:": "将从参考文献中移除：",
+  "La nota Markdown y sus datos se borrarán del vault.": "Markdown 笔记及其数据将从库中删除。",
+  "Formato de imagen no compatible. Usa PNG, JPG, WEBP, GIF, BMP o SVG.": "不支持的图片格式。请使用 PNG、JPG、WEBP、GIF、BMP 或 SVG。",
+  "No se pudo guardar la portada en el vault.": "无法将封面保存到库中。",
+  "La imagen debe pesar menos de": "图片大小必须小于",
+  "en este entorno.": "此环境中。",
+  "Sin título": "无标题",
+  // Bibliografía: búsqueda de metadatos en línea.
+  "Metadatos en línea": "在线元数据",
+  "Busca por DOI, ISBN o palabras clave en Crossref y Open Library. Solo se envía el texto que escribes.": "在 Crossref 和 Open Library 中按 DOI、ISBN 或关键词搜索。仅发送你输入的文本。",
+  "Si no hay conexión, completa los campos a mano: la búsqueda nunca bloquea el formulario.": "如果没有网络，请手动填写字段：搜索不会阻塞表单。",
+  "DOI, ISBN o palabras clave": "DOI、ISBN 或关键词",
+  "Buscar metadatos por DOI, ISBN o palabras clave": "按 DOI、ISBN 或关键词搜索元数据",
+  "Modo de búsqueda": "搜索模式",
+  "Automático": "自动",
+  "DOI": "DOI",
+  "ISBN": "ISBN",
+  "Palabras clave": "关键词",
+  "Buscar en línea": "在线搜索",
+  "Buscando metadatos…": "正在搜索元数据…",
+  "Buscando en Crossref y Open Library…": "正在搜索 Crossref 和 Open Library…",
+  "Escribe un DOI, un ISBN o palabras clave.": "输入 DOI、ISBN 或关键词。",
+  "Sin resultados. Prueba otras palabras clave o revisa el identificador.": "没有结果。请尝试其他关键词或检查标识符。",
+  "resultados encontrados": "个结果",
+  "Datos importados. Revisa los campos y pulsa Crear recurso.": "数据已导入。请检查字段并点击“创建资源”。",
+  "La consulta no es válida. Revisa el DOI o el ISBN.": "查询无效。请检查 DOI 或 ISBN。",
+  "No se encontró ningún recurso con esa consulta.": "未找到与该查询匹配的资源。",
+  "Demasiadas búsquedas seguidas. Espera unos segundos.": "连续搜索过多。请稍等几秒。",
+  "La búsqueda tardó demasiado. Revisa tu conexión.": "搜索耗时过长。请检查网络连接。",
+  "No se pudo conectar. Revisa tu conexión.": "无法连接。请检查网络连接。",
+  "El servicio de metadatos no respondió. Inténtalo más tarde.": "元数据服务未响应。请稍后再试。",
+  "La respuesta del servicio era demasiado grande.": "服务响应过大。",
+  "El servicio devolvió una respuesta no válida.": "服务返回了无效响应。",
+  "La búsqueda en línea solo está disponible en la aplicación.": "在线搜索仅在应用中可用。",
+  "No se pudo completar la búsqueda.": "无法完成搜索。",
+};
+
+const spanishByEnglish = Object.fromEntries(
+  Object.entries(englishBySpanish).map(([spanish, english]) => [english, spanish])
+);
+
+const spanishByChinese = Object.fromEntries(
+  Object.entries(chineseBySpanish).map(([spanish, chinese]) => [chinese, spanish])
+);
+
+const excludedContentSelector = [
+  ".block-editor",
+  ".page-title",
+  ".headbar-page-breadcrumb",
+  ".vault-tree-page",
+  ".backlink-snippet",
+  ".flashcard-explorer-question",
+  ".flashcard-explorer-answer",
+  ".history-preview-content",
+  ".card-question",
+  ".card-answer",
+  ".image-occlusion-hint",
+  ".graph-preview-title",
+  ".graph-preview-body",
+  ".graph-preview-meta",
+  ".pages-list",
+  ".sidebar-pages-list",
+  "#active-vault-name",
+  // Datos de usuario en la vista móvil: nunca deben traducirse.
+  ".mobile-question",
+  ".mobile-answer",
+  ".mobile-card-source",
+  ".mobile-notes-list",
+  ".mobile-occlusion-stage",
+  "[contenteditable='true']",
+  ".bib-user-data",
+].join(",");
+
+let language: InterfaceLanguage = "es";
+let preference: LanguagePreference = "auto";
+const originalTexts = new WeakMap<Text, string>();
+const originalAttributes = new WeakMap<Element, Map<string, string>>();
+const localizedTexts = new WeakMap<Text, string>();
+const localizedAttributes = new WeakMap<Element, Map<string, string>>();
+const reverseDictionary = new Map<string, string>([
+  ...Object.entries(spanishByEnglish),
+  ...Object.entries(spanishByChinese),
+]);
+const languageChangeListeners = new Set<(language: InterfaceLanguage) => void>();
+
+function canonicalSpanish(value: string): string {
+  const trimmed = value.trim();
+  const reversed = reverseDictionary.get(trimmed);
+  if (reversed) return reversed;
+  const cardMatch = trimmed.match(/^Card (\d+) of (\d+)$/);
+  if (cardMatch) return `Tarjeta ${cardMatch[1]} de ${cardMatch[2]}`;
+  const vaultMatch = trimmed.match(/^Active vault: (.+)$/);
+  if (vaultMatch) return `Vault activo: ${vaultMatch[1]}`;
+  const createdMatch = trimmed.match(/^Nota "(.+)" creada$/);
+  if (createdMatch) return `Page "${createdMatch[1]}" created`;
+  const areaMatch = trimmed.match(/^Area (\d+)$/);
+  if (areaMatch) return `Área ${areaMatch[1]}`;
+  const cardsMatch = trimmed.match(/^(\d+) cards?$/);
+  if (cardsMatch) return `${cardsMatch[1]} tarjeta${cardsMatch[1] === "1" ? "" : "s"}`;
+  const pageCardCountMatch = trimmed.match(/^(.+) \((\d+) cards?\)$/);
+  if (pageCardCountMatch) {
+    return `${pageCardCountMatch[1]} (${pageCardCountMatch[2]} tarjeta${pageCardCountMatch[2] === "1" ? "" : "s"})`;
+  }
+  const pagesMatch = trimmed.match(/^(\d+) pages?$/);
+  if (pagesMatch) return `${pagesMatch[1]} página${pagesMatch[1] === "1" ? "" : "s"}`;
+  const tasksMatch = trimmed.match(/^(\d+) active tasks?$/);
+  if (tasksMatch) return `${tasksMatch[1]} tareas activas`;
+  const sourceMatch = trimmed.match(/^Source: (.+)$/);
+  if (sourceMatch) return `Origen: ${sourceMatch[1]}`;
+  const renameMatch = trimmed.match(/^Page renamed to "(.+)"$/);
+  if (renameMatch) return `Página renombrada a "${renameMatch[1]}"`;
+  const deletedMatch = trimmed.match(/^Page "(.+)" deleted$/);
+  if (deletedMatch) return `Página "${deletedMatch[1]}" eliminada`;
+  const copiedMatch = trimmed.match(/^Link \[\[(.+)\]\] copied to clipboard!$/);
+  if (copiedMatch) return `¡Enlace [[${copiedMatch[1]}]] copiado al portapapeles!`;
+  const occlusionMatch = trimmed.match(/^(\d+) occlusion\(s\) saved\.$/);
+  if (occlusionMatch) return `${occlusionMatch[1]} oclusión(es) guardada(s).`;
+  const propertiesMatch = trimmed.match(/^Page properties \((\d+)\)$/);
+  if (propertiesMatch) return `Propiedades de página (${propertiesMatch[1]})`;
+  const versionHistoryMatch = trimmed.match(/^(?:Historial de Versiones|Version history): (.+)$/);
+  if (versionHistoryMatch) return `Historial de Versiones: ${versionHistoryMatch[1]}`;
+  const renameConfirmMatch = trimmed.match(/^Are you sure you want to permanently delete page "(.+)"\?$/);
+  if (renameConfirmMatch) return `¿Estás seguro de que deseas eliminar permanentemente la página "${renameConfirmMatch[1]}"?`;
+  const deleteConfirmMatch = trimmed.match(/^Delete page "(.+)" permanently\?$/);
+  if (deleteConfirmMatch) return `¿Eliminar la página "${deleteConfirmMatch[1]}" permanentemente?`;
+  const sidebarDeleteMatch = trimmed.match(/^Are you sure you want to delete page "(.+)"\?$/);
+  if (sidebarDeleteMatch) return `¿Estás seguro de que deseas eliminar la página "${sidebarDeleteMatch[1]}"?`;
+  const clearCacheMatch = trimmed.match(/^Could not clear the temporary cache: (.+)$/);
+  if (clearCacheMatch) return `No se pudo borrar la caché temporal: ${clearCacheMatch[1]}`;
+  const pdfExportMatch = trimmed.match(/^Could not prepare PDF export: (.+)$/);
+  if (pdfExportMatch) return `No se pudo preparar la exportación a PDF: ${pdfExportMatch[1]}`;
+  const deleteAreaMatch = trimmed.match(/^Eliminar área (\d+)$/);
+  if (deleteAreaMatch) return `Eliminar área ${deleteAreaMatch[1]}`;
+  return trimmed;
+}
+
+function localizedText(value: string): string {
+  const canonical = canonicalSpanish(value);
+  if (language === "en") {
+    const direct = englishBySpanish[canonical];
+    if (direct) return direct;
+    const cardMatch = canonical.match(/^Tarjeta (\d+) de (\d+)$/);
+    if (cardMatch) return `Card ${cardMatch[1]} of ${cardMatch[2]}`;
+    const pageInfoMatch = canonical.match(/^Página (\d+) de (\d+)$/);
+    if (pageInfoMatch) return `Page ${pageInfoMatch[1]} of ${pageInfoMatch[2]}`;
+    const pageCardCountMatch = canonical.match(/^(.+) \((\d+) tarjetas?\)$/);
+    if (pageCardCountMatch) {
+      return `${pageCardCountMatch[1]} (${pageCardCountMatch[2]} card${pageCardCountMatch[2] === "1" ? "" : "s"})`;
+    }
+    const atomProgressMatch = canonical.match(/^(\d+) puntos? · (.+) \(Z=(\d+)\)$/);
+    if (atomProgressMatch) {
+      return `${atomProgressMatch[1]} point${atomProgressMatch[1] === "1" ? "" : "s"} · ${atomProgressMatch[2]} (Z=${atomProgressMatch[3]})`;
+    }
+    const vaultMatch = canonical.match(/^Vault activo: (.+)$/);
+    if (vaultMatch) return `Active vault: ${vaultMatch[1]}`;
+    const vaultActiveToastMatch = canonical.match(/^Bóveda activa: (.+)$/);
+    if (vaultActiveToastMatch) return `Active vault: ${vaultActiveToastMatch[1]}`;
+    const activeVaultEntryMatch = canonical.match(/^(.+) \(bóveda activa\)$/);
+    if (activeVaultEntryMatch) return `${activeVaultEntryMatch[1]} (active vault)`;
+    const openVaultMatch = canonical.match(/^Abrir (.+)$/);
+    if (openVaultMatch) return `Open ${openVaultMatch[1]}`;
+    const removeVaultMatch = canonical.match(/^Quitar (.+) de la lista$/);
+    if (removeVaultMatch) return `Remove ${removeVaultMatch[1]} from the list`;
+    const removeVaultConfirmMatch = canonical.match(/^¿Quitar "(.+)" de la lista de bóvedas\? La carpeta y sus notas no se eliminarán\.$/);
+    if (removeVaultConfirmMatch) {
+      return `Remove "${removeVaultConfirmMatch[1]}" from the vault list? The folder and its pages will not be deleted.`;
+    }
+    const vaultRemovedMatch = canonical.match(/^"(.+)" se quitó de la lista de bóvedas\.$/);
+    if (vaultRemovedMatch) return `"${vaultRemovedMatch[1]}" was removed from the vault list.`;
+    const skippedNotesMatch = canonical.match(/^Se omitieron (\d+) notas \(errores de lectura\/permisos\/tamaño\)\.$/);
+    if (skippedNotesMatch) {
+      return `${skippedNotesMatch[1]} page${skippedNotesMatch[1] === "1" ? "" : "s"} skipped (read/permission/size errors).`;
+    }
+    const createdMatch = canonical.match(/^Nota "(.+)" creada$/);
+    if (createdMatch) return `Page "${createdMatch[1]}" created`;
+    const areaMatch = canonical.match(/^Área (\d+)$/);
+    if (areaMatch) return `Area ${areaMatch[1]}`;
+    const cardsMatch = canonical.match(/^(\d+) tarjetas?$/);
+    if (cardsMatch) return `${cardsMatch[1]} card${cardsMatch[1] === "1" ? "" : "s"}`;
+    const pagesMatch = canonical.match(/^(\d+) páginas?$/);
+    if (pagesMatch) return `${pagesMatch[1]} page${pagesMatch[1] === "1" ? "" : "s"}`;
+    const tasksMatch = canonical.match(/^(\d+) tareas activas$/);
+    if (tasksMatch) return `${tasksMatch[1]} active task${tasksMatch[1] === "1" ? "" : "s"}`;
+    const sourceMatch = canonical.match(/^Origen: (.+)$/);
+    if (sourceMatch) return `Source: ${sourceMatch[1]}`;
+    const renameMatch = canonical.match(/^Página renombrada a "(.+)"$/);
+    if (renameMatch) return `Page renamed to "${renameMatch[1]}"`;
+    const deletedMatch = canonical.match(/^Página "(.+)" eliminada$/);
+    if (deletedMatch) return `Page "${deletedMatch[1]}" deleted`;
+    const copiedMatch = canonical.match(/^¡Enlace \[\[(.+)\]\] copiado al portapapeles!$/);
+    if (copiedMatch) return `Link [[${copiedMatch[1]}]] copied to clipboard!`;
+    const occlusionMatch = canonical.match(/^(\d+) oclusión\(es\) guardada\(s\)\.$/);
+    if (occlusionMatch) return `${occlusionMatch[1]} occlusion(s) saved.`;
+    const propertiesMatch = canonical.match(/^Propiedades de página \((\d+)\)$/);
+    if (propertiesMatch) return `Page properties (${propertiesMatch[1]})`;
+    const versionHistoryMatch = canonical.match(/^Historial de Versiones: (.+)$/);
+    if (versionHistoryMatch) return `Version history: ${versionHistoryMatch[1]}`;
+    const renameConfirmMatch = canonical.match(/^¿Estás seguro de que deseas eliminar permanentemente la página "(.+)"\?$/);
+    if (renameConfirmMatch) return `Are you sure you want to permanently delete page "${renameConfirmMatch[1]}"?`;
+    const deleteConfirmMatch = canonical.match(/^¿Eliminar la página "(.+)" permanentemente\?$/);
+    if (deleteConfirmMatch) return `Delete page "${deleteConfirmMatch[1]}" permanently?`;
+    const sidebarDeleteMatch = canonical.match(/^¿Estás seguro de que deseas eliminar la página "(.+)"\?$/);
+    if (sidebarDeleteMatch) return `Are you sure you want to delete page "${sidebarDeleteMatch[1]}"?`;
+    const clearCacheMatch = canonical.match(/^No se pudo borrar la caché temporal: (.+)$/);
+    if (clearCacheMatch) return `Could not clear the temporary cache: ${clearCacheMatch[1]}`;
+    // Ajustes > Avanzado: mantenimiento (mensajes con conteos interpolados).
+    const removedPropertiesMatch = canonical.match(/^Se borraron (\d+) propiedad\(es\) del vault\.$/);
+    if (removedPropertiesMatch) {
+      const removed = Number(removedPropertiesMatch[1]);
+      return `Removed ${removed} propert${removed === 1 ? "y" : "ies"} from the vault.`;
+    }
+    const unusedRefMatch = canonical.match(/^No hay imágenes sin usar: las (\d+) imágenes de assets están referenciadas\.$/);
+    if (unusedRefMatch) {
+      return `No unused images: all ${unusedRefMatch[1]} asset images are referenced.`;
+    }
+    const removedUnusedMatch = canonical.match(/^Se eliminaron (\d+) de (\d+) imágenes sin usar\. Se conservaron (\d+)\. No se pudieron borrar (\d+) archivo\(s\)\.$/);
+    if (removedUnusedMatch) {
+      return `Removed ${removedUnusedMatch[1]} of ${removedUnusedMatch[2]} unused images. Kept ${removedUnusedMatch[3]}. Could not delete ${removedUnusedMatch[4]} file(s).`;
+    }
+    const keptUnusedMatch = canonical.match(/^Se eliminaron (\d+) de (\d+) imágenes sin usar\. Se conservaron (\d+)\.$/);
+    if (keptUnusedMatch) {
+      return `Removed ${keptUnusedMatch[1]} of ${keptUnusedMatch[2]} unused images. Kept ${keptUnusedMatch[3]}.`;
+    }
+    const cleanupCompleteMatch = canonical.match(/^Limpieza completada: (\d+) imagen\(es\) eliminada\(s\)\.$/);
+    if (cleanupCompleteMatch) {
+      return `Cleanup complete: ${cleanupCompleteMatch[1]} image(s) removed.`;
+    }
+    const cacheClearedMatch = canonical.match(/^Caché temporal borrada \((\d+) caché\(s\)\)\.$/);
+    if (cacheClearedMatch) {
+      return `Temporary cache cleared (${cacheClearedMatch[1]} cache(s)).`;
+    }
+    const pdfExportMatch = canonical.match(/^No se pudo preparar la exportación a PDF: (.+)$/);
+    if (pdfExportMatch) return `Could not prepare PDF export: ${pdfExportMatch[1]}`;
+    const deleteAreaMatch = canonical.match(/^Eliminar área (\d+)$/);
+    if (deleteAreaMatch) return `Delete area ${deleteAreaMatch[1]}`;
+    return canonical;
+  }
+  if (language === "zh") {
+    const direct = chineseBySpanish[canonical];
+    if (direct) return direct;
+    const cardMatch = canonical.match(/^Tarjeta (\d+) de (\d+)$/);
+    if (cardMatch) return `第 ${cardMatch[1]} 张，共 ${cardMatch[2]} 张`;
+    const pageInfoMatch = canonical.match(/^Página (\d+) de (\d+)$/);
+    if (pageInfoMatch) return `第 ${pageInfoMatch[1]} 页，共 ${pageInfoMatch[2]} 页`;
+    const pageCardCountMatch = canonical.match(/^(.+) \((\d+) tarjetas?\)$/);
+    if (pageCardCountMatch) {
+      return `${pageCardCountMatch[1]}（${pageCardCountMatch[2]} 张卡片）`;
+    }
+    const atomProgressMatch = canonical.match(/^(\d+) puntos? · (.+) \(Z=(\d+)\)$/);
+    if (atomProgressMatch) {
+      return `${atomProgressMatch[1]} 点 · ${atomProgressMatch[2]} (Z=${atomProgressMatch[3]})`;
+    }
+    const vaultMatch = canonical.match(/^Vault activo: (.+)$/);
+    if (vaultMatch) return `当前库：${vaultMatch[1]}`;
+    const vaultActiveToastMatch = canonical.match(/^Bóveda activa: (.+)$/);
+    if (vaultActiveToastMatch) return `当前知识库：${vaultActiveToastMatch[1]}`;
+    const activeVaultEntryMatch = canonical.match(/^(.+) \(bóveda activa\)$/);
+    if (activeVaultEntryMatch) return `${activeVaultEntryMatch[1]}（当前知识库）`;
+    const openVaultMatch = canonical.match(/^Abrir (.+)$/);
+    if (openVaultMatch) return `打开 ${openVaultMatch[1]}`;
+    const removeVaultMatch = canonical.match(/^Quitar (.+) de la lista$/);
+    if (removeVaultMatch) return `从列表中移除 ${removeVaultMatch[1]}`;
+    const removeVaultConfirmMatch = canonical.match(/^¿Quitar "(.+)" de la lista de bóvedas\? La carpeta y sus notas no se eliminarán\.$/);
+    if (removeVaultConfirmMatch) {
+      return `要从知识库列表中移除「${removeVaultConfirmMatch[1]}」吗？文件夹及其页面不会被删除。`;
+    }
+    const vaultRemovedMatch = canonical.match(/^"(.+)" se quitó de la lista de bóvedas\.$/);
+    if (vaultRemovedMatch) return `已将「${vaultRemovedMatch[1]}」从知识库列表中移除。`;
+    const skippedNotesMatch = canonical.match(/^Se omitieron (\d+) notas \(errores de lectura\/permisos\/tamaño\)\.$/);
+    if (skippedNotesMatch) {
+      return `已跳过 ${skippedNotesMatch[1]} 个页面（读取/权限/大小错误）。`;
+    }
+    const createdMatch = canonical.match(/^Nota "(.+)" creada$/);
+    if (createdMatch) return `页面「${createdMatch[1]}」已创建`;
+    const areaMatch = canonical.match(/^Área (\d+)$/);
+    if (areaMatch) return `区域 ${areaMatch[1]}`;
+    const cardsMatch = canonical.match(/^(\d+) tarjetas?$/);
+    if (cardsMatch) return `${cardsMatch[1]} 张卡片`;
+    const pagesMatch = canonical.match(/^(\d+) páginas?$/);
+    if (pagesMatch) return `${pagesMatch[1]} 个页面`;
+    const tasksMatch = canonical.match(/^(\d+) tareas activas$/);
+    if (tasksMatch) return `${tasksMatch[1]} 个活动任务`;
+    const sourceMatch = canonical.match(/^Origen: (.+)$/);
+    if (sourceMatch) return `来源：${sourceMatch[1]}`;
+    const renameMatch = canonical.match(/^Página renombrada a "(.+)"$/);
+    if (renameMatch) return `页面已重命名为「${renameMatch[1]}」`;
+    const deletedMatch = canonical.match(/^Página "(.+)" eliminada$/);
+    if (deletedMatch) return `页面「${deletedMatch[1]}」已删除`;
+    const copiedMatch = canonical.match(/^¡Enlace \[\[(.+)\]\] copiado al portapapeles!$/);
+    if (copiedMatch) return `链接 [[${copiedMatch[1]}]] 已复制到剪贴板！`;
+    const occlusionMatch = canonical.match(/^(\d+) oclusión\(es\) guardada\(s\)\.$/);
+    if (occlusionMatch) return `${occlusionMatch[1]} 个遮挡已保存。`;
+    const propertiesMatch = canonical.match(/^Propiedades de página \((\d+)\)$/);
+    if (propertiesMatch) return `页面属性（${propertiesMatch[1]}）`;
+    const versionHistoryMatch = canonical.match(/^Historial de Versiones: (.+)$/);
+    if (versionHistoryMatch) return `版本历史：${versionHistoryMatch[1]}`;
+    const renameConfirmMatch = canonical.match(/^¿Estás seguro de que deseas eliminar permanentemente la página "(.+)"\?$/);
+    if (renameConfirmMatch) return `确定要永久删除页面「${renameConfirmMatch[1]}」吗？`;
+    const deleteConfirmMatch = canonical.match(/^¿Eliminar la página "(.+)" permanentemente\?$/);
+    if (deleteConfirmMatch) return `要永久删除页面「${deleteConfirmMatch[1]}」吗？`;
+    const sidebarDeleteMatch = canonical.match(/^¿Estás seguro de que deseas eliminar la página "(.+)"\?$/);
+    if (sidebarDeleteMatch) return `确定要删除页面「${sidebarDeleteMatch[1]}」吗？`;
+    const clearCacheMatch = canonical.match(/^No se pudo borrar la caché temporal: (.+)$/);
+    if (clearCacheMatch) return `无法清除临时缓存：${clearCacheMatch[1]}`;
+    const removedPropertiesMatch = canonical.match(/^Se borraron (\d+) propiedad\(es\) del vault\.$/);
+    if (removedPropertiesMatch) return `已从库中删除 ${removedPropertiesMatch[1]} 个属性。`;
+    const unusedRefMatch = canonical.match(/^No hay imágenes sin usar: las (\d+) imágenes de assets están referenciadas\.$/);
+    if (unusedRefMatch) return `没有未使用的图片：assets 中的 ${unusedRefMatch[1]} 张图片均已被引用。`;
+    const removedUnusedMatch = canonical.match(/^Se eliminaron (\d+) de (\d+) imágenes sin usar\. Se conservaron (\d+)\. No se pudieron borrar (\d+) archivo\(s\)\.$/);
+    if (removedUnusedMatch) {
+      return `已删除 ${removedUnusedMatch[1]}/${removedUnusedMatch[2]} 张未使用图片。保留了 ${removedUnusedMatch[3]} 张。无法删除 ${removedUnusedMatch[4]} 个文件。`;
+    }
+    const keptUnusedMatch = canonical.match(/^Se eliminaron (\d+) de (\d+) imágenes sin usar\. Se conservaron (\d+)\.$/);
+    if (keptUnusedMatch) {
+      return `已删除 ${keptUnusedMatch[1]}/${keptUnusedMatch[2]} 张未使用图片。保留了 ${keptUnusedMatch[3]} 张。`;
+    }
+    const cleanupCompleteMatch = canonical.match(/^Limpieza completada: (\d+) imagen\(es\) eliminada\(s\)\.$/);
+    if (cleanupCompleteMatch) return `清理完成：已删除 ${cleanupCompleteMatch[1]} 张图片。`;
+    const cacheClearedMatch = canonical.match(/^Caché temporal borrada \((\d+) caché\(s\)\)\.$/);
+    if (cacheClearedMatch) return `临时缓存已清除（${cacheClearedMatch[1]} 个缓存）。`;
+    const pdfExportMatch = canonical.match(/^No se pudo preparar la exportación a PDF: (.+)$/);
+    if (pdfExportMatch) return `无法准备 PDF 导出：${pdfExportMatch[1]}`;
+    const deleteAreaMatch = canonical.match(/^Eliminar área (\d+)$/);
+    if (deleteAreaMatch) return `删除区域 ${deleteAreaMatch[1]}`;
+    return canonical;
+  }
+  return canonical;
+}
+function localizeTextNode(node: Text): void {
+  const parent = node.parentElement;
+  if (!parent || parent.closest(excludedContentSelector)) return;
+  const previousOutput = localizedTexts.get(node);
+  const previousOriginal = originalTexts.get(node);
+  const original = previousOriginal !== undefined && node.data === previousOutput
+    ? previousOriginal
+    : node.data;
+  originalTexts.set(node, original);
+  const trimmed = original.trim();
+  let localized = localizedText(trimmed);
+  // Las etiquetas y ayudas del HTML están partidas en varias líneas por el
+  // formateo del documento. Para encontrarlas en el diccionario comparamos
+  // también con los espacios internos colapsados, pero solo sustituimos si
+  // existe una traducción real: así no se altera el texto sin traducir.
+  const normalized = trimmed.replace(/\s+/g, " ");
+  if (normalized !== trimmed) {
+    const normalizedLocalized = localizedText(normalized);
+    if (normalizedLocalized !== canonicalSpanish(normalized)) {
+      localized = normalizedLocalized;
+    }
+  }
+  const leading = original.match(/^\s*/)?.[0] || "";
+  const trailing = original.match(/\s*$/)?.[0] || "";
+  const nextValue = `${leading}${localized}${trailing}`;
+  if (node.data !== nextValue) node.data = nextValue;
+  localizedTexts.set(node, nextValue);
+}
+
+function localizeAttribute(element: Element, name: string): void {
+  if (element.closest(excludedContentSelector)) return;
+  let values = originalAttributes.get(element);
+  if (!values) {
+    values = new Map();
+    originalAttributes.set(element, values);
+  }
+  let outputs = localizedAttributes.get(element);
+  if (!outputs) {
+    outputs = new Map();
+    localizedAttributes.set(element, outputs);
+  }
+  const current = element.getAttribute(name);
+  if (current === null) return;
+  const previousOriginal = values.get(name);
+  const original = previousOriginal !== undefined && current === outputs.get(name)
+    ? previousOriginal
+    : canonicalSpanish(current);
+  values.set(name, original);
+  const localized = localizedText(original);
+  if (current !== localized) element.setAttribute(name, localized);
+  outputs.set(name, localized);
+}
+
+function localizeElement(element: Element): void {
+  element.childNodes.forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE) localizeTextNode(node as Text);
+    else if (node instanceof Element) localizeElement(node);
+  });
+  ["title", "placeholder", "aria-label", "aria-description", "data-tooltip"].forEach((name) =>
+    localizeAttribute(element, name)
+  );
+}
+
+function applyLanguage(nextLanguage: InterfaceLanguage): void {
+  language = nextLanguage;
+  document.documentElement.lang = language;
+  localizeElement(document.body);
+  languageChangeListeners.forEach((listener) => listener(language));
+}
+
+export function translate(spanish: string): string {
+  return localizedText(spanish);
+}
+
+export function currentLanguage(): InterfaceLanguage {
+  return language;
+}
+
+export function currentLanguagePreference(): LanguagePreference {
+  return preference;
+}
+
+/**
+ * Cambia el idioma de inmediato sin recargar la página. La vista móvil usa
+ * esta función para que el cambio se aplique en el acto; antes solo se
+ * escribía `localStorage` y dependía de un `reload`.
+ */
+export function setLanguagePreference(next: LanguagePreference): void {
+  preference = next === "auto" || isInterfaceLanguage(next) ? next : "auto";
+  try {
+    localStorage.setItem("sinnotas-language", preference);
+  } catch {
+    // La traducción se aplica igualmente aunque no se pueda persistir.
+  }
+  applyLanguage(preference === "auto" ? systemLanguageFromNavigator() : preference);
+}
+
+export function onLanguageChange(listener: (language: InterfaceLanguage) => void): () => void {
+  languageChangeListeners.add(listener);
+  return () => languageChangeListeners.delete(listener);
+}
+
+function systemLanguageFromNavigator(): InterfaceLanguage {
+  const lang = navigator.language.toLowerCase();
+  if (lang.startsWith("es")) return "es";
+  if (lang.startsWith("zh")) return "zh";
+  return "en";
+}
+
+function isInterfaceLanguage(value: string | null): value is InterfaceLanguage {
+  return value === "es" || value === "en" || value === "zh";
+}
+
+/**
+ * Inicializa el idioma guardado y mantiene traducidos los nodos que se añaden
+ * dinámicamente. El selector es opcional: la vista móvil no tiene un
+ * `<select>`, pero sí necesita el mismo sistema de traducción.
+ */
+export function initializeLocalization(selector: HTMLSelectElement | null = null): void {
+  const stored = localStorage.getItem("sinnotas-language");
+  preference = isInterfaceLanguage(stored) || stored === "auto" ? stored : "auto";
+  applyLanguage(preference === "auto" ? systemLanguageFromNavigator() : preference);
+  if (selector) selector.value = preference;
+
+  if (selector) {
+    // Clear existing options
+    selector.innerHTML = "";
+    // Add new options
+    const autoOption = document.createElement("option");
+    autoOption.value = "auto";
+    autoOption.textContent = "Automático (Sistema)";
+    selector.appendChild(autoOption);
+
+    const esOption = document.createElement("option");
+    esOption.value = "es";
+    esOption.textContent = "Español";
+    selector.appendChild(esOption);
+
+    const enOption = document.createElement("option");
+    enOption.value = "en";
+    enOption.textContent = "English";
+    selector.appendChild(enOption);
+
+    const zhOption = document.createElement("option");
+    zhOption.value = "zh";
+    zhOption.textContent = "中文";
+    selector.appendChild(zhOption);
+
+    selector.value = preference;
+    selector.addEventListener("change", () => {
+      const selected = selector.value;
+      setLanguagePreference(
+        isInterfaceLanguage(selected) || selected === "auto" ? selected : "auto"
+      );
+    });
+  }
+
+  const observer = new MutationObserver((records) => {
+    records.forEach((record) => {
+      if (record.type === "characterData" && record.target instanceof Text) {
+        localizeTextNode(record.target);
+      }
+      record.addedNodes.forEach((node) => {
+        if (node instanceof Text) localizeTextNode(node);
+        else if (node instanceof Element) localizeElement(node);
+      });
+      if (record.type === "attributes" && record.target instanceof Element && record.attributeName) {
+        localizeAttribute(record.target, record.attributeName);
+      }
+    });
+  });
+  observer.observe(document.body, {
+    subtree: true,
+    childList: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ["title", "placeholder", "aria-label", "aria-description", "data-tooltip"],
+  });
+}
+
