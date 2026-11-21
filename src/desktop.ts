@@ -3919,13 +3919,9 @@ async function initUpdateSettings(): Promise<void> {
 
   await detectInstallKind();
 
-  // En Android el actualizador integrado no se muestra: la APK se distribuye
-  // fuera de la tienda y se actualiza manualmente. Esto también cubre el
+  // En Android se descarga el APK y el backend lo guarda en
+  // Descargas/SinNotas; la instalación es manual. Esto también cubre el
   // editor completo abierto desde la APK.
-  if (getUpdatePlatform() === "android") {
-    updateSettingsSection.hidden = true;
-    return;
-  }
 
   // Snap, Flatpak y MSIX se actualizan desde la tienda. El actualizador de
   // Tauri no puede reemplazar esos paquetes (son de solo lectura y no usa la

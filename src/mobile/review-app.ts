@@ -3549,13 +3549,9 @@ class MobileReviewApp {
     if (this.updateUiReady) return;
     this.updateUiReady = true;
 
-    // La APK de Android no muestra el actualizador: se distribuye fuera de la
-    // tienda y las actualizaciones se instalan manualmente desde el APK.
-    if (isAndroidRuntime() || getUpdatePlatform() === "android") {
-      this.refs.updateBlock.hidden = true;
-      return;
-    }
-
+    // En Android el actualizador descarga el APK y el backend lo guarda en
+    // Descargas/SinNotas; la instalación sigue siendo manual. Solo se oculta
+    // en plataformas sin flujo de actualización.
     if (getUpdatePlatform() === "unsupported") {
       this.refs.updateBlock.hidden = true;
       return;

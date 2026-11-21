@@ -427,8 +427,8 @@ repaso** de la interfaz de escritorio.
 
 ### Diferencias con escritorio
 
-- El actualizador no se muestra en Android: las actualizaciones se descargan
-  desde GitHub y se instalan manualmente.
+- El actualizador de Android descarga el APK desde GitHub y lo guarda en
+  `Descargas/SinNotas/`; la instalación sigue siendo manual.
 - El panel de productividad (Pomodoro, actividad y progreso) se oculta en el
   editor completo de Android para dejar espacio a las notas.
 - La barra de estado y la barra de navegación se respetan mediante el puente de
@@ -436,11 +436,13 @@ repaso** de la interfaz de escritorio.
 
 ### Actualizar el APK
 
-1. Descarga la nueva release desde GitHub.
-2. Abre el APK con el gestor de archivos.
-3. Acepta la instalación del sistema.
+1. En **Ajustes → Actualizaciones**, pulsa **Buscar actualizaciones**.
+2. Pulsa **Descargar APK**. El archivo se guarda en `Descargas/SinNotas/`.
+3. Abre el APK con el gestor de archivos.
+4. Acepta la instalación del sistema.
 
-Sin Notas no descarga ni instala APKs por sí mismo.
+Sin Notas descarga el APK, pero no lo instala por sí mismo: el instalador del
+sistema siempre pide confirmación.
 
 ## Datos, copias y sincronización
 

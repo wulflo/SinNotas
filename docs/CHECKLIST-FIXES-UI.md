@@ -1,7 +1,7 @@
 # Checklist — Fixes de UI (botones mapa mental / oclusión, tareas canvas, scroll flashcards)
 
 **Estado:** Fases 1–3 y Fase 5 (regresiones 8.1–8.3) implementadas; tsc, tests y build ✅. Pendiente la prueba manual en la app Tauri. **Última actualización:** 2026-11-21
-**Rama de trabajo:** `master` (se publica en `v0.5.1`)
+**Rama de trabajo:** `master` (se publica en `v0.5.2`)
 **Documento principal:** `docs/SinNotas.md`
 
 Este documento es el punto de reanudación si una sesión de trabajo se corta a
