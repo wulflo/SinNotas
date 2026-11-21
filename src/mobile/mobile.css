@@ -792,7 +792,8 @@ body.mobile-review-body {
   position: relative;
   max-width: 100%;
   overflow: auto;
-  overscroll-behavior: contain;
+  /* Sin `overscroll-behavior: contain`: si la imagen no está ampliada no hay
+   * nada que desplazar aquí y la rueda debe mover el repaso (`.mobile-main`). */
   border-radius: 14px;
   touch-action: pan-x pan-y;
 }

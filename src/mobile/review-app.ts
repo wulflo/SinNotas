@@ -1087,6 +1087,7 @@ class MobileReviewApp {
     this.refs.fsrsSheet.addEventListener("click", (event) => {
       if (event.target === this.refs.fsrsSheet) this.closeFSRSSettings();
     });
+    migrateSelect(this.refs.fsrsDeckSelect);
     migrateSelect(this.refs.fsrsRecalcAction);
     migrateSelect(this.refs.fsrsAnchor);
     this.refs.fsrsRecalcAction.addEventListener("change", () => {
@@ -3454,6 +3455,21 @@ class MobileReviewApp {
     return viewport;
   }
 
+  /**
+   * Comprueba que una URL de imagen carga de verdad. En algunos equipos la
+   * URL del protocolo `asset:` no está disponible aunque `resolve_image_path`
+   * sí devuelva la ruta canónica; en ese caso hay que caer a la lectura nativa
+   * por IPC (igual que hace `resolveDisplayImageUrl` en escritorio).
+   */
+  private imageUrlLoads(url: string): Promise<boolean> {
+    return new Promise((resolve) => {
+      const probe = new Image();
+      probe.onload = () => resolve(true);
+      probe.onerror = () => resolve(false);
+      probe.src = url;
+    });
+  }
+
   private async resolveImageUrl(source?: string): Promise<string | null> {
     if (!source) return null;
     const remoteUrl = resolveAllowedRemoteImageUrl(source);
@@ -3489,11 +3505,14 @@ class MobileReviewApp {
 
     try {
       const canonical = await invoke<string>("resolve_image_path", { source: absolute });
-      if (requestId === this.imageRequest) {
-        const url = convertFileSrc(canonical);
-        this.imageUrls.set(source, url);
+      const url = convertFileSrc(canonical);
+      // La ruta canónica puede ser válida y aun así no cargar por el protocolo
+      // de assets; se comprueba antes de darla por buena.
+      if (await this.imageUrlLoads(url)) {
+        if (requestId === this.imageRequest) this.imageUrls.set(source, url);
         return url;
       }
+      console.warn("La URL de recurso no cargó; se intentará leer la imagen por IPC:", url);
     } catch (error) {
       console.warn("La URL de recurso falló; se intentará leer la imagen por IPC:", error);
     }

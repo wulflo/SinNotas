@@ -38,8 +38,8 @@
   --ls-done-bg: #1e2a24;
   --ls-done-color: #a6d3b7;
 
-  --ls-kanban-card-bg: #17191f;
-  --ls-kanban-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.24), 0 4px 12px rgba(0, 0, 0, 0.08);
+  --ls-kanban-card-bg: #1e242d;
+  --ls-kanban-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.05);
   --ls-kanban-column-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
   
   --ls-cloze-gap-bg: rgba(97, 175, 239, 0.15);
@@ -4872,8 +4872,15 @@ body.is-bullet-selecting {
 .concept-map-tools {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex: none;
+}
+
+.concept-map-tools .btn-icon {
+  width: 28px;
+  height: 28px;
+  font-size: calc(17px * var(--ls-font-scale, 1));
+  line-height: 1;
 }
 
 .concept-map-canvas-wrap {
@@ -5279,6 +5286,13 @@ body.is-bullet-selecting {
   color: var(--ls-text-title);
 }
 
+.image-occlusion-header .btn-icon {
+  width: 40px;
+  height: 40px;
+  font-size: calc(24px * var(--ls-font-scale, 1));
+  line-height: 1;
+}
+
 .settings-language-control {
   display: flex;
   align-items: center;
@@ -5463,6 +5477,11 @@ body.is-bullet-selecting {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+}
+
+.image-occlusion-toolbar .font-option-btn {
+  min-height: 40px;
+  padding: 8px 12px;
 }
 
 .image-occlusion-toolbar .font-option-btn:disabled {
@@ -5747,11 +5766,28 @@ body.is-bullet-selecting {
   font-size: calc(14px * var(--ls-font-scale, 1));
 }
 
-.app-dialog-actions .btn-primary,
-.image-occlusion-footer .btn-primary {
+.app-dialog-actions .btn-primary {
   min-height: 40px;
   padding: 8px 18px;
   border-radius: 999px;
+}
+
+.image-occlusion-footer .btn-primary {
+  min-height: 40px;
+  padding: 10px 24px;
+  border-radius: 8px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--ls-accent) 82%, #ffffff 18%),
+    var(--ls-accent)
+  );
+  color: var(--ls-accent-foreground);
+  border: none;
+  font-size: calc(14px * var(--ls-font-scale, 1));
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 18px -7px color-mix(in srgb, var(--ls-accent) 70%, transparent);
+  transition: opacity 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
 }
 
 .app-dialog label {
@@ -5766,9 +5802,19 @@ body.is-bullet-selecting {
   color: var(--ls-text-title);
 }
 
-.app-dialog-actions .btn-primary:hover,
-.image-occlusion-footer .btn-primary:hover {
+.app-dialog-actions .btn-primary:hover {
   filter: brightness(1.06);
+}
+
+.image-occlusion-footer .btn-primary:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  filter: none;
+  box-shadow: 0 10px 24px -8px color-mix(in srgb, var(--ls-accent) 80%, transparent);
+}
+
+.image-occlusion-footer .btn-primary:active {
+  transform: translateY(0);
 }
 
 .settings-overlay .settings-dialog-header .btn-icon {
@@ -5967,7 +6013,8 @@ body.is-bullet-selecting {
 
 .flashcard-image-scroller {
   overflow: auto;
-  overscroll-behavior: contain;
+  /* Sin `overscroll-behavior: contain`: sin zoom no hay desbordamiento y la
+   * rueda debe seguir moviendo la tarjeta o la vista, no quedarse atrapada. */
   border-radius: 12px;
 }
 
@@ -6550,6 +6597,7 @@ body.is-bullet-selecting {
   border-radius: 12px;
   padding: 3%;
   min-height: 280px;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -7135,6 +7183,11 @@ body.mobile-full-editor .flashcard-review-tools {
   justify-content: center;
   justify-content: safe center;
   min-height: 0;
+  overflow-y: auto;
+  /* Sin `overscroll-behavior: contain`: cuando la tarjeta no desborda, la
+   * rueda debe seguir desplazando la vista de Flashcards en vez de quedarse
+   * atrapada sobre la tarjeta. */
+  scrollbar-gutter: stable;
 }
 
 .card-source-tag {

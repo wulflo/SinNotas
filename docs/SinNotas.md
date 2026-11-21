@@ -1,6 +1,6 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.4.16 · **Fecha:** 2026-11-21
+**Versión:** 0.5.1 · **Fecha:** 2026-11-21
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
@@ -401,6 +401,47 @@ npm run dev
 Debe mostrar `HARNESS PASS`. Al tocar el grafo hay que ejecutar la suite y el
 harness.
 
+## Ajustes de interfaz (0.4.3)
+
+Correcciones de solo CSS en `src/style.css`; no cambian HTML ni TypeScript.
+
+- **Mapa conceptual:** los botones de `.concept-map-tools .btn-icon` (zoom,
+  recentrar y cerrar) miden 28×28 px, un 30 % menos que los 40×40 px del
+  encabezado de ajustes, y usan `calc(17px * var(--ls-font-scale, 1))`. El
+  `gap` de la barra pasa a 6 px.
+- **Oclusión de imagen:** el cierre del diálogo
+  (`.image-occlusion-header .btn-icon`) se mantiene en 40×40 px; los botones de
+  la toolbar (escalar, rotar, alinear, distribuir) usan `min-height: 40px` y
+  `padding: 8px 12px`. "Guardar oclusiones"
+  (`.image-occlusion-footer .btn-primary`) deja el estilo píldora y usa el
+  primario canónico: `border-radius: 8px`, fondo degradado del acento, texto
+  `--ls-accent-foreground`, sombra y estados hover/activo propios.
+- **Tareas en modo canvas:** `--ls-kanban-card-bg` sube de `#17191f` a
+  `#1e242d` y la sombra se suaviza (`rgba(0,0,0,0.15)` y `rgba(0,0,0,0.05)`)
+  para que las tarjetas se distingan del fondo sin oscurecerse.
+- **Flashcards:** `.flashcard-box` limita su alto a `90vh` y
+  `.flashcard-content` añade `overflow-y: auto` y `scrollbar-gutter: stable`,
+  de modo que la rueda del ratón hace scroll dentro de la tarjeta cuando el
+  contenido excede el alto. Las flechas direccionales no cambian.
+
+## Regresiones corregidas en repaso
+
+- **Imágenes de tarjetas:** `review-app.ts` ya no confía ciegamente en la URL
+  del protocolo `asset:`: la prueba con un `Image()` y, si no carga, lee los
+  bytes con `read_image_data` y usa una URL `blob:`. Así una ruta canónica
+  válida pero un protocolo de assets no disponible ya no muestra «No se pudo
+  cargar la imagen de esta tarjeta». Es el mismo respaldo que ya usaba el
+  editor de escritorio en `resolveDisplayImageUrl`.
+- **Selector «Mazo» de la hoja FSRS:** se migra con `CustomSelect` igual que la
+  acción y el ancla de recálculo, así que el menú sigue el tema de la app en
+  lugar del menú nativo del sistema.
+- **Rueda del ratón:** se retiró `overscroll-behavior: contain` de
+  `.flashcard-content`, `.flashcard-image-scroller` y
+  `.mobile-image-viewport`. Esos contenedores casi nunca desbordan; al
+  contener el scroll, la rueda tampoco se encadenaba al contenedor padre y
+  parecía no funcionar dentro de la tarjeta. Ahora, si el contenido desborda,
+  se desplaza dentro; si no, la rueda mueve la vista o el repaso.
+
 ## Cache de metadatos y watcher
 
 Las bóvedas locales guardan un índice binario (`.sinnotas_cache.bin`) para que
@@ -606,7 +647,7 @@ declara `runFullTrust`.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Última release publicada: `0.4.16` (`versionCode 4016`)
+- Última release publicada: `0.5.1` (`versionCode 5001`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):
@@ -642,6 +683,13 @@ declara `runFullTrust`.
   FSRS-7, los vectores dorados de intervalos y las regresiones de oclusión.
   Además de mazos con ajustes de FSRS por mazo, los selectores desplegables de
   la app usan `CustomSelect` (estilo de tema de la app).
+- Ajustes de interfaz 0.4.3 (mapa conceptual, oclusión, tareas canvas y scroll
+  de flashcards): solo CSS; `npx tsc --noEmit`, `npm test` y `npm run build`
+  pasan. Falta la comprobación manual en la app Tauri, no solo en modo web.
+- Regresiones de repaso (imágenes, selector de mazo y rueda del ratón):
+  implementadas y verificadas en navegador; `npx tsc --noEmit`, `npm test`
+  (465 pruebas en 45 archivos) y `npm run build` pasan. Falta abrir una tarjeta
+  con imagen y probar la rueda en la app Tauri real.
 - `cargo check --manifest-path src-tauri/Cargo.toml --lib`: correcto.
 - Lector PDF Fases 1–4: 12 pruebas Rust (`cargo test ... pdf`), incluidas la
   carga de PDFium, el render PNG, la extracción de texto, las capturas y la
@@ -694,5 +742,6 @@ operativo en `docs/CHECKLIST-*.md`, con el estado exacto, los archivos tocados y
 las reglas para reanudar sin borrar código parcial. Este documento enlaza cada
 checklist; el lector PDF usa `docs/CHECKLIST-PDF.md`, el endurecimiento de
 Documentos/Bibliografía usa
-`docs/CHECKLIST-SEGURIDAD-DOCUMENTOS-BIBLIOGRAFIA.md` y la búsqueda de
-metadatos usa `docs/CHECKLIST-BUSQUEDA-BIBLIOGRAFIA.md`.
+`docs/CHECKLIST-SEGURIDAD-DOCUMENTOS-BIBLIOGRAFIA.md`, la búsqueda de
+metadatos usa `docs/CHECKLIST-BUSQUEDA-BIBLIOGRAFIA.md` y los ajustes de
+interfaz de 0.4.3 usan `docs/CHECKLIST-FIXES-UI.md`.
