@@ -30,7 +30,7 @@ quien la desarrolla. Para la arquitectura y los detalles internos, consulta
 Sin Notas es un outliner local-first: tus notas son archivos Markdown normales
 dentro de una carpeta que tú eliges. Encima de esos archivos, la aplicación
 añade jerarquía de bullets, enlaces entre notas, tarjetas de repaso con
-FSRS-4.5, un lector de PDF, bibliografía, tablero Kanban y un grafo de
+FSRS-7, un lector de PDF, bibliografía, tablero Kanban y un grafo de
 conexiones.
 
 No hay cuenta, nube obligatoria ni base de datos propietaria. Puedes abrir la
@@ -251,7 +251,7 @@ sin borrar el contenido, usa **Eliminar flashcard**.
 - **Cloze:** uno o varios huecos dentro de un texto.
 - **Oclusión:** zonas de una imagen que se revelan al responder.
 
-### FSRS-4.5
+### FSRS-7
 
 FSRS calcula cuándo conviene volver a ver cada tarjeta según tu historial. Cada
 repaso guarda:

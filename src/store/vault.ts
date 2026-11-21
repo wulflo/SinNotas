@@ -127,7 +127,7 @@ export const initialVaultPages: PageData[] = [
       {
         id: "b-j1",
         type: "text",
-        content: "TODO Integrar el algoritmo de repetición espaciada FSRS-4.5 en [[Tarjetas de repaso]]",
+        content: "TODO Integrar el algoritmo de repetición espaciada FSRS-7 en [[Tarjetas de repaso]]",
         collapsed: false,
         children: [],
       },
@@ -224,7 +224,7 @@ export const initialVaultPages: PageData[] = [
       {
         id: "b-f1",
         type: "text",
-        content: "Guía de repaso espaciado en SinNotas con soporte para FSRS-4.5 y Cloze Deletions.",
+        content: "Guía de repaso espaciado en SinNotas con soporte para FSRS-7 y Cloze Deletions.",
         collapsed: false,
         children: [
           {

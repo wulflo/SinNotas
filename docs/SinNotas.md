@@ -1,6 +1,6 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.4.15 · **Fecha:** 2026-11-17
+**Versión:** 0.4.16 · **Fecha:** 2026-11-21
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
@@ -48,7 +48,7 @@ antiguos se descartan para que el archivo no crezca indefinidamente.
   desplazar el bullet.
 - Markdown con negritas, cursivas, subrayado, resaltado, wikilinks, etiquetas,
   tablas, imágenes y tarjetas Cloze.
-- Flashcards básicas, Cloze y de oclusión de imagen con FSRS-4.5.
+- Flashcards básicas, Cloze y de oclusión de imagen con FSRS-7.
 - Modo Aprendizaje de práctica: reinicia la cola con todas las tarjetas y no
   modifica el estado FSRS (`rate(..., persist=false)`).
 - Kanban de tareas, grafo/mapa conceptual, historial de versiones y exportación.
@@ -138,16 +138,36 @@ reanudación viven en
 
 ## FSRS y repaso
 
-- FSRS-4.5 implementado en `src/editor/fsrs.ts`.
-- Se usan los **17 pesos oficiales** de FSRS-4.5 (`ts-fsrs` 5.4.2), no una
-  aproximación propia: `0.212, 1.2931, 2.3065, 11.2624, 4.4032, 1.2805, ...`.
+- FSRS-7 implementado en `src/editor/fsrs.ts`.
+- Se usan los **34 pesos oficiales** de FSRS-7 (`ts-fsrs` 6.0.0), no una
+  aproximación propia: `0.1104, 2.2395, 3.9221, 11.7841, 6.1686, 0.6457, ...`.
+- Los ajustes de recálculo (pesos, retención deseada, intervalo máximo, pasos
+  de aprendizaje) son **propios de cada mazo** (`FlashcardDeck.fsrs`, en
+  `src/store/flashcard-decks.ts`); se editan en la sección *FSRS 7* del
+  escritorio y en la hoja *Ajustes de FSRS* de Android. Los mazos sin
+  configuración heredan valores por defecto (`deckFSRSSettings`); los que
+  tenían configuración global legada la heredan al cargar
+  (`FlashcardDeckRepository.load`).
+- Recálculo masivo (**Ajustes → Recalcular propiedades**): por nota,
+  `runFlashcardMaintenance` aplica el recálculo **con los ajustes del mazo que
+  contiene la nota** (`resolveDeckParameters`); con `batchSize` 40, cede el
+  hilo con rAF entre lotes y guarda página a página, así el dispositivo no se
+  satura.
+- Los menús selectores desplegables de la app usan `CustomSelect`
+  (`src/views/custom-select.ts`): estilo de tema de la app (claro/oscuro y
+  estilos visuales) en vez del nativo del sistema operativo.
 - Fases de aprendizaje: pasos cortos de 1 min y 10 min antes de graduarse a
   repaso, para evitar intervalos iniciales irreales.
 - El estado de aprendizaje se persiste; una tarjeta no vuelve a Review al
   recargar.
-- En Learning/Relearning, **Easy** usa `nextRecallStability` en lugar de
-  reiniciar a `S0(4)`.
+- En Learning/Relearning, **Easy** aplica `next_stability` sobre el rastro
+  lento y el rápido de FSRS-7, sin reiniciar a `S0(4)`.
 - Los intervalos se muestran en unidades legibles: `m`, `h`, `d`, `mo`, `y`.
+- Migración: **Ajustes → Recalcular propiedades → Convertir FSRS-4.5 a
+  FSRS-7** conserva estabilidad, dificultad, repasos, lapsos y pasos, añade
+  `card-s-fast::` como `0.8 × estabilidad`, normaliza `card-state` y recalcula
+  las tarjetas en repaso. **Restablecer FSRS** sigue disponible para empezar
+  de cero.
 - El modo Aprendizaje no guarda progreso; al activarlo o desactivarlo la cola se
   reinicia con todas las tarjetas para que ninguna quede oculta.
 
@@ -586,7 +606,7 @@ declara `runFullTrust`.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Última release publicada: `0.4.15` (`versionCode 4015`)
+- Última release publicada: `0.4.16` (`versionCode 4016`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):
@@ -618,8 +638,10 @@ declara `runFullTrust`.
 ## Verificación actual
 
 - `npx tsc --noEmit`: correcto.
-- `npm test`: **331 pruebas en 35 archivos**; incluye los pesos oficiales de
-  FSRS-4.5, las regresiones de oclusión y las pruebas de mazos jerárquicos.
+- `npm test`: **465 pruebas en 45 archivos**; incluye los pesos oficiales de
+  FSRS-7, los vectores dorados de intervalos y las regresiones de oclusión.
+  Además de mazos con ajustes de FSRS por mazo, los selectores desplegables de
+  la app usan `CustomSelect` (estilo de tema de la app).
 - `cargo check --manifest-path src-tauri/Cargo.toml --lib`: correcto.
 - Lector PDF Fases 1–4: 12 pruebas Rust (`cargo test ... pdf`), incluidas la
   carga de PDFium, el render PNG, la extracción de texto, las capturas y la
@@ -646,7 +668,7 @@ declara `runFullTrust`.
   coincide con `latest.json`; `latest.json` declara `version: "0.2.8"` e incluye
   Linux (`AppImage` y `.deb`), Windows, macOS universal y Android. Las descargas
   de `latest.json` y del APK devuelven 200. En local, los pesos oficiales de
-  FSRS-4.5 están aplicados, las 249 pruebas y `tsc --noEmit` pasan, la respuesta
+  FSRS-7 están aplicados, las 422 pruebas y `tsc --noEmit` pasan, la respuesta
   de oclusión ya no dibuja máscaras y la vista previa ajusta su caja al tamaño
   real de la imagen.
 - Oclusión de imagen, medición en navegador: con el CSS anterior una imagen

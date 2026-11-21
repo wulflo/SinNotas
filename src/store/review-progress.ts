@@ -129,6 +129,7 @@ function sanitizeSnapshot(value: unknown): CardScheduleSnapshot {
   const snapshot: CardScheduleSnapshot = {};
   const stability = safeNumber(candidate.stability);
   const difficulty = safeNumber(candidate.difficulty);
+  const stabilityFast = safeNumber(candidate.stabilityFast);
   const reps = safeNumber(candidate.reps);
   const lapses = safeNumber(candidate.lapses);
   const intervalDays = safeNumber(candidate.intervalDays);
@@ -138,8 +139,13 @@ function sanitizeSnapshot(value: unknown): CardScheduleSnapshot {
   const lastReviewDate = safeString(candidate.lastReviewDate, 128);
   const dueDate = safeString(candidate.dueDate, 128);
 
-  if (stability !== undefined) snapshot.stability = stability;
-  if (difficulty !== undefined) snapshot.difficulty = difficulty;
+  if (stability !== undefined && stability > 0) snapshot.stability = stability;
+  if (difficulty !== undefined && difficulty >= 1 && difficulty <= 10) {
+    snapshot.difficulty = difficulty;
+  }
+  if (stabilityFast !== undefined && stabilityFast > 0) {
+    snapshot.stabilityFast = stabilityFast;
+  }
   if (reps !== undefined) snapshot.reps = Math.max(0, Math.floor(reps));
   if (lapses !== undefined) snapshot.lapses = Math.max(0, Math.floor(lapses));
   if (intervalDays !== undefined) snapshot.intervalDays = Math.max(0, intervalDays);

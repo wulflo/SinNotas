@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { translate } from "../i18n";
+import { migrateSelect, syncCustomSelect } from "./custom-select";
 import type {
   PdfDocumentInfo,
   PdfListItem,
@@ -156,6 +157,8 @@ export class PdfReaderView {
     this.importButton = query<HTMLButtonElement>("#pdf-import");
     this.retentionSelect = query<HTMLSelectElement>("#pdf-retention");
     this.currentRetentionSelect = query<HTMLSelectElement>("#pdf-current-retention");
+    migrateSelect(this.retentionSelect);
+    migrateSelect(this.currentRetentionSelect);
     this.prevButton = query<HTMLButtonElement>("#pdf-prev");
     this.nextButton = query<HTMLButtonElement>("#pdf-next");
     this.fitButton = query<HTMLButtonElement>("#pdf-fit");
@@ -234,6 +237,7 @@ export class PdfReaderView {
     }
     const allowed = Array.from(this.retentionSelect.options).map((option) => option.value);
     this.retentionSelect.value = allowed.includes(stored) ? stored : "";
+    syncCustomSelect(this.retentionSelect);
   }
 
   private saveRetentionPreference(): void {

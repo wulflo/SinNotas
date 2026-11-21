@@ -467,9 +467,13 @@
                   </div>
                 </div>
 
-                <div class="settings-section-title">FSRS 4.5</div>
-                <p class="settings-help">Configura la retención objetivo y los intervalos usados por el planificador. Los cambios se aplican a los próximos repasos; reprograma las tarjetas por separado si quieres actualizar sus vencimientos.</p>
+                <div class="settings-section-title">FSRS 7</div>
+                <p class="settings-help">Configura la retención objetivo, el intervalo máximo y los pasos del planificador del mazo seleccionado abajo. Cada mazo repasa con sus propios ajustes; cambia el recálculo desde «Recalcular propiedades».</p>
                 <div class="sync-box">
+                  <div class="settings-row">
+                    <label for="flashcard-fsrs-deck-select">Mazo</label>
+                    <select id="flashcard-fsrs-deck-select" aria-label="Mazo cuya configuración se edita"></select>
+                  </div>
                   <div class="settings-row fsrs-retention-row">
                     <label for="flashcard-fsrs-retention">Retención deseada</label>
                     <div class="fsrs-retention-control">
@@ -481,6 +485,7 @@
                     <label for="flashcard-fsrs-maximum-interval">Intervalo máximo (días)</label>
                     <input id="flashcard-fsrs-maximum-interval" type="number" min="1" max="36500" step="1" />
                   </div>
+                  <p class="settings-help">El intervalo máximo es un límite duro: si una tarjeta lo alcanza, su retención efectiva puede quedar por encima de la objetivo.</p>
                   <div class="settings-row">
                     <label for="flashcard-fsrs-learning-steps">Pasos de aprendizaje</label>
                     <input id="flashcard-fsrs-learning-steps" class="fsrs-steps-input" type="text" placeholder="1m 10m" autocomplete="off" />
@@ -490,9 +495,9 @@
                     <input id="flashcard-fsrs-relearning-steps" class="fsrs-steps-input" type="text" placeholder="10m" autocomplete="off" />
                   </div>
                   <details class="fsrs-advanced-settings">
-                    <summary>Parámetros FSRS-4.5</summary>
-                    <p class="settings-help">17 valores numéricos separados por comas. Cambiarlos manualmente sustituye la optimización automática de Anki; SinNotas no conserva todavía un historial completo para optimizarlos.</p>
-                    <textarea id="flashcard-fsrs-weights" rows="3" spellcheck="false" aria-label="Parámetros de FSRS-4.5"></textarea>
+                    <summary>Parámetros FSRS-7</summary>
+                    <p class="settings-help">34 valores numéricos separados por comas. Cambiarlos manualmente sustituye la optimización automática de Anki; SinNotas no conserva todavía un historial completo para optimizarlos.</p>
+                    <textarea id="flashcard-fsrs-weights" rows="3" spellcheck="false" aria-label="Parámetros de FSRS-7"></textarea>
                   </details>
                   <div class="advanced-actions">
                     <button class="font-option-btn" id="btn-flashcard-fsrs-save" type="button">Guardar configuración</button>
@@ -518,14 +523,22 @@
                 </div>
 
                 <div class="settings-section-title">Recalcular propiedades</div>
-                <p class="settings-help">Actualiza las propiedades de programación de todas las tarjetas del vault.</p>
+                <p class="settings-help">Actualiza las propiedades de programación de todas las tarjetas del vault. Cada nota se recálcula con la retención y los ajustes del mazo que la contiene.</p>
                 <div class="sync-box">
                   <div class="settings-row">
                     <label for="flashcard-recalc-action">Acción de recálculo</label>
                     <select id="flashcard-recalc-action">
                       <option value="due-dates">Recalcular vencimientos</option>
                       <option value="reschedule">Reprogramar repasos FSRS</option>
+                      <option value="convert">Convertir FSRS-4.5 a FSRS-7</option>
                       <option value="reset">Restablecer FSRS</option>
+                    </select>
+                  </div>
+                  <div class="settings-row" id="flashcard-recalc-anchor-row" hidden>
+                    <label for="flashcard-recalc-anchor">Ancla de reprogramación</label>
+                    <select id="flashcard-recalc-anchor">
+                      <option value="today">Desde hoy (recomendado)</option>
+                      <option value="last-reviewed">Desde el último repaso</option>
                     </select>
                   </div>
                   <p class="settings-help" id="flashcard-recalc-help">Recalcula la fecha de vencimiento usando la última revisión y el intervalo programado.</p>
@@ -864,7 +877,7 @@
           </div>
         </section>
 
-        <!-- VIEW 3: FLASHCARDS (TARJETAS DE REPASO FSRS-4.5 & CLOZE) -->
+        <!-- VIEW 3: FLASHCARDS (TARJETAS DE REPASO FSRS-7 & CLOZE) -->
         <section class="view-panel" id="view-flashcards">
           <div class="flashcards-container">
             <div class="flashcard-header">

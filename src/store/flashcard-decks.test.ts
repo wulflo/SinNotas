@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   FLASHCARD_DECKS_LEGACY_DECK_ID,
   addFlashcardDeck,
+  deckFSRSSettings,
   deleteFlashcardDeck,
   emptyFlashcardDeckFile,
+  flashcardDeckContainsPageTitle,
   flashcardDeckNameKey,
   mergeFlashcardDeckFiles,
   mergeFlashcardDeckSelection,
@@ -16,6 +18,7 @@ import {
   validateFlashcardDeckName,
   type FlashcardDeck,
 } from "./flashcard-decks";
+import { defaultFSRSParams, type FSRSParameters } from "../editor/fsrs";
 
 function deck(overrides: Partial<FlashcardDeck> = {}): FlashcardDeck {
   return {
@@ -234,5 +237,77 @@ describe("migración de la selección antigua", () => {
 
   it("no migra cuando el filtro es nulo", () => {
     expect(migrateLegacyFlashcardSelection(null).decks).toHaveLength(0);
+  });
+});
+
+describe("configuración FSRS por mazo", () => {
+  const custom: FSRSParameters = {
+    ...defaultFSRSParams,
+    w: [...defaultFSRSParams.w.map((weight) => weight + 0.01)],
+    requestRetention: 0.85,
+    maximumInterval: 100,
+  };
+
+  it("guarda ajustes en la creación y en la actualización de un mazo", () => {
+    const created = addFlashcardDeck(emptyFlashcardDeckFile(), "Mazo", ["A"], 1000, custom);
+    expect(created.deck.fsrs?.requestRetention).toBe(0.85);
+    expect(created.deck.fsrs?.maximumInterval).toBe(100);
+
+    const updated = updateFlashcardDeck(created.file, created.deck.id, {
+      fsrs: { ...custom, requestRetention: 0.75 },
+    });
+    expect(updated.decks[0].fsrs?.requestRetention).toBe(0.75);
+
+    // Omitir `fsrs` conserva la configuración actual.
+    const renamed = updateFlashcardDeck(updated, created.deck.id, { name: "Otro" });
+    expect(renamed.decks[0].fsrs?.requestRetention).toBe(0.75);
+  });
+
+  it("parseo conserva la configuración y la deja en defecto al no existir", () => {
+    const raw = JSON.stringify({
+      version: 1,
+      decks: [
+        {
+          id: "deck-a",
+          name: "Mazo",
+          pageTitles: ["A"],
+          fsrs: { requestRetention: 0.9, maximumInterval: 50 },
+          createdAt: 1,
+          updatedAt: 1,
+        },
+        deck({ id: "deck-b" }),
+      ],
+      tombstones: [],
+    });
+    const parsed = parseFlashcardDeckFile(raw);
+    const configuredDeck = parsed.decks.find((deck) => deck.id === "deck-a")!;
+    expect(configuredDeck.fsrs?.requestRetention).toBe(0.9);
+    expect(configuredDeck.fsrs?.maximumInterval).toBe(50);
+    // Mazo sin configuración: no existe `fsrs` en memoria.
+    expect(parsed.decks.find((deck) => deck.id === "deck-b")?.fsrs).toBeUndefined();
+    // La configuración se mantiene serializable.
+    const serialized = JSON.parse(serializeFlashcardDeckFile(parsed));
+    const roundTripped = serialized.decks.find((deck: { id: string }) => deck.id === "deck-a");
+    expect(roundTripped.fsrs.requestRetention).toBe(0.9);
+  });
+
+  it("deckFSRSSettings devuelve los ajustes del mazo o los de defecto", () => {
+    const configured = addFlashcardDeck(
+      emptyFlashcardDeckFile(),
+      "Mazo",
+      ["A"],
+      1000,
+      custom
+    ).deck;
+    expect(deckFSRSSettings(configured)).toMatchObject({ requestRetention: 0.85 });
+    expect(deckFSRSSettings(null)).toMatchObject({
+      requestRetention: defaultFSRSParams.requestRetention,
+    });
+  });
+
+  it("flashcardDeckContainsPageTitle compara normalizando títulos", () => {
+    const configured = deck({ pageTitles: ["Exámen FINAL"] });
+    expect(flashcardDeckContainsPageTitle(configured, "examen final")).toBe(true);
+    expect(flashcardDeckContainsPageTitle(configured, "otra nota")).toBe(false);
   });
 });

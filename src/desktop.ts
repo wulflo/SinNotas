@@ -78,8 +78,10 @@ import {
   FLASHCARD_DECK_NAME_MAX_LENGTH,
   addFlashcardDeck,
   deleteFlashcardDeck,
+  deckFSRSSettings,
   emptyFlashcardDeckFile,
   findFlashcardDeck,
+  flashcardDeckContainsPageTitle,
   flashcardDeckPageTitlesEqual,
   mergeFlashcardDeckSelection,
   normalizeFlashcardDeckName,
@@ -157,14 +159,21 @@ import {
 } from "./views/all-pages";
 import { VirtualList } from "./views/virtual-list";
 import { ConceptMapView } from "./views/concept-map-view";
+import { migrateSelect, syncCustomSelect } from "./views/custom-select";
 import { buildReviewHeatmap, defaultHeatmapStart } from "./views/review-heatmap";
-import { defaultFSRSParams, FSRSRating } from "./editor/fsrs";
+import { FSRS7_WEIGHT_COUNT, defaultFSRSParams, FSRSRating, type FSRSParameters } from "./editor/fsrs";
 import {
   formatLearningSteps,
   loadFSRSParameters,
+  normalizeFSRSParameters,
   parseLearningSteps,
+  parseMaximumInterval,
   saveFSRSParameters,
 } from "./editor/fsrs-settings";
+import {
+  runFlashcardMaintenance,
+  type FlashcardMaintenanceAction,
+} from "./views/flashcard-maintenance";
 import {
   CONTROLLER_TYPE_OPTIONS,
   buttonLabelsFor,
@@ -488,6 +497,12 @@ const flashcardDeckRepository = new FlashcardDeckRepository();
 let flashcardDeckFile: FlashcardDeckFile = emptyFlashcardDeckFile();
 let activeFlashcardDeckId: string | null = null;
 let flashcardDecksLoadToken = 0;
+
+/**
+ * Ajustes que usa el motor de FSRS cuando se repasa sin mazo activo
+ * ("Sin mazo activo" en el selector de la sección FSRS).
+ */
+let flashcardFSRSDefaultSettings: FSRSParameters = loadFSRSParameters(localStorage);
 
 /** Editor del mazo abierto. Para un mazo nuevo, `editorId` es null y
  * `editorIsNew` indica que todavía no existe en el archivo. */
@@ -904,9 +919,12 @@ const flashcardFSRSLearningSteps = document.getElementById("flashcard-fsrs-learn
 const flashcardFSRSRelearningSteps = document.getElementById("flashcard-fsrs-relearning-steps") as HTMLInputElement;
 const flashcardFSRSWeights = document.getElementById("flashcard-fsrs-weights") as HTMLTextAreaElement;
 const flashcardFSRSStatus = document.getElementById("flashcard-fsrs-status") as HTMLElement;
+const flashcardFSRSDeckSelect = document.getElementById("flashcard-fsrs-deck-select") as HTMLSelectElement;
 const btnFlashcardFSRSSave = document.getElementById("btn-flashcard-fsrs-save") as HTMLButtonElement;
 const btnFlashcardFSRSDefaults = document.getElementById("btn-flashcard-fsrs-defaults") as HTMLButtonElement;
 const flashcardRecalcActionSelect = document.getElementById("flashcard-recalc-action") as HTMLSelectElement;
+const flashcardRecalcAnchorRow = document.getElementById("flashcard-recalc-anchor-row") as HTMLElement;
+const flashcardRecalcAnchorSelect = document.getElementById("flashcard-recalc-anchor") as HTMLSelectElement;
 const flashcardRecalcHelp = document.getElementById("flashcard-recalc-help") as HTMLElement;
 const flashcardRecalcStatus = document.getElementById("flashcard-recalc-status") as HTMLElement;
 const btnFlashcardRecalc = document.getElementById("btn-flashcard-recalc") as HTMLButtonElement;
@@ -955,6 +973,7 @@ const snapshotActiveNotesList = document.getElementById("snapshot-active-notes-l
 const btnOpenSnapshotHistory = document.getElementById("btn-open-snapshot-history") as HTMLButtonElement;
 const systemFontSelect = document.getElementById("system-font-select") as HTMLSelectElement;
 initializeLocalization(languageSelect);
+syncCustomSelect(languageSelect);
 
 // Gamepad Elements
 const gamepadEnabledCheckbox = document.getElementById("gamepad-enabled-checkbox") as HTMLInputElement;
@@ -1430,6 +1449,7 @@ function setupPomodoroSelect(
     select.appendChild(option);
   });
   select.value = String(selectedValue);
+  syncCustomSelect(select);
 }
 
 function initThemeAndTypography() {
@@ -1449,7 +1469,10 @@ function initThemeAndTypography() {
     const savedSystemFont = localStorage.getItem("sinnotas-system-font");
     if (savedSystemFont) {
       applySystemFont(savedSystemFont);
-      if (systemFontSelect) systemFontSelect.value = savedSystemFont;
+      if (systemFontSelect) {
+        systemFontSelect.value = savedSystemFont;
+        syncCustomSelect(systemFontSelect);
+      }
     } else {
       setFont("sans");
     }
@@ -1588,6 +1611,7 @@ async function loadSystemFonts(): Promise<void> {
       systemFontSelect.appendChild(option);
     }
     systemFontSelect.value = savedSystemFont;
+    syncCustomSelect(systemFontSelect);
     applySystemFont(savedSystemFont);
   }
 
@@ -1690,7 +1714,10 @@ function setFont(font: TypographyType) {
   if (font !== "system") {
     document.documentElement.style.removeProperty("--ls-system-font");
     localStorage.removeItem("sinnotas-system-font");
-    if (systemFontSelect) systemFontSelect.value = "";
+    if (systemFontSelect) {
+      systemFontSelect.value = "";
+      syncCustomSelect(systemFontSelect);
+    }
   }
 
   settingsDropdownMenu.querySelectorAll<HTMLButtonElement>(".font-option-btn[data-font]").forEach((btn) => {
@@ -2233,10 +2260,26 @@ function applyActiveFlashcardDeckFilter(options: {
     // El filtro sigue activo aunque el WebView no permita persistirlo.
   }
   flashcardsManager.setPageFilter(flashcardPageFilter);
+  // El motor del repaso usa los ajustes del mazo activo; sin mazo → ajustes
+  // globales legados conservados en `flashcardFSRSDefaultSettings`.
+  flashcardsManager.setFSRSParameters(
+    activeFlashcardDeck()
+      ? deckFSRSSettings(activeFlashcardDeck())
+      : flashcardFSRSDefaultSettings
+  );
+  renderFSRSSettings();
   if (options.renderTree) renderFlashcardPagesFilter(false);
   if (options.restartSession && currentView === "flashcards") {
     startFlashcardsSession();
   }
+}
+
+/** Ajustes FSRS de la nota: los del mazo que la contiene (si existe). */
+function pageDeckFSRSSettings(page: PageData): FSRSParameters | undefined {
+  for (const deck of flashcardDeckFile.decks) {
+    if (flashcardDeckContainsPageTitle(deck, page.title)) return deckFSRSSettings(deck);
+  }
+  return undefined;
 }
 
 /** Guarda el archivo de mazos en serie para no pisar escrituras rápidas. */
@@ -2356,6 +2399,9 @@ function renderFlashcardDecksUI(): void {
   };
   fillSelect(flashcardActiveDeckSelect);
   fillSelect(flashcardDeckSwitcher);
+  syncCustomSelect(flashcardActiveDeckSelect);
+  syncCustomSelect(flashcardDeckSwitcher);
+  renderFSRSDeckSelect();
 
   if (flashcardDecksGrid) {
     flashcardDecksGrid.replaceChildren();
@@ -2954,7 +3000,10 @@ flashcardDeckActivateOnSave?.addEventListener("change", () => {
 
 /** Sincroniza el valor del selector de orden con el estado persistido. */
 function syncFlashcardPagesSortValue(): void {
-  if (flashcardPagesSort) flashcardPagesSort.value = flashcardPagesSortMode;
+  if (flashcardPagesSort) {
+    flashcardPagesSort.value = flashcardPagesSortMode;
+    syncCustomSelect(flashcardPagesSort);
+  }
 }
 
 if (flashcardPagesSearch) {
@@ -3082,8 +3131,37 @@ function saveFlashcardPagesSelection(): void {
   void saveFlashcardDeckEditor();
 }
 
+/** Mazo cuyos ajustes se muestran en el panel FSRS (el activo por defecto). */
+function selectedFSRSSettingsDeck(): FlashcardDeck | null {
+  return findFlashcardDeck(flashcardDeckFile, flashcardFSRSDeckSelect.value);
+}
+
+/** Rellena el selector de mazo del panel FSRS con los mazos existentes. */
+function renderFSRSDeckSelect(): void {
+  const decks = [...flashcardDeckFile.decks].sort(
+    (left, right) => left.name.localeCompare(right.name, "es", { sensitivity: "base" })
+  );
+  flashcardFSRSDeckSelect.replaceChildren();
+  const none = document.createElement("option");
+  none.value = "";
+  none.textContent = "Sin mazo activo";
+  flashcardFSRSDeckSelect.appendChild(none);
+  for (const deck of decks) {
+    const option = document.createElement("option");
+    option.value = deck.id;
+    option.textContent = deck.name;
+    flashcardFSRSDeckSelect.appendChild(option);
+  }
+  flashcardFSRSDeckSelect.value = activeFlashcardDeckId ?? "";
+  syncCustomSelect(flashcardFSRSDeckSelect);
+}
+
 function renderFSRSSettings(): void {
-  const parameters = loadFSRSParameters(localStorage);
+  renderFSRSDeckSelect();
+  const selectedDeck = selectedFSRSSettingsDeck();
+  const parameters = selectedDeck
+    ? deckFSRSSettings(selectedDeck)
+    : flashcardFSRSDefaultSettings;
   flashcardFSRSRetention.value = String(parameters.requestRetention);
   flashcardFSRSRetentionValue.value = `${Math.round(parameters.requestRetention * 100)}%`;
   flashcardFSRSMaximumInterval.value = String(parameters.maximumInterval);
@@ -3093,38 +3171,74 @@ function renderFSRSSettings(): void {
 }
 
 function saveFSRSSettings(useDefaults = false): void {
-  const current = loadFSRSParameters(localStorage);
-  const learningSteps = parseLearningSteps(flashcardFSRSLearningSteps.value);
-  const relearningSteps = parseLearningSteps(flashcardFSRSRelearningSteps.value);
+  const selectedDeckId = flashcardFSRSDeckSelect.value;
+  const selectedDeck = selectedFSRSSettingsDeck();
+  const current = selectedDeck
+    ? deckFSRSSettings(selectedDeck)
+    : flashcardFSRSDefaultSettings;
+  const learningSteps = useDefaults
+    ? [...defaultFSRSParams.learningSteps]
+    : parseLearningSteps(flashcardFSRSLearningSteps.value);
+  const relearningSteps = useDefaults
+    ? [...defaultFSRSParams.relearningSteps]
+    : parseLearningSteps(flashcardFSRSRelearningSteps.value);
+  const maximumInterval = useDefaults
+    ? defaultFSRSParams.maximumInterval
+    : parseMaximumInterval(flashcardFSRSMaximumInterval.value);
   const weights = useDefaults
     ? [...defaultFSRSParams.w]
     : flashcardFSRSWeights.value.split(/[,\s]+/).filter(Boolean).map(Number);
   if (
     !learningSteps ||
     !relearningSteps ||
-    weights.length !== 17 ||
-    weights.some((weight) => !Number.isFinite(weight) || weight <= 0)
+    maximumInterval === null ||
+    weights.length !== FSRS7_WEIGHT_COUNT ||
+    weights.some((weight) => !Number.isFinite(weight) || weight < 0)
   ) {
-    flashcardFSRSStatus.textContent = translate("Revisa los pasos y los 17 parámetros numéricos de FSRS.");
+    flashcardFSRSStatus.textContent = translate("Revisa los pasos y los 34 parámetros numéricos de FSRS.");
     return;
   }
 
-  const parameters = saveFSRSParameters(localStorage, {
-    ...current,
-    w: weights,
-    requestRetention: useDefaults ? defaultFSRSParams.requestRetention : flashcardFSRSRetention.valueAsNumber,
-    maximumInterval: useDefaults ? defaultFSRSParams.maximumInterval : Number(flashcardFSRSMaximumInterval.value),
-    learningSteps: useDefaults ? [...defaultFSRSParams.learningSteps] : learningSteps,
-    relearningSteps: useDefaults ? [...defaultFSRSParams.relearningSteps] : relearningSteps,
-  });
-  flashcardsManager.setFSRSParameters(parameters);
-  renderFSRSSettings();
-  flashcardFSRSStatus.textContent = translate("Configuración FSRS guardada.");
-  if (currentView === "flashcards") updateFlashcardUI();
+  try {
+    const parameters = normalizeFSRSParameters({
+      ...current,
+      w: weights,
+      requestRetention: useDefaults ? defaultFSRSParams.requestRetention : flashcardFSRSRetention.valueAsNumber,
+      maximumInterval,
+      learningSteps: useDefaults ? [...defaultFSRSParams.learningSteps] : learningSteps,
+      relearningSteps: useDefaults ? [...defaultFSRSParams.relearningSteps] : relearningSteps,
+    });
+    if (selectedDeckId) {
+      // Los ajustes de recálculo son propios de cada mazo.
+      flashcardDeckFile = updateFlashcardDeck(flashcardDeckFile, selectedDeckId, {
+        fsrs: parameters,
+      });
+      void persistFlashcardDeckFile();
+      if (selectedDeckId === activeFlashcardDeckId) {
+        flashcardsManager.setFSRSParameters(parameters);
+      }
+    } else {
+      // Sin mazo activo se repasan todas las notas; conservamos la configuración
+      // en la clave global legada para aplicaciones sin mazo.
+      flashcardFSRSDefaultSettings = parameters;
+      saveFSRSParameters(localStorage, parameters);
+      flashcardsManager.setFSRSParameters(parameters);
+    }
+    renderFSRSSettings();
+    flashcardFSRSStatus.textContent = translate("Configuración FSRS guardada.");
+    if (currentView === "flashcards") updateFlashcardUI();
+  } catch (error) {
+    console.error("No se pudo guardar la configuración FSRS:", error);
+    flashcardFSRSStatus.textContent = translate("No se pudo guardar la configuración FSRS.");
+  }
 }
 
 flashcardFSRSRetention.addEventListener("input", () => {
   flashcardFSRSRetentionValue.value = `${Math.round(flashcardFSRSRetention.valueAsNumber * 100)}%`;
+});
+flashcardFSRSDeckSelect.addEventListener("change", () => {
+  renderFSRSSettings();
+  syncCustomSelect(flashcardFSRSDeckSelect);
 });
 btnFlashcardFSRSSave.addEventListener("click", () => saveFSRSSettings());
 btnFlashcardFSRSDefaults.addEventListener("click", () => {
@@ -3141,15 +3255,27 @@ renderFSRSSettings();
 function renderFlashcardRecalcControls(): void {
   const reset = flashcardRecalcActionSelect.value === "reset";
   const reschedule = flashcardRecalcActionSelect.value === "reschedule";
+  const convert = flashcardRecalcActionSelect.value === "convert";
+  // El ancla solo tiene sentido al reprogramar; en el resto de acciones el
+  // vencimiento se deriva de los datos almacenados.
+  flashcardRecalcAnchorRow.hidden = !reschedule;
   flashcardRecalcHelp.textContent = translate(
     reset
       ? "Elimina las propiedades de programación FSRS y convierte todas las tarjetas en nuevas. Esta acción no se puede deshacer."
-      : reschedule
-        ? "Recalcula el intervalo y el vencimiento de las tarjetas en repaso usando su estabilidad y la retención FSRS configurada."
-        : "Recalcula la fecha de vencimiento usando la última revisión y el intervalo programado."
+      : convert
+        ? "Convierte las tarjetas con datos de FSRS-4.5 al formato FSRS-7: añade el rastro rápido (0.8 × estabilidad), normaliza el estado y recalcula los repasos. No modifica las tarjetas que ya son FSRS-7."
+        : reschedule
+          ? "Recalcula el intervalo y el vencimiento de las tarjetas en repaso usando la estabilidad de cada una y la retención configurada en su mazo."
+          : "Recalcula la fecha de vencimiento usando la última revisión y el intervalo programado."
   );
   btnFlashcardRecalc.textContent = translate(
-    reset ? "Restablecer propiedades" : reschedule ? "Reprogramar tarjetas" : "Recalcular fechas"
+    reset
+      ? "Restablecer propiedades"
+      : convert
+        ? "Convertir tarjetas"
+        : reschedule
+          ? "Reprogramar tarjetas"
+          : "Recalcular fechas"
   );
 }
 
@@ -3163,7 +3289,7 @@ btnFlashcardRecalc.addEventListener("click", async () => {
   const action = flashcardRecalcActionSelect.value;
   if (action === "reset") {
     const confirmed = await confirmAction(
-      "Se eliminará el progreso de repaso de todas las tarjetas y volverán a contar como nuevas. ¿Continuar?",
+      "Se eliminará la programación FSRS de todas las tarjetas y volverán a contar como nuevas. El historial de repasos y las estadísticas se conservan. ¿Continuar?",
       "Restablecer propiedades"
     );
     if (!confirmed) return;
@@ -3173,65 +3299,61 @@ btnFlashcardRecalc.addEventListener("click", async () => {
       "Reprogramar tarjetas"
     );
     if (!confirmed) return;
+  } else if (action === "convert") {
+    const confirmed = await confirmAction(
+      "Se convertirán las tarjetas con datos de FSRS-4.5 al formato FSRS-7. Se conservan estabilidad, dificultad, repasos, lapsos y pasos de aprendizaje; el rastro rápido se aproxima como 0.8 × estabilidad. Las tarjetas que ya son FSRS-7 no se modifican. ¿Continuar?",
+      "Convertir tarjetas"
+    );
+    if (!confirmed) return;
   }
 
   flashcardRecalcStatus.textContent = "";
   flashcardRecalcActionSelect.disabled = true;
+  flashcardRecalcAnchorSelect.disabled = true;
   btnFlashcardRecalc.disabled = true;
   btnFlashcardRecalc.textContent = translate("Procesando...");
 
   try {
-    flashcardsManager.scanVault(vault.getPages(), flashcardReviewOrder);
-    const uniqueCards = new Map<string, Flashcard>();
-    const cardCountByBlock = new Map<string, number>();
-    flashcardsManager.getAllCards().forEach((card) => {
-      const key = `${card.pageTitle}\u0000${card.blockId}`;
-      uniqueCards.set(key, card);
-      cardCountByBlock.set(key, (cardCountByBlock.get(key) || 0) + 1);
+    const anchor: "today" | "last-reviewed" =
+      flashcardRecalcAnchorSelect.value === "last-reviewed" ? "last-reviewed" : "today";
+    const result = await runFlashcardMaintenance({
+      action: action as FlashcardMaintenanceAction,
+      parameters: flashcardsManager.getFSRSParameters(),
+      resolveDeckParameters: pageDeckFSRSSettings,
+      pages: vault.getPages(),
+      manager: flashcardsManager,
+      anchor,
+      now: new Date(),
+      savePage: (page) => vault.savePage(page),
+      onProgress: (progress) => {
+        flashcardRecalcStatus.textContent = `${translate("Procesando...")} ${progress.processed}/${progress.total} · ${progress.updatedCards} ${translate("actualizadas")}`;
+      },
     });
 
-    const pages = vault.getPages();
-    const pageByTitle = new Map(pages.map((page) => [page.title.toLowerCase(), page]));
-    const changedPages = new Set<PageData>();
-    let updatedCards = 0;
-
-    for (const [key, card] of uniqueCards) {
-      const page = pageByTitle.get(card.pageTitle.toLowerCase());
-      if (!page) continue;
-      const location = findNodeLocation(page.blocks, card.blockId);
-      if (!location) continue;
-
-      const block = location.parentList[location.index];
-      const updatedContent =
-        action === "reset"
-          ? FlashcardsManager.clearFSRSProgress(block.content)
-          : action === "reschedule"
-            ? FlashcardsManager.rescheduleFSRS(block.content, loadFSRSParameters(localStorage))
-            : FlashcardsManager.recalculateDueDate(block.content);
-      if (updatedContent === null || updatedContent === block.content) continue;
-
-      block.content = updatedContent;
-      changedPages.add(page);
-      updatedCards += cardCountByBlock.get(key) || 1;
+    if (result.cancelled) {
+      const message = translate("Recálculo cancelado.");
+      flashcardRecalcStatus.textContent = message;
+      showToast(message);
+      return;
     }
 
-    if (changedPages.size > 0) {
-      await Promise.all(Array.from(changedPages).map((page) => vault.savePage(page)));
-      const currentPageChanged = Array.from(changedPages).some(
-        (page) => page.id === currentPage.id
-      );
-      if (currentPageChanged) {
-        currentPage = vault.getPageByTitle(currentPage.title) || currentPage;
-        if (currentView === "editor") renderEditor();
-      }
+    if (result.updatedCards > 0) {
+      // Vuelve a escanear para que la cola y el explorador reflejen las
+      // propiedades recién escritas, y repinta la vista actual.
+      flashcardsManager.scanVault(vault.getPages(), flashcardReviewOrder);
+      currentPage = vault.getPageByTitle(currentPage.title) || currentPage;
+      if (currentView === "editor") renderEditor();
       renderSidebar();
       if (currentView === "flashcards") startFlashcardsSession();
     }
 
-    const message =
-      updatedCards > 0
-        ? `${translate("Tarjetas actualizadas:")} ${updatedCards}`
+    let message =
+      result.updatedCards > 0
+        ? `${translate("Tarjetas actualizadas:")} ${result.updatedCards}`
         : translate("No había tarjetas que actualizar.");
+    if (result.pastDueCards > 0) {
+      message += ` ${translate("Aviso: algunas tarjetas quedan vencidas con el ancla actual. Usa «Desde hoy» para reprogramarlas desde ahora.").replace("{count}", String(result.pastDueCards))}`;
+    }
     flashcardRecalcStatus.textContent = message;
     showToast(message);
   } catch (error) {
@@ -3241,6 +3363,7 @@ btnFlashcardRecalc.addEventListener("click", async () => {
     showToast(message);
   } finally {
     flashcardRecalcActionSelect.disabled = false;
+    flashcardRecalcAnchorSelect.disabled = false;
     btnFlashcardRecalc.disabled = false;
     renderFlashcardRecalcControls();
   }
@@ -3302,10 +3425,12 @@ gamepadControllerTypeSelect.value =
   storedControllerType && CONTROLLER_TYPE_OPTIONS.some((o) => o.value === storedControllerType)
     ? storedControllerType
     : "";
+syncCustomSelect(gamepadControllerTypeSelect);
 populateGamepadMappingSelects();
 gamepadMappingSelects.forEach((select, index) => {
   select.value = localStorage.getItem(gamepadMappingActionKeys[index]) || "";
 });
+gamepadMappingSelects.forEach((select) => syncCustomSelect(select));
 gamepadEnabledCheckbox.checked = localStorage.getItem("sinnotas-gamepad-enabled") === "true";
 
 function updateGamepadStatus(): void {
@@ -11023,6 +11148,7 @@ function openImageOcclusionEditor(blockId: string, source: string): void {
     selectedImageOcclusionIndex = null;
     imageOcclusionShape = "rect";
     imageOcclusionShapeSelect.value = "rect";
+    syncCustomSelect(imageOcclusionShapeSelect);
     imageOcclusionHintInput.value = "";
     imageOcclusionImage.removeAttribute("src");
     imageOcclusionOverlay.classList.add("image-block-loading");
@@ -11632,7 +11758,7 @@ document.getElementById("sctx-delete")?.addEventListener("click", async () => {
   hideAllContextMenus();
 });
 
-/* ==================== FLASHCARDS SESSION (FSRS-4.5) ==================== */
+/* ==================== FLASHCARDS SESSION (FSRS-7) ==================== */
 const cardProgressEl = document.getElementById("card-progress") as HTMLSpanElement;
 const cardProgressLabel = document.getElementById("card-progress-label") as HTMLSpanElement;
 const cardProgressRingValue = document.getElementById("card-progress-ring-value") as unknown as SVGCircleElement;
@@ -11686,6 +11812,7 @@ let flashcardExplorerSortBy: FlashcardExplorerSort =
     ? savedFlashcardSort
     : "due-date";
 flashcardExplorerSort.value = flashcardExplorerSortBy;
+syncCustomSelect(flashcardExplorerSort);
 
 /** Renderiza solo las tarjetas visibles: con 15.000 tarjetas, crear un nodo
  * por tarjeta bloqueaba la interfaz ~79 s y disparaba la memoria a 3,3 GB. */
@@ -12158,6 +12285,7 @@ function renderFlashcardHeatmap(): void {
   flashcardHeatmapStartInput.max = today;
   flashcardHeatmapStartInput.value = flashcardHeatmapStartDate;
   flashcardHeatmapStyleSelect.value = flashcardHeatmapStyle;
+  syncCustomSelect(flashcardHeatmapStyleSelect);
   flashcardHeatmapGrid.dataset.style = flashcardHeatmapStyle;
 
   const weeks = buildReviewHeatmap(reviewProgress.getEntries(), flashcardHeatmapStartDate, today);
@@ -13054,7 +13182,7 @@ function updateFlashcardUI() {
     cardSourceEl.innerText = "🎉 ¡Completado!";
     cardFsrsBadge.innerText = "";
     syncCardParentContext(null);
-    cardQuestionEl.innerText = "¡Has completado todas las tarjetas pendientes con FSRS-4.5!";
+    cardQuestionEl.innerText = "¡Has completado todas las tarjetas pendientes con FSRS-7!";
     cardAnswerEl.classList.remove("visible");
     btnShowAnswer.style.display = "inline-block";
     btnShowAnswer.innerText = "Reiniciar Sesión";
@@ -16625,7 +16753,35 @@ function schedulePrewarmHiddenViews(): void {
   scheduleNext();
 }
 
+/**
+ * Reemplaza los selectores desplegables nativos por el estilo de la app
+ * (`CustomSelect`). Los controles siguen leyendo/escribiendo `select.value`
+ * y escuchando "change", así que el resto del código no cambia.
+ */
+function migrateDesktopSelects(): void {
+  migrateSelect(languageSelect);
+  migrateSelect(systemFontSelect);
+  migrateSelect(flashcardReviewOrderSelect);
+  migrateSelect(flashcardRecalcActionSelect);
+  migrateSelect(flashcardRecalcAnchorSelect);
+  migrateSelect(flashcardFSRSDeckSelect);
+  migrateSelect(flashcardPagesSort);
+  migrateSelect(flashcardActiveDeckSelect);
+  migrateSelect(flashcardDeckSwitcher);
+  migrateSelect(flashcardExplorerSort);
+  migrateSelect(allPagesSortSelect);
+  migrateSelect(flashcardHeatmapStyleSelect);
+  migrateSelect(imageOcclusionShapeSelect);
+  migrateSelect(gamepadControllerTypeSelect);
+  gamepadMappingSelects.forEach((select) => migrateSelect(select));
+  migrateSelect(pomodoroFocusDurationInput);
+  migrateSelect(pomodoroBreakDurationInput);
+  migrateSelect(pomodoroLongBreakDurationInput);
+  migrateSelect(pomodoroSessionsBeforeLongBreakInput);
+}
+
 async function initializeDesktopApp(): Promise<void> {
+  migrateDesktopSelects();
   initThemeAndTypography();
   initNoteScrollNav();
   await initUpdateSettings();

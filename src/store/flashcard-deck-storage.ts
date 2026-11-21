@@ -8,8 +8,14 @@ import {
   migrateLegacyFlashcardSelection,
   parseFlashcardDeckFile,
   serializeFlashcardDeckFile,
+  updateFlashcardDeck,
   type FlashcardDeckFile,
 } from "./flashcard-decks";
+import {
+  FSRS_SETTINGS_KEY,
+  normalizeFSRSParameters,
+} from "../editor/fsrs-settings";
+import type { FSRSParameters } from "../editor/fsrs";
 
 const WEB_DECKS_STORAGE_PREFIX = "sinnotas-flashcard-decks-v1";
 const ACTIVE_DECK_STORAGE_PREFIX = "sinnotas-flashcard-active-deck-v1";
@@ -59,6 +65,21 @@ function utf8Size(value: string): number {
   return value.length * 3;
 }
 
+/**
+ * Lee los ajustes FSRS globales heredados (`sinnotas-fsrs-settings`). Se
+ * usa solo para la migración de mazos: desde ahora cada mazo guarda sus
+ * propios ajustes, así que la configuración global deja de ser la fuente.
+ */
+function legacyGlobalFSRSSettings(): FSRSParameters | null {
+  const stored = safeGetItem(FSRS_SETTINGS_KEY);
+  if (!stored) return null;
+  try {
+    return normalizeFSRSParameters(JSON.parse(stored));
+  } catch {
+    return null;
+  }
+}
+
 export interface LoadedFlashcardDecks {
   file: FlashcardDeckFile;
   activeDeckId: string | null;
@@ -79,7 +100,22 @@ export class FlashcardDeckRepository {
     } else {
       raw = safeGetItem(webDecksStorageKey(rootPath));
     }
-    return parseFlashcardDeckFile(raw);
+    let file = parseFlashcardDeckFile(raw);
+    // Migración: mazos sin ajustes de FSRS heredan los globales antiguos, si
+    // los hay, para conservar el comportamiento anterior. Los mazos sin
+    // configuración heredan valores por defecto al leerlos (`deckFSRSSettings`).
+    if (file.decks.some((deck) => deck.fsrs === undefined)) {
+      const legacy = legacyGlobalFSRSSettings();
+      if (legacy) {
+        file = {
+          ...file,
+          decks: file.decks.map((deck) =>
+            deck.fsrs === undefined ? { ...deck, fsrs: normalizeFSRSParameters(legacy) } : deck
+          ),
+        };
+      }
+    }
+    return file;
   }
 
   /**
@@ -137,6 +173,22 @@ export class FlashcardDeckRepository {
     if (findFlashcardDeck(file, stored)) return stored;
     this.setActiveDeckId(rootPath, null);
     return null;
+  }
+
+  /**
+   * Guarda los ajustes FSRS de un mazo: actualiza el mazo en el archivo y
+   * lo persiste en el vault. El resto de campos del mazo no cambia.
+   */
+  public async saveDeckSettings(
+    rootPath: string | null,
+    deckId: string,
+    fsrs: FSRSParameters
+  ): Promise<FlashcardDeckFile> {
+    const file = await this.load(rootPath);
+    const updated = updateFlashcardDeck(file, deckId, {
+      fsrs: normalizeFSRSParameters(fsrs),
+    });
+    return this.save(rootPath, updated);
   }
 
   /**

@@ -1,4 +1,6 @@
 import { normalizeDeckTitle } from "../deck-title";
+import { normalizeFSRSParameters } from "../editor/fsrs-settings";
+import type { FSRSParameters } from "../editor/fsrs";
 
 /**
  * Mazos personalizados de flashcards.
@@ -25,6 +27,12 @@ export interface FlashcardDeck {
   name: string;
   /** Títulos exactos de las notas que forman el mazo. */
   pageTitles: string[];
+  /**
+   * Ajustes de FSRS-7 para las notas de este mazo (retención deseada,
+   * intervalo máximo, pasos de aprendizaje y pesos). No se comparte con
+   * otros mazos: cada uno lleva su propia configuración.
+   */
+  fsrs?: FSRSParameters;
   createdAt: number;
   updatedAt: number;
 }
@@ -175,18 +183,45 @@ export function findFlashcardDeck(
   return file.decks.find((deck) => deck.id === id) ?? null;
 }
 
+/**
+ * Ajustes de FSRS efectivos de un mazo: sus propios o los por defecto
+ * normalizados cuando el mazo no lleva configuración.
+ */
+export function deckFSRSSettings(deck: FlashcardDeck | null | undefined): FSRSParameters {
+  return deck?.fsrs ? normalizeFSRSParameters(deck.fsrs) : normalizeFSRSParameters(null);
+}
+
+/** Clave de comparación sin acentos (igual que `flashcardDeckNameKey`). */
+function pageTitleKey(title: string): string {
+  return normalizeDeckTitle(title)
+    .normalize("NFKD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLocaleLowerCase("es");
+}
+
+/**
+ * Indica si una nota pertenece a un mazo. Comparación normalizada (sine
+ * mayúsculas, acentos ni separadores redundantes).
+ */
+export function flashcardDeckContainsPageTitle(deck: FlashcardDeck, pageTitle: string): boolean {
+  const key = pageTitleKey(pageTitle);
+  return deck.pageTitles.some((title) => pageTitleKey(title) === key);
+}
+
 /** Crea un mazo y lo añade al archivo. Garantiza nombre e id únicos. */
 export function addFlashcardDeck(
   file: FlashcardDeckFile,
   name: string,
   pageTitles: readonly string[],
-  now = Date.now()
+  now = Date.now(),
+  fsrsSettings?: FSRSParameters
 ): { file: FlashcardDeckFile; deck: FlashcardDeck } {
   const timestamp = safeTimestamp(now, Date.now());
   const deck: FlashcardDeck = {
     id: uniqueDeckId(file.decks),
     name: uniqueFlashcardDeckName(name, file.decks),
     pageTitles: sanitizeFlashcardDeckPageTitles(pageTitles),
+    fsrs: fsrsSettings ? normalizeFSRSParameters(fsrsSettings) : undefined,
     createdAt: timestamp,
     updatedAt: timestamp,
   };
@@ -206,11 +241,11 @@ function uniqueDeckId(decks: readonly FlashcardDeck[]): string {
   return id;
 }
 
-/** Actualiza nombre y/o notas de un mazo existente. */
+/** Actualiza nombre, notas y/o ajustes FSRS de un mazo existente. */
 export function updateFlashcardDeck(
   file: FlashcardDeckFile,
   id: string,
-  changes: { name?: string; pageTitles?: readonly string[] },
+  changes: { name?: string; pageTitles?: readonly string[]; fsrs?: FSRSParameters },
   now = Date.now()
 ): FlashcardDeckFile {
   const timestamp = safeTimestamp(now, Date.now());
@@ -228,6 +263,8 @@ export function updateFlashcardDeck(
         changes.pageTitles === undefined
           ? deck.pageTitles
           : sanitizeFlashcardDeckPageTitles(changes.pageTitles),
+      fsrs:
+        changes.fsrs === undefined ? deck.fsrs : normalizeFSRSParameters(changes.fsrs),
       updatedAt: timestamp,
     };
   });
@@ -367,6 +404,8 @@ function parseDeck(value: unknown): FlashcardDeck | null {
     id,
     name,
     pageTitles: sanitizeFlashcardDeckPageTitles(value.pageTitles),
+    // Un mazo sin configuración hereda `deckFSRSSettings()` → valores por defecto.
+    fsrs: value.fsrs === undefined ? undefined : normalizeFSRSParameters(value.fsrs),
     createdAt,
     updatedAt,
   };
@@ -461,6 +500,7 @@ export function serializeFlashcardDeckFile(file: FlashcardDeckFile): string {
       id: deck.id,
       name: deck.name,
       pageTitles: deck.pageTitles,
+      fsrs: deck.fsrs,
       createdAt: deck.createdAt,
       updatedAt: deck.updatedAt,
     })),

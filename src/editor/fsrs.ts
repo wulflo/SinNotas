@@ -1,7 +1,10 @@
 /**
- * Free Spaced Repetition Scheduler (FSRS-4.5) implementation for SinNotas.
- * Based on the official algorithm specification:
- * https://github.com/open-spaced-repetition/awesome-fsrs/wiki/The-Algorithm
+ * Free Spaced Repetition Scheduler (FSRS-7) implementation for SinNotas.
+ *
+ * The memory formulas come from the official `ts-fsrs` port of
+ * `fsrs-rs/src/model_v7.rs` (34 weights, dual-trace `stability` +
+ * `stabilityFast`). See `docs/CHECKLIST-FSRS7.md` and
+ * `THIRD_PARTY_LICENSES.md`.
  *
  * FSRS schedules the review phase. New and lapsed cards first go through
  * short learning/relearning steps (under one day), as recommended by the
@@ -9,12 +12,24 @@
  * memory formulas and avoid treating a brand-new card as a multi-day review.
  */
 
+import {
+  FSRS7_DEFAULT_WEIGHTS,
+  FSRS7_MODEL_BOUNDS,
+  FSRS7Algorithm,
+  clipFSRS7Parameters,
+  type FSRS7State,
+} from "ts-fsrs/models/fsrs-7";
+
 export type FSRSRating = 1 | 2 | 3 | 4; // 1: Again, 2: Hard, 3: Good, 4: Easy
 export type CardState = 0 | 1 | 2 | 3; // 0: New, 1: Learning, 2: Review, 3: Relearning
+/** Milisegundos de un día; se usa para programar vencimientos. */
+export const DAY_MS = 86_400_000;
 
 export interface FSRSItem {
   stability: number; // S (days)
   difficulty: number; // D (1..10)
+  /** Fast trace used by FSRS-7. Absent on cards created before FSRS-7. */
+  stabilityFast?: number;
   reps: number;
   lapses: number;
   state: CardState;
@@ -23,6 +38,7 @@ export interface FSRSItem {
 }
 
 export interface FSRSParameters {
+  /** FSRS-7 uses 34 weights. */
   w: number[];
   requestRetention: number; // default: 0.9 (90% target retention)
   maximumInterval: number; // default: 36500 (100 years)
@@ -32,19 +48,17 @@ export interface FSRSParameters {
   relearningSteps: number[];
 }
 
+/** Longitud oficial del vector de pesos de FSRS-7. */
+export const FSRS7_WEIGHT_COUNT = 34;
+
 /**
- * Default parameters published for FSRS-4.5. They use 17 weights:
- * w0..w3 initial stability, w4..w7 difficulty, w8..w10 recall stability,
- * w11..w14 post-lapse stability and w15..w16 hard/easy modifiers.
+ * Default FSRS-7 parameters published by the official implementation.
+ * `w0..w3` initial stability, `w4..w6` difficulty, `w7..w14` slow stability,
+ * `w15..w22` fast stability, `w23..w26` forgetting-curve decays and
+ * `w27..w33` mixture weights / difficulty timescale.
  */
 export const defaultFSRSParams: FSRSParameters = {
-  w: [
-    0.4872, 1.4003, 3.7145, 13.8206,
-    5.1618, 1.2298, 0.8975, 0.031,
-    1.6474, 0.1367, 1.0461,
-    2.1072, 0.0793, 0.3246, 1.587,
-    0.2272, 2.8755,
-  ],
+  w: [...FSRS7_DEFAULT_WEIGHTS],
   requestRetention: 0.9,
   maximumInterval: 36500,
   // Anki/FSRS default learning steps. Both are shorter than one day so the
@@ -53,13 +67,37 @@ export const defaultFSRSParams: FSRSParameters = {
   relearningSteps: [10 / 1440],
 };
 
-/** Factor de olvido de FSRS-4.5 en la curva de potencia. */
-export const FACTOR = 19 / 81;
-/** Decaimiento de la curva de potencia de FSRS-4.5. */
-export const DECAY = -0.5;
-
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
+}
+
+function isStrictlyIncreasing(steps: number[]): boolean {
+  return steps.every((step, index) => index === 0 || step > steps[index - 1]);
+}
+
+/**
+ * Calcula el vencimiento de una tarjeta.
+ *
+ * Los pasos de aprendizaje (`< 1 día`) conservan la hora exacta. Los
+ * intervalos de un día o más se normalizan al inicio del día local: antes
+ * heredaban la hora del repaso y dos tarjetas del mismo día podían vencer a
+ * horas distintas (o quedar “vencidas” a las 23:50).
+ */
+export function computeDueDate(reviewedAt: number | string, intervalDays: number): string {
+  const reviewed =
+    typeof reviewedAt === "number" ? reviewedAt : Date.parse(reviewedAt);
+  const safeReviewed = Number.isFinite(reviewed) ? reviewed : Date.now();
+  const safeInterval =
+    Number.isFinite(intervalDays) && intervalDays > 0 ? intervalDays : 0;
+
+  if (safeInterval < 1) {
+    return new Date(safeReviewed + safeInterval * DAY_MS).toISOString();
+  }
+
+  const due = new Date(safeReviewed);
+  due.setDate(due.getDate() + Math.round(safeInterval));
+  due.setHours(0, 0, 0, 0);
+  return due.toISOString();
 }
 
 interface LearningTransition {
@@ -71,80 +109,127 @@ interface LearningTransition {
 
 export class FSRSEngine {
   private params: FSRSParameters;
+  private algorithm: FSRS7Algorithm;
 
   constructor(params: Partial<FSRSParameters> = {}) {
     this.params = { ...defaultFSRSParams, ...params };
+
+    const normalizeSteps = (steps: unknown, fallback: number[]): number[] =>
+      Array.isArray(steps) &&
+      steps.every(
+        (step) => typeof step === "number" && Number.isFinite(step) && step > 0 && step < 1
+      ) &&
+      isStrictlyIncreasing(steps as number[])
+        ? [...(steps as number[])]
+        : [...fallback];
+
+    const weights =
+      Array.isArray(this.params.w) &&
+      this.params.w.length === FSRS7_WEIGHT_COUNT &&
+      this.params.w.every(Number.isFinite)
+        ? clipFSRS7Parameters(this.params.w)
+        : [...defaultFSRSParams.w];
+
+    this.params = {
+      ...this.params,
+      w: weights,
+      requestRetention: clamp(
+        Number.isFinite(this.params.requestRetention)
+          ? this.params.requestRetention
+          : defaultFSRSParams.requestRetention,
+        0.7,
+        0.97
+      ),
+      maximumInterval: Math.max(
+        1,
+        Number.isFinite(this.params.maximumInterval)
+          ? Math.round(this.params.maximumInterval)
+          : defaultFSRSParams.maximumInterval
+      ),
+      learningSteps: normalizeSteps(
+        this.params.learningSteps,
+        defaultFSRSParams.learningSteps
+      ),
+      relearningSteps: normalizeSteps(
+        this.params.relearningSteps,
+        defaultFSRSParams.relearningSteps
+      ),
+    };
+
+    this.algorithm = new FSRS7Algorithm(weights, FSRS7_MODEL_BOUNDS);
+  }
+
+  /** Versión del algoritmo usada por este motor. */
+  public readonly version = "FSRS-7";
+
+  /** Parámetros normalizados que el motor usa para calcular intervalos. */
+  public getParameters(): FSRSParameters {
+    return this.params;
+  }
+
+  /** Normaliza un `FSRSItem` a un estado de memoria válido para FSRS-7. */
+  private memoryState(item: Pick<FSRSItem, "stability" | "difficulty" | "stabilityFast">): FSRS7State {
+    const stability =
+      Number.isFinite(item.stability) && item.stability > 0 ? item.stability : 0.01;
+    const difficulty =
+      Number.isFinite(item.difficulty) && item.difficulty > 0 ? item.difficulty : 5;
+    const stabilityFast =
+      Number.isFinite(item.stabilityFast) && (item.stabilityFast as number) > 0
+        ? (item.stabilityFast as number)
+        : stability * 0.8;
+    return { stability, difficulty, stabilityFast };
   }
 
   /** S0(G) = w[G-1]. */
-  private initStability(rating: FSRSRating): number {
-    return Math.max(0.01, this.params.w[rating - 1]);
+  public initStability(rating: FSRSRating): number {
+    return this.algorithm.init_stability(rating);
   }
 
-  /** D0(G) = w4 - (G - 3) * w5, clamped to [1, 10]. */
-  private initDifficulty(rating: FSRSRating): number {
-    const d0 = this.params.w[4] - (rating - 3) * this.params.w[5];
-    return clamp(d0, 1, 10);
+  /** D0(G) = w4 - exp(w5 · (G - 1)) + 1. */
+  public initDifficulty(rating: FSRSRating): number {
+    return this.algorithm.init_difficulty(rating);
+  }
+
+  /** Retrievability of a memory state after `elapsedDays`. */
+  public retrievability(elapsedDays: number, stability: number): number;
+  public retrievability(
+    elapsedDays: number,
+    item: Pick<FSRSItem, "stability" | "difficulty" | "stabilityFast">
+  ): number;
+  public retrievability(
+    elapsedDays: number,
+    itemOrStability: number | Pick<FSRSItem, "stability" | "difficulty" | "stabilityFast">
+  ): number {
+    const item =
+      typeof itemOrStability === "number"
+        ? { stability: itemOrStability, difficulty: 5, stabilityFast: itemOrStability * 0.8 }
+        : itemOrStability;
+    return this.algorithm.curve(Math.max(0, elapsedDays), this.memoryState(item)).retrievability;
   }
 
   /**
-   * D' = w7 * D0(3) + (1 - w7) * (D - w6 * (G - 3)).
-   * This is the FSRS-4.5 mean-reversion formula.
+   * Interval in days from a complete memory state at the target retention.
+   * Sub-day intervals stay fractional so FSRS-7 can honour retentions above
+   * 90%; intervals of one day or more are rounded to whole days.
    */
-  private nextDifficulty(difficulty: number, rating: FSRSRating): number {
-    const meanReversion = this.params.w[7] * this.initDifficulty(3);
-    const adjusted = meanReversion + (1 - this.params.w[7]) * (difficulty - this.params.w[6] * (rating - 3));
-    return clamp(adjusted, 1, 10);
-  }
-
-  /** Retrievability given elapsed days t and stability S. */
-  public retrievability(elapsedDays: number, stability: number): number {
-    if (stability <= 0) return 0;
-    return Math.pow(1 + FACTOR * (Math.max(0, elapsedDays) / stability), DECAY);
-  }
-
-  /** S'r after a successful review (ratings 2, 3 and 4). */
-  private nextRecallStability(
-    difficulty: number,
-    stability: number,
-    retrievability: number,
-    rating: FSRSRating
+  public nextInterval(stability: number): number;
+  public nextInterval(state: Pick<FSRSItem, "stability" | "difficulty" | "stabilityFast">): number;
+  public nextInterval(
+    stateOrStability: number | Pick<FSRSItem, "stability" | "difficulty" | "stabilityFast">
   ): number {
-    const hardPenalty = rating === 2 ? this.params.w[15] : 1;
-    const easyBonus = rating === 4 ? this.params.w[16] : 1;
-    const factor =
-      1 +
-      Math.exp(this.params.w[8]) *
-        (11 - difficulty) *
-        Math.pow(stability, -this.params.w[9]) *
-        (Math.exp(this.params.w[10] * (1 - retrievability)) - 1) *
-        hardPenalty *
-        easyBonus;
-    return Math.max(0.01, stability * factor);
-  }
-
-  /** S'f after forgetting (rating 1). */
-  private nextLapseStability(difficulty: number, stability: number, retrievability: number): number {
-    const lapse =
-      this.params.w[11] *
-      Math.pow(difficulty, -this.params.w[12]) *
-      (Math.pow(stability + 1, this.params.w[13]) - 1) *
-      Math.exp(this.params.w[14] * (1 - retrievability));
-    return Math.max(0.01, lapse);
-  }
-
-  /** Interval in days from stability at the configured target retention. */
-  public nextInterval(stability: number): number {
-    const requestRetention = this.params.requestRetention;
-    // Inversa de la curva de potencia: I = (S / FACTOR) · (R^(1/DECAY) − 1).
-    // Para R = 0.9 el cociente es 1 exactamente en matemáticas; la aritmética
-    // en coma flotante lo deja en 0.9999999999999999, lo que desplazaría el
-    // redondeo un día. Se corrige ese caso límite para mantener la identidad
-    // histórica (I = S cuando requestRetention = 0.9).
-    const ratio = (Math.pow(requestRetention, 1 / DECAY) - 1) / FACTOR;
-    const effectiveRatio = Math.abs(ratio - 1) < 1e-12 ? 1 : ratio;
-    const interval = stability * effectiveRatio;
-    return Math.min(this.params.maximumInterval, Math.max(1, Math.round(interval)));
+    const state =
+      typeof stateOrStability === "number"
+        ? { stability: stateOrStability, difficulty: 5, stabilityFast: stateOrStability * 0.8 }
+        : stateOrStability;
+    const raw = this.algorithm.next_interval(
+      this.memoryState(state),
+      this.params.requestRetention
+    );
+    if (!Number.isFinite(raw) || raw <= 0) return 0;
+    // FSRS-7 returns fractional days. Keeping sub-day intervals (instead of
+    // clamping them to one day) is what makes 0.91-0.97 retention meaningful.
+    const interval = raw < 1 ? raw : Math.round(raw);
+    return Math.min(this.params.maximumInterval, interval);
   }
 
   /**
@@ -153,12 +238,16 @@ export class FSRSEngine {
    */
   public formatInterval(days: number): string {
     const minutes = days * 1440;
+    if (minutes < 1) return `${Math.max(1, Math.round(minutes * 60))}s`;
     if (minutes < 60) return `${Math.max(1, Math.round(minutes))}m`;
-    if (days < 1) return `${Math.max(1, Math.round(minutes / 60))}h`;
-    if (days < 30) return `${Math.round(days)}d`;
+    const hours = minutes / 60;
+    if (hours < 23.5) return `${Math.max(1, Math.round(hours))}h`;
+    // Hasta dos meses se muestran días exactos: redondear 44d a "1mo" o 45d a
+    // "2mo" introducía hasta un 33% de error visible.
+    if (days < 60) return `${Math.max(1, Math.round(days))}d`;
     if (days < 365) {
-      const months = Math.max(1, Math.round(days / 30));
-      return `${months}mo`;
+      const months = Number((days / 30.4375).toFixed(1));
+      return `${Math.max(1, months)}mo`;
     }
     const years = Number((days / 365).toFixed(1));
     return `${years}y`;
@@ -198,8 +287,11 @@ export class FSRSEngine {
     }
 
     if (rating === 2) {
+      // Solo el primer paso promedia con el siguiente. En los demás pasos
+      // "Difícil" repite el paso actual; antes, con 3+ pasos, un Hard en 10m
+      // dentro de "1m 10m 1h" saltaba a 35m y alargaba el aprendizaje.
       const intervalDays =
-        step + 1 < steps.length ? (steps[step] + steps[step + 1]) / 2 : steps[step];
+        step === 0 && steps.length > 1 ? (steps[0] + steps[1]) / 2 : steps[step];
       return { state: learningState, learningStep: step, graduated: false, intervalDays };
     }
 
@@ -214,8 +306,8 @@ export class FSRSEngine {
    * Calculate future outcomes for all 4 ratings from the current card state.
    *
    * `elapsedDays` is only used by FSRS review states. During learning, the
-   * short fixed steps decide the delay and the memory state is carried from the
-   * first rating (plus any lapse on Again).
+   * short fixed steps decide the delay and the memory state is carried from
+   * the first rating (plus any lapse on Again).
    */
   public previewRatings(
     item: FSRSItem,
@@ -227,84 +319,68 @@ export class FSRSEngine {
     >;
     const ratings: FSRSRating[] = [1, 2, 3, 4];
     const reviewedAt = new Date().toISOString();
-    const safeStability = item.stability > 0 ? item.stability : this.initStability(3);
-    const safeDifficulty = item.difficulty > 0 ? item.difficulty : this.initDifficulty(3);
-    const retrievability = this.retrievability(elapsedDays, safeStability);
+    const state = this.memoryState(item);
+    const retrievability = this.algorithm.curve(elapsedDays, state).retrievability;
 
     ratings.forEach((rating) => {
-      let nextS: number;
-      let nextD: number;
-      let nextState: CardState;
+      let nextState: FSRS7State;
+      let nextCardState: CardState;
       let nextLearningStep: number | undefined;
       let nextLapses = item.lapses;
       let intervalDays: number;
 
       if (item.state === 0) {
-        // New card: the first rating initializes both memory components.
-        nextS = this.initStability(rating);
-        nextD = this.initDifficulty(rating);
+        // New card: the first rating initializes both memory traces.
+        nextState = this.algorithm.next_state(null, 0, rating);
         const transition = this.learningTransition(0, 0, rating);
-        nextState = transition.state;
+        nextCardState = transition.state;
         nextLearningStep = transition.learningStep;
-        intervalDays = transition.graduated ? 0 : transition.intervalDays;
+        intervalDays = transition.graduated ? this.nextInterval(nextState) : transition.intervalDays;
       } else if (item.state === 1) {
         // Learning: the fixed steps rule the schedule; FSRS still carries the
         // memory state so graduation starts from a sensible interval.
         const currentStep = item.learningStep ?? 0;
-        nextD = this.nextDifficulty(safeDifficulty, rating);
-        // En Learning, Easy también es un repaso correcto: se aplica la
-        // fórmula de estabilidad de recuerdo, no se reinicia a S0(4). Reiniciar
-        // la estabilidad ignoraba la memoria acumulada durante los pasos.
-        nextS =
-          rating === 1
-            ? this.nextLapseStability(safeDifficulty, safeStability, retrievability)
-            : this.nextRecallStability(safeDifficulty, safeStability, retrievability, rating);
+        nextState = this.algorithm.next_state(state, elapsedDays, rating, retrievability);
         const transition = this.learningTransition(1, currentStep, rating);
-        nextState = transition.state;
+        nextCardState = transition.state;
         nextLearningStep = transition.learningStep;
-        intervalDays = transition.graduated ? 0 : transition.intervalDays;
+        intervalDays = transition.graduated ? this.nextInterval(nextState) : transition.intervalDays;
       } else if (item.state === 3) {
         // Relearning uses the same fixed-step mechanism as learning.
         const currentStep = item.learningStep ?? 0;
-        nextD = this.nextDifficulty(safeDifficulty, rating);
-        // Igual que en Learning: Easy usa la fórmula de recuerdo y conserva
-        // la estabilidad acumulada; no se fuerza el mínimo de una tarjeta nueva.
-        nextS =
-          rating === 1
-            ? this.nextLapseStability(safeDifficulty, safeStability, retrievability)
-            : this.nextRecallStability(safeDifficulty, safeStability, retrievability, rating);
+        nextState = this.algorithm.next_state(state, elapsedDays, rating, retrievability);
         const transition = this.learningTransition(3, currentStep, rating);
-        nextState = transition.state;
+        nextCardState = transition.state;
         nextLearningStep = transition.learningStep;
-        intervalDays = transition.graduated ? 0 : transition.intervalDays;
+        intervalDays = transition.graduated ? this.nextInterval(nextState) : transition.intervalDays;
       } else {
-        // Review: apply the full FSRS-4.5 memory formulas.
-        nextD = this.nextDifficulty(safeDifficulty, rating);
+        // Review: apply the full FSRS-7 memory formulas.
+        nextState = this.algorithm.next_state(state, elapsedDays, rating, retrievability);
         if (rating === 1) {
-          nextS = this.nextLapseStability(safeDifficulty, safeStability, retrievability);
-          nextState = 3; // Relearning
           nextLapses += 1;
           const transition = this.learningTransition(3, 0, rating);
+          // Sin pasos de reaprendizaje la tarjeta no puede quedarse en
+          // Relearning con intervalo 0: se gradúa a Review con el intervalo
+          // que acaba de calcular FSRS.
+          nextCardState = transition.state;
           nextLearningStep = transition.learningStep;
-          intervalDays = transition.intervalDays;
+          intervalDays = transition.graduated
+            ? this.nextInterval(nextState)
+            : transition.intervalDays;
         } else {
-          nextS = this.nextRecallStability(safeDifficulty, safeStability, retrievability, rating);
-          nextState = 2; // Review
-          intervalDays = this.nextInterval(nextS);
+          nextCardState = 2; // Review
+          intervalDays = this.nextInterval(nextState);
         }
-      }
-
-      if (nextState === 2 && intervalDays === 0) {
-        intervalDays = this.nextInterval(nextS);
       }
 
       result[rating] = {
         item: {
-          stability: nextS,
-          difficulty: nextD,
+          stability: nextState.stability,
+          difficulty: nextState.difficulty,
+          stabilityFast: nextState.stabilityFast,
           reps: item.reps + 1,
           lapses: nextLapses,
-          state: nextState,
+          state: nextCardState,
           lastReviewDate: reviewedAt,
           ...(nextLearningStep !== undefined ? { learningStep: nextLearningStep } : {}),
         },

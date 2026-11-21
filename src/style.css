@@ -1694,6 +1694,89 @@ select {
   border: 1px solid #d1d5db !important;
 }
 
+/* ==================== SELECTORES DESPLEGADOS (CustomSelect) ==================== */
+/* Reemplazan a los `<select>` nativos: el menú siempre sigue el tema de la app
+ * (claro/oscuro y estilos visuales) en lugar del del sistema operativo.
+ * Las variables `--ls-*` se definen por tema/visual, así que una sola regla
+ * basta y adapta el estilo. */
+.custom-select {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 130px;
+  max-width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--ls-border-color);
+  border-radius: 8px;
+  background-color: var(--ls-bg-secondary);
+  color: var(--ls-text-primary);
+  font-size: var(--ls-font-size-ui);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  user-select: none;
+  box-shadow: none;
+}
+
+.custom-select:hover:not(:disabled) {
+  border-color: var(--ls-accent);
+}
+
+.custom-select:focus-visible {
+  outline: 2px solid var(--ls-accent);
+  outline-offset: 1px;
+}
+
+.custom-select::after {
+  content: "▾";
+  font-size: 0.8em;
+  color: var(--ls-text-muted);
+}
+
+.custom-select:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.custom-select-menu {
+  position: fixed;
+  z-index: 2300;
+  min-width: 160px;
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--ls-border-color);
+  border-radius: 8px;
+  background-color: var(--ls-menu-bg);
+  box-shadow: var(--ls-menu-shadow);
+  font-size: var(--ls-font-size-ui);
+}
+
+.custom-select-menu .custom-select-item {
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  outline: none;
+}
+
+.custom-select-menu .custom-select-item:hover,
+.custom-select-menu .custom-select-item.is-active {
+  background-color: var(--ls-bg-hover);
+}
+
+.custom-select-menu .custom-select-item:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--ls-accent);
+}
+
+.custom-select-menu .custom-select-item.is-disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 .settings-tab-panel {
   padding-right: 20px;
   padding-bottom: 20px;
@@ -1908,6 +1991,11 @@ select {
   padding: 4px 0;
   font-size: var(--ls-font-size-ui);
   color: var(--ls-text-title);
+}
+
+/* El atributo `hidden` debe ganar a `display: flex` (filas condicionales). */
+.settings-row[hidden] {
+  display: none;
 }
 
 .settings-row > label {
@@ -5917,7 +6005,7 @@ body.is-bullet-selecting {
   border-radius: 4px;
 }
 
-/* ==================== FLASHCARDS (FSRS-4.5 & CLOZE) ==================== */
+/* ==================== FLASHCARDS (FSRS-7 & CLOZE) ==================== */
 #view-flashcards {
   background: radial-gradient(
       1200px 800px at 50% 0%,

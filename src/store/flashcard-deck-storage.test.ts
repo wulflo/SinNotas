@@ -17,6 +17,8 @@ import {
   serializeFlashcardDeckFile,
 } from "./flashcard-decks";
 import { FlashcardDeckRepository } from "./flashcard-deck-storage";
+import { defaultFSRSParams } from "../editor/fsrs";
+import { FSRS_SETTINGS_KEY } from "../editor/fsrs-settings";
 
 describe("FlashcardDeckRepository", () => {
   beforeEach(() => {
@@ -126,5 +128,43 @@ describe("FlashcardDeckRepository", () => {
       1000
     ).file;
     expect(findFlashcardDeck(file, file.decks[0].id)?.name).toBe("Mazo");
+  });
+
+  it("migra los ajustes FSRS globales antiguos a los mazos que no los tienen", async () => {
+    const repository = new FlashcardDeckRepository();
+    const legacy = { ...defaultFSRSParams, requestRetention: 0.88 };
+    localStorage.setItem(FSRS_SETTINGS_KEY, JSON.stringify(legacy));
+    const created = addFlashcardDeck(emptyFlashcardDeckFile(), "Mazo", ["A"], 1000);
+    expect(created.deck.fsrs).toBeUndefined();
+    await repository.save("/vault", created.file);
+
+    const loaded = await repository.load("/vault");
+    expect(loaded.decks[0].fsrs?.requestRetention).toBe(0.88);
+    expect(loaded.decks[0].fsrs?.maximumInterval).toBe(defaultFSRSParams.maximumInterval);
+  });
+
+  it("no asigna ajustes cuando no existe configuración global legada", async () => {
+    const repository = new FlashcardDeckRepository();
+    localStorage.removeItem(FSRS_SETTINGS_KEY);
+    const created = addFlashcardDeck(emptyFlashcardDeckFile(), "Mazo", ["A"], 1000);
+    await repository.save("/vault", created.file);
+
+    const loaded = await repository.load("/vault");
+    expect(loaded.decks[0].fsrs).toBeUndefined();
+  });
+
+  it("saveDeckSettings guarda los ajustes FSRS de un mazo", async () => {
+    const repository = new FlashcardDeckRepository();
+    const created = addFlashcardDeck(emptyFlashcardDeckFile(), "Mazo", ["A"], 1000);
+    await repository.save("/vault", created.file);
+
+    const settings = { ...defaultFSRSParams, requestRetention: 0.8, maximumInterval: 250 };
+    const saved = await repository.saveDeckSettings("/vault", created.deck.id, settings);
+    expect(saved.decks[0].fsrs).toMatchObject({
+      requestRetention: 0.8,
+      maximumInterval: 250,
+    });
+    const loaded = await repository.load("/vault");
+    expect(loaded.decks[0].fsrs?.requestRetention).toBe(0.8);
   });
 });

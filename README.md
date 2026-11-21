@@ -39,7 +39,7 @@
 | Pillar | What it gives you |
 | :--- | :--- |
 | **🗂️ Files, not silos** | Every page is a plain Markdown file inside your vault. Read, edit, grep, back up or sync it with any tool you already use. |
-| **🧠 Built for learning** | FSRS-4.5 flashcards, Cloze cards, image occlusion, hierarchical decks, focus mode and a Pomodoro timer — inside the same place where you write. |
+| **🧠 Built for learning** | FSRS-7 flashcards, Cloze cards, image occlusion, hierarchical decks, focus mode and a Pomodoro timer — inside the same place where you write. |
 | **🔗 Connected thinking** | Wikilinks, backlinks and a custom force-directed graph turn isolated notes into a map of ideas. |
 | **📄 One workspace** | Outliner, daily journals, tasks, PDF reader, bibliography and review queue live together, without plugins or a subscription. |
 | **🔒 Local-first by default** | No telemetry, no account and no bundled cloud. Network access only happens when you explicitly ask for it. |
@@ -69,9 +69,11 @@
 
 ### 🧠 Flashcards and spaced repetition
 
-- **Card types:** basic, Cloze and image-occlusion cards, scheduled with FSRS-4.5.
+- **Card types:** basic, Cloze and image-occlusion cards, scheduled with FSRS-7.
+- **FSRS-7 model:** the official 34-weight FSRS-7 scheduler from `ts-fsrs` 6.0.0, with a dual-trace memory state (stability plus fast stability) instead of an approximation. Desired retention, maximum interval, learning/relearning steps and weights are configurable **per deck**, and each deck schedules its notes with its own parameters.
 - **Learning phase:** new cards pass through short fixed steps (1 min, 10 min) before graduating to FSRS review, avoiding misleading initial interval jumps. The learning state persists across reloads.
 - **Review tools:** focus mode, Pomodoro timer, review statistics, a heatmap and a progress visualization that grows with your practice.
+- **Batched recalculation:** *Settings → Recalculate properties* applies each note's deck parameters and yields between batches of 40 notes, saving page by page so large vaults stay responsive.
 - **Hierarchical decks:** use `→` in note titles (for example `Mental health → Anxiety → Topic 1`) to nest decks. Select a parent deck to include all child notes, filter reviews from settings and keep the draft selection while searching or paging.
 - **Image occlusion:** draw rectangles, ellipses and polygons, move, resize and rotate areas, add hints and store the transformations in the block's Markdown metadata.
 - **Images:** supports PNG, JPG/JPEG, WebP, SVG, GIF and BMP. Inserted images are saved to the vault's `assets/` folder.

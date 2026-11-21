@@ -169,7 +169,7 @@ It is organized by banner comments. When editing, jump to the banner rather than
 | **KANBAN BOARD VIEW** | Kanban columns, drag between columns, persistence in the daily note. |
 | **BLOCK CONTEXT MENU** | Block-level context actions. |
 | **NAVIGATION CONTEXT MENU** / **SIDEBAR CONTEXT MENU ACTIONS** | Page and sidebar context menus. |
-| **FLASHCARDS SESSION (FSRS-4.5)** | Review session, card queue, ratings, keybindings, heatmap and statistics. |
+| **FLASHCARDS SESSION (FSRS-7)** | Review session, card queue, ratings, keybindings, heatmap and statistics. |
 | **GRAPH VIEW** / **GRAPH SETTINGS UI** | Graph lifecycle, selection, dragging, filters and settings panel. |
 | **ALL PAGES VIEW** | Sorting, filtering, dates and persistent column widths. |
 | **JOURNALS VIEW** | Daily-note calendar and journal navigation. |
@@ -205,8 +205,9 @@ Pure, DOM-light modules. This is where block and Markdown behavior belongs; keep
 | `markdown.ts` | Block tree ↔ Markdown serialization, system-property lines, card/task tags, sanitized HTML rendering (DOMPurify), style-attribute filtering and KaTeX integration. |
 | `markdown-table.ts` | Parse, serialize and edit Markdown tables with alignment. |
 | `math.ts` | KaTeX rendering helpers for inline and display math. |
-| `fsrs.ts` | FSRS-4.5 scheduler: ratings, card states, retrievability, intervals and review logging. |
-| `fsrs-settings.ts` | Persisted FSRS parameters and learning steps (`sinnotas-fsrs-settings`). |
+| `fsrs.ts` | FSRS-7 scheduler: ratings, card states, retrievability, intervals and review logging. |
+| `fsrs-settings.ts` | FSRS-7 parameter normalization (`normalizeFSRSParameters`); the `sinnotas-fsrs-settings` key remains only as legacy for deck migration. |
+| `custom-select.ts` | App-themed dropdown selectors: `CustomSelect` replaces native `<select>`s (`migrateSelect`, `syncCustomSelect`); see `docs/SinNotas.md` → dropdowns. |
 | `image-occlusion.ts` | Region normalization, parsing, clamping, updates and mask rendering data for image-occlusion cards. |
 | `image-bytes.ts` | Raster image type detection and normalization before saving. |
 | `note-search.ts` | Folded, accent-insensitive match search inside blocks. |
@@ -222,7 +223,7 @@ View modules render into a container and receive a small `host` interface for ca
 
 | File | Responsibility |
 | --- | --- |
-| `flashcard-decks.ts` | Deck tree building, sorting, searching, selection state and flattening. |
+| `flashcard-decks.ts` | Deck tree building, sorting, searching, selection state and flattening; per-deck FSRS settings (`deckFSRSSettings`, `flashcardDeckContainsPageTitle`). |
 | `flashcards-manager.ts` | Review queue, page statistics, editable card fields and schedule snapshots. |
 | `flashcard-loader.ts` | Progressive hydration of note blocks for card generation. |
 | `review-heatmap.ts` | Review heatmap data shaping (days and weeks). |

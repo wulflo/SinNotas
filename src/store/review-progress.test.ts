@@ -96,6 +96,30 @@ describe("diario de repasos compartido", () => {
     expect(parsed.entries[1].after.state).toBeUndefined();
   });
 
+  it("descarta estabilidades no positivas y dificultades fuera de rango", () => {
+    const parsed = parseReviewProgress(
+      JSON.stringify({
+        version: 1,
+        entries: [
+          makeEvent({
+            after: {
+              stability: 0,
+              stabilityFast: -1,
+              difficulty: 99,
+              reps: 2,
+              lapses: 0,
+            },
+          }),
+        ],
+      })
+    );
+
+    expect(parsed.entries[0].after.stability).toBeUndefined();
+    expect(parsed.entries[0].after.stabilityFast).toBeUndefined();
+    expect(parsed.entries[0].after.difficulty).toBeUndefined();
+    expect(parsed.entries[0].after.reps).toBe(2);
+  });
+
   it("une historiales de dos equipos sin duplicar repasos", () => {
     const left: ReviewProgressFile = {
       version: 1,

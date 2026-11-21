@@ -1,5 +1,12 @@
 import { Flashcard, PageData, BlockNode, FlashcardType, ImageOcclusionRegion } from "../types";
-import { CardState, FSRSEngine, FSRSItem, FSRSParameters, FSRSRating } from "../editor/fsrs";
+import {
+  CardState,
+  computeDueDate,
+  FSRSEngine,
+  FSRSItem,
+  FSRSParameters,
+  FSRSRating,
+} from "../editor/fsrs";
 import {
   isSystemPropertyLine,
   renderMarkdownToHtml,
@@ -43,6 +50,8 @@ export interface EditableCardFields {
 export interface CardScheduleSnapshot {
   stability?: number;
   difficulty?: number;
+  /** Rastro rápido de FSRS-7. Ausente en tarjetas anteriores al cambio. */
+  stabilityFast?: number;
   reps?: number;
   lapses?: number;
   lastReviewDate?: string;
@@ -61,7 +70,9 @@ export interface CardScheduleSnapshot {
 function inferSnapshotState(snapshot: CardScheduleSnapshot): CardState | undefined {
   if (snapshot.state !== undefined) return snapshot.state;
   if (!snapshot.lastReviewDate) return undefined;
-  if (snapshot.learningStep !== undefined) return 1;
+  // Una tarjeta sin `card-state` con paso de aprendizaje y lapsos es
+  // Relearning, no Learning: ya se le olvidó antes y está recuperándose.
+  if (snapshot.learningStep !== undefined) return (snapshot.lapses ?? 0) > 0 ? 3 : 1;
   if (snapshot.reps !== undefined) return snapshot.reps > 0 ? 2 : 0;
   return 2;
 }
@@ -112,6 +123,20 @@ function joinCardSource(prefix: string, body: string, properties: string[]): str
   return `${visible}${properties.length > 0 ? `\n${properties.join("\n")}` : ""}`;
 }
 
+/**
+ * Opciones de reprogramación.
+ *
+ * `anchor: "last-reviewed"` conserva el comportamiento anterior (el
+ * vencimiento se calcula desde el último repaso y puede quedar en el
+ * pasado). `anchor: "today"` parte del momento actual y es la opción
+ * recomendada en la interfaz.
+ */
+export interface RescheduleFSRSOptions {
+  anchor?: "today" | "last-reviewed";
+  /** Reloj inyectable para tests. */
+  now?: Date;
+}
+
 export class FlashcardsManager {
   /** Todas las tarjetas detectadas en la bóveda, sin aplicar el filtro de notas. */
   private allCards: Flashcard[] = [];
@@ -135,6 +160,11 @@ export class FlashcardsManager {
 
   public setFSRSParameters(parameters: FSRSParameters): void {
     this.fsrs = new FSRSEngine(parameters);
+  }
+
+  /** Parámetros de FSRS que el motor usa ahora (usados por el recálculo y los fallbacks). */
+  public getFSRSParameters(): FSRSParameters {
+    return this.fsrs.getParameters();
   }
 
   /**
@@ -228,6 +258,7 @@ export class FlashcardsManager {
   /** Extract FSRS metadata stored in block properties (e.g. card-s:: 2.5) */
   private parseBlockFSRS(content: string): FSRSItem {
     const sMatch = content.match(/card-s::\s*([\d.]+)/i);
+    const sFastMatch = content.match(/card-s-fast::\s*([\d.]+)/i);
     const dMatch = content.match(/card-d::\s*([\d.]+)/i);
     const repsMatch = content.match(/card-reps::\s*(\d+)/i);
     const lapsesMatch = content.match(/card-lapses::\s*(\d+)/i);
@@ -236,6 +267,7 @@ export class FlashcardsManager {
     const learningStepMatch = content.match(/card-learn-step::\s*(\d+)/i);
 
     const stability = sMatch ? parseFloat(sMatch[1]) : 0;
+    const stabilityFast = sFastMatch ? parseFloat(sFastMatch[1]) : undefined;
     const difficulty = dMatch ? parseFloat(dMatch[1]) : 5.0;
     const reps = repsMatch ? parseInt(repsMatch[1], 10) : 0;
     const lapses = lapsesMatch ? parseInt(lapsesMatch[1], 10) : 0;
@@ -247,14 +279,23 @@ export class FlashcardsManager {
     const state: CardState = stateMatch
       ? (Number(stateMatch[1]) as CardState)
       : learningStep !== undefined && (reps > 0 || lastReviewedMatch)
-        ? 1
+        ? lapses > 0
+          ? 3
+          : 1
         : reps === 0
           ? 0
           : 2;
 
+    const normalizedStability = stability || 0.4;
     return {
-      stability: stability || 0.4,
+      stability: normalizedStability,
       difficulty: difficulty || 5.0,
+      // Las tarjetas FSRS-7 no guardaban el rastro rápido. Se usa el mismo
+      // ratio con el que FSRS-7 inicializa una tarjeta nueva (0.8 · S).
+      stabilityFast:
+        stabilityFast !== undefined && Number.isFinite(stabilityFast) && stabilityFast > 0
+          ? stabilityFast
+          : normalizedStability * 0.8,
       reps,
       lapses,
       state,
@@ -324,7 +365,7 @@ export class FlashcardsManager {
       return null;
     }
 
-    const dueDate = new Date(reviewedAt + intervalDays * 86_400_000).toISOString();
+    const dueDate = computeDueDate(reviewedAt, intervalDays);
     const existingDueDate = content.match(/(?:^|\n)due-date::\s*(\S+)/i)?.[1];
     if (existingDueDate && Date.parse(existingDueDate) === Date.parse(dueDate)) return null;
 
@@ -333,25 +374,177 @@ export class FlashcardsManager {
   }
 
   /** Reprograma tarjetas en Review desde su estabilidad y retención objetivo. */
-  public static rescheduleFSRS(content: string, parameters: FSRSParameters): string | null {
+  public static rescheduleFSRS(
+    content: string,
+    parameters: FSRSParameters,
+    options: RescheduleFSRSOptions = {}
+  ): string | null {
     const stateMatch = content.match(/(?:^|\n)card-state::\s*(\d+)/i);
-    if (stateMatch && Number(stateMatch[1]) !== 2) return null;
+    if (stateMatch) {
+      if (Number(stateMatch[1]) !== 2) return null;
+    } else if (/(?:^|\n)card-learn-step::/i.test(content)) {
+      // Tarjeta anterior a `card-state` que sigue en Learning/Relearning:
+      // reprogramarla como Review saltaría el paso de aprendizaje.
+      return null;
+    }
 
     const stabilityMatch = content.match(/(?:^|\n)card-s::\s*([\d.]+)/i);
+    const difficultyMatch = content.match(/(?:^|\n)card-d::\s*([\d.]+)/i);
+    const stabilityFastMatch = content.match(/(?:^|\n)card-s-fast::\s*([\d.]+)/i);
     const reviewedMatch = content.match(/(?:^|\n)last-reviewed::\s*(\S+)/i);
     if (!stabilityMatch || !reviewedMatch) return null;
     const stability = Number(stabilityMatch[1]);
+    const difficulty = difficultyMatch ? Number(difficultyMatch[1]) : 5;
+    const parsedStabilityFast = stabilityFastMatch ? Number(stabilityFastMatch[1]) : Number.NaN;
+    const stabilityFast =
+      Number.isFinite(parsedStabilityFast) && parsedStabilityFast > 0
+        ? parsedStabilityFast
+        : stability * 0.8;
     const reviewedAt = Date.parse(reviewedMatch[1]);
     if (!Number.isFinite(stability) || stability <= 0 || !Number.isFinite(reviewedAt)) return null;
 
-    const intervalDays = new FSRSEngine(parameters).nextInterval(stability);
-    const dueDate = new Date(reviewedAt + intervalDays * 86_400_000).toISOString();
+    const intervalDays = new FSRSEngine(parameters).nextInterval({
+      stability,
+      difficulty,
+      stabilityFast,
+    });
+    const anchor = options.anchor ?? "last-reviewed";
+    const now = options.now ?? new Date();
+    const dueDate = computeDueDate(
+      anchor === "today" ? now.getTime() : reviewedAt,
+      intervalDays
+    );
     let updated = content.replace(/(^|\n)interval-days::[^\n]*/gi, `$1interval-days:: ${intervalDays}`);
     if (!/(?:^|\n)interval-days::/i.test(updated)) updated += `\ninterval-days:: ${intervalDays}`;
     updated = updated.replace(/(^|\n)card-last-interval::[^\n]*/gi, `$1card-last-interval:: ${intervalDays}`);
     updated = updated.replace(/\n?due-date::[^\n]*/gi, "").trimEnd();
     updated += `\ndue-date:: ${dueDate}`;
+
+    // Rastro rápido: las tarjetas anteriores a FSRS-7 no lo guardaban. Se
+    // añade una sola vez, con el mismo ratio con el que FSRS-7 inicializa una
+    // tarjeta nueva (0.8 · S).
+    if (!/(?:^|\n)card-s-fast::\s*[\d.]+/i.test(updated)) {
+      const fastLine = `card-s-fast:: ${stabilityFast}`;
+      updated = updated.replace(/(^|\n)card-s-fast::[^\n]*/gi, `$1${fastLine}`);
+      if (!/(?:^|\n)card-s-fast::/i.test(updated)) {
+        updated = `${updated.trimEnd()}\n${fastLine}`;
+      }
+    }
+
     return updated === content ? null : updated;
+  }
+
+  /**
+   * Convierte una tarjeta aprendida con FSRS-4.5 al formato FSRS-7.
+   *
+   * FSRS-4.5 no guardaba el rastro rápido (`stabilityFast`). Se aproxima como
+   * `0.8 · stability`, el mismo ratio con el que FSRS-7 inicializa una tarjeta
+   * nueva. Las tarjetas en repaso recalculan su intervalo con FSRS-7; las que
+   * están en aprendizaje conservan su paso y su retraso.
+   *
+   * Devuelve `null` si la tarjeta ya es FSRS-7 o no tiene datos que convertir.
+   */
+  public static migrateLegacyFSRS(
+    content: string,
+    parameters: FSRSParameters
+  ): string | null {
+    // Ya tiene un rastro rápido válido: la tarjeta está en formato FSRS-7.
+    const existingFastMatch = content.match(/(?:^|\n)card-s-fast::\s*([\d.]+)/i);
+    if (existingFastMatch) {
+      const existingFast = Number(existingFastMatch[1]);
+      if (Number.isFinite(existingFast) && existingFast > 0) return null;
+    }
+
+    const stabilityMatch = content.match(/(?:^|\n)card-s::\s*([\d.]+)/i);
+    const lastReviewedMatch = content.match(/(?:^|\n)last-reviewed::\s*(\S+)/i);
+    if (!stabilityMatch || !lastReviewedMatch) return null;
+
+    const stability = Number(stabilityMatch[1]);
+    const reviewedAt = Date.parse(lastReviewedMatch[1]);
+    if (!Number.isFinite(stability) || stability <= 0 || !Number.isFinite(reviewedAt)) {
+      return null;
+    }
+
+    const readNumber = (pattern: RegExp, fallback: number): number => {
+      const match = content.match(pattern);
+      const value = match ? Number(match[1]) : Number.NaN;
+      return Number.isFinite(value) ? value : fallback;
+    };
+    const readCount = (pattern: RegExp): number => {
+      const value = readNumber(pattern, 0);
+      return Math.max(0, Math.floor(value));
+    };
+
+    const difficulty = Math.min(
+      10,
+      Math.max(1, readNumber(/(?:^|\n)card-d::\s*([\d.]+)/i, 5))
+    );
+    const easeFactor = Math.max(
+      1.3,
+      readNumber(/(?:^|\n)ease-factor::\s*([\d.]+)/i, 2.5)
+    );
+    const reps = readCount(/(?:^|\n)card-reps::\s*(\d+)/i);
+    const lapses = readCount(/(?:^|\n)card-lapses::\s*(\d+)/i);
+    const learningStepMatch = content.match(/(?:^|\n)card-learn-step::\s*(\d+)/i);
+    const learningStep = learningStepMatch ? Number(learningStepMatch[1]) : undefined;
+
+    const stateMatch = content.match(/(?:^|\n)card-state::\s*([0-3])/i);
+    const state: CardState = stateMatch
+      ? (Number(stateMatch[1]) as CardState)
+      : learningStep !== undefined
+        ? lapses > 0
+          ? 3
+          : 1
+        : reps === 0
+          ? 0
+          : 2;
+
+    // Una tarjeta nueva no tiene programación que convertir.
+    if (state === 0) return null;
+
+    const stabilityFast = stability * 0.8;
+    let intervalDays: number;
+    if (state === 2) {
+      intervalDays = new FSRSEngine(parameters).nextInterval({
+        stability,
+        difficulty,
+        stabilityFast,
+      });
+    } else {
+      // Learning/Relearning: el paso corto manda; no se sustituye por un
+      // intervalo de repaso.
+      const storedInterval = readNumber(
+        /(?:^|\n)(?:interval-days|card-last-interval)::\s*([\d.]+)/i,
+        Number.NaN
+      );
+      const steps = state === 3 ? parameters.relearningSteps : parameters.learningSteps;
+      const stepIndex = Math.min(
+        Math.max(0, learningStep ?? 0),
+        Math.max(0, steps.length - 1)
+      );
+      intervalDays =
+        Number.isFinite(storedInterval) && storedInterval >= 0
+          ? storedInterval
+          : steps.length > 0
+            ? steps[stepIndex]
+            : 0;
+    }
+
+    return this.updateBlockFSRS(
+      content,
+      {
+        stability,
+        difficulty,
+        stabilityFast,
+        reps,
+        lapses,
+        state,
+        lastReviewDate: lastReviewedMatch[1],
+        ...(learningStep !== undefined ? { learningStep } : {}),
+      },
+      intervalDays,
+      easeFactor
+    );
   }
 
   /** Remove scheduling metadata so the block becomes a new card again. */
@@ -359,7 +552,7 @@ export class FlashcardsManager {
     return content
       .split(/\r?\n/)
       .filter((line) =>
-        !/^(?:card-s|card-d|card-reps|card-lapses|card-last-interval|last-reviewed|interval-days|ease-factor|due-date|card-state|card-learn-step)::/i.test(
+        !/^(?:card-s|card-s-fast|card-d|card-reps|card-lapses|card-last-interval|last-reviewed|interval-days|ease-factor|due-date|card-state|card-learn-step)::/i.test(
           line.trim()
         )
       )
@@ -433,6 +626,7 @@ export class FlashcardsManager {
     const snapshot: CardScheduleSnapshot = {
       stability: readNumber(/card-s::\s*([\d.]+)/i),
       difficulty: readNumber(/card-d::\s*([\d.]+)/i),
+      stabilityFast: readNumber(/card-s-fast::\s*([\d.]+)/i),
       reps: readNumber(/card-reps::\s*(\d+)/i),
       lapses: readNumber(/card-lapses::\s*(\d+)/i),
       lastReviewDate: readText(/last-reviewed::\s*(\S+)/i),
@@ -442,6 +636,12 @@ export class FlashcardsManager {
       state: readNumber(/card-state::\s*([0-3])/i) as CardState | undefined,
       learningStep: readNumber(/card-learn-step::\s*(\d+)/i),
     };
+
+    // Las tarjetas antiguas sin rastro rápido se normalizan al mismo ratio con
+    // el que FSRS-7 inicializa una tarjeta nueva (0.8 · S).
+    if (snapshot.stability !== undefined && snapshot.stabilityFast === undefined) {
+      snapshot.stabilityFast = snapshot.stability * 0.8;
+    }
 
     return Object.fromEntries(
       Object.entries(snapshot).filter(([, value]) => value !== undefined)
@@ -455,6 +655,7 @@ export class FlashcardsManager {
    */
   public static applyScheduleSnapshot(content: string, snapshot: CardScheduleSnapshot): string {
     const cleaned = content
+      .replace(/\n?card-s-fast::[^\n]*/gi, "")
       .replace(/\n?card-s::[^\n]*/gi, "")
       .replace(/\n?card-d::[^\n]*/gi, "")
       .replace(/\n?card-reps::[^\n]*/gi, "")
@@ -474,15 +675,24 @@ export class FlashcardsManager {
     // Los diarios antiguos no guardaban `state`; se reconstruye para que
     // deshacer un repaso no pierda la fase Learning/Relearning.
     const state = inferSnapshotState(snapshot) ?? 0;
+    const stability = Number.isFinite(snapshot.stability) ? snapshot.stability! : 0.4;
+    const difficulty = Number.isFinite(snapshot.difficulty) ? snapshot.difficulty! : 5;
+    const stabilityFast = Number.isFinite(snapshot.stabilityFast)
+      ? snapshot.stabilityFast!
+      : stability * 0.8;
     const lines = [
-      `card-s:: ${snapshot.stability ?? 0.4}`,
-      `card-d:: ${snapshot.difficulty ?? 5}`,
+      `card-s:: ${stability}`,
+      `card-d:: ${difficulty}`,
+      `card-s-fast:: ${stabilityFast}`,
       `card-reps:: ${snapshot.reps ?? 0}`,
       `card-lapses:: ${snapshot.lapses ?? 0}`,
       `last-reviewed:: ${snapshot.lastReviewDate}`,
       `interval-days:: ${snapshot.intervalDays ?? 0}`,
       `ease-factor:: ${snapshot.easeFactor ?? 2.5}`,
-      `due-date:: ${snapshot.dueDate ?? snapshot.lastReviewDate}`,
+      `due-date:: ${
+        snapshot.dueDate ??
+        computeDueDate(snapshot.lastReviewDate, snapshot.intervalDays ?? 0)
+      }`,
       `card-state:: ${state}`,
     ];
     if (snapshot.learningStep !== undefined) {
@@ -496,9 +706,17 @@ export class FlashcardsManager {
     left: CardScheduleSnapshot,
     right: CardScheduleSnapshot
   ): boolean {
+    // Las instantáneas anteriores a FSRS-7 no guardaban `stabilityFast`.
+    // `readScheduleSnapshot` las normaliza a 0.8·S, así que la comparación debe
+    // aplicar el mismo criterio o todos los repasos antiguos parecerían haber
+    // cambiado en otro dispositivo y no se podrían deshacer.
+    const normalizedStabilityFast = (snapshot: CardScheduleSnapshot) =>
+      snapshot.stabilityFast ??
+      (snapshot.stability !== undefined ? snapshot.stability * 0.8 : null);
     const normalize = (snapshot: CardScheduleSnapshot) => ({
       stability: snapshot.stability ?? null,
       difficulty: snapshot.difficulty ?? null,
+      stabilityFast: normalizedStabilityFast(snapshot),
       reps: snapshot.reps ?? null,
       lapses: snapshot.lapses ?? null,
       lastReviewDate: snapshot.lastReviewDate ?? null,
@@ -520,6 +738,7 @@ export class FlashcardsManager {
   ): string {
     // Strip existing FSRS properties
     let cleaned = content
+      .replace(/\n?card-s-fast::[^\n]*/gi, "")
       .replace(/\n?card-s::[^\n]*/gi, "")
       .replace(/\n?card-d::[^\n]*/gi, "")
       .replace(/\n?card-reps::[^\n]*/gi, "")
@@ -534,8 +753,13 @@ export class FlashcardsManager {
       .trim();
 
     const lastReviewed = fsrs.lastReviewDate || new Date().toISOString();
-    const dueDate = new Date(Date.parse(lastReviewed) + intervalDays * 86_400_000).toISOString();
-    const props = `\ncard-s:: ${fsrs.stability}\ncard-d:: ${fsrs.difficulty}\ncard-reps:: ${fsrs.reps}\ncard-lapses:: ${fsrs.lapses}\nlast-reviewed:: ${lastReviewed}\ninterval-days:: ${intervalDays}\nease-factor:: ${easeFactor}\ndue-date:: ${dueDate}\ncard-state:: ${fsrs.state}${fsrs.learningStep !== undefined ? `\ncard-learn-step:: ${fsrs.learningStep}` : ""}`;
+    const dueDate = computeDueDate(lastReviewed, intervalDays);
+    const stability = Number.isFinite(fsrs.stability) ? fsrs.stability : 0.4;
+    const difficulty = Number.isFinite(fsrs.difficulty) ? fsrs.difficulty : 5;
+    const stabilityFast = Number.isFinite(fsrs.stabilityFast)
+      ? fsrs.stabilityFast!
+      : stability * 0.8;
+    const props = `\ncard-s:: ${stability}\ncard-d:: ${difficulty}\ncard-s-fast:: ${stabilityFast}\ncard-reps:: ${fsrs.reps}\ncard-lapses:: ${fsrs.lapses}\nlast-reviewed:: ${lastReviewed}\ninterval-days:: ${intervalDays}\nease-factor:: ${easeFactor}\ndue-date:: ${dueDate}\ncard-state:: ${fsrs.state}${fsrs.learningStep !== undefined ? `\ncard-learn-step:: ${fsrs.learningStep}` : ""}`;
     return cleaned + props;
   }
 
@@ -968,14 +1192,12 @@ export class FlashcardsManager {
     if (persist) {
       card.fsrs = chosen.item;
       card.lastIntervalDays = chosen.intervalDays;
-      card.easeFactor = Math.max(
-        1.3,
-        card.easeFactor + (rating === 1 ? -0.2 : rating === 2 ? -0.15 : rating === 4 ? 0.15 : 0)
+      // FSRS-7 no usa `ease-factor`; se conserva el valor por compatibilidad
+      // con tarjetas antiguas, pero ya no se aplican deltas de SM-2.
+      card.dueDate = computeDueDate(
+        chosen.item.lastReviewDate || new Date().toISOString(),
+        chosen.intervalDays
       );
-      card.dueDate = new Date(
-        Date.parse(chosen.item.lastReviewDate || new Date().toISOString()) +
-          chosen.intervalDays * 86_400_000
-      ).toISOString();
     }
 
     this.currentIndex += 1;

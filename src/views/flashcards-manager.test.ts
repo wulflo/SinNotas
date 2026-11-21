@@ -1,10 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { FlashcardsManager } from "./flashcards-manager";
 import { BlockNode, PageData } from "../types";
+import { FSRS7_DEFAULT_WEIGHTS } from "ts-fsrs/models/fsrs-7";
 
 function makePage(id: string, title: string, cardContent: string): PageData {
   const block: BlockNode = { id: `${id}-b1`, type: "text", content: cardContent, children: [] };
   return { id, title, path: `notes/${title}.md`, blocks: [block] };
+}
+
+/** Medianoche local del día `addDays` después de una revisión ISO. */
+function localMidnightAfter(reviewedIso: string, addDays: number): string {
+  const due = new Date(reviewedIso);
+  due.setDate(due.getDate() + addDays);
+  due.setHours(0, 0, 0, 0);
+  return due.toISOString();
 }
 
 const pages: PageData[] = [
@@ -60,15 +69,15 @@ interval-days:: 30
 due-date:: 2026-10-31T00:00:00.000Z`;
 
     const updated = FlashcardsManager.rescheduleFSRS(content, {
-      w: [0.4872, 1.4003, 3.7145, 13.8206, 5.1618, 1.2298, 0.8975, 0.031, 1.6474, 0.1367, 1.0461, 2.1072, 0.0793, 0.3246, 1.587, 0.2272, 2.8755],
+      w: [...FSRS7_DEFAULT_WEIGHTS],
       requestRetention: 0.8,
       maximumInterval: 36500,
       learningSteps: [1 / 1440, 10 / 1440],
       relearningSteps: [10 / 1440],
     });
 
-    expect(updated).toContain("interval-days:: 72");
-    expect(updated).toContain("due-date:: 2026-12-12T00:00:00.000Z");
+    expect(updated).toContain("interval-days:: 338");
+    expect(updated).toContain(`due-date:: ${localMidnightAfter("2026-10-01T00:00:00.000Z", 338)}`);
   });
 
   it("no modifica tarjetas Learning o Relearning", () => {
@@ -76,6 +85,261 @@ due-date:: 2026-10-31T00:00:00.000Z`;
     expect(FlashcardsManager.rescheduleFSRS(content, {
       w: [], requestRetention: 0.9, maximumInterval: 36500, learningSteps: [], relearningSteps: [],
     })).toBeNull();
+  });
+
+  it("no reprograma una tarjeta legacy de aprendizaje sin card-state", () => {
+    const content = [
+      "Pregunta :: Respuesta",
+      "card-s:: 5",
+      "card-learn-step:: 1",
+      "last-reviewed:: 2026-10-01T00:00:00.000Z",
+    ].join("\n");
+
+    expect(
+      FlashcardsManager.rescheduleFSRS(content, {
+        w: [...FSRS7_DEFAULT_WEIGHTS],
+        requestRetention: 0.9,
+        maximumInterval: 36500,
+        learningSteps: [1 / 1440, 10 / 1440],
+        relearningSteps: [10 / 1440],
+      })
+    ).toBeNull();
+  });
+
+  it("usa stabilityFast al reprogramar una tarjeta en Review", () => {
+    const content = (stabilityFast: number) => [
+      "Pregunta :: Respuesta",
+      "card-s:: 10",
+      `card-s-fast:: ${stabilityFast}`,
+      "card-d:: 5",
+      "card-state:: 2",
+      "last-reviewed:: 2026-10-01T00:00:00.000Z",
+      "interval-days:: 10",
+      "due-date:: 2026-10-11T00:00:00.000Z",
+    ].join("\n");
+    const parameters = {
+      w: [...FSRS7_DEFAULT_WEIGHTS],
+      requestRetention: 0.9,
+      maximumInterval: 36500,
+      learningSteps: [1 / 1440, 10 / 1440],
+      relearningSteps: [10 / 1440],
+    };
+
+    const slow = FlashcardsManager.rescheduleFSRS(content(8), parameters);
+    const fast = FlashcardsManager.rescheduleFSRS(content(100), parameters);
+
+    expect(slow).toContain("interval-days:: 13");
+    expect(fast).toContain("interval-days:: 15");
+  });
+
+  it("añade el rastro rápido 0.8 × estabilidad si la tarjeta no lo tiene", () => {
+    const content = [
+      "Pregunta :: Respuesta",
+      "card-s:: 30",
+      "card-d:: 5",
+      "card-state:: 2",
+      "last-reviewed:: 2026-10-01T00:00:00.000Z",
+      "interval-days:: 30",
+      "due-date:: 2026-10-31T00:00:00.000Z",
+    ].join("\n");
+    const parameters = {
+      w: [...FSRS7_DEFAULT_WEIGHTS],
+      requestRetention: 0.9,
+      maximumInterval: 36500,
+      learningSteps: [1 / 1440, 10 / 1440],
+      relearningSteps: [10 / 1440],
+    };
+
+    const updated = FlashcardsManager.rescheduleFSRS(content, parameters);
+    expect(updated).toContain("card-s-fast:: 24");
+    expect(updated!.match(/card-s-fast::/g)).toHaveLength(1);
+  });
+
+  it("reprograma desde hoy cuando el ancla es today", () => {
+    const content = [
+      "Pregunta :: Respuesta",
+      "card-s:: 30",
+      "card-d:: 5",
+      "card-state:: 2",
+      "last-reviewed:: 2020-01-01T00:00:00.000Z",
+      "interval-days:: 30",
+      "due-date:: 2020-01-31T00:00:00.000Z",
+    ].join("\n");
+    const parameters = {
+      w: [...FSRS7_DEFAULT_WEIGHTS],
+      requestRetention: 0.9,
+      maximumInterval: 36500,
+      learningSteps: [1 / 1440, 10 / 1440],
+      relearningSteps: [10 / 1440],
+    };
+    const now = new Date(2026, 10, 21, 14, 10, 0, 0);
+
+    const updated = FlashcardsManager.rescheduleFSRS(content, parameters, {
+      anchor: "today",
+      now,
+    });
+    const expected = new Date(now);
+    expected.setDate(expected.getDate() + Number(updated!.match(/interval-days:: (\d+)/)![1]));
+    expected.setHours(0, 0, 0, 0);
+    expect(updated).toContain(`due-date:: ${expected.toISOString()}`);
+  });
+
+  it("mantiene el ancla last-reviewed por defecto y puede dar vencimiento pasado", () => {
+    const content = [
+      "Pregunta :: Respuesta",
+      "card-s:: 30",
+      "card-d:: 5",
+      "card-state:: 2",
+      "last-reviewed:: 2020-01-01T00:00:00.000Z",
+      "interval-days:: 30",
+      "due-date:: 2020-01-31T00:00:00.000Z",
+    ].join("\n");
+    const parameters = {
+      w: [...FSRS7_DEFAULT_WEIGHTS],
+      requestRetention: 0.9,
+      maximumInterval: 36500,
+      learningSteps: [1 / 1440, 10 / 1440],
+      relearningSteps: [10 / 1440],
+    };
+
+    const updated = FlashcardsManager.rescheduleFSRS(content, parameters);
+    const due = new Date(updated!.match(/due-date:: (\S+)/)![1]);
+    expect(due.getTime()).toBeLessThan(Date.now());
+    expect(updated).toContain(
+      `due-date:: ${localMidnightAfter("2020-01-01T00:00:00.000Z", 55)}`
+    );
+  });
+});
+
+describe("FlashcardsManager - conversión FSRS-4.5 → FSRS-7", () => {
+  const parameters = {
+    w: [...FSRS7_DEFAULT_WEIGHTS],
+    requestRetention: 0.9,
+    maximumInterval: 36500,
+    learningSteps: [1 / 1440, 10 / 1440],
+    relearningSteps: [10 / 1440],
+  };
+
+  it("convierte una tarjeta en Review y añade el rastro rápido", () => {
+    const legacy = [
+      "Pregunta :: Respuesta",
+      "card-s:: 10",
+      "card-d:: 5",
+      "card-reps:: 6",
+      "card-lapses:: 0",
+      "last-reviewed:: 2026-10-01T00:00:00.000Z",
+      "interval-days:: 10",
+      "ease-factor:: 2.5",
+      "due-date:: 2026-10-11T00:00:00.000Z",
+      "card-state:: 2",
+    ].join("\n");
+
+    const migrated = FlashcardsManager.migrateLegacyFSRS(legacy, parameters);
+    expect(migrated).not.toBeNull();
+
+    const snapshot = FlashcardsManager.readScheduleSnapshot(migrated!);
+    expect(snapshot.stability).toBe(10);
+    expect(snapshot.stabilityFast).toBeCloseTo(8, 10);
+    expect(snapshot.state).toBe(2);
+    expect(snapshot.intervalDays).toBe(13);
+    expect(snapshot.dueDate).toBe(localMidnightAfter("2026-10-01T00:00:00.000Z", 13));
+
+    // La conversión es idempotente.
+    expect(FlashcardsManager.migrateLegacyFSRS(migrated!, parameters)).toBeNull();
+  });
+
+  it("convierte una tarjeta legacy en Learning conservando su paso", () => {
+    const legacy = [
+      "Pregunta :: Respuesta",
+      "card-s:: 3.71",
+      "card-d:: 5.16",
+      "card-reps:: 1",
+      "card-lapses:: 0",
+      "last-reviewed:: 2026-10-01T00:00:00.000Z",
+      "interval-days:: 0.006944444444444444",
+      "ease-factor:: 2.5",
+      "due-date:: 2026-10-01T00:10:00.000Z",
+      "card-learn-step:: 1",
+    ].join("\n");
+
+    const migrated = FlashcardsManager.migrateLegacyFSRS(legacy, parameters);
+    expect(migrated).not.toBeNull();
+
+    const snapshot = FlashcardsManager.readScheduleSnapshot(migrated!);
+    expect(snapshot.stabilityFast).toBeCloseTo(2.968, 10);
+    expect(snapshot.state).toBe(1);
+    expect(snapshot.learningStep).toBe(1);
+    expect(snapshot.intervalDays).toBeCloseTo(10 / 1440, 12);
+    expect(snapshot.dueDate).toBe("2026-10-01T00:10:00.000Z");
+  });
+
+  it("convierte una tarjeta legacy en Relearning conservando su paso", () => {
+    const legacy = [
+      "Pregunta :: Respuesta",
+      "card-s:: 2.4",
+      "card-d:: 7.1",
+      "card-reps:: 8",
+      "card-lapses:: 2",
+      "last-reviewed:: 2026-10-01T00:00:00.000Z",
+      "interval-days:: 0.006944444444444444",
+      "card-state:: 3",
+      "card-learn-step:: 0",
+    ].join("\n");
+
+    const migrated = FlashcardsManager.migrateLegacyFSRS(legacy, parameters);
+    expect(migrated).not.toBeNull();
+
+    const snapshot = FlashcardsManager.readScheduleSnapshot(migrated!);
+    expect(snapshot.stabilityFast).toBeCloseTo(1.92, 10);
+    expect(snapshot.state).toBe(3);
+    expect(snapshot.learningStep).toBe(0);
+    expect(snapshot.intervalDays).toBeCloseTo(0.006944444444444444, 12);
+  });
+
+  it("infiere Relearning al convertir una tarjeta sin card-state pero con lapsos", () => {
+    const legacy = [
+      "Pregunta :: Respuesta",
+      "card-s:: 2.4",
+      "card-d:: 7.1",
+      "card-reps:: 8",
+      "card-lapses:: 2",
+      "last-reviewed:: 2026-10-01T00:00:00.000Z",
+      "interval-days:: 0.006944444444444444",
+      "card-learn-step:: 0",
+    ].join("\n");
+
+    const migrated = FlashcardsManager.migrateLegacyFSRS(legacy, parameters);
+    expect(migrated).not.toBeNull();
+    expect(FlashcardsManager.readScheduleSnapshot(migrated!).state).toBe(3);
+  });
+
+  it("convierte una tarjeta con card-state sin rastro rápido y es idempotente", () => {
+    const legacy = [
+      "Pregunta :: Respuesta",
+      "card-s:: 10",
+      "card-d:: 5",
+      "card-reps:: 6",
+      "card-lapses:: 0",
+      "last-reviewed:: 2026-10-01T00:00:00.000Z",
+      "interval-days:: 10",
+      "card-state:: 2",
+    ].join("\n");
+
+    const migrated = FlashcardsManager.migrateLegacyFSRS(legacy, parameters);
+    expect(migrated).toContain("card-s-fast:: 8");
+    expect(FlashcardsManager.migrateLegacyFSRS(migrated!, parameters)).toBeNull();
+  });
+
+  it("no toca tarjetas nuevas ni tarjetas sin datos FSRS", () => {
+    expect(
+      FlashcardsManager.migrateLegacyFSRS("Pregunta :: Respuesta #card", parameters)
+    ).toBeNull();
+    expect(
+      FlashcardsManager.migrateLegacyFSRS(
+        "Pregunta :: Respuesta\ncard-s:: 0\nlast-reviewed:: 2026-10-01T00:00:00.000Z",
+        parameters
+      )
+    ).toBeNull();
   });
 });
 
@@ -335,6 +599,45 @@ describe("FlashcardsManager - instantáneas FSRS para deshacer repasos", () => {
     const second = { ...first, reps: 2, lastReviewDate: "2026-10-25T10:00:00.000Z" };
     expect(FlashcardsManager.scheduleSnapshotsEqual(first, second)).toBe(false);
   });
+
+  it("trata como iguales una instantánea antigua sin stabilityFast y la tarjeta normalizada", () => {
+    const current = FlashcardsManager.readScheduleSnapshot(reviewedContent);
+    const legacy = { ...current };
+    delete legacy.stabilityFast;
+
+    expect(FlashcardsManager.scheduleSnapshotsEqual(current, legacy)).toBe(true);
+  });
+
+  it("restaura como Relearning una instantánea sin state con paso y lapsos", () => {
+    const restored = FlashcardsManager.applyScheduleSnapshot(
+      "Pregunta :: Respuesta",
+      {
+        stability: 2.4,
+        difficulty: 7.1,
+        reps: 8,
+        lapses: 2,
+        lastReviewDate: "2026-10-01T00:00:00.000Z",
+        intervalDays: 0.006944444444444444,
+        learningStep: 0,
+      }
+    );
+
+    expect(restored).toContain("card-state:: 3");
+    expect(restored).toContain("card-learn-step:: 0");
+  });
+
+  it("persiste stabilityFast y lo elimina al restablecer la tarjeta", () => {
+    const updated = FlashcardsManager.updateBlockFSRS(
+      "Pregunta :: Respuesta #card",
+      { stability: 10, difficulty: 5, stabilityFast: 8, reps: 3, lapses: 0, state: 2 },
+      42.85,
+      2.5
+    );
+
+    expect(updated).toContain("card-s-fast:: 8");
+    expect(FlashcardsManager.readScheduleSnapshot(updated).stabilityFast).toBe(8);
+    expect(FlashcardsManager.clearFSRSProgress(updated)).not.toContain("card-s-fast");
+  });
 });
 
 describe("FlashcardsManager - modo Aprendizaje", () => {
@@ -527,6 +830,19 @@ describe("FlashcardsManager - persistencia del estado FSRS", () => {
 
     const card = manager.getCurrentCard();
     expect(card?.fsrs).toMatchObject({ state: 1, learningStep: 1 });
+  });
+
+  it("infiere Relearning cuando hay card-learn-step y lapsos sin card-state", () => {
+    const legacy = learningContent
+      .split("\n")
+      .filter((line) => !line.startsWith("card-state::"))
+      .map((line) => (line.startsWith("card-lapses::") ? "card-lapses:: 2" : line))
+      .join("\n");
+    const manager = new FlashcardsManager();
+    manager.scanVault([makePage("legacy-relearning", "Antigua", legacy)], "new-first");
+
+    const card = manager.getCurrentCard();
+    expect(card?.fsrs).toMatchObject({ state: 3, learningStep: 1, lapses: 2 });
   });
 
   it("escribe card-state al programar y lo elimina al borrar el progreso", () => {

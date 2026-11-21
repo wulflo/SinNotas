@@ -2572,7 +2572,10 @@ location.reload();
 | --- | --- |
 | Todas las páginas | `src/views/all-pages.test.ts` |
 | Flashcards (detección, cola, FSRS) | `src/views/flashcards-manager.test.ts` |
+| Motor FSRS-7 y vectores dorados | `src/editor/fsrs.test.ts` |
+| Ajustes y normalización de FSRS | `src/editor/fsrs-settings.test.ts` |
 | Carga por lotes | `src/views/flashcard-loader.test.ts` |
+| Recálculo masivo por lotes | `src/views/flashcard-maintenance.test.ts` |
 | Grafo | `src/views/graph-physics.test.ts`, `graph-settings.test.ts`, `graph-labels.test.ts` |
 | Tipografía | `src/typography.test.ts` |
 | Mando | `src/gamepad.test.ts` |

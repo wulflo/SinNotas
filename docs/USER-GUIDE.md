@@ -28,7 +28,7 @@ architecture and internal details, see [SinNotas.md](SinNotas.md).
 
 Sin Notas is a local-first outliner: your notes are normal Markdown files inside
 a folder you choose. On top of those files, the app adds bullet hierarchy, links
-between notes, FSRS-4.5 review cards, a PDF reader, a bibliography, a Kanban
+between notes, FSRS-7 review cards, a PDF reader, a bibliography, a Kanban
 board and a graph of connections.
 
 There is no account, no mandatory cloud and no proprietary database. You can open
@@ -249,7 +249,7 @@ content, use **Remove flashcard**.
 - **Cloze:** one or more gaps inside a text.
 - **Occlusion:** areas of an image that are revealed when you answer.
 
-### FSRS-4.5
+### FSRS-7
 
 FSRS computes when each card should be seen again based on your history. Each
 review stores:
