@@ -453,6 +453,8 @@ scripts/benchmark-cache.sh
 # o: cargo run --release --manifest-path src-tauri/Cargo.toml --example cache_benchmark -- 5000
 ```
 
+Los resultados registrados están en [BENCHMARK-2026-10-29.md](BENCHMARK-2026-10-29.md) y el seguimiento de la tarea T9 en la [sección D1 del checklist consolidado](CHECKLIST-CONSOLIDADO.md#d1-mantenimiento-y-recuperacion).
+
 ## Seguridad
 
 - Las operaciones de archivos se limitan a la bóveda activa.

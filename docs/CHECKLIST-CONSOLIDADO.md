@@ -58,7 +58,8 @@
 
 | Fecha | Sección | Cambio | Verificación | Commit |
 | --- | --- | --- | --- | --- |
-| 2026-11-23 | — | Fusión de los 11 checklist en un único documento; originales eliminados; enlaces actualizados en `README.md`, `docs/SinNotas.md`, `src/editor/fsrs.ts`, `src/style.css` e `index.html`. | Revisión de enlaces y estructura del documento | (este commit) |
+| 2026-11-23 | — | Fusión de los 11 checklist en un único documento; originales eliminados; enlaces actualizados en `README.md`, `docs/SinNotas.md`, `src/editor/fsrs.ts`, `src/style.css` e `index.html`. | Revisión de enlaces y estructura del documento | `5f4d4ac` |
+| 2026-11-23 | — | Benchmark renombrado a `docs/BENCHMARK-2026-10-29.md`; referencias del consolidado, `README.md` y `docs/SinNotas.md` apuntan al nuevo nombre. | Comprobación de enlaces locales y `git diff --check` | (este commit) |
 
 > Al añadir filas, mantener el orden cronológico (más reciente abajo). No resumir dos cambios distintos en una sola fila.
 
@@ -3638,7 +3639,7 @@ cosas y permite cerrar victorias rápidas antes de los refactors grandes.
 - [ ] Etiquetar el punto de partida: `git tag baseline-0.3.5`.
 
 > **Estado:** los tres primeros puntos se cumplieron al iniciar el trabajo;
-> las cifras base están en `docs/benchmark-2026-10-29.md`. No se creó el tag
+> las cifras base están en [BENCHMARK-2026-10-29.md](BENCHMARK-2026-10-29.md). No se creó el tag
 > porque no se pidieron commits y todos los cambios quedan en el árbol de
 > trabajo.
 
@@ -3723,7 +3724,7 @@ y documenta los resultados.
 > Rust con 5.000 y 20.000 notas, el benchmark JS de 1.000 × 100 bloques y una
 > bóveda sintética de 5.000 notas × 30 bloques en el navegador (índice de
 > búsqueda, escaneo de tarjetas y grafo). Resultados y comparación con
-> `ffd40a5` en `docs/benchmark-2026-10-29.md`. Queda repetir la medición de
+> `ffd40a5` en [BENCHMARK-2026-10-29.md](BENCHMARK-2026-10-29.md). Queda repetir la medición de
 > todas las vistas con una bóveda real en Tauri y con la APK. Los dos checks
 > genéricos que siguen abiertos son precisamente la validación en APK y el
 > commit: no se hicieron commits por indicación expresa, así que el cambio
@@ -5820,7 +5821,7 @@ abajo dispara RT. Coincide exactamente con el síntoma descrito.
 - [x] Bóveda sintética de 5.000 y 20.000 notas
 - [x] Medición de arranque, vistas, búsqueda y repaso
 - [x] Comparación antes/después
-- [x] Resultados documentados (`docs/benchmark-2026-10-29.md`)
+- [x] Resultados documentados ([BENCHMARK-2026-10-29.md](BENCHMARK-2026-10-29.md))
 
 **Prioridad:** alta (transversal) · **Esfuerzo:** medio · **Riesgo:** medio
 

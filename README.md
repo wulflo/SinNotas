@@ -240,7 +240,7 @@ scripts/benchmark-cache.sh
 # or: cargo run --release --manifest-path src-tauri/Cargo.toml --example cache_benchmark -- 5000
 ```
 
-The script prints cold/warm milliseconds and the speedup, then deletes the temporary vault. See [docs/SinNotas.md#cache-de-metadatos-y-watcher](docs/SinNotas.md#cache-de-metadatos-y-watcher).
+The script prints cold/warm milliseconds and the speedup, then deletes the temporary vault. See [docs/SinNotas.md#cache-de-metadatos-y-watcher](docs/SinNotas.md#cache-de-metadatos-y-watcher) and the recorded results in [docs/BENCHMARK-2026-10-29.md](docs/BENCHMARK-2026-10-29.md).
 
 ## 🏗️ Building from source
 
