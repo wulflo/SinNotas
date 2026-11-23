@@ -3,7 +3,7 @@
  *
  * The memory formulas come from the official `ts-fsrs` port of
  * `fsrs-rs/src/model_v7.rs` (34 weights, dual-trace `stability` +
- * `stabilityFast`). See `docs/CHECKLIST-FSRS7.md` and
+ * `stabilityFast`). See `docs/CHECKLIST-CONSOLIDADO.md` (section B1) and
  * `THIRD_PARTY_LICENSES.md`.
  *
  * FSRS schedules the review phase. New and lapsed cards first go through

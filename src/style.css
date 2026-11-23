@@ -8721,7 +8721,7 @@ body.mobile-full-editor .flashcard-review-tools {
  * bloque crítico inline de `index.html`. Si esta hoja redeclarara
  * `.app-splash`, el splash cambiaría de apariencia justo al llegar el CSS y
  * parecería una segunda pantalla de carga distinta (ver el detalle del fix en
- * `docs/CHECKLIST-TEMAS-VISUALES.md`).
+ * la sección C1 de `docs/CHECKLIST-CONSOLIDADO.md`).
  */
 
 /* ==================== GRAPH SETTINGS ==================== */

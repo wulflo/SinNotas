@@ -378,13 +378,7 @@ The technical guide [docs/SinNotas.md](docs/SinNotas.md) covers architecture, th
 Additional checklists:
 
 - [Release process](docs/RELEASE.md)
-- [PDF reader](docs/CHECKLIST-PDF.md)
-- [Maintenance](docs/CHECKLIST-MANTENIMIENTO.md)
-- [Security: documents and bibliography](docs/CHECKLIST-SEGURIDAD-DOCUMENTOS-BIBLIOGRAFIA.md)
-- [Visual themes](docs/CHECKLIST-TEMAS-VISUALES.md)
-- [Vault performance](docs/CHECKLIST-PERF-VAULT.md)
-- [Custom decks](docs/CHECKLIST-MAZOS-PERSONALIZADOS.md)
-- [Bibliography search](docs/CHECKLIST-BUSQUEDA-BIBLIOGRAFIA.md)
+- [Consolidated checklist — PDF, security, bibliography, FSRS, decks, themes, UI, maintenance and performance](docs/CHECKLIST-CONSOLIDADO.md)
 - [Android keystores](docs/KEYSTORES.md)
 
 ## 🤝 Contributing

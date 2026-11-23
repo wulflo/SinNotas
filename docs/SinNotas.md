@@ -110,7 +110,7 @@ antiguos se descartan para que el archivo no crezca indefinidamente.
   miniaturas y pruebas con PDFs de varias columnas o texto rotado.
 
 El plan detallado, las reglas de reanudación tras una interrupción y el estado
-exacto por fase viven en [`docs/CHECKLIST-PDF.md`](CHECKLIST-PDF.md).
+exacto por fase viven en la [sección A2 del checklist consolidado](CHECKLIST-CONSOLIDADO.md#a2-documentos-y-lector-pdf-nativo-pdfium).
 
 ## Bibliografía y búsqueda de metadatos
 
@@ -133,8 +133,7 @@ exacto por fase viven en [`docs/CHECKLIST-PDF.md`](CHECKLIST-PDF.md).
 - La descarga de portadas al vault queda fuera de alcance en esta versión.
 
 El estado, el modelo de amenaza, la matriz de pruebas manuales y el punto de
-reanudación viven en
-[`docs/CHECKLIST-BUSQUEDA-BIBLIOGRAFIA.md`](CHECKLIST-BUSQUEDA-BIBLIOGRAFIA.md).
+reanudación viven en la [sección A3 del checklist consolidado](CHECKLIST-CONSOLIDADO.md#a3-busqueda-de-metadatos-para-bibliografia).
 
 ## FSRS y repaso
 
@@ -737,11 +736,12 @@ declara `runFullTrust`.
 La documentación técnica y de estado vive en este archivo: `docs/SinNotas.md`.
 El README de la raíz es el punto de entrada y enlaza aquí.
 
-Las fases largas que pueden interrumpirse mantienen además un checklist
-operativo en `docs/CHECKLIST-*.md`, con el estado exacto, los archivos tocados y
-las reglas para reanudar sin borrar código parcial. Este documento enlaza cada
-checklist; el lector PDF usa `docs/CHECKLIST-PDF.md`, el endurecimiento de
-Documentos/Bibliografía usa
-`docs/CHECKLIST-SEGURIDAD-DOCUMENTOS-BIBLIOGRAFIA.md`, la búsqueda de
-metadatos usa `docs/CHECKLIST-BUSQUEDA-BIBLIOGRAFIA.md` y los ajustes de
-interfaz de 0.4.3 usan `docs/CHECKLIST-FIXES-UI.md`.
+Las fases largas que pueden interrumpirse mantienen además un único checklist
+operativo, [`docs/CHECKLIST-CONSOLIDADO.md`](CHECKLIST-CONSOLIDADO.md), con el
+estado exacto, los archivos tocados, los pendientes consolidados y las reglas
+para reanudar sin borrar código parcial. Todo el seguimiento (PDF, seguridad de
+Documentos/Bibliografía, búsqueda de metadatos, FSRS, mazos, temas visuales,
+ajustes de interfaz, mantenimiento y rendimiento) vive en secciones con ID
+estable dentro de ese archivo; no se crean checklist nuevos por área. Su §0
+define cómo registrar cada edición, cómo ordenar las secciones y cuándo debe
+crearse una fase (o, en su defecto, registrarse su destino externo).
