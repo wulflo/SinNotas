@@ -16,6 +16,19 @@ function localMidnightAfter(reviewedIso: string, addDays: number): string {
   return due.toISOString();
 }
 
+/**
+ * Programación repasada ayer que vence dentro de `intervalDays` días.
+ * Es relativa a hoy para que la tarjeta no se vuelva "vencida" con el paso
+ * del tiempo (una fecha fija acaba cayendo en el pasado y rompe el test).
+ */
+function futureSchedule(intervalDays = 30): { lastReviewed: string; dueDate: string } {
+  const reviewed = new Date();
+  reviewed.setDate(reviewed.getDate() - 1);
+  reviewed.setHours(12, 0, 0, 0);
+  const lastReviewed = reviewed.toISOString();
+  return { lastReviewed, dueDate: localMidnightAfter(lastReviewed, intervalDays) };
+}
+
 const pages: PageData[] = [
   makePage("p1", "Nota A", "Pregunta A :: Respuesta A"),
   makePage("p2", "Nota B", "Pregunta B :: Respuesta B"),
@@ -36,10 +49,11 @@ describe("FlashcardsManager - refresco incremental tras deshacer", () => {
     manager.rate(3);
     expect(manager.getCurrentCard()?.id).toBe(second.id);
 
+    const schedule = futureSchedule();
     const content = `Pregunta A :: Respuesta A
-last-reviewed:: 2026-10-24T00:00:00.000Z
+last-reviewed:: ${schedule.lastReviewed}
 interval-days:: 30
-due-date:: 2026-11-23T00:00:00.000Z`;
+due-date:: ${schedule.dueDate}`;
 
     const refreshed = manager.refreshCardSchedule(
       first.id,
@@ -49,8 +63,8 @@ due-date:: 2026-11-23T00:00:00.000Z`;
       false
     );
 
-    expect(refreshed?.fsrs.lastReviewDate).toBe("2026-10-24T00:00:00.000Z");
-    expect(refreshed?.dueDate).toBe("2026-11-23T00:00:00.000Z");
+    expect(refreshed?.fsrs.lastReviewDate).toBe(schedule.lastReviewed);
+    expect(refreshed?.dueDate).toBe(schedule.dueDate);
     // La tarjeta actual no se pierde aunque la deshecha salga de la cola.
     expect(manager.getCurrentCard()?.id).toBe(second.id);
     // La primera ya no está vencida y no vuelve a la cola de repaso.
@@ -659,6 +673,7 @@ describe("FlashcardsManager - modo Aprendizaje", () => {
   });
 
   it("setIncludeAllCards incluye las tarjetas que aún no vencen", () => {
+    const schedule = futureSchedule();
     const future = makePage(
       "future",
       "Futura",
@@ -668,9 +683,9 @@ describe("FlashcardsManager - modo Aprendizaje", () => {
         "card-d:: 5",
         "card-reps:: 3",
         "card-lapses:: 0",
-        "last-reviewed:: 2026-10-24T00:00:00.000Z",
+        `last-reviewed:: ${schedule.lastReviewed}`,
         "interval-days:: 30",
-        "due-date:: 2026-11-23T00:00:00.000Z",
+        `due-date:: ${schedule.dueDate}`,
         "card-state:: 2",
       ].join("\n")
     );
