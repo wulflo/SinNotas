@@ -8,9 +8,12 @@
   flex-direction: column;
   min-height: 0;
   height: 100%;
-  width: min(1180px, 100%);
-  margin: 0 auto;
-  padding: 28px clamp(18px, 3.2vw, 44px) 0;
+  /* Toda la vista, con márgenes laterales; antes se limitaba a 1180 px y
+   * parecía una columna compacta en pantallas anchas. */
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 28px clamp(18px, 3vw, 48px) 0;
   box-sizing: border-box;
 }
 
