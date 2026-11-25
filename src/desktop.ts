@@ -14731,7 +14731,19 @@ function fittedAllPagesWidths(
   const ids = [...ALL_PAGES_COLUMN_IDS];
   const total = ids.reduce((sum, id) => sum + widths[id], 0);
   if (total <= available) {
-    widths.title += available - total;
+    const extra = available - total;
+    // Reparte el sobrante: una parte al título y el resto proporcional a las
+    // demas columnas, para no desaprovechar el espacio a la derecha en
+    // ventanas anchas.
+    widths.title += Math.floor(extra * 0.5);
+    const otherIds = ids.filter((id) => id !== "title");
+    const otherTotal = otherIds.reduce((sum, id) => sum + widths[id], 0);
+    if (otherTotal > 0) {
+      const otherExtra = Math.floor(extra * 0.5);
+      otherIds.forEach((id) => {
+        widths[id] += Math.floor((otherExtra * widths[id]) / otherTotal);
+      });
+    }
     return widths;
   }
 

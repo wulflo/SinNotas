@@ -7932,11 +7932,10 @@ body.mobile-full-editor .flashcard-review-tools {
 
 /* ==================== ALL PAGES & JOURNALS ==================== */
 .table-view-container {
-  /* Ocupa todo el ancho disponible de la vista (antes quedaba en ~1080 px,
-   * es decir, alrededor de 2/3 de una ventana ancha). */
+  /* Ocupa todo el ancho disponible de la vista. */
   max-width: none;
   margin: 30px 0;
-  padding: 0 clamp(20px, 3vw, 48px);
+  padding: 0 clamp(20px, 3vw, 32px);
   box-sizing: border-box;
   width: 100%;
   /* En ventanas estrechas las columnas redimensionables no deben comprimirse
