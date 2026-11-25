@@ -5493,7 +5493,7 @@ function createEditorTableCell(
   cell.className = "table-cell";
   cell.contentEditable = "true";
   cell.dataset.colIndex = String(colIndex);
-  cell.addEventListener("focus", () => {
+  cell.addEventListener("focusin", () => {
     const table = cell.closest<HTMLTableElement>("table.markdown-block-table");
     if (table) lastFocusedTableCells.set(table, cell);
   });

@@ -3444,6 +3444,11 @@ body.is-bullet-selecting {
 .markdown-block-table {
   position: relative;
   margin-left: 8px;
+  /* Borde exterior de la tabla para que la primera celda (esquina superior
+   * izquierda) tenga sus cuatro bordes visibles incluso con
+   * border-collapse: collapse. Sin esto, el borde superior/izquierdo puede
+   * quedar del color del fondo (blanco en claro, negro en oscuro). */
+  border: 1px solid var(--ls-table-border);
 }
 
 /* Antes había dos "asas" con degradado grueso a los lados de filas y celdas.
@@ -3473,6 +3478,8 @@ body.is-bullet-selecting {
 .markdown-block-table thead th:first-child {
   border-top: 1px solid var(--ls-table-border);
   border-left: 1px solid var(--ls-table-border);
+  border-right: 1px solid var(--ls-table-border);
+  border-bottom: 1px solid var(--ls-table-border);
 }
 
 .markdown-block-table mark {
