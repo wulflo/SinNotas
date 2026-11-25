@@ -13816,10 +13816,12 @@ function renderFlashcardExplorer(): void {
 
   const pages = vault.getPages();
   const version = vault.getVersionView();
-  const cached = flashcardLoader.getCachedCards(pages, version);
+  // getCachedCards() devuelve las cartas también en estado "partial": usarlas
+  // aquí sin comprobar isFresh() mostraba datos viejos tras calificar/deshacer.
+  const fresh = flashcardLoader.isFresh(pages, version);
+  const cached = fresh ? flashcardLoader.getCachedCards(pages, version) : null;
   const loading = flashcardLoader.isLoading();
-  const willStartScan =
-    desktopReady && !cached && !loading && !flashcardLoader.isFresh(pages, version);
+  const willStartScan = desktopReady && !cached && !loading && !fresh;
   const sourceCards = cached ?? (loading ? flashcardLoader.getCardsForDisplay() : []);
   const searchToken = normalizeDeckSearchText(flashcardExplorerSearchText);
   const filtered = searchToken
