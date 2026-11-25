@@ -492,6 +492,13 @@ const flashcardDeckCollapsed = new Set<string>();
  * hechos en otras; persiste hasta guardar el mazo. */
 const flashcardPagesDraftSelection = new Map<string, boolean>();
 
+/** Estado del selector de notas/mazos para borrar propiedades FSRS. Reutiliza
+ * el mismo árbol paginado que el editor de mazos, pero con selección propia. */
+const fsrsClearSelectedTitles = new Set<string>();
+const fsrsClearCollapsedNodes = new Set<string>();
+let fsrsClearSearchText = "";
+let fsrsClearCurrentPage = 1;
+
 /* ==================== MAZOS PERSONALIZADOS ==================== */
 
 const flashcardDeckRepository = new FlashcardDeckRepository();
@@ -896,7 +903,9 @@ const btnClearCache = document.getElementById("btn-clear-cache") as HTMLButtonEl
 const btnClearFlashcardStats = document.getElementById("btn-clear-flashcard-stats") as HTMLButtonElement;
 const btnClearReviewLog = document.getElementById("btn-clear-review-log") as HTMLButtonElement;
 const fsrsClearTargetSelect = document.getElementById("fsrs-clear-target") as HTMLSelectElement;
-const fsrsClearCardSelect = document.getElementById("fsrs-clear-card") as HTMLSelectElement;
+const fsrsClearSearch = document.getElementById("fsrs-clear-search") as HTMLInputElement | null;
+const fsrsClearPickerList = document.getElementById("fsrs-clear-picker-list") as HTMLDivElement | null;
+const fsrsClearSelectionStatus = document.getElementById("fsrs-clear-selection-status") as HTMLElement | null;
 const fsrsClearCardRow = document.getElementById("fsrs-clear-card-row") as HTMLElement;
 const btnClearFsrsProperties = document.getElementById("btn-clear-fsrs-properties") as HTMLButtonElement;
 const fsrsClearStatus = document.getElementById("fsrs-clear-status") as HTMLElement;
@@ -3859,44 +3868,191 @@ btnClearReviewLog.addEventListener("click", async () => {
   }
 });
 
-function populateFsrsClearCards(): void {
-  const cards = flashcardsManager.getAllCards();
-  fsrsClearCardSelect.replaceChildren();
-  if (cards.length === 0) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = translate("No hay tarjetas detectadas.");
-    fsrsClearCardSelect.appendChild(option);
-    return;
-  }
-  for (const card of cards) {
-    const option = document.createElement("option");
-    option.value = card.id;
-    const question = card.question.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
-    option.textContent = `${card.pageTitle} · ${question.slice(0, 70)}`;
-    fsrsClearCardSelect.appendChild(option);
+/** Actualiza el resumen de notas elegidas en el selector de borrado. */
+function updateFsrsClearSelectionStatus(): void {
+  if (!fsrsClearSelectionStatus) return;
+  const count = fsrsClearSelectedTitles.size;
+  fsrsClearSelectionStatus.textContent = count === 0
+    ? translate("Ninguna nota seleccionada. Marca notas o mazos para borrar sus propiedades FSRS.")
+    : `${count} ${count === 1 ? translate("nota seleccionada") : translate("notas seleccionadas")}`;
+}
+
+/** Marca/desmarca todas las notas de un mazo (incluidos sus submazos). */
+function setFsrsClearDeckSelection(node: DeckNode, selected: boolean): void {
+  for (const title of collectDeckPageTitles(node)) {
+    if (selected) fsrsClearSelectedTitles.add(title);
+    else fsrsClearSelectedTitles.delete(title);
   }
 }
 
+/**
+ * Selector paginado de notas y mazos para borrar propiedades FSRS. Usa el mismo
+ * árbol y paginación que el editor de mazos, pero con selección independiente;
+ * así funciona igual con unas pocas notas que con miles de tarjetas.
+ */
+function renderFsrsClearPicker(): void {
+  if (!fsrsClearPickerList) return;
+  fsrsClearPickerList.replaceChildren();
+
+  const pages = flashcardsManager.getPagesWithCards();
+  if (pages.length === 0) {
+    ensureFlashcardScan({
+      onDone: () => {
+        if (fsrsClearTargetSelect.value === "one") renderFsrsClearPicker();
+      },
+    });
+    const waiting = document.createElement("div");
+    waiting.className = "settings-help";
+    waiting.innerText = translate("Escaneando notas… la lista aparecerá en breve.");
+    fsrsClearPickerList.appendChild(waiting);
+    updateFsrsClearSelectionStatus();
+    return;
+  }
+
+  const validTitles = new Set(
+    pages.map((title) => normalizeDeckTitle(title).toLowerCase())
+  );
+  for (const title of [...fsrsClearSelectedTitles]) {
+    if (!validTitles.has(normalizeDeckTitle(title).toLowerCase())) {
+      fsrsClearSelectedTitles.delete(title);
+    }
+  }
+
+  const tree = buildDeckTree(pages, {
+    cardCount: (title) => flashcardsManager.getCardCountForPage(title),
+  });
+  sortDeckTree(tree, compareDeckNodesByName);
+  const search = searchDeckTree(tree, fsrsClearSearchText);
+  const visibleRoots = visibleDeckRoots(tree, search);
+  const totalPages = Math.max(1, Math.ceil(visibleRoots.length / FLASHCARD_PAGES_PER_PAGE));
+  if (fsrsClearCurrentPage > totalPages) fsrsClearCurrentPage = totalPages;
+  if (fsrsClearCurrentPage < 1) fsrsClearCurrentPage = 1;
+
+  const pagination = document.getElementById("fsrs-clear-pagination");
+  const prev = document.getElementById("fsrs-clear-prev") as HTMLButtonElement | null;
+  const next = document.getElementById("fsrs-clear-next") as HTMLButtonElement | null;
+  const info = document.getElementById("fsrs-clear-page-info");
+  if (pagination) pagination.hidden = totalPages <= 1;
+  if (prev) prev.disabled = fsrsClearCurrentPage === 1;
+  if (next) next.disabled = fsrsClearCurrentPage === totalPages;
+  if (info) info.textContent = `Página ${fsrsClearCurrentPage} de ${totalPages}`;
+
+  if (visibleRoots.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "settings-help";
+    empty.innerText = translate("No hay mazos ni notas que coincidan con la búsqueda.");
+    fsrsClearPickerList.appendChild(empty);
+    updateFsrsClearSelectionStatus();
+    return;
+  }
+
+  const start = (fsrsClearCurrentPage - 1) * FLASHCARD_PAGES_PER_PAGE;
+  const rows = flattenDeckRows(
+    visibleRoots.slice(start, start + FLASHCARD_PAGES_PER_PAGE),
+    search,
+    (nodeId) => fsrsClearCollapsedNodes.has(nodeId)
+  );
+
+  rows.forEach(({ node, depth }) => {
+    const row = document.createElement("div");
+    row.className = "flashcard-deck-row";
+    row.style.setProperty("--deck-depth", String(depth));
+    row.setAttribute("role", "treeitem");
+    row.setAttribute("aria-level", String(depth + 1));
+    row.title = node.path.join(DECK_SEPARATOR);
+
+    if (node.children.length > 0) {
+      const collapsed = fsrsClearCollapsedNodes.has(node.id);
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "flashcard-deck-toggle";
+      toggle.setAttribute("aria-label", collapsed ? "Expandir mazo" : "Contraer mazo");
+      toggle.setAttribute("aria-expanded", String(!collapsed));
+      toggle.textContent = collapsed ? "▸" : "▾";
+      toggle.addEventListener("click", () => {
+        if (fsrsClearCollapsedNodes.has(node.id)) fsrsClearCollapsedNodes.delete(node.id);
+        else fsrsClearCollapsedNodes.add(node.id);
+        renderFsrsClearPicker();
+      });
+      row.appendChild(toggle);
+    } else {
+      const spacer = document.createElement("span");
+      spacer.className = "flashcard-deck-toggle is-placeholder";
+      spacer.setAttribute("aria-hidden", "true");
+      row.appendChild(spacer);
+    }
+
+    const label = document.createElement("label");
+    label.className = "flashcard-deck-label";
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.setAttribute("aria-label", node.path.join(DECK_SEPARATOR));
+    const state = getDeckSelectionState(node, (title) => fsrsClearSelectedTitles.has(title));
+    checkbox.checked = state === "checked";
+    checkbox.indeterminate = state === "indeterminate";
+    checkbox.addEventListener("change", () => {
+      setFsrsClearDeckSelection(node, checkbox.checked);
+      renderFsrsClearPicker();
+    });
+    const name = document.createElement("span");
+    name.className = "flashcard-deck-name";
+    name.textContent = node.name;
+    label.append(checkbox, name);
+    row.appendChild(label);
+
+    const count = document.createElement("span");
+    count.className = "flashcard-deck-count";
+    const cardLabel = translate(node.totalCardCount === 1 ? "tarjeta" : "tarjetas");
+    const noteLabel = translate(node.totalPageCount === 1 ? "nota" : "notas");
+    count.textContent = node.totalPageCount > 1
+      ? `${node.totalCardCount} ${cardLabel} · ${node.totalPageCount} ${noteLabel}`
+      : `${node.totalCardCount} ${cardLabel}`;
+    row.appendChild(count);
+    fsrsClearPickerList.appendChild(row);
+  });
+
+  updateFsrsClearSelectionStatus();
+}
+
+fsrsClearSearch?.addEventListener("input", () => {
+  fsrsClearSearchText = fsrsClearSearch.value.trim();
+  fsrsClearCurrentPage = 1;
+  renderFsrsClearPicker();
+});
+document.getElementById("fsrs-clear-prev")?.addEventListener("click", () => {
+  if (fsrsClearCurrentPage > 1) {
+    fsrsClearCurrentPage -= 1;
+    renderFsrsClearPicker();
+  }
+});
+document.getElementById("fsrs-clear-next")?.addEventListener("click", () => {
+  fsrsClearCurrentPage += 1;
+  renderFsrsClearPicker();
+});
+
 fsrsClearTargetSelect.addEventListener("change", () => {
   fsrsClearCardRow.hidden = fsrsClearTargetSelect.value !== "one";
-  if (fsrsClearTargetSelect.value === "one") populateFsrsClearCards();
+  if (fsrsClearTargetSelect.value === "one") renderFsrsClearPicker();
+  syncCustomSelect(fsrsClearTargetSelect);
 });
 
 btnClearFsrsProperties.addEventListener("click", async () => {
   const all = fsrsClearTargetSelect.value !== "one";
   let selectedCards: Flashcard[] | undefined;
   if (!all) {
-    const cardId = fsrsClearCardSelect.value;
-    selectedCards = flashcardsManager.getAllCards().filter((card) => card.id === cardId);
-    if (!cardId || selectedCards.length === 0) {
-      fsrsClearStatus.textContent = translate("No hay tarjetas detectadas.");
+    selectedCards = flashcardsManager.getAllCards().filter((card) =>
+      fsrsClearSelectedTitles.has(card.pageTitle)
+    );
+    if (selectedCards.length === 0) {
+      fsrsClearStatus.textContent = translate(
+        "No hay tarjetas detectadas en las notas seleccionadas."
+      );
       return;
     }
   }
   const target = all
     ? translate("todas las tarjetas")
-    : translate("la tarjeta seleccionada");
+    : `${selectedCards?.length ?? 0} ${translate("tarjeta(s) de las notas seleccionadas")}`;
   const confirmed = await confirmAction(
     `Se borrarán las propiedades FSRS de ${target}. Las tarjetas volverán a ser nuevas; el texto no se modifica. El proceso se hace por lotes. ¿Continuar?`,
     "Borrar propiedades FSRS"
@@ -16980,6 +17136,7 @@ function migrateDesktopSelects(): void {
   migrateSelect(flashcardExplorerSort);
   migrateSelect(allPagesSortSelect);
   migrateSelect(flashcardHeatmapStyleSelect);
+  migrateSelect(fsrsClearTargetSelect);
   migrateSelect(imageOcclusionShapeSelect);
   migrateSelect(gamepadControllerTypeSelect);
   gamepadMappingSelects.forEach((select) => migrateSelect(select));

@@ -758,9 +758,20 @@
                       <option value="one">Una tarjeta específica</option>
                     </select>
                   </div>
-                  <div class="settings-row" id="fsrs-clear-card-row" hidden>
-                    <label for="fsrs-clear-card">Tarjeta</label>
-                    <select id="fsrs-clear-card"></select>
+                  <div id="fsrs-clear-card-row" hidden>
+                    <div class="settings-row">
+                      <label for="fsrs-clear-search">Nota o mazo</label>
+                      <input type="text" id="fsrs-clear-search" placeholder="Buscar nota o mazo..." autocomplete="off" />
+                    </div>
+                    <div class="fsrs-clear-picker">
+                      <div class="flashcard-pages-list" id="fsrs-clear-picker-list" role="tree" aria-multiselectable="true" aria-label="Notas y mazos cuyas tarjetas se van a borrar"></div>
+                      <div class="flashcard-pages-pagination" id="fsrs-clear-pagination" hidden>
+                        <button class="btn-pagination" id="fsrs-clear-prev" type="button" disabled>← Anterior</button>
+                        <span class="pagination-info" id="fsrs-clear-page-info">Página 1 de 1</span>
+                        <button class="btn-pagination" id="fsrs-clear-next" type="button" disabled>Siguiente →</button>
+                      </div>
+                      <p class="settings-help" id="fsrs-clear-selection-status" role="status" aria-live="polite"></p>
+                    </div>
                   </div>
                   <div class="advanced-actions">
                     <button class="font-option-btn snapshot-danger" id="btn-clear-fsrs-properties" type="button">Borrar propiedades FSRS</button>

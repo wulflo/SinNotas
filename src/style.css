@@ -2386,6 +2386,18 @@ input[type="checkbox"] {
   padding: 0;
 }
 
+/* Selector de notas/mazos para borrar propiedades FSRS: comparte estilos con
+ * el editor de mazos pero necesita un poco más de alto para la búsqueda. */
+.fsrs-clear-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fsrs-clear-picker .flashcard-pages-list {
+  max-height: 260px;
+}
+
 .flashcard-pages-status {
   font-size: calc(12px * var(--ls-font-scale, 1));
   color: var(--ls-warning, #d97706);
