@@ -125,6 +125,30 @@ describe("lectura de propiedades FSRS", () => {
   });
 });
 
+describe("programación compartida de oclusiones", () => {
+  it("sincroniza todas las regiones de un mismo bloque al calificar", () => {
+    const regions = [
+      { source: "assets/x.png", x: 0.1, y: 0.1, width: 0.3, height: 0.3 },
+      { source: "assets/x.png", x: 0.6, y: 0.6, width: 0.3, height: 0.3 },
+    ];
+    const page = makePage(
+      "p-occ",
+      "Oclusiones",
+      `![[assets/x.png]]\nimage-occlusions:: ${JSON.stringify(regions)}`
+    );
+    const manager = new FlashcardsManager();
+    manager.scanVault([page], "new-first");
+    expect(manager.getAllCards()).toHaveLength(2);
+
+    expect(manager.rate(3)).not.toBeNull();
+    const [first, second] = manager.getAllCards();
+
+    expect(first.fsrs.reps).toBe(1);
+    expect(second.fsrs.reps).toBe(1);
+    expect(second.dueDate).toBe(first.dueDate);
+  });
+});
+
 describe("FlashcardsManager - refresco incremental tras deshacer", () => {
   const pages: PageData[] = [
     makePage("p1", "Nota A", "Pregunta A :: Respuesta A"),

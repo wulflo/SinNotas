@@ -1278,6 +1278,19 @@ export class FlashcardsManager {
         chosen.item.lastReviewDate || new Date().toISOString(),
         chosen.intervalDays
       );
+      // Un bloque con varias regiones de oclusión tiene UNA sola línea de
+      // programación en Markdown. Sincronizar las tarjetas hermanas en memoria
+      // evita que la región 2 calcule desde un estado obsoleto y sobrescriba
+      // la programación recién escrita.
+      if (card.cardType === "image-occlusion") {
+        for (const sibling of this.allCards) {
+          if (sibling === card || sibling.cardType !== "image-occlusion") continue;
+          if (sibling.pageTitle !== card.pageTitle || sibling.blockId !== card.blockId) continue;
+          sibling.fsrs = chosen.item;
+          sibling.lastIntervalDays = chosen.intervalDays;
+          sibling.dueDate = card.dueDate;
+        }
+      }
     }
 
     this.currentIndex += 1;
