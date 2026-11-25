@@ -5481,8 +5481,11 @@ function ImageBlock(source: string, alt: string, blockId: string): HTMLImageElem
 }
 
 /** Última celda enfocada de cada tabla: el toolbar conserva el foco al
- * pulsarlo, así que sin este mapa las acciones siempre caerían en la primera. */
-const lastFocusedTableCells = new WeakMap<HTMLTableElement, HTMLTableCellElement>();
+ * pulsarlo, así que sin este registro las acciones siempre caerían en la
+ * primera. Se indexa por `blockId` (string estable) y no por el elemento
+ * `<table>` del DOM, porque `renderMarkdownText()` recrea toda la tabla
+ * tras cada edición y un `WeakMap<DOM, DOM>` perdería la referencia. */
+const lastFocusedTableInfo = new Map<string, { rowIndex: number; colIndex: number }>();
 
 function createEditorTableCell(
   cell: HTMLTableCellElement,
@@ -5495,7 +5498,14 @@ function createEditorTableCell(
   cell.dataset.colIndex = String(colIndex);
   cell.addEventListener("focusin", () => {
     const table = cell.closest<HTMLTableElement>("table.markdown-block-table");
-    if (table) lastFocusedTableCells.set(table, cell);
+    const blockItem = cell.closest<HTMLElement>(".block-item");
+    const blockId = blockItem?.dataset.id;
+    if (table && blockId) {
+      const allRows = Array.from(table.querySelectorAll<HTMLTableRowElement>("tr"));
+      const rowIndex = allRows.indexOf(cell.parentElement as HTMLTableRowElement);
+      const colIndex = Number(cell.dataset.colIndex || "0");
+      lastFocusedTableInfo.set(blockId, { rowIndex, colIndex });
+    }
   });
   if (alignment) {
     cell.dataset.align = alignment;
@@ -5593,7 +5603,20 @@ function createTableToolbar(table: HTMLTableElement): HTMLDivElement {
 function activeTableCell(table: HTMLTableElement): HTMLTableCellElement | null {
   const focused = document.activeElement;
   if (focused instanceof HTMLTableCellElement && table.contains(focused)) return focused;
-  return lastFocusedTableCells.get(table) ?? table.querySelector<HTMLTableCellElement>(".table-cell");
+  // Si no hay foco directo, recuperar la última celda por blockId (sobrevive a
+  // que renderMarkdownText recree el DOM de la tabla tras cada edición).
+  const blockItem = table.closest<HTMLElement>(".block-item");
+  const blockId = blockItem?.dataset.id;
+  if (blockId && lastFocusedTableInfo.has(blockId)) {
+    const { rowIndex, colIndex } = lastFocusedTableInfo.get(blockId)!;
+    const allRows = Array.from(table.querySelectorAll<HTMLTableRowElement>("tr"));
+    const row = allRows[rowIndex];
+    if (row) {
+      const cells = row.querySelectorAll<HTMLTableCellElement>(".table-cell");
+      return cells[colIndex] ?? null;
+    }
+  }
+  return table.querySelector<HTMLTableCellElement>(".table-cell");
 }
 
 function applyTableEditToBlockTable(table: HTMLTableElement, action: TableEditAction): void {
