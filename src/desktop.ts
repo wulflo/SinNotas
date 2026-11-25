@@ -14181,6 +14181,9 @@ function launchEasyCelebration(origin?: { x: number; y: number }): void {
   celebrationFrame = window.requestAnimationFrame(draw);
 }
 
+/** Cadena de guardado del repaso en curso; se espera antes de cambiar de bóveda. */
+let pendingReviewSave: Promise<void> | null = null;
+
 function applyFSRSRating(
   rating: FSRSRating,
   persist = true,
@@ -14221,7 +14224,7 @@ function applyFSRSRating(
         result.easeFactor
       );
       const after = FlashcardsManager.readScheduleSnapshot(block.content);
-      void vault
+      const saveChain = vault
         .savePage(page, true)
         .then(() =>
           reviewProgress.record({
@@ -14261,6 +14264,10 @@ function applyFSRSRating(
           console.error("No se pudo guardar el repaso en .sinnotas/progress/reviews.json:", error);
           showToast(translate("No se pudo guardar el repaso. Revisa los permisos de la bóveda."));
         });
+      pendingReviewSave = saveChain;
+      void saveChain.finally(() => {
+        if (pendingReviewSave === saveChain) pendingReviewSave = null;
+      });
     }
   }
 
@@ -16096,6 +16103,9 @@ async function openVaultAtPath(rootPath: string): Promise<void> {
   btnAddVault.disabled = true;
   vaultManagerStatus.textContent = "Abriendo bóveda…";
   try {
+    // Un repaso recién calificado debe terminar de escribirse en su bóveda
+    // antes de cambiar el root que usa el backend.
+    if (pendingReviewSave) await pendingReviewSave.catch(() => undefined);
     await vault.flushPendingFileOperations();
     const snapshot = await invoke<VaultSnapshot>("load_vault", {
       rootPath,
