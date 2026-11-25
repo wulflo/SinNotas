@@ -927,7 +927,8 @@ input[type="checkbox"] {
   max-width: 250px;
   margin-left: 16px;
   border-color: var(--ma-glass-border);
-  box-shadow: var(--md-elevation-2);
+  border-radius: var(--ma-radius-lg);
+  box-shadow: none;
 }
 
 /* Tinte suave del acento sobre la superficie del calendario. Se replica la

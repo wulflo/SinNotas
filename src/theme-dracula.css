@@ -216,7 +216,6 @@
 :root[data-visual="dracula"] .flashcard-review-tools,
 :root[data-visual="dracula"] .flashcard-explorer,
 :root[data-visual="dracula"] .references-panel,
-:root[data-visual="dracula"] .journal-calendar,
 :root[data-visual="dracula"] .journal-entry-wrapper,
 :root[data-visual="dracula"] .sync-box,
 :root[data-visual="dracula"] .update-box,
@@ -227,6 +226,14 @@
   -webkit-backdrop-filter: none;
   border-color: var(--md-outline-variant);
   box-shadow: var(--md-elevation-2);
+}
+
+:root[data-visual="dracula"] .journal-calendar {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: var(--md-outline-variant);
+  border-radius: 12px;
+  box-shadow: none;
 }
 
 :root[data-visual="dracula"] .all-pages-table td {

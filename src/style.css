@@ -8315,8 +8315,8 @@ body.mobile-full-editor .flashcard-review-tools {
     ),
     var(--ls-card-bg);
   border: 1px solid color-mix(in srgb, var(--ls-accent) 26%, var(--ls-card-border));
-  border-radius: 18px;
-  box-shadow: 0 10px 30px color-mix(in srgb, var(--ls-accent) 12%, transparent);
+  border-radius: 12px;
+  box-shadow: none;
   flex-shrink: 0;
 }
 
@@ -8472,7 +8472,7 @@ body.mobile-full-editor .flashcard-review-tools {
   min-width: 0;
   aspect-ratio: 1;
   border: 0;
-  border-radius: 50%;
+  border-radius: 8px;
   background: transparent;
   color: var(--ls-text-primary);
   font: inherit;

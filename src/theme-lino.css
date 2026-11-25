@@ -242,7 +242,6 @@
 :root[data-visual="lino"] .flashcard-review-tools,
 :root[data-visual="lino"] .flashcard-explorer,
 :root[data-visual="lino"] .references-panel,
-:root[data-visual="lino"] .journal-calendar,
 :root[data-visual="lino"] .journal-entry-wrapper,
 :root[data-visual="lino"] .sync-box,
 :root[data-visual="lino"] .update-box,
@@ -253,6 +252,14 @@
   -webkit-backdrop-filter: none;
   border-color: var(--md-outline-variant);
   box-shadow: var(--md-elevation-2);
+}
+
+:root[data-visual="lino"] .journal-calendar {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border-color: var(--md-outline-variant);
+  border-radius: 12px;
+  box-shadow: none;
 }
 
 /* Tablas planas: sin la semitransparencia de aero. */
