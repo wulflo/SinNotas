@@ -3377,7 +3377,8 @@ btnFlashcardRecalc.addEventListener("click", async () => {
       manager: flashcardsManager,
       anchor,
       now: new Date(),
-      savePage: (page) => vault.savePage(page),
+      // propagateError: el informe debe contar solo páginas realmente escritas.
+      savePage: (page) => vault.savePage(page, true),
       onProgress: (progress) => {
         flashcardRecalcStatus.textContent = `${translate("Procesando...")} ${progress.processed}/${progress.total} · ${progress.updatedCards} ${translate("actualizadas")}`;
       },
@@ -4164,7 +4165,8 @@ btnClearFsrsProperties.addEventListener("click", async () => {
       pages: vault.getPages(),
       manager: flashcardsManager,
       cards: selectedCards,
-      savePage: (page) => vault.savePage(page),
+      // propagateError: el informe debe contar solo páginas realmente escritas.
+      savePage: (page) => vault.savePage(page, true),
       onProgress: (progress) => {
         fsrsClearStatus.textContent = `${translate("Tarjetas procesadas:")} ${progress.processed}/${progress.total} · ${progress.updatedCards} ${translate("actualizadas")}`;
       },

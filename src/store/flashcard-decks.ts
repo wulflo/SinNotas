@@ -454,11 +454,17 @@ function applyTombstones(
   });
 }
 
+/** El límite se mide en bytes UTF-8, igual que en la escritura y en Rust. */
+function utf8ByteLength(value: string): number {
+  if (typeof TextEncoder !== "undefined") return new TextEncoder().encode(value).length;
+  return value.length * 3;
+}
+
 /** Lee y valida un archivo. Cualquier dato inválido se descarta sin romper. */
 export function parseFlashcardDeckFile(
   raw: string | null | undefined
 ): FlashcardDeckFile {
-  if (!raw || raw.length > FLASHCARD_DECKS_MAX_BYTES) {
+  if (!raw || utf8ByteLength(raw) > FLASHCARD_DECKS_MAX_BYTES) {
     return emptyFlashcardDeckFile();
   }
   let parsed: unknown;

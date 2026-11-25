@@ -122,6 +122,18 @@ describe("parseo y serialización", () => {
     expect(parseFlashcardDeckFile('{"version":2,"decks":[]}').decks).toEqual([]);
   });
 
+  it("aplica el límite de 1 MiB en bytes UTF-8, no en caracteres UTF-16", () => {
+    const filler = "卡".repeat(400_000); // 400k chars ≈ 1,2 MB en UTF-8
+    const raw = JSON.stringify({
+      version: 1,
+      decks: [{ id: "d", name: "Mazo", pageTitles: [filler], updatedAt: 1 }],
+      tombstones: [],
+    });
+    expect(raw.length).toBeLessThan(1024 * 1024);
+
+    expect(parseFlashcardDeckFile(raw).decks).toEqual([]);
+  });
+
   it("serializa y vuelve a leer sin perder datos", () => {
     const file = addFlashcardDeck(
       emptyFlashcardDeckFile(),
