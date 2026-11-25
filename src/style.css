@@ -3481,6 +3481,13 @@ body.is-bullet-selecting {
   font-weight: 650;
 }
 
+/* Con `border-collapse: collapse` el borde superior/izquierdo de la primera
+ * celda podía quedar oculto. Se fuerza para que tenga sus cuatro lados. */
+.markdown-block-table thead th:first-child {
+  border-top: 1px solid var(--ls-table-border);
+  border-left: 1px solid var(--ls-table-border);
+}
+
 .markdown-block-table mark {
   border-radius: 3px;
   padding-inline: 2px;

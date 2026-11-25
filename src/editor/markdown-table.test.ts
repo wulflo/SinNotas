@@ -86,6 +86,17 @@ describe("markdown-table", () => {
     expect(movedColumn.rows[0]).toEqual(["Ana", "**Amiga**", "30"]);
   });
 
+  it("mueve filas hacia abajo y columnas hacia la derecha conservando alineaciones", () => {
+    const movedRow = applyTableEdit(parsedTable(), "move-row-down", 1, 0);
+    expect(movedRow.rows[0]).toEqual(["Luis", "25", "Hermano"]);
+    expect(movedRow.rows[1]).toEqual(["Ana", "30", "**Amiga**"]);
+
+    const movedColumn = applyTableEdit(parsedTable(), "move-col-right", 1, 0);
+    expect(movedColumn.header).toEqual(["Edad", "Nombre", "Notas"]);
+    expect(movedColumn.alignments).toEqual(["right", "left", "center"]);
+    expect(movedColumn.rows[0]).toEqual(["30", "Ana", "**Amiga**"]);
+  });
+
   it("edita solo la tabla indicada y conserva el texto alrededor", () => {
     const content = `Antes\n\n${TABLE}\n\nEn medio\n\n${TABLE}\n\nDespués`;
     const updated = editMarkdownTable(content, 1, "add-row-below", 1, 0);

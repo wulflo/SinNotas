@@ -5481,6 +5481,10 @@ function ImageBlock(source: string, alt: string, blockId: string): HTMLImageElem
   return image;
 }
 
+/** Última celda enfocada de cada tabla: el toolbar conserva el foco al
+ * pulsarlo, así que sin este mapa las acciones siempre caerían en la primera. */
+const lastFocusedTableCells = new WeakMap<HTMLTableElement, HTMLTableCellElement>();
+
 function createEditorTableCell(
   cell: HTMLTableCellElement,
   text: string,
@@ -5490,6 +5494,10 @@ function createEditorTableCell(
   cell.className = "table-cell";
   cell.contentEditable = "true";
   cell.dataset.colIndex = String(colIndex);
+  cell.addEventListener("focus", () => {
+    const table = cell.closest<HTMLTableElement>("table.markdown-block-table");
+    if (table) lastFocusedTableCells.set(table, cell);
+  });
   if (alignment) {
     cell.dataset.align = alignment;
     cell.classList.add(`markdown-align-${alignment}`);
@@ -5541,8 +5549,12 @@ function createTableToolbar(table: HTMLTableElement): HTMLDivElement {
   toolbar.setAttribute("aria-label", "Editar tabla");
 
   const actions: Array<{ action: TableEditAction; label: string; title: string }> = [
-    { action: "add-row-below", label: "+ Fila", title: "Añadir fila" },
-    { action: "add-col-right", label: "+ Col", title: "Añadir columna" },
+    { action: "add-row-below", label: "+ Fila", title: "Añadir fila debajo" },
+    { action: "add-col-right", label: "+ Col", title: "Añadir columna a la derecha" },
+    { action: "move-row-up", label: "↑ Fila", title: "Mover fila arriba" },
+    { action: "move-row-down", label: "↓ Fila", title: "Mover fila abajo" },
+    { action: "move-col-left", label: "← Col", title: "Mover columna a la izquierda" },
+    { action: "move-col-right", label: "Col →", title: "Mover columna a la derecha" },
     { action: "delete-row", label: "− Fila", title: "Eliminar fila" },
     { action: "delete-col", label: "− Col", title: "Eliminar columna" },
   ];
@@ -5571,7 +5583,7 @@ function createTableToolbar(table: HTMLTableElement): HTMLDivElement {
 function activeTableCell(table: HTMLTableElement): HTMLTableCellElement | null {
   const focused = document.activeElement;
   if (focused instanceof HTMLTableCellElement && table.contains(focused)) return focused;
-  return table.querySelector<HTMLTableCellElement>(".table-cell");
+  return lastFocusedTableCells.get(table) ?? table.querySelector<HTMLTableCellElement>(".table-cell");
 }
 
 function applyTableEditToBlockTable(table: HTMLTableElement, action: TableEditAction): void {
@@ -5608,6 +5620,10 @@ function applyTableEditToBlockTable(table: HTMLTableElement, action: TableEditAc
   else if (action === "add-col-left") targetCol = colIndex;
   else if (action === "add-col-right") targetCol = colIndex + 1;
   else if (action === "delete-col") targetCol = Math.max(0, colIndex);
+  else if (action === "move-row-up") targetRow = Math.max(1, rowIndex - 1);
+  else if (action === "move-row-down") targetRow = rowIndex + 1;
+  else if (action === "move-col-left") targetCol = Math.max(0, colIndex - 1);
+  else if (action === "move-col-right") targetCol = colIndex + 1;
 
   const nextTable = editor.querySelectorAll<HTMLTableElement>("table.markdown-block-table")[tableIndex];
   const nextRows = nextTable ? Array.from(nextTable.querySelectorAll<HTMLTableRowElement>("tr")) : [];
