@@ -46,6 +46,7 @@ import {
   findNodeLocation,
   getAllBlocksFlat,
   getSelectedBlockRoots,
+  getHighestSelectedRoot,
   removeBlocks,
   cloneTree,
   indentBlocks,
@@ -7797,7 +7798,7 @@ function deleteFlashcardsInSelection(page: PageData = getSelectionPage()): boole
   return true;
 }
 
-/** Convierte en tarjeta básica (#card) los bullets seleccionados. */
+/** Incrusta #card en el bloque de mayor jerarquía de la selección. */
 function createBasicCardFromSelection(page: PageData = getSelectionPage()): boolean {
   const ids = selectedBulletIds.length > 0
     ? new Set(selectedBulletIds)
@@ -7805,22 +7806,24 @@ function createBasicCardFromSelection(page: PageData = getSelectionPage()): bool
       ? new Set([cursorState.blockId])
       : new Set<string>();
   if (ids.size === 0) return false;
-  let changed = false;
-  getAllBlocksFlat(page.blocks).forEach((block) => {
-    if (!ids.has(block.id) || block.type === "image") return;
-    const visible = getVisibleBlockContent(block.content);
-    if (!visible.trim() || isFlashcardBlockContent(block.content)) return;
-    setVisibleBlockContent(block, `${visible.trim()} #card`);
-    ensureBlockCreatedAt(block);
-    changed = true;
-  });
-  if (!changed) {
-    showToast("No hay bullets de texto para convertir en tarjeta.");
+  // Solo el bloque superior: marcar todos los seleccionados convertía también
+  // cada descendant en tarjeta y rompía la jerarquía esperada del outliner.
+  const target = getHighestSelectedRoot(page.blocks, ids);
+  if (!target || target.type === "image") {
+    showToast("El bloque principal no puede convertirse en tarjeta.");
     return false;
   }
+  const visible = getVisibleBlockContent(target.content);
+  if (!visible.trim() || isFlashcardBlockContent(target.content)) {
+    showToast("El bloque principal ya es una tarjeta o está vacío.");
+    return false;
+  }
+  setVisibleBlockContent(target, `${visible.trim()} #card`);
+  ensureBlockCreatedAt(target);
   void vault.savePage(page);
   renderBlocksTree();
-  showToast("Tarjeta básica creada.");
+  refreshBulletSelection();
+  showToast("Tarjeta básica creada en el bloque principal.");
   return true;
 }
 

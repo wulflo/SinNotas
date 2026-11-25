@@ -166,6 +166,33 @@ export function getSelectedBlockRoots(nodes: BlockNode[], selectedIds: ReadonlyS
   return selected;
 }
 
+/**
+ * Devuelve, entre las raíces de la selección, la de menor profundidad
+ * (es decir, la de mayor jerarquía). Si la selección incluye un padre y su
+ * hijo, `getSelectedBlockRoots` ya descarta el hijo; si hay ramas disjuntas,
+ * gana la más externa y, en caso de empate, la primera en orden documental.
+ */
+export function getHighestSelectedRoot(
+  nodes: BlockNode[],
+  selectedIds: ReadonlySet<string>
+): BlockNode | null {
+  let best: BlockNode | null = null;
+  let bestDepth = Number.POSITIVE_INFINITY;
+  for (const root of getSelectedBlockRoots(nodes, selectedIds)) {
+    let depth = 0;
+    let location = findNodeLocation(nodes, root.id);
+    while (location?.parentNode) {
+      depth += 1;
+      location = findNodeLocation(nodes, location.parentNode.id);
+    }
+    if (depth < bestDepth) {
+      best = root;
+      bestDepth = depth;
+    }
+  }
+  return best;
+}
+
 export function removeBlocks(tree: BlockNode[], targetIds: ReadonlySet<string>): BlockNode[] {
   const newTree = cloneTree(tree);
   // Procesamos cada lista de hermanos de atrás hacia delante. Si se recorre en

@@ -3,6 +3,7 @@ import { BlockNode } from "../types";
 import {
   enterAtEnd,
   getFlatVisibleBlocks,
+  getHighestSelectedRoot,
   insertImageBlockAfter,
   removeBlock,
   removeBlocks,
@@ -194,5 +195,27 @@ describe("insertar imagen en un bullet vacío", () => {
     const inserted = insertImageBlockAfter([block("b-text", "Nota")], "b-text", "assets/x.png", "x");
     expect(inserted!.newTree).toHaveLength(2);
     expect(inserted!.newTree[0].content).toBe("Nota");
+  });
+});
+
+describe("getHighestSelectedRoot", () => {
+  it("elige el padre cuando se seleccionan padre e hijo", () => {
+    const tree = [block("parent", "P", [block("child", "C", [block("grand", "G")])])];
+    const selected = new Set(["parent", "child", "grand"]);
+
+    expect(getHighestSelectedRoot(tree, selected)?.id).toBe("parent");
+  });
+
+  it("elige la rama más externa entre varias ramas disjuntas", () => {
+    const tree = [
+      block("deep", "D", [block("deep-child", "DC", [block("deep-grand", "DG")])]),
+      block("shallow", "S", [block("shallow-child", "SC")]),
+    ];
+
+    expect(getHighestSelectedRoot(tree, new Set(["deep-grand", "shallow"]))?.id).toBe("shallow");
+  });
+
+  it("devuelve null si no hay selección", () => {
+    expect(getHighestSelectedRoot([block("a", "A")], new Set())).toBeNull();
   });
 });
