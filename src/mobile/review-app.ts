@@ -2073,6 +2073,29 @@ class MobileReviewApp {
     this.render();
   }
 
+  /** Resuelve la nota/bloque de una tarjeta por id de página y huella, como escritorio. */
+  private findReviewTarget(
+    card: Flashcard
+  ): { page: PageData; block: BlockNode } | null {
+    const pageIdMatch = card.id.match(/^fc-(?:image|cloze|basic)-(p-[^-]+)-/);
+    const page = (pageIdMatch && this.pages.find((candidate) => candidate.id === pageIdMatch[1]))
+      || this.pages.find((candidate) => candidate.title === card.pageTitle);
+    if (!page) return null;
+    const location = findNodeLocation(page.blocks, card.blockId);
+    const block = location?.parentList[location.index];
+    if (block && (!card.fingerprint
+      || FlashcardsManager.cardFingerprint(block.content, card.cardType) === card.fingerprint)) {
+      return { page, block };
+    }
+    // El blockId puede reasignarse al recargar: buscar por huella solo dentro
+    // de la nota correcta evita escribir en otra tarjeta con el mismo título.
+    const fallback = getAllBlocksFlat(page.blocks).find((candidate) =>
+      card.fingerprint
+      && FlashcardsManager.cardFingerprint(candidate.content, card.cardType) === card.fingerprint
+    );
+    return fallback ? { page, block: fallback } : null;
+  }
+
   private async rate(rating: FSRSRating): Promise<void> {
     if (this.busy || this.historyActionInFlight) return;
     if (!this.manager.isRevealed()) return;
@@ -2090,20 +2113,13 @@ class MobileReviewApp {
       return;
     }
 
-    const page = this.pages.find((candidate) => candidate.title === result.card.pageTitle);
-    if (!page) {
-      this.showToast("La nota de esta tarjeta ya no está disponible.");
-      this.render();
-      return;
-    }
-    const location = findNodeLocation(page.blocks, result.card.blockId);
-    if (!location) {
+    const target = this.findReviewTarget(result.card);
+    if (!target) {
       this.showToast("No se encontró el bloque de la tarjeta en la nota.");
       this.render();
       return;
     }
-
-    const block = location.parentList[location.index];
+    const { page, block } = target;
     const previousContent = block.content;
     const before = FlashcardsManager.readScheduleSnapshot(previousContent);
     block.content = FlashcardsManager.updateBlockFSRS(
@@ -2164,15 +2180,11 @@ class MobileReviewApp {
       this.openOcclusionEditor(card);
       return;
     }
-    const page = this.pages.find((candidate) => candidate.title === card.pageTitle);
-    if (!page) return;
-    const location = findNodeLocation(page.blocks, card.blockId);
-    if (!location) return;
+    const target = this.findReviewTarget(card);
+    if (!target) return;
+    const { page, block } = target;
 
-    const fields = FlashcardsManager.readEditableFields(
-      location.parentList[location.index].content,
-      card.cardType
-    );
+    const fields = FlashcardsManager.readEditableFields(block.content, card.cardType);
     const isBasic = card.cardType === "basic";
     this.refs.questionField.hidden = !isBasic;
     this.refs.answerField.hidden = !isBasic;
@@ -2943,13 +2955,12 @@ class MobileReviewApp {
       this.showToast("Esta tarjeta de imagen no tiene una oclusión editable.");
       return;
     }
-    const page = this.pages.find((candidate) => candidate.title === card.pageTitle);
-    if (!page) return;
-    const location = findNodeLocation(page.blocks, card.blockId);
-    if (!location) {
+    const target = this.findReviewTarget(card);
+    if (!target) {
       this.showToast("No se encontró el bloque de la tarjeta.");
       return;
     }
+    const { page } = target;
 
     const sourceRegions = card.imageOcclusions?.length
       ? card.imageOcclusions
