@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   clampImageOcclusionRegion,
+  occlusionRegionsMatch,
   parseImageOcclusions,
   updateImageOcclusionInContent,
 } from "./image-occlusion";
@@ -23,6 +24,25 @@ const second: ImageOcclusionRegion = {
   height: 0.25,
   shape: "ellipse",
 };
+
+describe("occlusionRegionsMatch", () => {
+  it("distingue regiones con la misma geometría pero distinta pista o puntos", () => {
+    const base: ImageOcclusionRegion = {
+      source: "assets/x.png",
+      x: 0.1,
+      y: 0.2,
+      width: 0.3,
+      height: 0.4,
+      shape: "polygon",
+      points: [{ x: 0.1, y: 0.2 }],
+      hint: "A",
+    };
+
+    expect(occlusionRegionsMatch(base, { ...base })).toBe(true);
+    expect(occlusionRegionsMatch(base, { ...base, hint: "B" })).toBe(false);
+    expect(occlusionRegionsMatch(base, { ...base, points: [{ x: 0.9, y: 0.9 }] })).toBe(false);
+  });
+});
 
 describe("updateImageOcclusionInContent", () => {
   it("mueve solo la región activa y conserva FSRS, texto y demás oclusiones", () => {

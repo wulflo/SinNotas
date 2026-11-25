@@ -644,6 +644,9 @@ export class VaultStore {
     // FASE 4: el estado del LRU de bloques pertenece al vault anterior.
     this.loadedPageEpochs.clear();
     this.pinnedLoadedPaths.clear();
+    // Los epochs por página también pertenecen al vault anterior: sin esto,
+    // una ruta repetida en otra bóveda podía parecer fresco para el grafo.
+    this.pageVersions.clear();
     this.loadedTick = 0;
     // Las revisiones viven en disco por vault: solo limpiamos la caché en memoria.
     this.revisionCache.clear();

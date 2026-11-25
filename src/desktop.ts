@@ -9912,6 +9912,9 @@ async function showEditorPage(): Promise<void> {
   // No enfocar el primer bloque al abrir la nota: eso dejaba su wikilink en
   // source view sin que el usuario hubiera hecho clic en él.
   cursorState = null;
+  // La selección pertenece a la nota anterior: sin limpiarla, los atajos de
+  // tarjetas seguían actuando sobre esa nota mientras se mostraba la nueva.
+  clearBulletSelection();
   snapshotState = null;
   snapshotActivateForm.hidden = true;
   snapshotFormError.textContent = "";

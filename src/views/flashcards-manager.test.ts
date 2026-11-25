@@ -55,6 +55,27 @@ describe("detección de cloze", () => {
   });
 });
 
+describe("lectura de propiedades FSRS", () => {
+  it("acepta notación científica como readScheduleSnapshot", () => {
+    const manager = new FlashcardsManager();
+    manager.scanVault(
+      [
+        makePage(
+          "p-sci",
+          "Científica",
+          "Pregunta :: Respuesta\ncard-s:: 1.2e-7\ncard-d:: 1.3e-7\ninterval-days:: 1e-7"
+        ),
+      ],
+      "new-first"
+    );
+
+    const card = manager.getAllCards()[0];
+    expect(card.fsrs.stability).toBeCloseTo(1.2e-7, 12);
+    expect(card.fsrs.difficulty).toBeCloseTo(1.3e-7, 12);
+    expect(card.lastIntervalDays).toBeCloseTo(1e-7, 12);
+  });
+});
+
 describe("FlashcardsManager - refresco incremental tras deshacer", () => {
   const pages: PageData[] = [
     makePage("p1", "Nota A", "Pregunta A :: Respuesta A"),

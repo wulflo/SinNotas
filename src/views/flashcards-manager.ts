@@ -18,6 +18,9 @@ import { parseImageOcclusions } from "../editor/image-occlusion";
 
 export type FlashcardReviewOrder = "new-first" | "reviews-first" | "mixed";
 
+/** Acepta notación científica, igual que readScheduleSnapshot(). */
+const FSRS_NUMBER = "[+-]?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?";
+
 /** Resumen de tarjetas de una nota, sin aplicar el filtro de repaso activo. */
 export interface FlashcardPageStats {
   total: number;
@@ -283,9 +286,9 @@ export class FlashcardsManager {
 
   /** Extract FSRS metadata stored in block properties (e.g. card-s:: 2.5) */
   private parseBlockFSRS(content: string): FSRSItem {
-    const sMatch = content.match(/card-s::\s*([\d.]+)/i);
-    const sFastMatch = content.match(/card-s-fast::\s*([\d.]+)/i);
-    const dMatch = content.match(/card-d::\s*([\d.]+)/i);
+    const sMatch = content.match(new RegExp(`card-s::\\s*(${FSRS_NUMBER})`, "i"));
+    const sFastMatch = content.match(new RegExp(`card-s-fast::\\s*(${FSRS_NUMBER})`, "i"));
+    const dMatch = content.match(new RegExp(`card-d::\\s*(${FSRS_NUMBER})`, "i"));
     const repsMatch = content.match(/card-reps::\s*(\d+)/i);
     const lapsesMatch = content.match(/card-lapses::\s*(\d+)/i);
     const lastReviewedMatch = content.match(/last-reviewed::\s*(\S+)/i);
@@ -331,14 +334,16 @@ export class FlashcardsManager {
   }
 
   private parseIntervalDays(content: string): number {
-    const match = content.match(/interval-days::\s*([\d.]+)|card-last-interval::\s*([\d.]+)\s*d?/i);
+    const match = content.match(
+      new RegExp(`interval-days::\\s*(${FSRS_NUMBER})|card-last-interval::\\s*(${FSRS_NUMBER})\\s*d?`, "i")
+    );
     if (!match) return 0;
     const days = Number(match[1] || match[2]);
     return Number.isFinite(days) && days >= 0 ? days : 0;
   }
 
   private parseEaseFactor(content: string): number {
-    const match = content.match(/ease-factor::\s*([\d.]+)/i);
+    const match = content.match(new RegExp(`ease-factor::\\s*(${FSRS_NUMBER})`, "i"));
     if (!match) return 2.5;
     const easeFactor = Number(match[1]);
     return Number.isFinite(easeFactor) && easeFactor >= 1.3 ? easeFactor : 2.5;

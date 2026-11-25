@@ -187,7 +187,12 @@ export function occlusionRegionsMatch(
       left.width === right.width &&
       left.height === right.height &&
       (left.shape || "rect") === (right.shape || "rect") &&
-      (left.rotation || 0) === (right.rotation || 0)
+      (left.rotation || 0) === (right.rotation || 0) &&
+      // Dos polígonos iguales en geometría pero con puntos o pista distintos
+      // son regiones diferentes: sin esto se editaba/borraba la primera.
+      JSON.stringify(left.points ?? []) === JSON.stringify(right.points ?? []) &&
+      (left.color ?? "") === (right.color ?? "") &&
+      (left.hint ?? "") === (right.hint ?? "")
     )
   );
 }
