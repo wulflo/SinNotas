@@ -10198,6 +10198,39 @@ function saveTaskDueDate(target: TaskDueDateTarget, value: string | null): void 
 type KanbanVirtualLists = Record<KanbanStatus, VirtualList<KanbanTask>>;
 let kanbanVirtualLists: KanbanVirtualLists | null = null;
 
+/** Máximo de tareas montadas por columna y página. El tablero escanea todas
+ * las tareas (es barato) pero solo entrega a la lista virtual una página. */
+const KANBAN_TASKS_PER_PAGE = 50;
+const kanbanCurrentPage: Record<KanbanStatus, number> = { todo: 1, doing: 1, done: 1 };
+
+function kanbanPageFor(status: KanbanStatus, tasks: KanbanTask[]): KanbanTask[] {
+  const totalPages = Math.max(1, Math.ceil(tasks.length / KANBAN_TASKS_PER_PAGE));
+  if (kanbanCurrentPage[status] > totalPages) kanbanCurrentPage[status] = totalPages;
+  if (kanbanCurrentPage[status] < 1) kanbanCurrentPage[status] = 1;
+  const start = (kanbanCurrentPage[status] - 1) * KANBAN_TASKS_PER_PAGE;
+
+  const pagination = document.getElementById(`kanban-${status}-pagination`);
+  const prev = document.getElementById(`kanban-${status}-prev`) as HTMLButtonElement | null;
+  const next = document.getElementById(`kanban-${status}-next`) as HTMLButtonElement | null;
+  const info = document.getElementById(`kanban-${status}-page-info`);
+  if (pagination) pagination.hidden = totalPages <= 1;
+  if (prev) prev.disabled = kanbanCurrentPage[status] === 1;
+  if (next) next.disabled = kanbanCurrentPage[status] === totalPages;
+  if (info) info.textContent = `Página ${kanbanCurrentPage[status]} de ${totalPages}`;
+
+  return tasks.slice(start, start + KANBAN_TASKS_PER_PAGE);
+}
+
+document.querySelectorAll<HTMLButtonElement>("[data-kanban-page-step]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const status = button.id.match(/^kanban-(todo|doing|done)-/)?.[1] as KanbanStatus | undefined;
+    const step = Number(button.dataset.kanbanPageStep ?? 0);
+    if (!status || !step) return;
+    kanbanCurrentPage[status] += step;
+    renderKanbanBoard();
+  });
+});
+
 function getKanbanVirtualLists(): KanbanVirtualLists {
   if (kanbanVirtualLists) return kanbanVirtualLists;
   const create = (id: string): VirtualList<KanbanTask> => {
@@ -10332,9 +10365,11 @@ function renderKanbanBoard() {
   countDone.innerText = doneTasks.length.toString();
 
   const lists = getKanbanVirtualLists();
-  lists.todo.setItems(todoTasks);
-  lists.doing.setItems(doingTasks);
-  lists.done.setItems(kanbanHideCompleted.checked ? [] : doneTasks);
+  lists.todo.setItems(kanbanPageFor("todo", todoTasks));
+  lists.doing.setItems(kanbanPageFor("doing", doingTasks));
+  lists.done.setItems(
+    kanbanPageFor("done", kanbanHideCompleted.checked ? [] : doneTasks)
+  );
 
   // FASE 4-D: con el boot de metadatos las tareas llegan al revés que el
   // scan (el stream hidrata los lotes); cada hidratación re-pinta y el

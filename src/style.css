@@ -4311,6 +4311,13 @@ body.is-bullet-selecting {
   padding: 6px 12px 6px;
 }
 
+/* Paginador por columna: queda fijo bajo la lista virtual. */
+.kanban-pagination {
+  flex: 0 0 auto;
+  margin-top: 0;
+  padding: 0 12px 10px;
+}
+
 .kanban-card {
   display: flex;
   flex-direction: column;
