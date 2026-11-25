@@ -3380,10 +3380,16 @@ body.is-bullet-selecting {
  * superpuestos tapaban celdas y dificultaban editar la primera fila. */
 .table-toolbar {
   display: flex;
-  flex-wrap: wrap;
+  /* Una sola fila mientras haya ancho; si no cabe, se desplaza en horizontal
+   * en vez de partir los controles en dos filas. */
+  flex-wrap: nowrap;
+  overflow-x: auto;
   align-items: center;
   gap: 3px;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   margin-bottom: 8px;
   padding: 4px;
   border: 1px solid var(--ls-border-subtle);
@@ -3400,6 +3406,8 @@ body.is-bullet-selecting {
 }
 
 .table-toolbar-button {
+  flex: 0 0 auto;
+  white-space: nowrap;
   min-height: 28px;
   min-width: 28px;
   padding: 5px 8px;
@@ -3474,12 +3482,20 @@ body.is-bullet-selecting {
 }
 
 /* Con `border-collapse: collapse` el borde superior/izquierdo de la primera
- * celda podía quedar oculto. Se fuerza para que tenga sus cuatro lados. */
+ * celda podía quedar oculto. Se fuerza en acento puro para que la esquina
+ * superior izquierda respete el color de acento elegido por el usuario. */
 .markdown-block-table thead th:first-child {
-  border-top: 1px solid var(--ls-table-border);
-  border-left: 1px solid var(--ls-table-border);
-  border-right: 1px solid var(--ls-table-border);
-  border-bottom: 1px solid var(--ls-table-border);
+  border-top: 2px solid var(--ls-accent);
+  border-left: 2px solid var(--ls-accent);
+  border-right: 2px solid var(--ls-accent);
+  border-bottom: 2px solid var(--ls-accent);
+}
+
+/* Celda seleccionada con un solo clic: hace visible qué celda recibirá el
+ * formato o el movimiento de fila/columna, sin necesidad de seleccionar su texto. */
+.markdown-block-table .table-cell.is-selected {
+  background: color-mix(in srgb, var(--ls-accent) 16%, transparent);
+  box-shadow: inset 0 0 0 2px var(--ls-accent);
 }
 
 .markdown-block-table mark {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyTableEdit,
+  editMarkdownTableCell,
   editMarkdownTable,
   findMarkdownTableRanges,
   serializeMarkdownTable,
@@ -106,5 +107,18 @@ describe("markdown-table", () => {
     expect(ranges[1].model.rows).toHaveLength(3);
     expect(updated.startsWith("Antes")).toBe(true);
     expect(updated.endsWith("Después")).toBe(true);
+  });
+
+  it("editMarkdownTableCell modifica solo la celda indicada", () => {
+    const updated = editMarkdownTableCell(TABLE, 0, 1, 1, (value) => `**${value}**`);
+    const model = findMarkdownTableRanges(updated)[0].model;
+    expect(model.header).toEqual(["Nombre", "Edad", "Notas"]);
+    expect(model.rows[0]).toEqual(["Ana", "**30**", "**Amiga**"]);
+    expect(model.rows[1]).toEqual(["Luis", "25", "Hermano"]);
+    // La cabecera (fila 0) también se puede formatear sin tocar las filas.
+    const header = editMarkdownTableCell(TABLE, 0, 0, 0, (value) => `*${value}*`);
+    expect(findMarkdownTableRanges(header)[0].model.header).toEqual([
+      "*Nombre*", "Edad", "Notas",
+    ]);
   });
 });

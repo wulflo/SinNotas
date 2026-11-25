@@ -323,3 +323,37 @@ export function editMarkdownTable(
   );
   return text.slice(0, range.index) + updated + text.slice(range.index + range.length);
 }
+
+/**
+ * Modifica únicamente una celda de la tabla número `tableIndex` y deja el
+ * resto del Markdown intacto. `rowIndex` es lógico (0 = cabecera) y `colIndex`
+ * es la columna. Se usa para aplicar formato inline a la celda seleccionada
+ * sin envolver la tabla completa.
+ */
+export function editMarkdownTableCell(
+  text: string,
+  tableIndex: number,
+  rowIndex: number,
+  colIndex: number,
+  update: (value: string) => string
+): string {
+  const range = findMarkdownTableRanges(text)[tableIndex];
+  if (!range) return text;
+  const width = range.model.header.length;
+  if (colIndex < 0 || colIndex >= width) return text;
+
+  const model: MarkdownTableModel = {
+    header: [...range.model.header],
+    alignments: [...range.model.alignments],
+    rows: range.model.rows.map((row) => [...row]),
+  };
+  if (rowIndex <= 0) {
+    model.header[colIndex] = update(model.header[colIndex]);
+  } else {
+    const bodyIndex = rowIndex - 1;
+    if (bodyIndex >= model.rows.length) return text;
+    model.rows[bodyIndex][colIndex] = update(model.rows[bodyIndex][colIndex]);
+  }
+  const updated = serializeMarkdownTable(model);
+  return text.slice(0, range.index) + updated + text.slice(range.index + range.length);
+}

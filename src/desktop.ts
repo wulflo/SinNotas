@@ -202,6 +202,7 @@ import {
   type NoteScrollNavController,
 } from "./editor/note-scroll-nav";
 import {
+  editMarkdownTableCell,
   editMarkdownTable,
   escapeTableCell,
   findMarkdownTableRanges,
@@ -5485,7 +5486,7 @@ function ImageBlock(source: string, alt: string, blockId: string): HTMLImageElem
  * primera. Se indexa por `blockId` (string estable) y no por el elemento
  * `<table>` del DOM, porque `renderMarkdownText()` recrea toda la tabla
  * tras cada edición y un `WeakMap<DOM, DOM>` perdería la referencia. */
-const lastFocusedTableInfo = new Map<string, { rowIndex: number; colIndex: number }>();
+const lastFocusedTableInfo = new Map<string, { tableIndex: number; rowIndex: number; colIndex: number }>();
 
 function createEditorTableCell(
   cell: HTMLTableCellElement,
@@ -5496,17 +5497,27 @@ function createEditorTableCell(
   cell.className = "table-cell";
   cell.contentEditable = "true";
   cell.dataset.colIndex = String(colIndex);
-  cell.addEventListener("mousedown", () => {
+  const rememberCell = () => {
     const table = cell.closest<HTMLTableElement>("table.markdown-block-table");
     const blockItem = cell.closest<HTMLElement>(".block-item");
     const blockId = blockItem?.dataset.id;
-    if (table && blockId) {
-      const allRows = Array.from(table.querySelectorAll<HTMLTableRowElement>("tr"));
-      const rowIndex = allRows.indexOf(cell.parentElement as HTMLTableRowElement);
-      const colIndex = Number(cell.dataset.colIndex || "0");
-      lastFocusedTableInfo.set(blockId, { rowIndex, colIndex });
-    }
-  });
+    if (!table || !blockId) return;
+    const allRows = Array.from(table.querySelectorAll<HTMLTableRowElement>("tr"));
+    const rowIndex = allRows.indexOf(cell.parentElement as HTMLTableRowElement);
+    const colIndex = Number(cell.dataset.colIndex || "0");
+    lastFocusedTableInfo.set(blockId, {
+      tableIndex: Number(table.dataset.tableIndex || "0"),
+      rowIndex,
+      colIndex,
+    });
+    // Selección explícita de la celda: basta con clicarla, sin seleccionar texto.
+    table.querySelectorAll<HTMLTableCellElement>(".table-cell.is-selected").forEach((other) => {
+      if (other !== cell) other.classList.remove("is-selected");
+    });
+    cell.classList.add("is-selected");
+  };
+  cell.addEventListener("mousedown", rememberCell);
+  cell.addEventListener("focus", rememberCell);
   if (alignment) {
     cell.dataset.align = alignment;
     cell.classList.add(`markdown-align-${alignment}`);
@@ -5677,6 +5688,95 @@ function applyTableEditToBlockTable(table: HTMLTableElement, action: TableEditAc
       // Ignorar errores de selección en navegadores antiguos.
     }
   }
+}
+
+/** Celda seleccionada de un bloque; sobrevive a que renderMarkdownText recree el DOM. */
+function selectedTableCellInfo(
+  blockId: string
+): { editor: HTMLElement; tableIndex: number; rowIndex: number; colIndex: number } | null {
+  const info = lastFocusedTableInfo.get(blockId);
+  if (!info) return null;
+  const editor = Array.from(document.querySelectorAll<HTMLElement>(".block-editor")).find(
+    (candidate) => candidate.closest<HTMLElement>(".block-item")?.dataset.id === blockId
+  );
+  if (!editor) return null;
+  const tables = editor.querySelectorAll<HTMLTableElement>("table.markdown-block-table");
+  const tableIndex = Math.min(info.tableIndex, Math.max(0, tables.length - 1));
+  const rows = Array.from(tables[tableIndex]?.querySelectorAll<HTMLTableRowElement>("tr") ?? []);
+  const cell = rows[info.rowIndex]?.querySelectorAll<HTMLTableCellElement>(".table-cell")[info.colIndex];
+  if (!cell) return null;
+  return { editor, tableIndex, rowIndex: info.rowIndex, colIndex: info.colIndex };
+}
+
+function focusTableCell(
+  editor: HTMLElement,
+  tableIndex: number,
+  rowIndex: number,
+  colIndex: number
+): void {
+  const table = editor.querySelectorAll<HTMLTableElement>("table.markdown-block-table")[tableIndex];
+  const rows = Array.from(table?.querySelectorAll<HTMLTableRowElement>("tr") ?? []);
+  const cell = rows[rowIndex]?.querySelectorAll<HTMLTableCellElement>(".table-cell")[colIndex];
+  if (!cell) return;
+  cell.classList.add("is-selected");
+  cell.focus({ preventScroll: true });
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(cell);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+  } catch {
+    // Ignorar errores de selección en navegadores antiguos.
+  }
+}
+
+/** Aplica una edición solo a la celda seleccionada del bloque indicado. */
+function updateSelectedTableCell(blockId: string, edit: (value: string) => string): boolean {
+  const selected = selectedTableCellInfo(blockId);
+  if (!selected) return false;
+  const page = getContextPage();
+  const location = findNodeLocation(page.blocks, blockId);
+  if (!location) return false;
+  const node = location.parentList[location.index];
+  const content = getVisibleBlockContent(node.content);
+  const next = editMarkdownTableCell(
+    content,
+    selected.tableIndex,
+    selected.rowIndex,
+    selected.colIndex,
+    edit
+  );
+  if (next === content) return true;
+  setVisibleBlockContent(node, next);
+  void vault.savePage(page);
+  renderMarkdownText(selected.editor, next);
+  focusTableCell(selected.editor, selected.tableIndex, selected.rowIndex, selected.colIndex);
+  return true;
+}
+
+type TableFormatAction = "bold" | "italic" | "underline" | "strike" | "code" | "clear" | "cloze";
+
+function formatSelectedTableCell(
+  blockId: string,
+  format: TableFormatAction,
+  start: number,
+  end: number
+): boolean {
+  return updateSelectedTableCell(blockId, (value) => {
+    const from = Math.max(0, Math.min(start, value.length));
+    const to = Math.max(from, Math.min(end, value.length));
+    if (format === "clear") return clearFormatting(value, from, to);
+    if (format === "cloze") {
+      const selectedText = to > from ? value.slice(from, to) : value;
+      const wrapped = to > from
+        ? `${value.slice(0, from)}==${selectedText}==${value.slice(to)}`
+        : `==${value}==`;
+      return wrapped.includes("#card") ? wrapped : `${wrapped} #card`;
+    }
+    return applyFormatting(value, format, from, to);
+  });
 }
 
 function renderMarkdownText(editor: HTMLElement, content: string): void {
@@ -7994,7 +8094,11 @@ function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = 
         event.stopPropagation();
         const table = target.closest<HTMLTableElement>(".markdown-block-table");
         if (table) {
+          contextTargetBlockId = node.id;
           contextTargetPage = page;
+          // Los offsets del menú se calculan dentro de la celda, no del bloque,
+          // para que el formato no se aplique a toda la tabla.
+          setContextSelection(target, node.id);
           showTableContextMenu(table, target, event.clientX, event.clientY);
         }
       }
@@ -8004,17 +8108,20 @@ function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = 
       const rowHandle = event.target instanceof HTMLElement
         ? event.target.closest<HTMLTableRowElement>(".table-row")
         : null;
-      if (rowHandle && event.offsetX < 12) {
+      // Calcular el desplazamiento respecto a la fila/celda, no al nodo interno
+      // que recibió el evento: si el clic cae sobre un <strong>/<span> dentro de
+      // la celda, event.offsetX se mide desde ese nodo y el "asa" no responde.
+      if (rowHandle && event.clientX - rowHandle.getBoundingClientRect().left < 12) {
         const row = rowHandle;
         draggedRow = row;
         row.style.opacity = "0.5";
         event.preventDefault();
       }
-      
+
       const colHandle = event.target instanceof HTMLElement
         ? event.target.closest<HTMLTableCellElement>(".table-cell")
         : null;
-      if (colHandle && event.offsetY < 12) {
+      if (colHandle && event.clientY - colHandle.getBoundingClientRect().top < 12) {
         draggedColIndex = parseInt(colHandle.dataset.colIndex || "0");
         event.preventDefault();
       }
@@ -10703,6 +10810,28 @@ function getTableContextMenu(): HTMLDivElement {
     <div class="menu-item" data-action="move-col-right">
       <span>Mover columna derecha</span>
     </div>
+    <div class="menu-divider"></div>
+    <div class="menu-item" data-action="fmt:bold">
+      <span>Negrita</span>
+    </div>
+    <div class="menu-item" data-action="fmt:italic">
+      <span>Cursiva</span>
+    </div>
+    <div class="menu-item" data-action="fmt:underline">
+      <span>Subrayado</span>
+    </div>
+    <div class="menu-item" data-action="fmt:strike">
+      <span>Tachado</span>
+    </div>
+    <div class="menu-item" data-action="fmt:code">
+      <span>Código</span>
+    </div>
+    <div class="menu-item" data-action="fmt:cloze">
+      <span>Cloze</span>
+    </div>
+    <div class="menu-item" data-action="fmt:clear">
+      <span>Quitar formato</span>
+    </div>
   `;
   document.body.appendChild(tableContextMenu);
   
@@ -10736,7 +10865,22 @@ function showTableContextMenu(table: HTMLTableElement, cell: HTMLTableCellElemen
   });
 }
 
-function handleTableAction(action: string, state: { table: HTMLTableElement; rowIndex: number; colIndex: number }) {
+function handleTableAction(
+  action: string,
+  state: { table: HTMLTableElement; targetCell: HTMLTableCellElement; rowIndex: number; colIndex: number }
+) {
+  if (action.startsWith("fmt:")) {
+    const blockId = state.targetCell.closest<HTMLElement>(".block-item")?.dataset.id;
+    if (!blockId) return;
+    formatSelectedTableCell(
+      blockId,
+      action.slice(4) as TableFormatAction,
+      contextSelectionRange.start,
+      contextSelectionRange.end
+    );
+    return;
+  }
+
   const { table } = state;
   const editor = table.closest<HTMLElement>(".block-editor");
   if (!editor) return;
