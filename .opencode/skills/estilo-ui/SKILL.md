@@ -34,7 +34,9 @@ Propósito: evitar que aparezcan controles con el estilo del sistema operativo o
 5. **Toolbars y agrupación**
    - Agrupar acciones por contexto (insertar / mover / borrar) con separadores, como en `createTableToolbar` (`desktop.ts`).
    - Un toolbar de edición va en flujo normal, encima del contenido; nunca `position:absolute` tapando celdas.
-   - Objetivos táctiles de al menos 28–44 px y `flex-wrap` para que no se desborde en móvil.
+   - El toolbar de tablas se muestra **solo mientras una celda está seleccionada** y usa
+     `width: fit-content` + `flex-wrap: nowrap` con `overflow-x:auto`: una sola fila aunque falte ancho.
+   - Objetivos táctiles de al menos 28–44 px.
 
 6. **Verificación final**
    - `npx tsc --noEmit` y `npm test`.

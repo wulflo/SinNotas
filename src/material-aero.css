@@ -842,8 +842,10 @@ input[type="checkbox"] {
 
 /* ==================== TABLAS, DIARIOS Y TARJETAS ==================== */
 
+/* El ancho lo controla style.css (width:100%; max-width:none). Un tope fijo
+ * aquí dejaba una franja vacía a la derecha en pantallas anchas. */
 .table-view-container {
-  max-width: 1120px;
+  max-width: none;
 }
 
 .all-pages-table {

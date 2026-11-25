@@ -315,10 +315,9 @@ vault.onBeforeSave((page) => {
 
 /* Historial de snapshots: la configuración vive en el backend (.sinnotas/chronos/). */
 
-let cursorState: CursorState | null = {
-  blockId: currentPage.blocks[0]?.id || "b-1",
-  offset: 0,
-};
+// No empezar con el primer bloque enfocado: eso dejaba su wikilink en source
+// view nada más abrir la app, sin que el usuario hubiera hecho clic en él.
+let cursorState: CursorState | null = null;
 /**
  * Bullet vacío que ya se desindentó con Enter. El siguiente Enter crea un
  * hermano en ese nivel en lugar de desindentarlo otra vez. Se limpia al
@@ -1498,8 +1497,8 @@ function initThemeAndTypography() {
     setFont(savedFont);
   }
 
-  const savedPageWidth = Number(localStorage.getItem("sinnotas-page-width")) || 820;
-  setPageWidth(savedPageWidth);
+  const savedPageWidth = Number(localStorage.getItem("sinnotas-page-width"));
+  setPageWidth(migrateLegacyPageWidth(savedPageWidth));
 
   initTypographySettings();
 
@@ -1745,13 +1744,26 @@ function setFont(font: TypographyType) {
   graphView?.refresh();
 }
 
+/**
+ * Ancho del "box" de Editor, Diarios y Todas las páginas, como porcentaje del
+ * ancho disponible de la interfaz (no de un número fijo de píxeles). Así las
+ * tres vistas crecen con la ventana y el ajustador es siempre relativo.
+ */
 function setPageWidth(value: number): void {
-  const clamped = Math.max(600, Math.min(1200, value));
-  const width = 600 + Math.round((clamped - 600) / 20) * 20;
-  document.documentElement.style.setProperty("--ls-page-width", `${width}px`);
-  pageWidthSlider.value = String(width);
-  pageWidthValue.value = `${width} px`;
-  localStorage.setItem("sinnotas-page-width", String(width));
+  const clamped = Math.max(50, Math.min(100, value));
+  const percent = 50 + Math.round((clamped - 50) / 5) * 5;
+  document.documentElement.style.setProperty("--ls-page-width", `${percent}%`);
+  pageWidthSlider.value = String(percent);
+  pageWidthValue.value = `${percent} %`;
+  localStorage.setItem("sinnotas-page-width", String(percent));
+}
+
+/** Convierte el antiguo valor en píxeles guardado antes de usar porcentajes. */
+function migrateLegacyPageWidth(saved: number): number {
+  if (!Number.isFinite(saved) || saved <= 0) return 100;
+  if (saved <= 100) return saved;
+  const available = Math.max(600, document.querySelector(".main-container")?.clientWidth || window.innerWidth);
+  return Math.min(100, Math.max(50, Math.round((saved / available) * 20) * 5));
 }
 
 let currentFontSizes = readFontSizes();
@@ -4855,7 +4867,7 @@ function restoreNavigationHistory(index: number): void {
   try {
     navigationHistoryIndex = index;
     if (page && page.id !== currentPage.id) currentPage = page;
-    if (entry.view === "editor") cursorState = { blockId: currentPage.blocks[0]?.id || "b-1", offset: 0 };
+    if (entry.view === "editor") cursorState = null;
     switchView(entry.view);
   } finally {
     restoringNavigationHistory = false;
@@ -5488,6 +5500,35 @@ function ImageBlock(source: string, alt: string, blockId: string): HTMLImageElem
  * tras cada edición y un `WeakMap<DOM, DOM>` perdería la referencia. */
 const lastFocusedTableInfo = new Map<string, { tableIndex: number; rowIndex: number; colIndex: number }>();
 
+// El toolbar de la tabla solo aparece mientras una de sus celdas está
+// seleccionada. Un clic fuera limpia la selección y lo oculta de nuevo.
+document.addEventListener(
+  "pointerdown",
+  (event) => {
+    if (event.target instanceof Element && event.target.closest(".markdown-block-table, .table-toolbar")) return;
+    document.querySelectorAll<HTMLTableCellElement>(".table-cell.is-selected").forEach((cell) => {
+      cell.classList.remove("is-selected");
+    });
+    document.querySelectorAll<HTMLElement>(".markdown-table-wrapper.is-cell-selected").forEach((wrapper) => {
+      wrapper.classList.remove("is-cell-selected");
+    });
+  },
+  true
+);
+
+/** Fuerza el render enriquecido (source view off) al hacer clic fuera del editor. */
+function leaveEditorSourceView(): void {
+  const active = document.activeElement;
+  if (!(active instanceof HTMLElement) || !active.matches(".block-editor")) return;
+  renderMarkdownText(active, serializeEditorContent(active), false);
+}
+
+document.addEventListener("pointerdown", (event) => {
+  if (event.target instanceof Element && event.target.closest(".block-editor")) return;
+  leaveEditorSourceView();
+}, true);
+window.addEventListener("blur", leaveEditorSourceView);
+
 function createEditorTableCell(
   cell: HTMLTableCellElement,
   text: string,
@@ -5515,6 +5556,11 @@ function createEditorTableCell(
       if (other !== cell) other.classList.remove("is-selected");
     });
     cell.classList.add("is-selected");
+    const wrapper = table.closest<HTMLElement>(".markdown-table-wrapper");
+    document.querySelectorAll<HTMLElement>(".markdown-table-wrapper.is-cell-selected").forEach((other) => {
+      if (other !== wrapper) other.classList.remove("is-cell-selected");
+    });
+    wrapper?.classList.add("is-cell-selected");
   };
   cell.addEventListener("mousedown", rememberCell);
   cell.addEventListener("focus", rememberCell);
@@ -5571,15 +5617,17 @@ function createTableToolbar(table: HTMLTableElement): HTMLDivElement {
   // Agrupados por contexto (insertar / mover / borrar), como recomiendan las
   // guías de Tiptap y Lexical: los controles se agrupan con separadores y
   // nunca tapan la tabla que se está editando.
+  // Etiquetas cortas (iniciales) para que los 8 controles quepan en una fila;
+  // el título/aria-label conserva la descripción completa y accesible.
   const actions: Array<{ action: TableEditAction; label: string; title: string; group: string }> = [
-    { action: "add-row-below", label: "+ Fila", title: "Añadir fila debajo", group: "add" },
-    { action: "add-col-right", label: "+ Col", title: "Añadir columna a la derecha", group: "add" },
-    { action: "move-row-up", label: "↑ Fila", title: "Mover fila arriba", group: "move" },
-    { action: "move-row-down", label: "↓ Fila", title: "Mover fila abajo", group: "move" },
-    { action: "move-col-left", label: "← Col", title: "Mover columna a la izquierda", group: "move" },
-    { action: "move-col-right", label: "Col →", title: "Mover columna a la derecha", group: "move" },
-    { action: "delete-row", label: "− Fila", title: "Eliminar fila", group: "delete" },
-    { action: "delete-col", label: "− Col", title: "Eliminar columna", group: "delete" },
+    { action: "add-row-below", label: "+F", title: "Añadir fila debajo", group: "add" },
+    { action: "add-col-right", label: "+C", title: "Añadir columna a la derecha", group: "add" },
+    { action: "move-row-up", label: "↑F", title: "Mover fila arriba", group: "move" },
+    { action: "move-row-down", label: "↓F", title: "Mover fila abajo", group: "move" },
+    { action: "move-col-left", label: "←C", title: "Mover columna a la izquierda", group: "move" },
+    { action: "move-col-right", label: "C→", title: "Mover columna a la derecha", group: "move" },
+    { action: "delete-row", label: "−F", title: "Eliminar fila", group: "delete" },
+    { action: "delete-col", label: "−C", title: "Eliminar columna", group: "delete" },
   ];
 
   let previousGroup: string | null = null;
@@ -5676,6 +5724,8 @@ function applyTableEditToBlockTable(table: HTMLTableElement, action: TableEditAc
       Math.min(targetCol, Math.max(0, (nextRows[0]?.querySelectorAll(".table-cell").length || 1) - 1))
     ] ?? null;
   if (nextCell) {
+    nextCell.classList.add("is-selected");
+    nextCell.closest<HTMLElement>(".markdown-table-wrapper")?.classList.add("is-cell-selected");
     nextCell.focus();
     try {
       const range = document.createRange();
@@ -5719,6 +5769,7 @@ function focusTableCell(
   const cell = rows[rowIndex]?.querySelectorAll<HTMLTableCellElement>(".table-cell")[colIndex];
   if (!cell) return;
   cell.classList.add("is-selected");
+  cell.closest<HTMLElement>(".markdown-table-wrapper")?.classList.add("is-cell-selected");
   cell.focus({ preventScroll: true });
   try {
     const range = document.createRange();
@@ -5779,8 +5830,11 @@ function formatSelectedTableCell(
   });
 }
 
-function renderMarkdownText(editor: HTMLElement, content: string): void {
-  const isEditing = document.activeElement === editor;
+function renderMarkdownText(
+  editor: HTMLElement,
+  content: string,
+  isEditing = document.activeElement === editor
+): void {
   const tableRanges = findMarkdownTableRanges(content);
   if (tableRanges.length > 0) {
     const fragment = document.createDocumentFragment();
@@ -8019,7 +8073,7 @@ function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = 
         content !== getVisibleBlockContent(currentNode.content) ||
         !wikilinksMatchEditor(editor, content)
       ) {
-        renderMarkdownText(editor, getVisibleBlockContent(currentNode.content));
+        renderMarkdownText(editor, getVisibleBlockContent(currentNode.content), true);
         setCaretOffset(editor, caretOffset);
       }
       vault.scheduleSavePage(page);
@@ -8030,14 +8084,17 @@ function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = 
     editor.addEventListener("focus", () => {
       const content = serializeEditorContent(editor);
       const offset = getRenderedCaretOffset(editor);
-      renderMarkdownText(editor, content);
+      renderMarkdownText(editor, content, true);
       setCaretOffset(editor, offset);
       updateSlashMenu(editor, node.id);
     });
     editor.addEventListener("blur", () => {
       void vault.flushPendingSaves();
       const content = serializeEditorContent(editor);
-      renderMarkdownText(editor, content);
+      // En WebViews `document.activeElement` durante blur no es fiable: el
+      // estado de edición se pasa explícitamente para que el bloque vuelva a
+      // renderizarse siempre (wikilinks inclusive).
+      renderMarkdownText(editor, content, false);
       if (wikilinkAutocompleteState?.editor === editor) hideWikilinkAutocomplete();
       if (slashMenuState?.editor === editor) hideSlashMenu();
     });
@@ -9658,7 +9715,9 @@ async function showEditorPage(): Promise<void> {
   if (currentPage.blocksLoaded === false && isTauri()) {
     await vault.ensurePageLoaded(currentPage, { pin: true });
   }
-  cursorState = { blockId: currentPage.blocks[0]?.id || "b-1", offset: 0 };
+  // No enfocar el primer bloque al abrir la nota: eso dejaba su wikilink en
+  // source view sin que el usuario hubiera hecho clic en él.
+  cursorState = null;
   snapshotState = null;
   snapshotActivateForm.hidden = true;
   snapshotFormError.textContent = "";
@@ -17549,9 +17608,6 @@ async function initializeDesktopApp(): Promise<void> {
   recordNavigationHistory();
   restoreEditorSplitView();
   updatePdfEditorSplitButton();
-
-  const first = blocksContainer.querySelector<HTMLElement>(".block-editor");
-  if (currentView === "editor") first?.focus();
 
   scheduleAfterFirstPaint(() => {
     // Precarga de flashcards en segundo plano. Si el usuario entra antes en la

@@ -2909,7 +2909,7 @@ body.mobile-full-editor .note-scroll-nav {
 
 .canvas-wrapper {
   width: 100%;
-  max-width: var(--ls-page-width, 820px);
+  max-width: var(--ls-page-width, 100%);
 }
 
 .page-title-row {
@@ -3378,15 +3378,23 @@ body.is-bullet-selecting {
 
 /* El toolbar va en flujo normal, encima de la tabla: los menús flotantes
  * superpuestos tapaban celdas y dificultaban editar la primera fila. */
+/* Oculto hasta que se selecciona una celda de la tabla. */
 .table-toolbar {
+  display: none;
+}
+
+.markdown-table-wrapper.is-cell-selected .table-toolbar {
   display: flex;
+}
+
+.table-toolbar {
   /* Una sola fila mientras haya ancho; si no cabe, se desplaza en horizontal
    * en vez de partir los controles en dos filas. */
   flex-wrap: nowrap;
   overflow-x: auto;
   align-items: center;
   gap: 3px;
-  width: 100%;
+  width: fit-content;
   max-width: 100%;
   min-width: 0;
   box-sizing: border-box;
@@ -3482,13 +3490,14 @@ body.is-bullet-selecting {
 }
 
 /* Con `border-collapse: collapse` el borde superior/izquierdo de la primera
- * celda podía quedar oculto. Se fuerza en acento puro para que la esquina
- * superior izquierda respete el color de acento elegido por el usuario. */
+ * celda podía quedar oculto. Se fuerza con la MISMA variante de acento que
+ * usan los bordes del resto de celdas (--ls-table-border): la esquina no debe
+ * destacar. La única celda que sobresale es la seleccionada (abajo). */
 .markdown-block-table thead th:first-child {
-  border-top: 2px solid var(--ls-accent);
-  border-left: 2px solid var(--ls-accent);
-  border-right: 2px solid var(--ls-accent);
-  border-bottom: 2px solid var(--ls-accent);
+  border-top: 1px solid var(--ls-table-border);
+  border-left: 1px solid var(--ls-table-border);
+  border-right: 1px solid var(--ls-table-border);
+  border-bottom: 1px solid var(--ls-table-border);
 }
 
 /* Celda seleccionada con un solo clic: hace visible qué celda recibirá el
@@ -8355,7 +8364,7 @@ body.mobile-full-editor .flashcard-review-tools {
 }
 
 .journals-calendar-hint {
-  max-width: var(--ls-page-width, 820px);
+  max-width: var(--ls-page-width, 100%);
   margin: 4px auto 0;
   color: var(--ls-text-muted);
   font-size: calc(12px * var(--ls-font-scale, 1));
@@ -8544,7 +8553,7 @@ body.mobile-full-editor .flashcard-review-tools {
 .journal-entry-wrapper {
   position: relative;
   width: 100%;
-  max-width: var(--ls-page-width, 820px);
+  max-width: var(--ls-page-width, 100%);
   margin: 0 auto 20px;
   padding: 20px 24px;
   background: linear-gradient(
