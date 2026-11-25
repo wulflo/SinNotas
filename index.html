@@ -848,7 +848,7 @@
                     <path d="M5.5 16.5v-5h13v5"></path>
                   </svg>
                 </button>
-                <button class="btn-icon page-title-action" id="btn-graph-neighborhood" type="button" title="Ver notas conectadas en el grafo" aria-label="Ver notas conectadas en el grafo">
+                <button class="btn-icon page-title-action" id="btn-graph-neighborhood" type="button" title="Ver referencias (grafo y notas vinculadas)" aria-label="Ver referencias">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <circle cx="6" cy="6" r="2.5"></circle>
                     <circle cx="18" cy="6" r="2.5"></circle>
@@ -856,7 +856,7 @@
                     <path d="M8.2 7.2 10.8 16M15.8 7.2 13.2 16M8.5 6h7"></path>
                   </svg>
                 </button>
-                <button class="btn-icon page-title-action" id="btn-split-view" type="button" title="Abrir una nota de referencia al lado" aria-label="Abrir una nota de referencia al lado">
+                <button class="btn-icon page-title-action" id="btn-split-view" type="button" title="Abrir referencias" aria-label="Abrir referencias">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <rect x="3" y="4" width="18" height="16" rx="2"></rect>
                     <path d="M12 4v16"></path>
@@ -909,11 +909,18 @@
             </div>
             <aside class="reference-pane" id="reference-pane" aria-label="Notas de referencia" hidden>
               <header class="reference-pane-header">
-                <div class="reference-pane-title" id="reference-pane-title">Notas de referencia</div>
+                <div class="reference-pane-title" id="reference-pane-title">Referencias</div>
                 <span class="reference-pane-count" id="reference-pane-count">1/2</span>
                 <button class="btn-icon reference-pane-add" id="btn-add-reference-pane" type="button" title="Añadir otra nota de referencia" aria-label="Añadir otra nota de referencia">+</button>
                 <button class="btn-icon" id="btn-close-reference-pane" type="button" title="Cerrar panel de referencia" aria-label="Cerrar panel de referencia">×</button>
               </header>
+              <section class="reference-pane-graph" id="reference-pane-graph" hidden>
+                <div class="reference-pane-graph-header">
+                  <span>Grafo de notas conectadas</span>
+                  <button class="btn-icon" id="btn-close-reference-graph" type="button" title="Ocultar grafo" aria-label="Ocultar grafo">×</button>
+                </div>
+                <canvas id="reference-graph-canvas" aria-label="Grafo de la nota actual"></canvas>
+              </section>
               <div class="reference-slots" id="reference-slots"></div>
             </aside>
           </div>

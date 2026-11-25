@@ -766,6 +766,8 @@ const btnAddReferencePane = document.getElementById("btn-add-reference-pane") as
 const btnCloseReferencePane = document.getElementById(
   "btn-close-reference-pane"
 ) as HTMLButtonElement | null;
+const referenceGraphSection = document.getElementById("reference-pane-graph") as HTMLElement | null;
+const btnCloseReferenceGraph = document.getElementById("btn-close-reference-graph") as HTMLButtonElement | null;
 const pagePropertiesContainer = document.getElementById("page-properties-container") as HTMLDivElement;
 const headbarBreadcrumb = document.getElementById("headbar-breadcrumb") as HTMLDivElement;
 
@@ -14269,14 +14271,12 @@ async function applyGraphPages(): Promise<void> {
   }
 }
 
-/** Abre el grafo mostrando solo la nota actual y sus vecinas de 1 salto (T5). */
+/**
+ * Abre el grafo de la nota actual apilado sobre las referencias en la sidebar
+ * derecha, sin abandonar la vista de edición.
+ */
 function openGraphNeighborhood(): void {
-  graphNeighborhoodOrigin = currentPage.title;
-  switchView("graph");
-  requestAnimationFrame(() => {
-    graphView?.resetView();
-    graphView?.selectNode(currentPage.title);
-  });
+  showReferenceGraph();
 }
 
 function clearGraphNeighborhood(): void {
@@ -16656,8 +16656,53 @@ function closeReferencePane(): void {
   btnSplitView?.classList.remove("active");
   btnSplitView?.setAttribute("aria-pressed", "false");
   localStorage.setItem(SPLIT_OPEN_KEY, "false");
+  hideReferenceGraph();
   noteScrollNav?.refresh();
 }
+
+let referenceGraphView: GraphView | null = null;
+let referenceGraphRun = 0;
+
+/** Dibuja en la sidebar derecha la vecindad de 1 salto de la nota abierta. */
+async function renderReferenceGraph(): Promise<void> {
+  if (!referenceGraphSection || referenceGraphSection.hidden) return;
+  if (!referenceGraphView) {
+    referenceGraphView = new GraphView("reference-graph-canvas", (title) => {
+      loadPage(title);
+    });
+  }
+  const run = ++referenceGraphRun;
+  const edges = await buildGraphEdges();
+  if (run !== referenceGraphRun || !referenceGraphView) return;
+  const origin = currentPage?.title ?? null;
+  const allPages = vault.getPages();
+  const connected = origin
+    ? connectedPageTitles(allPages, origin, 1, edges ?? undefined)
+    : new Set<string>();
+  referenceGraphView.updateData(
+    connected.size > 0 ? allPages.filter((page) => connected.has(page.title)) : [],
+    edges ?? undefined
+  );
+  referenceGraphView.resetView();
+  if (origin) referenceGraphView.selectNode(origin);
+  referenceGraphView.resize();
+}
+
+/** Abre las referencias con el grafo en la parte superior. */
+function showReferenceGraph(): void {
+  if (!referenceGraphSection || !splitViewEnabled()) return;
+  openReferencePane();
+  referenceGraphSection.hidden = false;
+  void renderReferenceGraph();
+  noteScrollNav?.refresh();
+}
+
+function hideReferenceGraph(): void {
+  if (referenceGraphSection) referenceGraphSection.hidden = true;
+  referenceGraphRun += 1;
+}
+
+btnCloseReferenceGraph?.addEventListener("click", hideReferenceGraph);
 
 /** Restaura el panel tras recargar; solo si el flag sigue activo. */
 function restoreEditorSplitView(): void {
@@ -16672,7 +16717,9 @@ function restoreEditorSplitView(): void {
 
 btnSplitView?.addEventListener("click", () => {
   if (!referencePane) return;
-  if (referencePane.hidden) openReferencePane();
+  // Una sola acción «Ver referencias»: abre la sidebar derecha con el grafo
+  // de la nota actual arriba y las notas vinculadas debajo.
+  if (referencePane.hidden) showReferenceGraph();
   else closeReferencePane();
 });
 btnCloseReferencePane?.addEventListener("click", closeReferencePane);
