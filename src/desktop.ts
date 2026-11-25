@@ -507,7 +507,7 @@ let flashcardDecksLoadToken = 0;
 
 /**
  * Ajustes que usa el motor de FSRS cuando se repasa sin mazo activo
- * ("Sin mazo activo" en el selector de la sección FSRS).
+ * ("Todas las notas (mazo Todos)" en el selector de la sección FSRS).
  */
 let flashcardFSRSDefaultSettings: FSRSParameters = loadFSRSParameters(localStorage);
 
@@ -934,6 +934,7 @@ const flashcardFSRSRelearningSteps = document.getElementById("flashcard-fsrs-rel
 const flashcardFSRSWeights = document.getElementById("flashcard-fsrs-weights") as HTMLTextAreaElement;
 const flashcardFSRSStatus = document.getElementById("flashcard-fsrs-status") as HTMLElement;
 const flashcardFSRSDeckSelect = document.getElementById("flashcard-fsrs-deck-select") as HTMLSelectElement;
+const flashcardFSRSScopeHelp = document.getElementById("flashcard-fsrs-scope-help") as HTMLElement | null;
 const btnFlashcardFSRSSave = document.getElementById("btn-flashcard-fsrs-save") as HTMLButtonElement;
 const btnFlashcardFSRSDefaults = document.getElementById("btn-flashcard-fsrs-defaults") as HTMLButtonElement;
 const flashcardRecalcActionSelect = document.getElementById("flashcard-recalc-action") as HTMLSelectElement;
@@ -3158,7 +3159,7 @@ function renderFSRSDeckSelect(): void {
   flashcardFSRSDeckSelect.replaceChildren();
   const none = document.createElement("option");
   none.value = "";
-  none.textContent = "Sin mazo activo";
+  none.textContent = "Todas las notas (mazo Todos)";
   flashcardFSRSDeckSelect.appendChild(none);
   for (const deck of decks) {
     const option = document.createElement("option");
@@ -3182,6 +3183,13 @@ function renderFSRSSettings(): void {
   flashcardFSRSLearningSteps.value = formatLearningSteps(parameters.learningSteps);
   flashcardFSRSRelearningSteps.value = formatLearningSteps(parameters.relearningSteps);
   flashcardFSRSWeights.value = parameters.w.join(", ");
+  if (flashcardFSRSScopeHelp) {
+    flashcardFSRSScopeHelp.textContent = selectedDeck
+      ? translate("Estás editando los ajustes del mazo «") + selectedDeck.name + translate("».")
+      : translate(
+          "Estás editando los ajustes globales: se aplican a las notas que no pertenecen a ningún mazo y a las sesiones con el mazo «Todos» activo."
+        );
+  }
 }
 
 function saveFSRSSettings(useDefaults = false): void {

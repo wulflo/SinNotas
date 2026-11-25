@@ -4,9 +4,11 @@ import "katex/dist/katex.min.css";
 import { FSRS7_WEIGHT_COUNT, defaultFSRSParams, type FSRSRating } from "../editor/fsrs";
 import {
   formatLearningSteps,
+  loadFSRSParameters,
   normalizeFSRSParameters,
   parseLearningSteps,
   parseMaximumInterval,
+  saveFSRSParameters,
 } from "../editor/fsrs-settings";
 import type { FSRSParameters } from "../editor/fsrs";
 import {
@@ -320,6 +322,8 @@ class MobileReviewApp {
   private readonly deckRepository = new FlashcardDeckRepository();
   private deckFile: FlashcardDeckFile = emptyFlashcardDeckFile();
   private activeDeckId: string | null = null;
+  /** Ajustes globales FSRS para las sesiones sin mazo (mazo «Todos»). */
+  private globalFSRSSettings: FSRSParameters = loadFSRSParameters(localStorage);
   private deckEditorId: string | null = null;
   private deckEditorIsNew = false;
   /** ¿El usuario ya escribió en el nombre? Evita el error de campo vacío al abrir un mazo nuevo. */
@@ -905,8 +909,10 @@ class MobileReviewApp {
     this.applyTheme(this.readStoredTheme() ?? this.systemTheme(), false);
     this.applyAccent(this.readStoredAccent(), false);
     this.applyStoredFontSizes();
-    // El motor FSRS usa los ajustes del mazo activo (por defecto sin mazo).
-    this.manager.setFSRSParameters(deckFSRSSettings(this.activeDeck()));
+    // El motor FSRS usa los ajustes del mazo activo o, con «Todos», los globales.
+    this.manager.setFSRSParameters(
+      this.activeDeck() ? deckFSRSSettings(this.activeDeck()) : this.globalFSRSSettings
+    );
     this.learningMode = this.readStoredLearningMode();
     // El modo Aprendizaje debe incluir también las tarjetas que aún no vencen,
     // incluso si la app se abre con el interruptor ya activo.
@@ -1512,8 +1518,10 @@ class MobileReviewApp {
     const deck = this.activeDeck();
     const filter = deck ? this.deckPages(deck) : null;
     this.manager.setPageFilter(filter);
-    // El motor del repaso usa los ajustes del mazo activo; sin mazo → por defecto.
-    this.manager.setFSRSParameters(deckFSRSSettings(deck));
+    // El motor del repaso usa los ajustes del mazo activo; sin mazo → los globales.
+    this.manager.setFSRSParameters(
+      deck ? deckFSRSSettings(deck) : this.globalFSRSSettings
+    );
     this.manager.scanVault(this.pages, "new-first");
     this.writeStoredPageFilter(filter);
     this.reconcilePageFilter();
@@ -2687,7 +2695,7 @@ class MobileReviewApp {
     select.replaceChildren();
     const none = document.createElement("option");
     none.value = "";
-    none.textContent = "Sin mazo activo";
+    none.textContent = "Todas las notas (mazo Todos)";
     select.appendChild(none);
     for (const deck of decks) {
       const option = document.createElement("option");
@@ -2702,7 +2710,7 @@ class MobileReviewApp {
   private renderFSRSSettings(): void {
     this.renderFSRSDeckSelect();
     const selected = this.selectedFSRSDeck();
-    const parameters = selected ? deckFSRSSettings(selected) : deckFSRSSettings(null);
+    const parameters = selected ? deckFSRSSettings(selected) : this.globalFSRSSettings;
     this.refs.fsrsRetention.value = String(parameters.requestRetention);
     this.refs.fsrsRetentionValue.value = `${Math.round(parameters.requestRetention * 100)}%`;
     this.refs.fsrsMaximumInterval.value = String(parameters.maximumInterval);
@@ -2737,7 +2745,7 @@ class MobileReviewApp {
     const selectedDeck = this.selectedFSRSDeck();
     const current = selectedDeck
       ? deckFSRSSettings(selectedDeck)
-      : deckFSRSSettings(null);
+      : this.globalFSRSSettings;
     const learningSteps = useDefaults
       ? [...defaultFSRSParams.learningSteps]
       : parseLearningSteps(this.refs.fsrsLearningSteps.value);
@@ -2791,7 +2799,10 @@ class MobileReviewApp {
           this.manager.setFSRSParameters(parameters);
         }
       } else {
-        // Sin mazo activo: se repasan todas las notas con los ajustes del motor.
+        // Sin mazo activo: se repasan todas las notas con los ajustes globales,
+        // persistidos para que sobrevivan al reinicio de la app.
+        this.globalFSRSSettings = parameters;
+        saveFSRSParameters(localStorage, parameters);
         this.manager.setFSRSParameters(parameters);
       }
       this.renderFSRSSettings();

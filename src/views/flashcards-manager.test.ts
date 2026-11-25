@@ -1063,3 +1063,35 @@ describe("FlashcardsManager - rechequeo de tarjetas vencidas (T23)", () => {
     expect(manager.getCurrentCard()).toBeNull();
   });
 });
+
+describe("FlashcardsManager - ajustes globales sin mazo activo", () => {
+  const reviewContent = (): string => {
+    const reviewed = new Date();
+    reviewed.setDate(reviewed.getDate() - 20);
+    reviewed.setHours(12, 0, 0, 0);
+    return [
+      "Pregunta :: Respuesta",
+      "card-s:: 20",
+      "card-d:: 5",
+      "card-state:: 2",
+      `last-reviewed:: ${reviewed.toISOString()}`,
+      "interval-days:: 20",
+      `due-date:: ${new Date().toISOString()}`,
+    ].join("\n");
+  };
+
+  it("aplica los parámetros globales a los intervalos del siguiente repaso", () => {
+    const manager = new FlashcardsManager();
+    manager.setDetectedCards(
+      manager.scanPages([makePage("p-global", "Global", reviewContent())])
+    );
+    const before = manager.getRatingPreviews();
+    const base = manager.getFSRSParameters();
+    manager.setFSRSParameters({ ...base, requestRetention: 0.7, maximumInterval: 5 });
+    const after = manager.getRatingPreviews();
+
+    expect(manager.getFSRSParameters().requestRetention).toBe(0.7);
+    expect(after?.[3].intervalDays).toBeLessThanOrEqual(5);
+    expect(after?.[3].intervalDays).not.toBe(before?.[3].intervalDays);
+  });
+});

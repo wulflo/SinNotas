@@ -468,12 +468,13 @@
                 </div>
 
                 <div class="settings-section-title">FSRS 7</div>
-                <p class="settings-help">Configura la retención objetivo, el intervalo máximo y los pasos del planificador del mazo seleccionado abajo. Cada mazo repasa con sus propios ajustes; cambia el recálculo desde «Recalcular propiedades».</p>
+                <p class="settings-help">Configura la retención objetivo, el intervalo máximo y los pasos del planificador. Cada mazo repasa con sus propios ajustes; con <strong>Todas las notas (mazo Todos)</strong> editas la configuración global que usan las notas que no pertenecen a ningún mazo. Cambia el recálculo desde «Recalcular propiedades».</p>
                 <div class="sync-box">
                   <div class="settings-row">
                     <label for="flashcard-fsrs-deck-select">Mazo</label>
                     <select id="flashcard-fsrs-deck-select" aria-label="Mazo cuya configuración se edita"></select>
                   </div>
+                  <p class="settings-help" id="flashcard-fsrs-scope-help" role="status" aria-live="polite"></p>
                   <div class="settings-row fsrs-retention-row">
                     <label for="flashcard-fsrs-retention">Retención deseada</label>
                     <div class="fsrs-retention-control">
