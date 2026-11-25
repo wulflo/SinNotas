@@ -1091,7 +1091,10 @@ input[type="checkbox"] {
 
 .kanban-card {
   border-radius: var(--ma-radius-xl);
-  background: color-mix(in srgb, var(--md-surface-container-high) 74%, transparent);
+  /* Antes: 74% de una superficie ya oscura con 26% de transparencia sobre la
+   * columna, lo que dejaba la tarjeta casi negra. Se usa el rol más claro y
+   * casi opaco para que se lea sin despegarse del tema. */
+  background: color-mix(in srgb, var(--md-surface-container-highest) 88%, var(--md-surface-bright));
   border: 1px solid color-mix(in srgb, var(--md-outline-variant) 58%, transparent);
   box-shadow: var(--md-elevation-1);
 }

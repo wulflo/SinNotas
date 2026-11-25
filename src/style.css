@@ -42,7 +42,9 @@
   --ls-done-bg: #1e2a24;
   --ls-done-color: #a6d3b7;
 
-  --ls-kanban-card-bg: #1e242d;
+  /* Superficie elevada pero emparentada con el tema: antes era un gris fijo
+   * (#1e242d) que en temas oscuros llegaba a verse casi negro. */
+  --ls-kanban-card-bg: color-mix(in srgb, var(--ls-bg-secondary) 72%, var(--ls-bg-primary));
   --ls-kanban-card-shadow: 0 1px 2px rgba(0, 0, 0, 0.15), 0 4px 12px rgba(0, 0, 0, 0.05);
   --ls-kanban-column-shadow: 0 8px 24px rgba(0, 0, 0, 0.07);
   
@@ -4356,12 +4358,12 @@ body.is-bullet-selecting {
   transition: background-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease, opacity 0.15s ease;
 }
 
-[data-theme="light"] .kanban-card {
-  background: #ffffff;
-}
-
-:root:not([data-theme="light"]) .kanban-card {
-  background: #15171c;
+/* La tarjeta sigue siempre la variable del tema (material-aero, lino y
+ * dracula la redefinen). Los colores fijos anteriores rompían el contraste. */
+:root[data-visual="lino"] .kanban-card,
+:root[data-visual="dracula"] .kanban-card {
+  background: var(--ls-kanban-card-bg);
+  box-shadow: var(--ls-kanban-card-shadow);
 }
 
 .kanban-card.has-due {
