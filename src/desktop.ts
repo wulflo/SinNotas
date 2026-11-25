@@ -229,6 +229,7 @@ import {
   resetBinding,
   type EditableShortcutId,
 } from "./shortcuts";
+import { normalizeRatingKeys } from "./editor/rating-keys";
 import {
   checkForUpdates,
   detectInstallKind,
@@ -1539,10 +1540,16 @@ function initThemeAndTypography() {
   pomodoroCountUpInput.checked = pomodoroCountUp;
   pomodoroRemainingSeconds = pomodoroFocusMinutes * 60;
 
-  flashcardKeyAgain.value = localStorage.getItem("sinnotas-flashcard-key-again") || "1";
-  flashcardKeyHard.value = localStorage.getItem("sinnotas-flashcard-key-hard") || "2";
-  flashcardKeyGood.value = localStorage.getItem("sinnotas-flashcard-key-good") || "3";
-  flashcardKeyEasy.value = localStorage.getItem("sinnotas-flashcard-key-easy") || "4";
+  const [keyAgain, keyHard, keyGood, keyEasy] = normalizeRatingKeys([
+    localStorage.getItem("sinnotas-flashcard-key-again"),
+    localStorage.getItem("sinnotas-flashcard-key-hard"),
+    localStorage.getItem("sinnotas-flashcard-key-good"),
+    localStorage.getItem("sinnotas-flashcard-key-easy"),
+  ]);
+  flashcardKeyAgain.value = keyAgain;
+  flashcardKeyHard.value = keyHard;
+  flashcardKeyGood.value = keyGood;
+  flashcardKeyEasy.value = keyEasy;
 
 }
 
@@ -3708,7 +3715,16 @@ function clearBlockProperties(blocks: BlockNode[]): number {
 
 [flashcardKeyAgain, flashcardKeyHard, flashcardKeyGood, flashcardKeyEasy].forEach((input) => {
   input.addEventListener("change", () => {
-    localStorage.setItem(`sinnotas-${input.id}`, input.value);
+    const keys = normalizeRatingKeys([
+      flashcardKeyAgain.value,
+      flashcardKeyHard.value,
+      flashcardKeyGood.value,
+      flashcardKeyEasy.value,
+    ]);
+    [flashcardKeyAgain, flashcardKeyHard, flashcardKeyGood, flashcardKeyEasy].forEach((field, index) => {
+      field.value = keys[index];
+      localStorage.setItem(`sinnotas-${field.id}`, keys[index]);
+    });
   });
 });
 
@@ -17352,15 +17368,18 @@ window.addEventListener("keydown", (e: KeyboardEvent) => {
       return;
     }
     if (flashcardsManager.isRevealed()) {
-      const keyAgain = flashcardKeyAgain.value;
-      const keyHard = flashcardKeyHard.value;
-      const keyGood = flashcardKeyGood.value;
-      const keyEasy = flashcardKeyEasy.value;
+      const [keyAgain, keyHard, keyGood, keyEasy] = normalizeRatingKeys([
+        flashcardKeyAgain.value,
+        flashcardKeyHard.value,
+        flashcardKeyGood.value,
+        flashcardKeyEasy.value,
+      ]);
+      const pressed = e.key.toLowerCase();
 
-      if (e.key === keyAgain) applyFSRSRating(1);
-      else if (e.key === keyHard) applyFSRSRating(2);
-      else if (e.key === keyGood) applyFSRSRating(3);
-      else if (e.key === keyEasy) applyFSRSRating(4);
+      if (pressed === keyAgain) applyFSRSRating(1);
+      else if (pressed === keyHard) applyFSRSRating(2);
+      else if (pressed === keyGood) applyFSRSRating(3);
+      else if (pressed === keyEasy) applyFSRSRating(4);
     }
   }
 }, true);
