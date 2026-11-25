@@ -5,6 +5,7 @@ import {
   getFlatVisibleBlocks,
   getHighestSelectedRoot,
   insertImageBlockAfter,
+  moveBlocksTo,
   removeBlock,
   removeBlocks,
   splitBlock,
@@ -217,5 +218,38 @@ describe("getHighestSelectedRoot", () => {
 
   it("devuelve null si no hay selección", () => {
     expect(getHighestSelectedRoot([block("a", "A")], new Set())).toBeNull();
+  });
+});
+
+describe("moveBlocksTo", () => {
+  it("mueve varios bullets conservando su orden al soltarlos antes", () => {
+    const tree = [block("a", "A"), block("b", "B"), block("target", "T"), block("z", "Z")];
+
+    const result = moveBlocksTo(tree, new Set(["a", "b"]), "target", "before");
+
+    expect(result?.map((node) => node.id)).toEqual(["a", "b", "target", "z"]);
+  });
+
+  it("conserva el orden al soltarlos después", () => {
+    const tree = [block("z", "Z"), block("a", "A"), block("b", "B"), block("target", "T")];
+
+    const result = moveBlocksTo(tree, new Set(["a", "b"]), "target", "after");
+
+    expect(result?.map((node) => node.id)).toEqual(["z", "target", "a", "b"]);
+  });
+
+  it("mueve solo la raíz cuando se seleccionan padres e hijos", () => {
+    const tree = [block("parent", "P", [block("child", "C")]), block("target", "T")];
+
+    const result = moveBlocksTo(tree, new Set(["parent", "child"]), "target", "before");
+
+    expect(result?.map((node) => node.id)).toEqual(["parent", "target"]);
+    expect(result?.[0].children.map((node) => node.id)).toEqual(["child"]);
+  });
+
+  it("rechaza soltar un bloque dentro de su propio subárbol", () => {
+    const tree = [block("parent", "P", [block("child", "C")])];
+
+    expect(moveBlocksTo(tree, new Set(["parent"]), "child", "inside")).toBeNull();
   });
 });

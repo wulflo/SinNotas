@@ -488,6 +488,38 @@ export function moveBlockTo(
   return newTree;
 }
 
+/**
+ * Mueve todas las raíces seleccionadas a una posición, conservando su orden
+ * documental y su jerarquía. Reutiliza `moveBlockTo` para cada raíz y rechaza
+ * soltar un bloque dentro de su propio subárbol.
+ */
+export function moveBlocksTo(
+  tree: BlockNode[],
+  sourceIds: ReadonlySet<string>,
+  targetId: string,
+  position: "before" | "after" | "inside"
+): BlockNode[] | null {
+  const roots = getSelectedBlockRoots(tree, sourceIds).map((node) => node.id);
+  if (roots.length === 0 || roots.includes(targetId)) return null;
+
+  const targetLocation = findNodeLocation(tree, targetId);
+  if (!targetLocation) return null;
+  let ancestor = targetLocation.parentNode;
+  while (ancestor) {
+    if (sourceIds.has(ancestor.id)) return null;
+    ancestor = findNodeLocation(tree, ancestor.id)?.parentNode ?? null;
+  }
+
+  const ordered = position === "after" ? roots.slice().reverse() : roots;
+  let next = tree;
+  for (const id of ordered) {
+    const moved = moveBlockTo(next, id, targetId, position);
+    if (!moved) return null;
+    next = moved;
+  }
+  return next;
+}
+
 /** Delete block or merge into previous */
 export function deleteOrMergeBlock(
   tree: BlockNode[],
