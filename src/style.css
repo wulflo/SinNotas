@@ -8379,8 +8379,11 @@ body.mobile-full-editor .flashcard-review-tools {
   gap: 12px;
   padding: 12px 14px;
   border: 1px solid var(--ls-border-subtle);
+  border-left: 3px solid var(--ls-accent);
   border-radius: 10px;
-  background: linear-gradient(180deg, var(--ls-bg-secondary), color-mix(in srgb, var(--ls-bg-secondary), var(--ls-bg-tertiary) 35%));
+  /* Fondo con el mismo efecto de acento que los días del calendario que
+   * tienen diario, para que los diarios listados destaquen visualmente. */
+  background: var(--ls-accent-subtle);
   color: var(--ls-text-primary);
   font: inherit;
   text-align: left;
