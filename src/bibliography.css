@@ -587,17 +587,17 @@
   justify-content: center;
   padding: 22px;
   /*
-   * Sin `backdrop-filter`: el modal es opaco y solo queda visible el marco de
-   * 22 px alrededor, así que desenfocar toda la ventana no aporta nada visual y
-   * provoca un tirón de ~65 ms cada vez que parpadea el cursor del formulario.
-   * Un velo algo más denso cumple la misma función a coste cero.
+   * Velo translúcido del accent color en vez de negro: así el backdrop se
+   * integra con el tema (claro u oscuro) y no resulta un parche negro ajeno
+   * a la paleta de la app. Sin `backdrop-filter` para evitar el tirón de
+   * render del cursor del formulario.
    */
-  background: rgba(4, 6, 10, 0.7);
+  background: color-mix(in srgb, var(--ls-accent) 35%, transparent);
 }
 
 .bib-modal-backdrop.bib-modal-nested {
   z-index: 3300;
-  background: rgba(4, 6, 10, 0.42);
+  background: color-mix(in srgb, var(--ls-accent) 22%, transparent);
 }
 
 .bib-modal {
