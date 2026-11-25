@@ -32,7 +32,6 @@ import {
   splitBlock,
   indentBlock,
   outdentBlock,
-  moveBlockTo,
   deleteOrMergeBlock,
   moveBlockUp,
   moveBlockDown,
@@ -47,6 +46,7 @@ import {
   getAllBlocksFlat,
   getSelectedBlockRoots,
   getHighestSelectedRoot,
+  moveBlocksTo,
   removeBlocks,
   cloneTree,
   indentBlocks,
@@ -338,6 +338,8 @@ let cursorState: CursorState | null = null;
 let enterOutdentedBlockId: string | null = null;
 let selectedBulletIds: string[] = [];
 let bulletSelectionAnchorId: string | null = null;
+/** Evita que el clic posterior a un drag sobre el handle limpie la selección. */
+let suppressNextBulletClick = false;
 let pointerSelectionActive = false;
 let boxSelectionStart: { x: number; y: number } | null = null;
 let boxSelectionRoot: HTMLElement | null = null;
@@ -7946,11 +7948,16 @@ function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = 
   // Handle (Chevron + Bullet)
   const handle = document.createElement("div");
   handle.className = "block-bullet-handle";
+  // Superficie de arrastre amplia: mantener clic izquierdo sobre el tirador
+  // mueve el bullet (o todos los seleccionados), como en otros outliners.
+  handle.draggable = true;
+  handle.title = "Mantén pulsado y arrastra para mover; suelta sobre otro bullet para anidar";
 
   const { text: contentWithoutProperties, properties } = splitBlockProperties(node.content);
   if (properties.length > 0) {
     const propertyDetails = document.createElement("details");
     propertyDetails.className = "block-properties";
+    propertyDetails.draggable = false;
     const summary = document.createElement("summary");
     summary.title = "Mostrar propiedades del bullet";
     summary.setAttribute("aria-label", "Mostrar propiedades del bullet");
@@ -7969,6 +7976,7 @@ function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = 
   toggle.className = `collapse-toggle ${hasChildren ? "" : "is-hidden"} ${node.collapsed ? "is-collapsed" : ""
     }`;
   toggle.innerHTML = "▼";
+  toggle.draggable = false;
   toggle.addEventListener("click", (e) => {
     e.stopPropagation();
     page.blocks = toggleCollapse(page.blocks, node.id);
@@ -7979,9 +7987,13 @@ function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = 
 
   const bullet = document.createElement("div");
   bullet.className = `bullet-dot ${hasChildren && node.collapsed ? "has-collapsed-children" : ""}`;
-  bullet.draggable = true;
+  bullet.draggable = false;
   bullet.title = "Arrastra para mover; suelta sobre otro bullet para anidar";
   bullet.addEventListener("click", (event: MouseEvent) => {
+    if (suppressNextBulletClick) {
+      suppressNextBulletClick = false;
+      return;
+    }
     if (event.shiftKey) {
       selectBulletRange(bulletSelectionAnchorId || node.id, node.id, false, page);
     } else if (event.ctrlKey || event.metaKey) {
@@ -8005,12 +8017,37 @@ function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = 
     contextSelectionRange = { start: 0, end: 0 };
     showBulletContextMenu(event.clientX, event.clientY);
   });
-  bullet.addEventListener("dragstart", (event: DragEvent) => {
+  handle.addEventListener("dragstart", (event: DragEvent) => {
     if (!event.dataTransfer) return;
+    // Si el bullet ya está en una selección múltiple se arrastra el grupo;
+    // si no, se selecciona él solo antes de empezar el arrastre.
+    const sourceIds = selectedBulletIds.includes(node.id)
+      ? getSelectedBlockRoots(page.blocks, new Set(selectedBulletIds)).map((root) => root.id)
+      : [node.id];
+    if (!selectedBulletIds.includes(node.id)) {
+      clearBulletSelection();
+      selectedBulletIds = [node.id];
+      bulletSelectionAnchorId = node.id;
+      refreshBulletSelection();
+    }
     event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData("application/x-sinnotas-block", node.id);
-    event.dataTransfer.setData("text/plain", node.id);
-    item.classList.add("is-dragging");
+    event.dataTransfer.setData("application/x-sinnotas-block-list", JSON.stringify(sourceIds));
+    event.dataTransfer.setData("application/x-sinnotas-block", sourceIds[0]);
+    event.dataTransfer.setData("text/plain", sourceIds[0]);
+    // Un gesto iniciado en el handle no debe seguir vivo como selección por caja.
+    pendingTextDragSelection = null;
+    pendingBoxSelection = null;
+    boxSelectionStart = null;
+    pointerSelectionActive = false;
+    document.body.classList.remove("is-bullet-selecting");
+    suppressNextBulletClick = true;
+    const root = item.closest<HTMLElement>(".blocks-tree") ?? blocksContainer;
+    root.querySelectorAll<HTMLElement>(".block-item.is-dragging").forEach((element) => {
+      element.classList.remove("is-dragging");
+    });
+    sourceIds.forEach((id) => {
+      root.querySelector<HTMLElement>(`.block-item[data-id="${id}"]`)?.classList.add("is-dragging");
+    });
   });
   bullet.addEventListener("dragend", () => {
     const root = item.closest<HTMLElement>(".blocks-tree") ?? blocksContainer;
@@ -8046,8 +8083,19 @@ function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = 
     );
   });
   item.addEventListener("drop", (event: DragEvent) => {
-    const sourceId = event.dataTransfer?.getData("application/x-sinnotas-block");
-    if (!sourceId) return;
+    const rawList = event.dataTransfer?.getData("application/x-sinnotas-block-list");
+    const singleId = event.dataTransfer?.getData("application/x-sinnotas-block");
+    let sourceIds: string[] = [];
+    if (rawList) {
+      try {
+        const parsed: unknown = JSON.parse(rawList);
+        if (Array.isArray(parsed)) sourceIds = parsed.filter((id): id is string => typeof id === "string");
+      } catch {
+        sourceIds = [];
+      }
+    }
+    if (sourceIds.length === 0 && singleId) sourceIds = [singleId];
+    if (sourceIds.length === 0) return;
     event.preventDefault();
     event.stopPropagation();
     const rowElement = item.querySelector<HTMLElement>(":scope > .block-row");
@@ -8056,15 +8104,18 @@ function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = 
     const position = classes.contains("drop-target-inside")
       ? "inside"
       : classes.contains("drop-target-before") ? "before" : "after";
-    const newTree = moveBlockTo(page.blocks, sourceId, node.id, position);
+    const newTree = moveBlocksTo(page.blocks, new Set(sourceIds), node.id, position);
     if (!newTree) return;
     const previousTree = page.blocks;
     page.blocks = newTree;
-    cursorState = { blockId: sourceId, offset: 0 };
+    cursorState = { blockId: sourceIds[0], offset: 0 };
     void (async () => {
       try {
         await vault.savePage(page);
         renderBlocksTree();
+        selectedBulletIds = sourceIds.filter((id) => findNodeLocation(page.blocks, id) !== null);
+        bulletSelectionAnchorId = sourceIds[0];
+        refreshBulletSelection();
       } catch (error) {
         console.error("No se pudo guardar el nuevo orden de los bullets:", error);
         page.blocks = previousTree;
@@ -8476,7 +8527,24 @@ function installBlockSelectionHandler(root: HTMLElement): void {
     const id = item?.dataset.id;
     if (!row || !id) return;
     if (event.target.closest(".collapse-toggle, .block-properties")) return;
-    const targetIsEditorOrBullet = event.target.closest(".block-editor, .bullet-dot");
+    const targetIsHandle = !!event.target.closest(".block-bullet-handle");
+    const targetIsEditorOrBullet = event.target.closest(".block-editor, .bullet-dot, .block-bullet-handle");
+    if (targetIsHandle) {
+      // El tirador es superficie de arrastre: no puede iniciar selección por
+      // caja. Un clic simple selecciona el bullet y conserva la selección
+      // múltiple si ya estaba incluido, para poder arrastrar el grupo.
+      if (event.shiftKey) {
+        selectBulletRange(bulletSelectionAnchorId || id, id);
+      } else if (event.ctrlKey || event.metaKey) {
+        toggleBulletSelection(id);
+      } else if (!selectedBulletIds.includes(id)) {
+        clearBulletSelection();
+        selectedBulletIds = [id];
+        bulletSelectionAnchorId = id;
+        refreshBulletSelection();
+      }
+      return;
+    }
     if (targetIsEditorOrBullet && !event.shiftKey) {
       // Un arrastre vertical sobre el texto se convertirá en selección por caja
       // (con auto-scroll). Un clic o un arrastre horizontal conserva el caret y

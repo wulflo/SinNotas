@@ -3087,6 +3087,11 @@ body.is-bullet-selecting {
   gap: 1px;
   position: relative;
   user-select: none;
+  cursor: grab;
+}
+
+.block-bullet-handle:active {
+  cursor: grabbing;
 }
 
 .collapse-toggle {
