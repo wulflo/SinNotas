@@ -152,9 +152,14 @@ insert:
 
 ### Tables
 
-Tables are stored as Markdown. You can edit cells, add or remove rows and columns
-from the context menu and reorder by dragging. Cloze highlighting also works
-inside a cell.
+Click a cell to select it: a toolbar with initial buttons (`+F`, `+C`, `↑F`, …)
+appears (hover for the full description). Formatting (bold, italic, underline,
+strike, code, cloze and clear formatting) applies **only to the selected cell**,
+not to the whole table. You can add/remove rows and columns, reorder them by
+dragging and use the cell's context menu. The top-left corner border uses the
+same accent variant as the other cells; only the selected cell stands out.
+
+Changes are saved to the Markdown source of the page.
 
 ### Images
 
@@ -360,7 +365,9 @@ Pomodoro**.
 
 ### Appearance
 
-- **Page width.**
+- **Page width:** a percentage of the available width (50–100%, 100% by
+  default). It is not a fixed pixel value: Editor, Journals and All pages grow
+  with the window; the control is relative to the interface width.
 - **Interface language:** automatic, Spanish, English or Chinese.
 - **Theme:** light or dark.
 - **Visual style:** Aero, Simple or Dracula.
@@ -389,10 +396,16 @@ At the top of this section there is a link to this guide.
 - **Updates:** only contacts GitHub when you press the button. On desktop the
   package is verified with the updater signature. On Android this section is not
   shown: the APK is installed manually.
+- **Review:** statistics (today's counts, totals and focus minutes), card FSRS
+  properties (batch removal, all cards or a single one), centralized flashcard
+  removal (with a paged picker of pages/decks and review history). None of these
+  actions change the text of your notes.
 - **Maintenance:** clear bullet properties, remove unused images, clear cache,
   erase review statistics, delete snapshots and reload the app.
 - **Flashcards:** remove card markers across the whole vault without deleting the
   content.
+- Every text in this section is translated to English and Chinese; choose the
+  preference in **Appearance › Interface language**.
 
 ## Sin Notas on Android
 

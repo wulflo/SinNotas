@@ -155,9 +155,14 @@ puedes insertar:
 
 ### Tablas
 
-Las tablas se guardan como Markdown. Puedes editar celdas, añadir o quitar filas
-y columnas desde el menú contextual y reordenar arrastrando. El resaltado Cloze
-funciona también dentro de una celda.
+Las tablas se guardan como Markdown. Haz clic en una celda para seleccionarla:
+aparece una barra de herramientas con botones de iniciales (`+F`, `+C`, `↑F`, …)
+cuyo tooltip explica la acción. El formato (negrita, cursiva, subrayado, tachado,
+código, cloze y quitar formato) se aplica **solo a la celda seleccionada**, no a
+toda la tabla. Puedes añadir o quitar filas y columnas, reordenarlas arrastrando
+y usar el menú contextual de la celda. El borde de la esquina superior izquierda
+usa la misma variante de acento que el resto de celdas; solo la celda seleccionada
+se destaca. El resaltado Cloze funciona también dentro de una celda.
 
 ### Imágenes
 
@@ -365,7 +370,9 @@ contador progresivo, sonido y visibilidad en la barra superior) están en
 
 ### Apariencia
 
-- **Ancho de página.**
+- **Ancho de página:** porcentaje del ancho disponible (50–100 %, por defecto
+  100 %). No es un valor fijo en píxeles: Editor, Diarios y Todas las páginas
+  crecen con la ventana; el selector es proporcional al ancho de la interfaz.
 - **Idioma de la interfaz:** automático, español, inglés o chino.
 - **Tema:** claro u oscuro.
 - **Estilo visual:** Aero, Simple o Dracula.
@@ -394,11 +401,17 @@ Al principio de esta sección hay un enlace a esta guía de uso.
 - **Actualizaciones:** solo consulta GitHub cuando pulsas el botón. En
   escritorio el paquete se verifica con la firma del actualizador. En Android
   esta sección no se muestra: el APK se instala manualmente.
+- **Repaso:** estadísticas (contadores de hoy, totales y minutos de enfoque),
+  propiedades FSRS de las tarjetas (borrado por lotes, de todas o de una sola),
+  borrado centralizado de flashcards (con selector paginado de notas o mazos e
+  historial de repasos). Estas acciones no cambian el texto de las notas.
 - **Mantenimiento:** borrar propiedades de bullets, eliminar imágenes no usadas,
   borrar caché, borrar estadísticas de repaso, borrar snapshots y recargar la
   aplicación.
 - **Flashcards:** quitar los marcadores de tarjeta de todo el vault sin borrar el
   contenido.
+- Todos los textos de esta sección están traducidos al inglés y al chino; la
+  preferencia se elige en **Apariencia › Idioma de la interfaz**.
 
 ## Sin Notas en Android
 
