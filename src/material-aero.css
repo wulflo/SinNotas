@@ -644,6 +644,7 @@ select {
 
 .settings-row input[type="number"],
 .settings-row input[type="text"],
+.settings-row input[type="date"],
 .sync-input-field,
 .flashcard-explorer-search,
 .flashcard-explorer-sort,

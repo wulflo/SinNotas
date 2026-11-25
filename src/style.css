@@ -2046,7 +2046,8 @@ select {
 }
 
 .settings-row input[type="number"],
-.settings-row input[type="text"] {
+.settings-row input[type="text"],
+.settings-row input[type="date"] {
   width: 90px;
   max-width: 40%;
   flex: 0 0 auto;
@@ -2063,8 +2064,10 @@ select {
 
 .settings-row input[type="number"]:hover,
 .settings-row input[type="text"]:hover,
+.settings-row input[type="date"]:hover,
 .settings-row input[type="number"]:focus,
-.settings-row input[type="text"]:focus {
+.settings-row input[type="text"]:focus,
+.settings-row input[type="date"]:focus {
   border-color: var(--ls-accent);
   box-shadow: 0 0 0 3px var(--ls-accent-subtle);
   outline: none;
@@ -6914,6 +6917,31 @@ body.mobile-full-editor .flashcard-review-tools {
   max-width: 100%;
   flex: 0 1 220px;
   text-align: left;
+  /* El nativo de date ignora `font: inherit` en algunos WebViews. */
+  font-family: inherit;
+  font-size: var(--ls-font-size-ui);
+  line-height: 1.2;
+  min-height: 36px;
+}
+
+/* Icono de calendario acorde al tema, con el mismo tamaño que los botones. */
+.settings-row input[type="date"]::-webkit-calendar-picker-indicator {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-left: 6px;
+  cursor: pointer;
+  opacity: 0.75;
+  /* El tema oscuro es el predeterminado (sin atributo data-theme). */
+  filter: invert(1);
+}
+
+[data-theme="light"] .settings-row input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: none;
+}
+
+.settings-row input[type="date"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
 }
 
 .flashcard-heatmap-scroll {
