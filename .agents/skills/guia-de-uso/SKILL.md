@@ -18,6 +18,7 @@ se renombra un control o se modifica un flujo visible.
 2. **Actualizar ambas guías**
    - `docs/GUIA-DE-USO.md` (español) y `docs/USER-GUIDE.md` (inglés) en paralelo.
    - Si el texto es nuevo, revisar también la traducción al chino (skill `Traducciones UI`).
+   - Revisar si el README también requiere actualizaciones.
    - Mantener el mismo orden de secciones en ambos idiomas.
 
 3. **Qué documentar**

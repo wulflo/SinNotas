@@ -1090,7 +1090,7 @@ Todas las acciones de terceros están pineadas a SHA; `npm ci --ignore-scripts`;
 | `docs/KEYSTORES.md` | 140 | Regla de oro, backup GPG, key nueva vs legacy, 5 secretos, verificación local. |
 | `docs/BENCHMARK-2026-10-29.md` | 84 | Resultados JS, caché Rust y vault sintética. |
 | `PRIVACY_POLICY.md` / `THIRD_PARTY_LICENSES.md` | 31 / 1.494 | Privacidad e inventario de licencias (507 crates, PDFium, FSRS, fuentes KaTeX). |
-| `.opencode/skills/` | — | Skills del proyecto: `estructure` (índice técnico), `estilo-ui` (dropdowns, fechas, botones, temas y toolbars) y `busqueda-incremental` (ventanas, paginación, epochs y LRU para buscadores). |
+| `.agents/skills/` | — | Skills del proyecto, en la ruta compatible con varios agentes (OpenCode también las descubre aquí): `estilo-ui` (dropdowns, fechas, botones, temas y toolbars), `busqueda-incremental` (ventanas, paginación, epochs y LRU), `traducciones-ui` (ES→EN/ZH), `guia-de-uso` (documentación de usuario) y `vault-performance-guard` (bóvedas grandes, lotes y código muerto). |
 
 ---
 
