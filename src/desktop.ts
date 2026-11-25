@@ -14738,25 +14738,6 @@ function readAllPagesColumnWidths(): Record<AllPagesColumnId, number> {
 
 let allPagesColumnWidths = readAllPagesColumnWidths();
 let allPagesRenderedWidths: Record<AllPagesColumnId, number> = { ...allPagesColumnWidths };
-// Si el usuario nunca ha arrastrado una columna, la tabla se adapta al ancho
-// disponible para que todo quepa y el título se recorte. En cuanto ajusta una
-// columna, se respetan sus anchos (aunque eso active el scroll horizontal).
-let allPagesHasCustomWidths = (() => {
-  try {
-    const raw = localStorage.getItem(ALL_PAGES_WIDTHS_STORAGE_KEY);
-    if (!raw) return false;
-    const parsed: unknown = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") return false;
-    // Una clave vacía o corrupta no debe desactivar el modo adaptativo.
-    return Object.entries(parsed as Record<string, unknown>).some(
-      ([key, value]) =>
-        isAllPagesColumnId(key) && typeof value === "number" && Number.isFinite(value)
-    );
-  } catch {
-    return false;
-  }
-})();
-
 function allPagesTableAvailableWidth(table: HTMLTableElement): number {
   const container = table.closest<HTMLElement>(".table-view-container");
   if (!container) return 0;
@@ -14818,9 +14799,10 @@ function applyAllPagesColumnWidths(): void {
   const table = document.getElementById("all-pages-table") as HTMLTableElement | null;
   if (!table) return;
   const available = allPagesTableAvailableWidth(table);
-  allPagesRenderedWidths = allPagesHasCustomWidths
-    ? { ...allPagesColumnWidths }
-    : fittedAllPagesWidths(available);
+  // Siempre se ajustan al ancho visible, también cuando el usuario ha
+  // redimensionado columnas: así la tabta nunca se queda corta a la derecha
+  // ni deja un hueco a la derecha en ventanas anchas.
+  allPagesRenderedWidths = fittedAllPagesWidths(available);
   table.querySelectorAll<HTMLTableColElement>("colgroup col[data-col]").forEach((col) => {
     const id = col.dataset.col;
     if (!isAllPagesColumnId(id)) return;
@@ -14885,7 +14867,6 @@ document.addEventListener("keydown", (event) => {
   if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
   event.preventDefault();
   const delta = event.key === "ArrowRight" ? 20 : -20;
-  allPagesHasCustomWidths = true;
   allPagesColumnWidths[id] = Math.max(
     ALL_PAGES_MIN_WIDTHS[id],
     Math.min(1200, allPagesRenderedWidths[id] + delta)
@@ -14904,7 +14885,6 @@ document.addEventListener("pointerdown", (event) => {
   event.preventDefault();
   const startX = event.clientX;
   const startWidth = allPagesRenderedWidths[id];
-  allPagesHasCustomWidths = true;
   target.setPointerCapture(event.pointerId);
   target.classList.add("is-resizing");
 
@@ -14930,10 +14910,10 @@ document.addEventListener("pointerdown", (event) => {
   target.addEventListener("pointercancel", finish);
 });
 
-/* Sin anchos personalizados, la tabla se reajusta al cambiar el tamaño de la
-   ventana para seguir ocupando el ancho visible. */
+/* La tabla se reajusta al cambiar el tamaño de la ventana para seguir
+  ocupando todo el ancho visible, incluso con columnas redimensionadas. */
 window.addEventListener("resize", () => {
-  if (allPagesHasCustomWidths || currentView !== "all-pages") return;
+  if (currentView !== "all-pages") return;
   applyAllPagesColumnWidths();
 });
 

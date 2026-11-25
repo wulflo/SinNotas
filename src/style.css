@@ -8052,6 +8052,8 @@ body.mobile-full-editor .flashcard-review-tools {
 
 .all-pages-table {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   border-collapse: separate;
   border-spacing: 0;
   font-size: calc(14px * var(--ls-font-scale, 1));
