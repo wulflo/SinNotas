@@ -3960,10 +3960,17 @@ function createFlashcardScopePicker(options: FlashcardScopePickerOptions): Flash
 
     const pages = flashcardsManager.getPagesWithCards();
     if (pages.length === 0) {
-      ensureFlashcardScan({ onDone: () => render() });
+      // Con la caché fresca y vacía, `load()` llama a `onDone` de forma
+      // síncrona: volver a escanear aquí produciría una recursión infinita.
+      // Solo se escanea si la caché no es fresca y no hay una tarea en curso.
+      const fresh = flashcardLoader.isFresh(vault.getPages(), vault.getVersionView());
+      const needsScan = !fresh && !flashcardLoader.isLoading();
+      if (needsScan) ensureFlashcardScan({ onDone: () => render() });
       const waiting = document.createElement("div");
       waiting.className = "settings-help";
-      waiting.innerText = translate("Escaneando notas… la lista aparecerá en breve.");
+      waiting.innerText = needsScan
+        ? translate("Escaneando notas… la lista aparecerá en breve.")
+        : translate("Sin tarjetas");
       list.appendChild(waiting);
       updateStatus();
       return;
