@@ -5548,18 +5548,29 @@ function createTableToolbar(table: HTMLTableElement): HTMLDivElement {
   toolbar.setAttribute("role", "toolbar");
   toolbar.setAttribute("aria-label", "Editar tabla");
 
-  const actions: Array<{ action: TableEditAction; label: string; title: string }> = [
-    { action: "add-row-below", label: "+ Fila", title: "Añadir fila debajo" },
-    { action: "add-col-right", label: "+ Col", title: "Añadir columna a la derecha" },
-    { action: "move-row-up", label: "↑ Fila", title: "Mover fila arriba" },
-    { action: "move-row-down", label: "↓ Fila", title: "Mover fila abajo" },
-    { action: "move-col-left", label: "← Col", title: "Mover columna a la izquierda" },
-    { action: "move-col-right", label: "Col →", title: "Mover columna a la derecha" },
-    { action: "delete-row", label: "− Fila", title: "Eliminar fila" },
-    { action: "delete-col", label: "− Col", title: "Eliminar columna" },
+  // Agrupados por contexto (insertar / mover / borrar), como recomiendan las
+  // guías de Tiptap y Lexical: los controles se agrupan con separadores y
+  // nunca tapan la tabla que se está editando.
+  const actions: Array<{ action: TableEditAction; label: string; title: string; group: string }> = [
+    { action: "add-row-below", label: "+ Fila", title: "Añadir fila debajo", group: "add" },
+    { action: "add-col-right", label: "+ Col", title: "Añadir columna a la derecha", group: "add" },
+    { action: "move-row-up", label: "↑ Fila", title: "Mover fila arriba", group: "move" },
+    { action: "move-row-down", label: "↓ Fila", title: "Mover fila abajo", group: "move" },
+    { action: "move-col-left", label: "← Col", title: "Mover columna a la izquierda", group: "move" },
+    { action: "move-col-right", label: "Col →", title: "Mover columna a la derecha", group: "move" },
+    { action: "delete-row", label: "− Fila", title: "Eliminar fila", group: "delete" },
+    { action: "delete-col", label: "− Col", title: "Eliminar columna", group: "delete" },
   ];
 
-  for (const { action, label, title } of actions) {
+  let previousGroup: string | null = null;
+  for (const { action, label, title, group } of actions) {
+    if (previousGroup !== null && previousGroup !== group) {
+      const separator = document.createElement("span");
+      separator.className = "table-toolbar-separator";
+      separator.setAttribute("aria-hidden", "true");
+      toolbar.appendChild(separator);
+    }
+    previousGroup = group;
     const button = document.createElement("button");
     button.type = "button";
     button.className = "table-toolbar-button";

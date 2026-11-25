@@ -3367,50 +3367,59 @@ body.is-bullet-selecting {
 
 .markdown-table-wrapper {
   position: relative;
-  display: inline-block;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   max-width: 100%;
 }
 
+/* El toolbar va en flujo normal, encima de la tabla: los menús flotantes
+ * superpuestos tapaban celdas y dificultaban editar la primera fila. */
 .table-toolbar {
-  position: absolute;
-  top: -14px;
-  right: -6px;
-  z-index: 5;
   display: flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--ls-border-color);
-  border-radius: 7px;
-  background: var(--ls-bg-primary, var(--ls-bg-secondary));
-  box-shadow: 0 2px 10px rgb(0 0 0 / 18%);
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(3px);
-  transition: opacity 0.12s ease, transform 0.12s ease;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  margin-bottom: 8px;
+  padding: 4px;
+  border: 1px solid var(--ls-border-subtle);
+  border-radius: 8px;
+  background: var(--ls-bg-secondary);
+  color: var(--ls-text-muted);
 }
 
-.markdown-table-wrapper:hover .table-toolbar,
-.markdown-table-wrapper:focus-within .table-toolbar {
-  opacity: 1;
-  pointer-events: auto;
-  transform: translateY(0);
+.table-toolbar-separator {
+  flex: 0 0 1px;
+  align-self: stretch;
+  margin: 2px 3px;
+  background: var(--ls-border-color);
 }
 
 .table-toolbar-button {
-  border: 0;
-  border-radius: 5px;
-  padding: 3px 6px;
+  min-height: 28px;
+  min-width: 28px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
   background: transparent;
   color: var(--ls-text-secondary);
-  font-size: calc(11px * var(--ls-font-scale, 1));
+  font: inherit;
+  font-size: calc(12px * var(--ls-font-scale, 1));
   font-weight: 600;
   line-height: 1.2;
   cursor: pointer;
 }
 
 .table-toolbar-button:hover {
-  background: var(--ls-bg-hover);
+  border-color: color-mix(in srgb, var(--ls-accent) 32%, transparent);
+  background: var(--ls-accent-subtle);
   color: var(--ls-text-title);
+}
+
+.table-toolbar-button:focus-visible {
+  outline: 2px solid var(--ls-accent);
+  outline-offset: 1px;
 }
 
 .markdown-block-table th,
@@ -3434,46 +3443,16 @@ body.is-bullet-selecting {
   margin-left: 8px;
 }
 
-.table-row {
-  position: relative;
-}
-
-.table-row::before {
-  content: "";
-  position: absolute;
-  left: -12px;
-  top: 0;
-  bottom: 0;
-  width: 8px;
-  cursor: grab;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.table-row:hover::before {
-  opacity: 1;
-  background: linear-gradient(to right, var(--ls-accent) 0%, transparent 100%);
-}
-
+/* Antes había dos "asas" con degradado grueso a los lados de filas y celdas.
+ * Se sustituyen por un hover suave sobre la celda, en color de acento. */
 .table-cell {
   position: relative;
+  transition: background-color 0.12s ease, box-shadow 0.12s ease;
 }
 
-.table-cell::after {
-  content: "";
-  position: absolute;
-  top: -12px;
-  left: 0;
-  right: 0;
-  height: 8px;
-  cursor: grab;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.table-cell:hover::after {
-  opacity: 1;
-  background: linear-gradient(to bottom, var(--ls-accent) 0%, transparent 100%);
+.table-cell:hover {
+  background: color-mix(in srgb, var(--ls-accent) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ls-accent) 42%, transparent);
 }
 
 .table-context-menu {
