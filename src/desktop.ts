@@ -741,6 +741,7 @@ const outgoingCountBadge = document.getElementById("outgoing-count") as HTMLSpan
 const sidebarLeft = document.getElementById("sidebar-left") as HTMLElement;
 const sidebarResizer = document.getElementById("sidebar-resizer") as HTMLElement;
 const sidebarPagesList = document.getElementById("sidebar-pages-list") as HTMLDivElement;
+const sidebarShowAllContainer = document.getElementById("sidebar-show-all-container") as HTMLDivElement | null;
 const sidebarSearchInput = document.getElementById("sidebar-search-input") as HTMLInputElement;
 const searchResultsDropdown = document.getElementById("search-results-dropdown") as HTMLDivElement;
 const pageTitleHeading = document.getElementById("page-title-heading") as HTMLHeadingElement;
@@ -15432,8 +15433,10 @@ function renderSidebar() {
     recent.forEach((page) => sidebarPagesList.appendChild(buildSidebarItem(page)));
   }
 
-  // El botón lleva a la vista completa: la sidebar no crea un nodo por cada
-  // nota del vault.
+  // El botón vive en su propia fila, al final de la sección de páginas y
+  // justo encima del selector de bóveda, para que no se pierda al desplazar
+  // la lista larga de notas recientes.
+  if (sidebarShowAllContainer) sidebarShowAllContainer.replaceChildren();
   const totalPages = vault.getPages().length;
   if (totalPages > 0) {
     const loadMore = document.createElement("button");
@@ -15444,7 +15447,7 @@ function renderSidebar() {
       allPagesCurrentPage = 1;
       switchView("all-pages");
     });
-    sidebarPagesList.appendChild(loadMore);
+    (sidebarShowAllContainer ?? sidebarPagesList).appendChild(loadMore);
   }
 }
 

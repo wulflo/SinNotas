@@ -8704,23 +8704,32 @@ body.mobile-full-editor .flashcard-review-tools {
   background: linear-gradient(135deg, #61afef 50%, #e5c07b 50%);
 }
 
+.sidebar-show-all-row {
+  flex: 0 0 auto;
+  padding: 4px 8px 8px;
+}
+
 .sidebar-load-more {
   display: block;
   width: 100%;
   padding: 6px 10px;
-  margin: 4px 0;
-  text-align: center;
-  background: var(--ls-bg-secondary);
-  border: 1px solid var(--ls-border-color);
-  border-radius: 6px;
+  margin: 0;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   color: var(--ls-text-muted);
   font-size: calc(12px * var(--ls-font-scale, 1));
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: color 0.15s;
 }
 .sidebar-load-more:hover {
-  background: var(--ls-bg-tertiary);
-  color: var(--ls-text-primary);
+  color: var(--ls-accent);
+  text-decoration: underline;
+}
+.sidebar-load-more:focus-visible {
+  outline: 1px solid var(--ls-accent);
+  outline-offset: 2px;
 }
 
 .table-pagination {
