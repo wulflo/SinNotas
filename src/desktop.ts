@@ -6591,13 +6591,26 @@ async function insertImageBlock(source: string, fileName: string, blockId: strin
   const previousTree = targetPage.blocks;
   const targetLocation = findNodeLocation(previousTree, blockId);
   if (!targetLocation) throw new Error("No se encontró el bloque donde insertar la imagen.");
-  const cursorOffset = getVisibleBlockContent(targetLocation.parentList[targetLocation.index].content).length;
+  const targetNode = targetLocation.parentList[targetLocation.index];
+  const cursorOffset = getVisibleBlockContent(targetNode.content).length;
   const alt = fileName.replace(/\.[^.]+$/, "").replace(/[\[\]()\\]/g, "_") || "imagen";
   const result = insertImageBlockAfter(previousTree, blockId, source, alt);
   if (!result) throw new Error("No se encontró el bloque donde insertar la imagen.");
 
-  targetPage.blocks = result.newTree;
-  cursorState = { blockId, offset: cursorOffset };
+  // Si el bullet sobre el que se pegó estaba vacío, se sustituye por la imagen
+  // en vez de dejar un bullet en blanco encima de ella.
+  const wasEmptyBullet =
+    targetNode.type === "text" &&
+    getVisibleBlockContent(targetNode.content).trim() === "" &&
+    targetNode.children.length === 0 &&
+    splitBlockProperties(targetNode.content).properties.length === 0;
+
+  targetPage.blocks = wasEmptyBullet
+    ? removeBlock(result.newTree, blockId)
+    : result.newTree;
+  cursorState = wasEmptyBullet
+    ? { blockId: result.newBlockId, offset: 0 }
+    : { blockId, offset: cursorOffset };
   try {
     await vault.savePage(targetPage);
     renderBlocksTree();

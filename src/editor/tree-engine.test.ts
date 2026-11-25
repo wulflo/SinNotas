@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { BlockNode } from "../types";
-import { enterAtEnd, getFlatVisibleBlocks, removeBlocks, splitBlock } from "./tree-engine";
+import {
+  enterAtEnd,
+  getFlatVisibleBlocks,
+  insertImageBlockAfter,
+  removeBlock,
+  removeBlocks,
+  splitBlock,
+} from "./tree-engine";
 
 function block(id: string, content: string, children: BlockNode[] = []): BlockNode {
   return { id, type: "text", content, children, collapsed: false };
@@ -169,5 +176,23 @@ describe("splitBlock", () => {
     expect(first.content).toBe("Par");
     expect(first.children.map((node) => node.id)).toEqual([result!.newBlockId, "child"]);
     expect(first.children[0].content).toBe("ent");
+  });
+});
+
+describe("insertar imagen en un bullet vacío", () => {
+  it("sustituye el bullet vacío por el bloque de imagen", () => {
+    const inserted = insertImageBlockAfter([block("b-empty", "")], "b-empty", "assets/x.png", "x");
+    expect(inserted).not.toBeNull();
+    const finalTree = removeBlock(inserted!.newTree, "b-empty");
+
+    expect(finalTree).toHaveLength(1);
+    expect(finalTree[0].type).toBe("image");
+    expect(finalTree[0].content).toBe("assets/x.png");
+  });
+
+  it("conserva el bullet cuando tiene texto", () => {
+    const inserted = insertImageBlockAfter([block("b-text", "Nota")], "b-text", "assets/x.png", "x");
+    expect(inserted!.newTree).toHaveLength(2);
+    expect(inserted!.newTree[0].content).toBe("Nota");
   });
 });
