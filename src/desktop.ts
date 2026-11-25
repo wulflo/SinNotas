@@ -2765,10 +2765,10 @@ async function saveFlashcardDeckEditor(): Promise<void> {
   flashcardDeckEditorIsNew = false;
   flashcardDeckEditorBaseTitles = [...targetDeck.pageTitles];
   flashcardDeckEditorName = targetDeck.name;
-  await persistFlashcardDeckFile();
+  const saved = await persistFlashcardDeckFile();
   renderFlashcardDecksUI();
   renderFlashcardPagesFilter(false);
-  showToast(`Mazo «${targetDeck.name}» guardado`);
+  if (saved) showToast(`Mazo «${targetDeck.name}» guardado`);
 }
 
 /** Renderiza el árbol de mazos formado por los títulos de las notas.
@@ -3230,7 +3230,7 @@ function renderFSRSSettings(): void {
   }
 }
 
-function saveFSRSSettings(useDefaults = false): void {
+async function saveFSRSSettings(useDefaults = false): Promise<void> {
   const selectedDeckId = flashcardFSRSDeckSelect.value;
   const selectedDeck = selectedFSRSSettingsDeck();
   const current = selectedDeck
@@ -3268,12 +3268,13 @@ function saveFSRSSettings(useDefaults = false): void {
       learningSteps: useDefaults ? [...defaultFSRSParams.learningSteps] : learningSteps,
       relearningSteps: useDefaults ? [...defaultFSRSParams.relearningSteps] : relearningSteps,
     });
+    let saved = true;
     if (selectedDeckId) {
       // Los ajustes de recálculo son propios de cada mazo.
       flashcardDeckFile = updateFlashcardDeck(flashcardDeckFile, selectedDeckId, {
         fsrs: parameters,
       });
-      void persistFlashcardDeckFile();
+      saved = await persistFlashcardDeckFile();
       if (selectedDeckId === activeFlashcardDeckId) {
         flashcardsManager.setFSRSParameters(parameters);
       }
@@ -3285,7 +3286,9 @@ function saveFSRSSettings(useDefaults = false): void {
       flashcardsManager.setFSRSParameters(parameters);
     }
     renderFSRSSettings();
-    flashcardFSRSStatus.textContent = translate("Configuración FSRS guardada.");
+    flashcardFSRSStatus.textContent = saved
+      ? translate("Configuración FSRS guardada.")
+      : translate("No se pudieron guardar los mazos.");
     if (currentView === "flashcards") updateFlashcardUI();
   } catch (error) {
     console.error("No se pudo guardar la configuración FSRS:", error);

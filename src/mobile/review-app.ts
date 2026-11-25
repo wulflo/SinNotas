@@ -2761,7 +2761,7 @@ class MobileReviewApp {
     this.syncOverlayState();
   }
 
-  private saveFSRSSettings(useDefaults = false): void {
+  private async saveFSRSSettings(useDefaults = false): Promise<void> {
     const selectedDeck = this.selectedFSRSDeck();
     const current = selectedDeck
       ? deckFSRSSettings(selectedDeck)
@@ -2810,11 +2810,10 @@ class MobileReviewApp {
         this.deckFile = updateFlashcardDeck(this.deckFile, selectedDeck.id, {
           fsrs: parameters,
         });
-        void this.deckRepository
-          .save(this.vault.getActiveRootPath(), this.deckFile)
-          .then((saved) => {
-            this.deckFile = saved;
-          });
+        this.deckFile = await this.deckRepository.save(
+          this.vault.getActiveRootPath(),
+          this.deckFile
+        );
         if (selectedDeck.id === this.activeDeckId) {
           this.manager.setFSRSParameters(parameters);
         }
