@@ -15267,6 +15267,10 @@ function renderAllPagesView() {
 
     row.addEventListener("contextmenu", (e: MouseEvent) => {
       e.preventDefault();
+      // El listener global de `contextmenu` en document cierra todos los
+      // menús; sin stopPropagation se cerraría el menú recién abierto aquí.
+      // El resto de vistas (sidebar, bullets, tablas) ya lo hacen así.
+      e.stopPropagation();
       showSidebarContextMenu(e.clientX, e.clientY, p.id, p.title);
     });
 
