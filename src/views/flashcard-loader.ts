@@ -40,6 +40,8 @@ interface LoadTask {
   scanEpochs: Map<string, number>;
   /** Notas que seguían sin bloques tras la hidratación: no se marca caché fresca. */
   hasSkippedPages: boolean;
+  /** Firma de la evaluación con la que se creó: evita engancharse a datos viejos. */
+  evaluationSignature: string;
   version: FlashcardVersion;
   /** Tarjetas acumuladas (semilla + escaneo) para progreso y vista parcial. */
   cards: Flashcard[];
@@ -202,16 +204,23 @@ export class FlashcardLoader {
       return;
     }
 
+    const evaluationSignature = `${evaluation.state}:${evaluation.changed.map((page) => page.path).join(",")}`;
     const current = this.task;
     if (current && current.requestPages === pages && current.version === version) {
-      current.order = options.order;
-      if (options.preserve) current.preserve = options.preserve;
-      if (options.onProgress) {
-        current.progressListeners.add(options.onProgress);
-        options.onProgress(this.getProgress());
+      // Si la caché cambió mientras corría el escaneo (p. ej. el usuario editó
+      // una nota ya escaneada), enganchar aquí entregaría un `onDone` viejo.
+      if (current.evaluationSignature !== evaluationSignature) {
+        this.cancel();
+      } else {
+        current.order = options.order;
+        if (options.preserve) current.preserve = options.preserve;
+        if (options.onProgress) {
+          current.progressListeners.add(options.onProgress);
+          options.onProgress(this.getProgress());
+        }
+        if (options.onDone) current.doneListeners.add(options.onDone);
+        return;
       }
-      if (options.onDone) current.doneListeners.add(options.onDone);
-      return;
     }
 
     this.cancel();
@@ -259,6 +268,7 @@ export class FlashcardLoader {
       cards,
       scanEpochs: new Map(),
       hasSkippedPages: false,
+      evaluationSignature,
       nextPage: 0,
       order: options.order,
       preserve: options.preserve,

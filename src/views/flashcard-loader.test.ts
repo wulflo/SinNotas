@@ -160,6 +160,37 @@ describe("FlashcardLoader", () => {
     expect(loader.isFresh(pages, version)).toBe(true);
   });
 
+  it("no entrega un onDone viejo si la nota cambia mientras corre el escaneo", async () => {
+    const manager = new FlashcardsManager();
+    const loader = new FlashcardLoader(manager);
+    const pages = [makePage("p1", "Nota", "Solo texto, sin tarjeta")];
+    const epochs = new Map([["notes/Nota.md", 1]]);
+    const version = {
+      getStructural: () => 1,
+      getPageVersion: (page: PageData) => epochs.get(page.path) ?? 0,
+    };
+
+    // Primer escaneo: aún no ha empezado (el loader cede con setTimeout).
+    loader.load(pages, version, { order: "new-first", onDone: () => undefined });
+    // El usuario edita la nota antes de que se escanee ese bloque.
+    pages[0].blocks[0].content = "Pregunta :: Respuesta";
+    epochs.set("notes/Nota.md", 2);
+
+    let latest: readonly unknown[] = [];
+    await new Promise<void>((resolve) => {
+      loader.load(pages, version, {
+        order: "new-first",
+        onDone: (cards) => {
+          latest = cards;
+          resolve();
+        },
+      });
+    });
+
+    expect(latest).toHaveLength(1);
+    expect(manager.getAllCards()[0].question).toBe("Pregunta");
+  });
+
   it("hidrata los lotes sin bloques antes de escanearlos (FASE 4-D)", async () => {
     const manager = new FlashcardsManager();
     const hydrated: string[] = [];
