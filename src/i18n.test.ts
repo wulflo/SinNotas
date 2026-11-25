@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it } from "vitest";
 import { setLanguagePreference, translate } from "./i18n";
+import { BIBLIOGRAPHY_STATUS_LABELS } from "./views/bibliography";
 
 /**
  * Los párrafos de Ajustes > Avanzado que contienen <code> se traducen nodo a
@@ -37,6 +38,14 @@ describe("traducciones de Ajustes > Avanzado", () => {
     }
     expect(translate("Borra la programación FSRS (")).toBe("清除 FSRS 调度（");
     expect(translate(", resaltados")).toBe("，高亮");
+  });
+
+  it("usa 'Revisando' para el estado reading y lo traduce", () => {
+    expect(BIBLIOGRAPHY_STATUS_LABELS.reading).toBe("Revisando");
+    setLanguagePreference("en");
+    expect(translate("Revisando")).toBe("Reviewing");
+    setLanguagePreference("zh");
+    expect(translate("Revisando")).toBe("审阅中");
   });
 
   it("conserva el español original cuando la preferencia es es", () => {

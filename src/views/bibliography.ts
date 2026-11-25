@@ -49,7 +49,7 @@ export const BIBLIOGRAPHY_TYPE_LABELS: Record<BibliographyType, string> = {
 
 export const BIBLIOGRAPHY_STATUS_LABELS: Record<BibliographyStatus, string> = {
   pending: "Pendiente",
-  reading: "Leyendo",
+  reading: "Revisando",
   paused: "Pausado",
   completed: "Completado",
 };

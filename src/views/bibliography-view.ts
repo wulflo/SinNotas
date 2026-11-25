@@ -152,7 +152,7 @@ export class BibliographyView {
     const stats = el("div", "bib-stats");
     stats.append(
       this.buildStat(this.statTotal, translate("Recursos")),
-      this.buildStat(this.statReading, translate("Leyendo")),
+      this.buildStat(this.statReading, statusLabel("reading")),
       this.buildStat(this.statCompleted, translate("Completados"))
     );
 
