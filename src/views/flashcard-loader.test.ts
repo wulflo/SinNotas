@@ -184,4 +184,15 @@ describe("FlashcardLoader", () => {
     expect(manager.getAllCardsCount()).toBe(2);
     expect(loader.getCachedCards(pages, 1)?.length).toBe(2);
   });
+
+  it("no marca como fresca una nota que sigue seca tras la hidratación", async () => {
+    const manager = new FlashcardsManager();
+    const loader = new FlashcardLoader(manager, () => { /* hidratación fallida */ });
+    const pages = [makeDryPage("p0", "Uno")];
+
+    await load(loader, pages, 1);
+
+    expect(manager.getAllCardsCount()).toBe(0);
+    expect(loader.isFresh(pages, 1)).toBe(false);
+  });
 });

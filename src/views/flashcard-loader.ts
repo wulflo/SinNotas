@@ -38,6 +38,8 @@ interface LoadTask {
   scannedBuckets: Map<string, Flashcard[]>;
   /** Epoch de cada nota reescaneada, capturado EN el momento del escaneo. */
   scanEpochs: Map<string, number>;
+  /** Notas que seguían sin bloques tras la hidratación: no se marca caché fresca. */
+  hasSkippedPages: boolean;
   version: FlashcardVersion;
   /** Tarjetas acumuladas (semilla + escaneo) para progreso y vista parcial. */
   cards: Flashcard[];
@@ -256,6 +258,7 @@ export class FlashcardLoader {
       version,
       cards,
       scanEpochs: new Map(),
+      hasSkippedPages: false,
       nextPage: 0,
       order: options.order,
       preserve: options.preserve,
@@ -315,6 +318,13 @@ export class FlashcardLoader {
     const startedAt = performance.now();
     if (chunk.length) {
       for (const page of chunk) {
+        // Si la hidratación falló, la nota sigue sin bloques: escanearla como
+        // vacía y registrar su epoch la dejaría "fresca" con 0 tarjetas para
+        // siempre. Al no registrar el epoch, el próximo load la rescata.
+        if (page.blocksLoaded === false) {
+          task.hasSkippedPages = true;
+          continue;
+        }
         const detected = this.manager.scanPages([page]);
         task.scannedBuckets.set(page.path, detected);
         if (isVersionView(task.version)) {
@@ -367,15 +377,19 @@ export class FlashcardLoader {
     const epochs = new Map(this.cache && task.baseBuckets !== null ? this.cache.epochs : []);
     task.scanEpochs.forEach((value, key) => epochs.set(key, value));
 
-    this.cache = {
-      pages: task.requestPages,
-      version: view ? null : task.version,
-      view,
-      structural: view ? view.getStructural() : 0,
-      epochs,
-      cardsByPage: buckets,
-      cards,
-    };
+    if (!task.hasSkippedPages) {
+      this.cache = {
+        pages: task.requestPages,
+        version: view ? null : task.version,
+        view,
+        structural: view ? view.getStructural() : 0,
+        epochs,
+        cardsByPage: buckets,
+        cards,
+      };
+    } else {
+      this.cache = null;
+    }
 
     this.manager.setDetectedCards(cards, task.order, task.preserve);
 
