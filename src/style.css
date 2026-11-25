@@ -817,7 +817,10 @@ body.sidebar-resizing * {
 
 /* Integrated Search & Omnibar */
 .sidebar-search-container {
-  padding: 10px 12px 6px;
+  /* Separación del nombre de la app y de las subsecciones: antes el buscador
+   * quedaba pegado a la cabecera y la lista se veía compactada. */
+  margin-top: 6px;
+  padding: 14px 14px 10px;
   position: relative;
 }
 
@@ -1014,7 +1017,7 @@ body.sidebar-resizing * {
 }
 
 .sidebar-section-title {
-  padding: 12px 16px 6px;
+  padding: 14px 16px 8px;
   font-size: var(--ls-font-size-ui);
   font-weight: 600;
   text-transform: none;
@@ -1025,7 +1028,7 @@ body.sidebar-resizing * {
 .pages-list {
   flex: 1;
   overflow-y: auto;
-  padding: 4px 8px;
+  padding: 6px 10px;
 }
 
 .sidebar-footer {
@@ -8738,7 +8741,7 @@ body.mobile-full-editor .flashcard-review-tools {
 
 .sidebar-show-all-row {
   flex: 0 0 auto;
-  padding: 4px 8px 8px;
+  padding: 8px 10px 10px;
 }
 
 .sidebar-load-more {
