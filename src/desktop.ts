@@ -15329,8 +15329,8 @@ function renderJournalsView() {
 const SIDEBAR_JOURNAL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M16 2v4M8 2v4M3 9h18"></path><path d="M8 13h3M8 17h6"></path></svg>';
 const SIDEBAR_PAGE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13h8M8 17h8"></path></svg>';
 
-/** Máximo de notas en Recientes: las 5 aperturas más recientes. */
-const RECENT_PAGES_LIMIT = 5;
+/** Máximo de notas en Recientes: las 10 aperturas más recientes. */
+const RECENT_PAGES_LIMIT = 10;
 
 /**
  * Rutas de las últimas notas abiertas (la más reciente primero). Se guardar
