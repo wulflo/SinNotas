@@ -3526,16 +3526,13 @@ function handleGamepadAxes(gamepad: Gamepad): void {
 
   const view = document.getElementById("view-flashcards");
   if (!view) return;
-  // Si el contenido de la tarjeta desborda, es el que debe moverse. Si no,
-  // se desplaza el primer ancestro con scroll. Elegir siempre el ancestro
-  // hacía que, en modo focus, se moviesen dos contenedores anidados: en
-  // WebView2 (Windows) el interior con `overscroll-behavior: contain`
-  // rebotaba y daba la sensación de inercia al soltar el joystick.
-  const cardContent = view.querySelector<HTMLElement>(".flashcard-content");
+  // Primero el contenedor superior de la flashcard (#view-flashcards), que
+  // envuelve cabecera, tarjeta y acciones: es el que debe desplazarse para ver
+  // todo el contenido. El contenido interno (.flashcard-content) queda solo
+  // como respaldo en modo focus, donde el panel superior tiene overflow hidden.
   const scrollRoot =
-    cardContent && cardContent.scrollHeight > cardContent.clientHeight + 1
-      ? cardContent
-      : findScrollableAncestor(view);
+    findScrollableAncestor(view) ??
+    view.querySelector<HTMLElement>(".flashcard-content");
   if (!scrollRoot) return;
 
   const maxScroll = scrollRoot.scrollHeight - scrollRoot.clientHeight;
