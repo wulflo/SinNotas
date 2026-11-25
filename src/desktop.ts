@@ -4389,6 +4389,9 @@ function openSettingsOverlay(): void {
     renderFlashcardPagesFilter(true);
     void refreshFlashcardDecksFromVault(false);
   }
+  // El overlay se desmonta del DOM al cerrarse: hay que repoblar la lista al
+  // volver a abrirlo, aunque la pestaña ya estuviera seleccionada.
+  if (activeTab === "shortcuts") renderShortcutSettings();
   if (activeTab === "appearance") ensureSystemFontsLoaded();
   if (activeTab === "graph") syncGraphSettingsUi();
 }
@@ -4561,7 +4564,6 @@ shortcutsModalOverlay.addEventListener("click", (event) => {
 });
 
 /* ==================== AJUSTES > ATAJOS ==================== */
-const shortcutsSettingsList = document.getElementById("shortcuts-settings-list");
 let capturingShortcutId: EditableShortcutId | null = null;
 
 function refreshShortcutModalBindings(): void {
@@ -4572,8 +4574,11 @@ function refreshShortcutModalBindings(): void {
 }
 
 function renderShortcutSettings(): void {
-  if (!shortcutsSettingsList) return;
-  shortcutsSettingsList.replaceChildren();
+  // Se busca en cada llamada: switchSettingsTab() también se ejecuta durante
+  // la inicialización del módulo, antes de declarar el estado de captura.
+  const list = document.getElementById("shortcuts-settings-list");
+  if (!list) return;
+  list.replaceChildren();
   for (const definition of SHORTCUT_DEFINITIONS) {
     const row = document.createElement("div");
     row.className = "settings-row";
@@ -4588,7 +4593,9 @@ function renderShortcutSettings(): void {
     bindingButton.type = "button";
     bindingButton.className = "font-option-btn shortcut-binding-btn";
     bindingButton.dataset.shortcutId = definition.id;
-    bindingButton.textContent = capturingShortcutId === definition.id
+    const isCapturing = capturingShortcutId === definition.id;
+    if (isCapturing) bindingButton.classList.add("is-capturing");
+    bindingButton.textContent = isCapturing
       ? translate("Pulsa una combinación de teclas...")
       : formatShortcut(getBinding(definition.id));
     bindingButton.addEventListener("click", () => {
@@ -4614,7 +4621,7 @@ function renderShortcutSettings(): void {
 
     actions.append(bindingButton, resetButton);
     row.append(label, actions);
-    shortcutsSettingsList.append(row);
+    list.append(row);
   }
 }
 
