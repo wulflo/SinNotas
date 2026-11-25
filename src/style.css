@@ -9429,6 +9429,9 @@ body.editor-split-active #view-editor .canvas-wrapper {
   border-radius: 10px;
   background: var(--ls-bg-secondary);
   overflow: hidden;
+  /* Límite de altura para que el grafo de la nota actual no crezca sin
+   * control y ocupe toda la sidebar derecha. */
+  max-height: 220px;
 }
 
 .reference-pane-graph[hidden] {
@@ -9467,11 +9470,14 @@ body.editor-split-active #view-editor .canvas-wrapper {
 .reference-slot {
   display: flex;
   /* Altura mínima para que la nota se pueda recorrer con scroll en vez de
-   * quedar comprimida cuando el grafo ocupa la parte superior. */
+   * quedar comprimida cuando el grafo ocupa la parte superior. Se permite
+   * scroll dentro de cada ranura para ver todo el contenido de la referencia. */
   flex: 1 0 200px;
   flex-direction: column;
   min-height: 200px;
-  overflow: hidden;
+  max-height: 520px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   border: 1px solid var(--ls-border-subtle);
   border-radius: 12px;
   background: color-mix(in srgb, var(--ls-bg-secondary) 62%, transparent);
