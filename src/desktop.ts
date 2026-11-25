@@ -220,6 +220,16 @@ import {
 import { renderMathToHtml } from "./editor/math";
 import { currentLanguage, initializeLocalization, onLanguageChange, translate } from "./i18n";
 import {
+  SHORTCUT_DEFINITIONS,
+  assignBinding,
+  formatShortcut,
+  getBinding,
+  matchesShortcut,
+  normalizeShortcutEvent,
+  resetBinding,
+  type EditableShortcutId,
+} from "./shortcuts";
+import {
   checkForUpdates,
   detectInstallKind,
   getCurrentVersion,
@@ -1931,6 +1941,9 @@ function switchSettingsTab(tabName: string): void {
   if (tabName === "saved") {
     void refreshActiveSnapshotNotesList();
   }
+  if (tabName === "shortcuts") {
+    renderShortcutSettings();
+  }
   if (tabName === "appearance" && settingsOverlay.isConnected) {
     ensureSystemFontsLoaded();
   }
@@ -1942,7 +1955,7 @@ settingsDropdownMenu.querySelectorAll<HTMLButtonElement>("[data-settings-tab]").
   });
 });
 
-const settingsTabNames = ["appearance", "flashcards", "saved", "advanced"];
+const settingsTabNames = ["appearance", "flashcards", "saved", "shortcuts", "advanced"];
 // Las pestañas "Repaso" y "Pomodoro" ahora viven dentro de Flashcards, y
 // "Grafo" se movió a la propia vista de grafo. Si el usuario tenía una de
 // ellas seleccionada, se abre Flashcards en la subsección correspondiente.
@@ -4518,6 +4531,7 @@ conceptMapOverlay.addEventListener("click", (event) => {
 
 function openShortcutsModal(): void {
   if (hasMountedModalExcept(shortcutsModalOverlay)) return;
+  refreshShortcutModalBindings();
   mountOverlay(shortcutsModalOverlay);
   btnCloseShortcuts?.focus();
 }
@@ -4542,6 +4556,97 @@ btnCloseShortcuts?.addEventListener("click", () => {
 });
 shortcutsModalOverlay.addEventListener("click", (event) => {
   if (event.target === shortcutsModalOverlay) closeShortcutsModal();
+});
+
+/* ==================== AJUSTES > ATAJOS ==================== */
+const shortcutsSettingsList = document.getElementById("shortcuts-settings-list");
+let capturingShortcutId: EditableShortcutId | null = null;
+
+function refreshShortcutModalBindings(): void {
+  shortcutsModalOverlay.querySelectorAll<HTMLElement>("[data-shortcut-id]").forEach((kbd) => {
+    const id = kbd.dataset.shortcutId as EditableShortcutId | undefined;
+    if (id) kbd.textContent = formatShortcut(getBinding(id));
+  });
+}
+
+function renderShortcutSettings(): void {
+  if (!shortcutsSettingsList) return;
+  shortcutsSettingsList.replaceChildren();
+  for (const definition of SHORTCUT_DEFINITIONS) {
+    const row = document.createElement("div");
+    row.className = "settings-row";
+
+    const label = document.createElement("label");
+    label.textContent = translate(definition.label);
+
+    const actions = document.createElement("div");
+    actions.className = "shortcut-binding-actions";
+
+    const bindingButton = document.createElement("button");
+    bindingButton.type = "button";
+    bindingButton.className = "font-option-btn shortcut-binding-btn";
+    bindingButton.dataset.shortcutId = definition.id;
+    bindingButton.textContent = capturingShortcutId === definition.id
+      ? translate("Pulsa una combinación de teclas...")
+      : formatShortcut(getBinding(definition.id));
+    bindingButton.addEventListener("click", () => {
+      capturingShortcutId = definition.id;
+      renderShortcutSettings();
+    });
+
+    const resetButton = document.createElement("button");
+    resetButton.type = "button";
+    resetButton.className = "btn-icon";
+    resetButton.textContent = "↺";
+    resetButton.setAttribute(
+      "aria-label",
+      `${translate("Restablecer atajo")}: ${translate(definition.label)}`
+    );
+    resetButton.addEventListener("click", () => {
+      resetBinding(definition.id);
+      capturingShortcutId = null;
+      renderShortcutSettings();
+      refreshShortcutModalBindings();
+      showToast(translate("Atajo restablecido."));
+    });
+
+    actions.append(bindingButton, resetButton);
+    row.append(label, actions);
+    shortcutsSettingsList.append(row);
+  }
+}
+
+// Captura en fase capture: la combinación que se está asignando no debe
+// ejecutar su acción mientras se graba.
+window.addEventListener("keydown", (event) => {
+  if (!capturingShortcutId) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (event.key === "Escape") {
+    capturingShortcutId = null;
+    renderShortcutSettings();
+    return;
+  }
+  const result = assignBinding(capturingShortcutId, normalizeShortcutEvent(event));
+  if (!result.ok) {
+    const reasonKey = result.reason === "duplicate"
+      ? "Ese atajo ya está en uso por"
+      : result.reason === "reserved"
+        ? "Ese atajo está reservado por"
+        : "La combinación debe incluir Ctrl/Cmd o Alt.";
+    const conflict = result.conflictLabel ? ` ${translate(result.conflictLabel)}` : "";
+    showToast(`${translate(reasonKey)}${conflict}`);
+    return;
+  }
+  capturingShortcutId = null;
+  renderShortcutSettings();
+  refreshShortcutModalBindings();
+  showToast(translate("Atajo guardado."));
+}, true);
+
+onLanguageChange(() => {
+  renderShortcutSettings();
+  refreshShortcutModalBindings();
 });
 
 let pageExportCloseTimer: number | null = null;
@@ -8670,24 +8775,22 @@ document.addEventListener("keydown", (event: KeyboardEvent) => {
   const hasTextSelection = Boolean(window.getSelection() && !window.getSelection()?.isCollapsed);
 
   // Atajos de tarjetas y selección masiva cuando el foco no está en un editor
-  // de bloque (por ejemplo, tras una selección por caja).
-  if ((event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey) {
-    const key = event.key.toLowerCase();
-    if (key === "a") {
-      event.preventDefault();
-      selectAllBullets();
-      return;
-    }
-    if (key === "c") {
-      event.preventDefault();
-      createBasicCardFromSelection();
-      return;
-    }
-    if (key === "d") {
-      event.preventDefault();
-      deleteFlashcardsInSelection();
-      return;
-    }
+  // de bloque (por ejemplo, tras una selección por caja). Se consulta el
+  // registro para que respeten las combinaciones cambiadas en Ajustes > Atajos.
+  if (matchesShortcut(event, "selectAll")) {
+    event.preventDefault();
+    selectAllBullets();
+    return;
+  }
+  if (matchesShortcut(event, "createCard")) {
+    event.preventDefault();
+    createBasicCardFromSelection();
+    return;
+  }
+  if (matchesShortcut(event, "removeCards")) {
+    event.preventDefault();
+    deleteFlashcardsInSelection();
+    return;
   }
 
   // Selección múltiple: indentar/desindentar/borrar con foco fuera del editor.
@@ -9306,23 +9409,24 @@ function handleEditorKeyDown(e: KeyboardEvent, blockId: string, page: PageData =
   // Atajos de selección masiva y tarjetas.
   // Ctrl/Cmd+Shift+A selecciona todos los bullets de la página; Ctrl/Cmd+A
   // amplía la selección actual a toda la página.
-  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "a") {
-    if (e.shiftKey || selectedBulletIds.length > 0) {
-      e.preventDefault();
-      selectAllBullets(page);
-      return;
-    }
+  if (
+    matchesShortcut(e, "selectAll") ||
+    (!e.shiftKey && (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "a" && selectedBulletIds.length > 0)
+  ) {
+    e.preventDefault();
+    selectAllBullets(page);
+    return;
   }
 
-  // Ctrl/Cmd+Shift+C crea una tarjeta básica desde la selección (o el bullet actual).
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === "c") {
+  // Crear tarjeta básica desde la selección (o el bullet actual).
+  if (matchesShortcut(e, "createCard")) {
     e.preventDefault();
     createBasicCardFromSelection(page);
     return;
   }
 
-  // Ctrl/Cmd+Shift+D elimina los marcadores de flashcard de la selección.
-  if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && e.key.toLowerCase() === "d") {
+  // Quitar los marcadores de flashcard de la selección.
+  if (matchesShortcut(e, "removeCards")) {
     e.preventDefault();
     deleteFlashcardsInSelection(page);
     return;
@@ -17068,7 +17172,7 @@ window.addEventListener("click", (e) => {
 
 /* ==================== GLOBAL KEYBOARD SHORTCUTS ==================== */
 window.addEventListener("keydown", (e: KeyboardEvent) => {
-  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "f") {
+  if (matchesShortcut(e, "findInNote")) {
     const target = e.target instanceof HTMLElement ? e.target : null;
     const inAnotherField =
       target !== null &&
@@ -17089,7 +17193,7 @@ window.addEventListener("keydown", (e: KeyboardEvent) => {
     return;
   }
 
-  if ((e.ctrlKey || e.metaKey) && e.key === "/") {
+  if (matchesShortcut(e, "shortcuts")) {
     // No abrir atajos encima de otro diálogo (ajustes, historial, etc.).
     if (hasMountedModalExcept(shortcutsModalOverlay)) return;
     e.preventDefault();
@@ -17103,13 +17207,13 @@ window.addEventListener("keydown", (e: KeyboardEvent) => {
   if (e.key === "Escape" && slashMenu && !slashMenu.hidden) {
     hideSlashMenu();
   }
-  if ((e.ctrlKey || e.metaKey) && (e.key === "b" || e.key === "B")) {
+  if (matchesShortcut(e, "sidebar")) {
     e.preventDefault();
     toggleSidebar();
     return;
   }
 
-  if ((e.ctrlKey || e.metaKey) && (e.key === "k" || e.key === "K")) {
+  if (matchesShortcut(e, "searchPage")) {
     e.preventDefault();
     if (sidebarLeft.classList.contains("is-collapsed")) {
       toggleSidebar();

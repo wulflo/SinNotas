@@ -2027,6 +2027,24 @@ select {
   min-width: 0;
 }
 
+/* Ajustes > Atajos: captura y restablecimiento de combinaciones. */
+.shortcut-binding-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 auto;
+}
+
+.shortcut-binding-btn {
+  min-width: 170px;
+  font-variant-numeric: tabular-nums;
+}
+
+.shortcut-binding-btn.is-capturing {
+  border-color: var(--ls-accent);
+  color: var(--ls-accent);
+}
+
 .settings-row > select {
   width: min(220px, 100%);
   max-width: 100%;

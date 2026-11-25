@@ -313,6 +313,7 @@
                 <button class="settings-tab active" type="button" role="tab" aria-selected="true" data-settings-tab="appearance">Apariencia</button>
                 <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="flashcards">Flashcards</button>
                 <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="saved">Guardado</button>
+                <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="shortcuts">Atajos</button>
                 <button class="settings-tab" type="button" role="tab" aria-selected="false" data-settings-tab="advanced">Avanzado</button>
               </div>
 
@@ -816,6 +817,12 @@
                   <button class="font-option-btn" id="btn-reload-app" type="button">Recargar aplicación</button>
                 </div>
                 <p class="settings-help" id="unused-attachments-status" role="status" aria-live="polite"></p>
+              </section>
+
+              <section class="settings-tab-panel" role="tabpanel" data-settings-panel="shortcuts" hidden>
+                <div class="settings-section-title">Atajos de teclado</div>
+                <p class="settings-help">Cambia los atajos principales desde aquí. Las teclas de calificación se configuran en Ajustes → Flashcards.</p>
+                <div id="shortcuts-settings-list"></div>
               </section>
             </div>
             </div>
@@ -1700,27 +1707,27 @@
         <div class="shortcuts-modal-body">
           <section class="shortcuts-group" aria-labelledby="shortcuts-navigation-title">
             <h3 class="shortcuts-group-title" id="shortcuts-navigation-title">Navegación</h3>
-            <div class="shortcut-row"><span>Abrir o cerrar esta lista</span><kbd>Ctrl/Cmd+/</kbd></div>
-            <div class="shortcut-row"><span>Mostrar u ocultar la barra lateral</span><kbd>Ctrl/Cmd+B</kbd></div>
-            <div class="shortcut-row"><span>Buscar o crear una página</span><kbd>Ctrl/Cmd+K</kbd></div>
+            <div class="shortcut-row"><span>Abrir o cerrar esta lista</span><kbd data-shortcut-id="shortcuts">Ctrl/Cmd+/</kbd></div>
+            <div class="shortcut-row"><span>Mostrar u ocultar la barra lateral</span><kbd data-shortcut-id="sidebar">Ctrl/Cmd+B</kbd></div>
+            <div class="shortcut-row"><span>Buscar o crear una página</span><kbd data-shortcut-id="searchPage">Ctrl/Cmd+K</kbd></div>
             <div class="shortcut-row"><span>Cerrar ventanas y menús</span><kbd>Esc</kbd></div>
           </section>
 
           <section class="shortcuts-group" aria-labelledby="shortcuts-editor-title">
             <h3 class="shortcuts-group-title" id="shortcuts-editor-title">Editor</h3>
-            <div class="shortcut-row"><span>Buscar dentro de la nota</span><kbd>Ctrl/Cmd+F</kbd></div>
+            <div class="shortcut-row"><span>Buscar dentro de la nota</span><kbd data-shortcut-id="findInNote">Ctrl/Cmd+F</kbd></div>
             <div class="shortcut-row"><span>Crear un bullet nuevo</span><kbd>Enter</kbd></div>
             <div class="shortcut-row"><span>Salto de línea dentro del bullet</span><kbd>Shift+Enter</kbd></div>
             <div class="shortcut-row"><span>Sangrar bullet</span><kbd>Tab / Alt+→</kbd></div>
             <div class="shortcut-row"><span>Desangrar bullet</span><kbd>Shift+Tab / Alt+←</kbd></div>
             <div class="shortcut-row"><span>Seleccionar bullets contiguos</span><kbd>Shift+↑ / Shift+↓</kbd></div>
-            <div class="shortcut-row"><span>Seleccionar todos los bullets de la página</span><kbd>Ctrl/Cmd+Shift+A</kbd></div>
+            <div class="shortcut-row"><span>Seleccionar todos los bullets de la página</span><kbd data-shortcut-id="selectAll">Ctrl/Cmd+Shift+A</kbd></div>
             <div class="shortcut-row"><span>Unir con el bullet anterior</span><kbd>Backspace</kbd></div>
             <div class="shortcut-row"><span>Copiar bullets seleccionados</span><kbd>Ctrl/Cmd+C</kbd></div>
             <div class="shortcut-row"><span>Cortar bullets seleccionados</span><kbd>Ctrl/Cmd+X</kbd></div>
             <div class="shortcut-row"><span>Borrar bullets seleccionados</span><kbd>Del / Backspace</kbd></div>
-            <div class="shortcut-row"><span>Crear tarjeta básica desde la selección</span><kbd>Ctrl/Cmd+Shift+C</kbd></div>
-            <div class="shortcut-row"><span>Quitar flashcards de la selección</span><kbd>Ctrl/Cmd+Shift+D</kbd></div>
+            <div class="shortcut-row"><span>Crear tarjeta básica desde la selección</span><kbd data-shortcut-id="createCard">Ctrl/Cmd+Shift+C</kbd></div>
+            <div class="shortcut-row"><span>Quitar flashcards de la selección</span><kbd data-shortcut-id="removeCards">Ctrl/Cmd+Shift+D</kbd></div>
             <div class="shortcut-row"><span>Deshacer</span><kbd>Ctrl/Cmd+Z</kbd></div>
             <div class="shortcut-row"><span>Rehacer</span><kbd>Ctrl/Cmd+Y / Ctrl/Cmd+Shift+Z</kbd></div>
             <div class="shortcut-row"><span>Pegar sin formato</span><kbd>Ctrl/Cmd+Shift+V</kbd></div>
