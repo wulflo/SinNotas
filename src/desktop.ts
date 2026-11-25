@@ -14181,7 +14181,9 @@ function applyFSRSRating(
 
   const result = flashcardsManager.rate(rating, persist);
   if (result) {
-    if (rating === 4 && persist) launchEasyCelebration(celebrationOrigin);
+    // Si falla la escritura hay que devolver también las estadísticas: antes
+    // se sumaban aquí y el catch solo revertía el contenido del bloque.
+    const previousStats = { ...flashcardProgressStats };
     resetFlashcardDailyProgress();
     flashcardProgressStats.reviewsToday += 1;
     flashcardProgressStats.totalReviews += 1;
@@ -14220,16 +14222,26 @@ function applyFSRSRating(
           })
         )
         .then(() => {
+          if (rating === 4 && persist) launchEasyCelebration(celebrationOrigin);
           updateReviewHistoryButtons();
           renderFlashcardHeatmap();
         })
-        .catch((error: unknown) => {
+        .catch(async (error: unknown) => {
           // Sin diario no hay deshacer posible: devuelve la tarjeta a su
-          // programación anterior y deja la respuesta visible para repetir
-          // la calificación, igual que hace la app móvil.
+          // programación anterior **y vuelve a guardar la nota**, que ya había
+          // sido escrita por el primer savePage.
           block.content = previousContent;
           flashcardsManager.updateCardInSession(card.id, previousContent, card.id, true);
+          Object.assign(flashcardProgressStats, previousStats);
+          saveFlashcardProgressStats();
+          updateFlashcardProgressPanel();
           updateFlashcardUI();
+          try {
+            await vault.savePage(page, true);
+          } catch (rollbackError: unknown) {
+            console.error("No se pudo deshacer el repaso en la nota:", rollbackError);
+            showToast(translate("No se pudo guardar el repaso. Revisa los permisos de la bóveda."));
+          }
           console.error("No se pudo guardar el repaso en .sinnotas/progress/reviews.json:", error);
           showToast(translate("No se pudo guardar el repaso. Revisa los permisos de la bóveda."));
         });

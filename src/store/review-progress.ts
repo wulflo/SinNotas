@@ -450,10 +450,20 @@ export class ReviewProgressStore {
 
   public async commitUndo(event: ReviewProgressEvent): Promise<void> {
     const current = this.currentEvent(event.id) ?? event;
+    const previousState = current.state;
+    const previousUpdatedAt = current.updatedAt;
+    const previousRedoLength = this.redoStack.length;
     current.state = "undone";
     current.updatedAt = new Date().toISOString();
     this.redoStack.push(current);
-    await this.persist();
+    try {
+      await this.persist();
+    } catch (error) {
+      current.state = previousState;
+      current.updatedAt = previousUpdatedAt;
+      this.redoStack.length = previousRedoLength;
+      throw error;
+    }
   }
 
   public takeRedo(): ReviewProgressEvent | null {
@@ -477,10 +487,20 @@ export class ReviewProgressStore {
 
   public async commitRedo(event: ReviewProgressEvent): Promise<void> {
     const current = this.currentEvent(event.id) ?? event;
+    const previousState = current.state;
+    const previousUpdatedAt = current.updatedAt;
+    const previousUndoLength = this.undoStack.length;
     current.state = "applied";
     current.updatedAt = new Date().toISOString();
     this.undoStack.push(current);
-    await this.persist();
+    try {
+      await this.persist();
+    } catch (error) {
+      current.state = previousState;
+      current.updatedAt = previousUpdatedAt;
+      this.undoStack.length = previousUndoLength;
+      throw error;
+    }
   }
 
   public canUndo(): boolean {

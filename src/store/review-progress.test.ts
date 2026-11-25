@@ -294,4 +294,31 @@ describe("ReviewProgressStore - deshacer tras una recarga", () => {
       "applied"
     );
   });
+
+  it("revierte pila y estado si falla la escritura al deshacer", async () => {
+    const store = new ReviewProgressStore();
+    const event = await store.record({
+      pagePath: "pages/Nota.md",
+      pageTitle: "Nota",
+      blockId: "b-1",
+      cardId: "fc-basic-p1-b-1",
+      cardType: "basic",
+      rating: 3,
+      before: {},
+      after: { reps: 1, intervalDays: 1 },
+    });
+
+    const originalSetItem = fakeLocalStorage.setItem;
+    fakeLocalStorage.setItem = () => {
+      throw new Error("disco lleno");
+    };
+    try {
+      await expect(store.commitUndo(event)).rejects.toThrow("disco lleno");
+    } finally {
+      fakeLocalStorage.setItem = originalSetItem;
+    }
+
+    expect(store.getEntries().find((entry) => entry.id === event.id)?.state).toBe("applied");
+    expect(store.canRedo()).toBe(false);
+  });
 });

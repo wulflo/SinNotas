@@ -2139,6 +2139,14 @@ class MobileReviewApp {
       this.manager.scanVault(this.pages, "new-first");
       const refreshed = this.manager.refreshCard(this.pages, card.id, "new-first", true);
       if (!refreshed) this.manager.scanVault(this.pages, "new-first");
+      // La primera savePage ya escribió el repaso en disco: reescribir el
+      // contenido anterior para que el rollback no sea solo visual.
+      try {
+        await this.vault.savePage(page, true);
+      } catch (rollbackError) {
+        console.error("No se pudo deshacer el repaso en la nota:", rollbackError);
+        this.showToast("No se pudo guardar el repaso. Revisa los permisos de la bóveda.");
+      }
       this.render();
       console.error("No se pudo guardar el repaso de la tarjeta:", error);
       this.showToast("No se pudo guardar el repaso. Revisa los permisos de la bóveda.");
