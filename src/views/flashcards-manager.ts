@@ -18,8 +18,6 @@ import { parseImageOcclusions } from "../editor/image-occlusion";
 
 export type FlashcardReviewOrder = "new-first" | "reviews-first" | "mixed";
 
-/** Acepta notación científica, igual que readScheduleSnapshot(). */
-const FSRS_NUMBER = "[+-]?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?";
 
 /** Resumen de tarjetas de una nota, sin aplicar el filtro de repaso activo. */
 export interface FlashcardPageStats {
@@ -284,30 +282,58 @@ export class FlashcardsManager {
     return { total, due, new: newCards };
   }
 
+  /**
+   * Lee una propiedad solo si es una línea `clave:: valor`. Sin el anclaje,
+   * un `hint` de `image-occlusions::` o una pregunta que mencionara `card-s::`
+   * se convertían en programación FSRS fantasma.
+   */
+  private static readProperty(content: string, name: string): string | undefined {
+    const match = content
+      .replace(/\r\n?/g, "\n")
+      .match(new RegExp(`(?:^|\\n)[ \\t]*${name}::[ \\t]*([^\\n]*)`, "i"));
+    const value = match?.[1]?.trim();
+    return value || undefined;
+  }
+
+  private static readPropertyNumber(content: string, name: string): number | undefined {
+    const value = this.readProperty(content, name);
+    if (value === undefined) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  /** Quita solo líneas de propiedades FSRS, nunca texto dentro de otras propiedades. */
+  private static stripScheduledProperties(content: string): string {
+    const names = [
+      "card-s-fast", "card-s", "card-d", "card-reps", "card-lapses",
+      "card-last-interval", "last-reviewed", "interval-days", "ease-factor",
+      "due-date", "card-state", "card-learn-step",
+    ];
+    return content
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .filter((line) => !names.some((name) => new RegExp(`^[ \\t]*${name}::`, "i").test(line)))
+      .join("\n")
+      .trim();
+  }
+
   /** Extract FSRS metadata stored in block properties (e.g. card-s:: 2.5) */
   private parseBlockFSRS(content: string): FSRSItem {
-    const sMatch = content.match(new RegExp(`card-s::\\s*(${FSRS_NUMBER})`, "i"));
-    const sFastMatch = content.match(new RegExp(`card-s-fast::\\s*(${FSRS_NUMBER})`, "i"));
-    const dMatch = content.match(new RegExp(`card-d::\\s*(${FSRS_NUMBER})`, "i"));
-    const repsMatch = content.match(/card-reps::\s*(\d+)/i);
-    const lapsesMatch = content.match(/card-lapses::\s*(\d+)/i);
-    const lastReviewedMatch = content.match(/last-reviewed::\s*(\S+)/i);
-    const stateMatch = content.match(/card-state::\s*([0-3])/i);
-    const learningStepMatch = content.match(/card-learn-step::\s*(\d+)/i);
-
-    const stability = sMatch ? parseFloat(sMatch[1]) : 0;
-    const stabilityFast = sFastMatch ? parseFloat(sFastMatch[1]) : undefined;
-    const difficulty = dMatch ? parseFloat(dMatch[1]) : 5.0;
-    const reps = repsMatch ? parseInt(repsMatch[1], 10) : 0;
-    const lapses = lapsesMatch ? parseInt(lapsesMatch[1], 10) : 0;
-    const learningStep = learningStepMatch ? parseInt(learningStepMatch[1], 10) : undefined;
+    const stability = FlashcardsManager.readPropertyNumber(content, "card-s") ?? 0;
+    const stabilityFast = FlashcardsManager.readPropertyNumber(content, "card-s-fast");
+    const difficulty = FlashcardsManager.readPropertyNumber(content, "card-d") ?? 5.0;
+    const reps = FlashcardsManager.readPropertyNumber(content, "card-reps") ?? 0;
+    const lapses = FlashcardsManager.readPropertyNumber(content, "card-lapses") ?? 0;
+    const lastReviewed = FlashcardsManager.readProperty(content, "last-reviewed");
+    const stateRaw = FlashcardsManager.readPropertyNumber(content, "card-state");
+    const learningStep = FlashcardsManager.readPropertyNumber(content, "card-learn-step");
 
     // Las tarjetas antiguas no guardaban `card-state`. Si tienen un paso de
     // aprendizaje, hay que reconstruir el estado Learning; antes se infería
     // Review en cuanto reps > 0 y la tarjeta saltaba de fase al recargar.
-    const state: CardState = stateMatch
-      ? (Number(stateMatch[1]) as CardState)
-      : learningStep !== undefined && (reps > 0 || lastReviewedMatch)
+    const state: CardState = stateRaw !== undefined
+      ? (stateRaw as CardState)
+      : learningStep !== undefined && (reps > 0 || lastReviewed)
         ? lapses > 0
           ? 3
           : 1
@@ -328,35 +354,28 @@ export class FlashcardsManager {
       reps,
       lapses,
       state,
-      ...(lastReviewedMatch ? { lastReviewDate: lastReviewedMatch[1] } : {}),
+      ...(lastReviewed ? { lastReviewDate: lastReviewed } : {}),
       ...(learningStep !== undefined ? { learningStep } : {}),
     };
   }
 
   private parseIntervalDays(content: string): number {
-    const match = content.match(
-      new RegExp(`interval-days::\\s*(${FSRS_NUMBER})|card-last-interval::\\s*(${FSRS_NUMBER})\\s*d?`, "i")
-    );
-    if (!match) return 0;
-    const days = Number(match[1] || match[2]);
-    return Number.isFinite(days) && days >= 0 ? days : 0;
+    const days = FlashcardsManager.readPropertyNumber(content, "interval-days")
+      ?? FlashcardsManager.readPropertyNumber(content, "card-last-interval");
+    return days !== undefined && days >= 0 ? days : 0;
   }
 
   private parseEaseFactor(content: string): number {
-    const match = content.match(new RegExp(`ease-factor::\\s*(${FSRS_NUMBER})`, "i"));
-    if (!match) return 2.5;
-    const easeFactor = Number(match[1]);
-    return Number.isFinite(easeFactor) && easeFactor >= 1.3 ? easeFactor : 2.5;
+    const easeFactor = FlashcardsManager.readPropertyNumber(content, "ease-factor") ?? 2.5;
+    return easeFactor >= 1.3 ? easeFactor : 2.5;
   }
 
   private parseDueDate(content: string): string | undefined {
-    const match = content.match(/due-date::\s*(\S+)/i);
-    return match?.[1];
+    return FlashcardsManager.readProperty(content, "due-date");
   }
 
   private parseCreatedAt(content: string): string | undefined {
-    const match = content.match(/created-at::\s*(\S+)/i);
-    return match?.[1];
+    return FlashcardsManager.readProperty(content, "created-at");
   }
 
   private isDue(card: Flashcard, now: Date): boolean {
@@ -643,35 +662,22 @@ export class FlashcardsManager {
    * deshacer un repaso se puedan eliminar todas las propiedades añadidas.
    */
   public static readScheduleSnapshot(content: string): CardScheduleSnapshot {
-    const readNumber = (pattern: RegExp): number | undefined => {
-      const match = content.match(pattern);
-      if (!match) return undefined;
-      const value = Number(match[1]);
-      return Number.isFinite(value) ? value : undefined;
-    };
-    const readText = (pattern: RegExp): string | undefined => {
-      const match = content.match(pattern);
-      return match?.[1] || undefined;
-    };
-
-    // `Number.toString()` usa notación científica para valores muy pequeños
-    // (p. ej. 1.2e-7). El patrón anterior (`[\d.]+`) se quedaba a mitad del
-    // número y corrompía la instantánea al deshacer.
-    const numberPattern = "([+-]?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)";
+    const num = (name: string) => this.readPropertyNumber(content, name);
+    const text = (name: string) => this.readProperty(content, name);
+    // Leer solo líneas `clave:: valor` evita que un hint de oclusión con
+    // `card-s:: 99` se convierta en una instantánea falsa.
     const snapshot: CardScheduleSnapshot = {
-      stability: readNumber(new RegExp(`card-s::\\s*${numberPattern}`, "i")),
-      difficulty: readNumber(new RegExp(`card-d::\\s*${numberPattern}`, "i")),
-      stabilityFast: readNumber(new RegExp(`card-s-fast::\\s*${numberPattern}`, "i")),
-      reps: readNumber(/card-reps::\s*(\d+)/i),
-      lapses: readNumber(/card-lapses::\s*(\d+)/i),
-      lastReviewDate: readText(/last-reviewed::\s*(\S+)/i),
-      intervalDays: readNumber(
-        new RegExp(`(?:interval-days|card-last-interval)::\\s*${numberPattern}`, "i")
-      ),
-      easeFactor: readNumber(new RegExp(`ease-factor::\\s*${numberPattern}`, "i")),
-      dueDate: readText(/due-date::\s*(\S+)/i),
-      state: readNumber(/card-state::\s*([0-3])/i) as CardState | undefined,
-      learningStep: readNumber(/card-learn-step::\s*(\d+)/i),
+      stability: num("card-s"),
+      difficulty: num("card-d"),
+      stabilityFast: num("card-s-fast"),
+      reps: num("card-reps"),
+      lapses: num("card-lapses"),
+      lastReviewDate: text("last-reviewed"),
+      intervalDays: num("interval-days") ?? num("card-last-interval"),
+      easeFactor: num("ease-factor"),
+      dueDate: text("due-date"),
+      state: num("card-state") as CardState | undefined,
+      learningStep: num("card-learn-step"),
     };
 
     // Las tarjetas antiguas sin rastro rápido se normalizan al mismo ratio con
@@ -691,20 +697,7 @@ export class FlashcardsManager {
    * la etiqueta #card, las oclusiones y cualquier otra propiedad.
    */
   public static applyScheduleSnapshot(content: string, snapshot: CardScheduleSnapshot): string {
-    const cleaned = content
-      .replace(/\n?card-s-fast::[^\n]*/gi, "")
-      .replace(/\n?card-s::[^\n]*/gi, "")
-      .replace(/\n?card-d::[^\n]*/gi, "")
-      .replace(/\n?card-reps::[^\n]*/gi, "")
-      .replace(/\n?card-lapses::[^\n]*/gi, "")
-      .replace(/\n?card-last-interval::[^\n]*/gi, "")
-      .replace(/\n?last-reviewed::[^\n]*/gi, "")
-      .replace(/\n?interval-days::[^\n]*/gi, "")
-      .replace(/\n?ease-factor::[^\n]*/gi, "")
-      .replace(/\n?due-date::[^\n]*/gi, "")
-      .replace(/\n?card-state::[^\n]*/gi, "")
-      .replace(/\n?card-learn-step::[^\n]*/gi, "")
-      .trim();
+    const cleaned = this.stripScheduledProperties(content);
 
     // Una tarjeta nueva no tiene last-reviewed: se queda sin programación.
     if (!snapshot.lastReviewDate) return cleaned;
@@ -799,21 +792,9 @@ export class FlashcardsManager {
     intervalDays: number,
     easeFactor: number
   ): string {
-    // Strip existing FSRS properties
-    let cleaned = content
-      .replace(/\n?card-s-fast::[^\n]*/gi, "")
-      .replace(/\n?card-s::[^\n]*/gi, "")
-      .replace(/\n?card-d::[^\n]*/gi, "")
-      .replace(/\n?card-reps::[^\n]*/gi, "")
-      .replace(/\n?card-lapses::[^\n]*/gi, "")
-      .replace(/\n?card-last-interval::[^\n]*/gi, "")
-      .replace(/\n?last-reviewed::[^\n]*/gi, "")
-      .replace(/\n?interval-days::[^\n]*/gi, "")
-      .replace(/\n?ease-factor::[^\n]*/gi, "")
-      .replace(/\n?due-date::[^\n]*/gi, "")
-      .replace(/\n?card-state::[^\n]*/gi, "")
-      .replace(/\n?card-learn-step::[^\n]*/gi, "")
-      .trim();
+    // Quita solo líneas de propiedades FSRS, nunca values dentro de un hint
+    // de oclusión; además normaliza CRLF para no mezclar saltos al escribir.
+    const cleaned = this.stripScheduledProperties(content);
 
     const lastReviewed = fsrs.lastReviewDate || new Date().toISOString();
     const dueDate = computeDueDate(lastReviewed, intervalDays);

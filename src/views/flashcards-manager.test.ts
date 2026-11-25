@@ -55,6 +55,55 @@ describe("detección de cloze", () => {
   });
 });
 
+describe("propiedades FSRS ancladas a su línea", () => {
+  const occlusionContent = (hint: string): string => {
+    const regions = [
+      {
+        source: "assets/x.png",
+        x: 0.1,
+        y: 0.2,
+        width: 0.3,
+        height: 0.4,
+        shape: "rect",
+        hint,
+      },
+    ];
+    return `![[assets/x.png]]\nimage-occlusions:: ${JSON.stringify(regions)}`;
+  };
+
+  const reviewed = {
+    stability: 0.4,
+    difficulty: 5,
+    reps: 0,
+    lapses: 0,
+    state: 0 as const,
+  };
+
+  it("no lee card-s desde el hint de una oclusión", () => {
+    const content = occlusionContent("card-s:: 99 y last-reviewed:: 2020-01-01");
+
+    const snapshot = FlashcardsManager.readScheduleSnapshot(content);
+
+    expect(snapshot.stability).toBeUndefined();
+    expect(snapshot.lastReviewDate).toBeUndefined();
+  });
+
+  it("no rompe el JSON de oclusiones al calificar", () => {
+    const content = occlusionContent("card-s:: 99");
+    const updated = FlashcardsManager.updateBlockFSRS(content, reviewed, 1, 2.5);
+    const line = updated.split("\n").find((entry) => entry.startsWith("image-occlusions::"));
+
+    expect(line).toBeDefined();
+    expect(() => JSON.parse(line!.slice("image-occlusions:: ".length))).not.toThrow();
+  });
+
+  it("no mezcla saltos de línea al escribir sobre contenido CRLF", () => {
+    const updated = FlashcardsManager.updateBlockFSRS("Pregunta #card\r\n  hijo", reviewed, 1, 2.5);
+
+    expect(updated).not.toContain("\r");
+  });
+});
+
 describe("lectura de propiedades FSRS", () => {
   it("acepta notación científica como readScheduleSnapshot", () => {
     const manager = new FlashcardsManager();
