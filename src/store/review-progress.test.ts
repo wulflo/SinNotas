@@ -96,7 +96,7 @@ describe("diario de repasos compartido", () => {
     expect(parsed.entries[1].after.state).toBeUndefined();
   });
 
-  it("descarta estabilidades no positivas y dificultades fuera de rango", () => {
+  it("descarta estabilidades no positivas y dificultades fuera de rango, pero conserva el rastro rápido", () => {
     const parsed = parseReviewProgress(
       JSON.stringify({
         version: 1,
@@ -115,7 +115,9 @@ describe("diario de repasos compartido", () => {
     );
 
     expect(parsed.entries[0].after.stability).toBeUndefined();
-    expect(parsed.entries[0].after.stabilityFast).toBeUndefined();
+    // FSRS-7 puede producir un rastro rápido negativo; conservarlo evita un
+    // falso conflicto al comparar la instantánea con la nota.
+    expect(parsed.entries[0].after.stabilityFast).toBe(-1);
     expect(parsed.entries[0].after.difficulty).toBeUndefined();
     expect(parsed.entries[0].after.reps).toBe(2);
   });
@@ -196,6 +198,65 @@ describe("ReviewProgressStore - deshacer tras una recarga", () => {
 
   afterEach(() => {
     delete (globalThis as { localStorage?: unknown }).localStorage;
+  });
+
+  it("guarda la instantánea sin descartar valores finitos al registrar un repaso", async () => {
+    const store = new ReviewProgressStore();
+    const after = {
+      stability: 11.7841,
+      difficulty: 5.26,
+      stabilityFast: -0.5, // FSRS-7 puede producirlo; no debe descartarse
+      reps: 1,
+      lapses: 0,
+      intervalDays: 54,
+      easeFactor: 2.5,
+      lastReviewDate: "2026-11-25T02:02:32.369Z",
+      dueDate: "2027-01-17T03:00:00.000Z",
+      state: 2 as const,
+    };
+    const event = await store.record({
+      pagePath: "pages/Nota.md",
+      pageTitle: "Nota",
+      blockId: "b-1",
+      cardId: "fc-basic-p1-b-1",
+      cardType: "basic",
+      rating: 4,
+      before: {},
+      after,
+    });
+    expect(event.after).toEqual(after);
+    expect(parseReviewProgress(fakeLocalStorage.getItem("sinnotas-review-progress-v1")).entries[0].after).toEqual(after);
+  });
+
+  it("deshace en orden de repaso aunque los guardados terminen desordenados", async () => {
+    const store = new ReviewProgressStore();
+    // `at` explícito simula dos calificaciones rápidas cuyo guardado termina
+    // al revés: record() las apila en orden de finalización.
+    await store.record({
+      pagePath: "pages/Nota.md", pageTitle: "Nota", blockId: "b-1",
+      cardId: "fc-1", cardType: "basic", rating: 3,
+      at: "2026-11-24T10:00:00.000Z", before: {}, after: { reps: 1 },
+    });
+    await store.record({
+      pagePath: "pages/Nota.md", pageTitle: "Nota", blockId: "b-2",
+      cardId: "fc-2", cardType: "basic", rating: 3,
+      at: "2026-11-24T10:00:05.000Z", before: {}, after: { reps: 1 },
+    });
+    expect(store.takeUndo()?.cardId).toBe("fc-2");
+    expect(store.takeUndo()?.cardId).toBe("fc-1");
+  });
+
+  it("borra todo el diario sin que la fusión lo revive", async () => {
+    const store = new ReviewProgressStore();
+    await store.record({
+      pagePath: "pages/Nota.md", pageTitle: "Nota", blockId: "b-1",
+      cardId: "fc-1", cardType: "basic", rating: 3, before: {}, after: { reps: 1 },
+    });
+    expect(store.canUndo()).toBe(true);
+    await store.clear();
+    expect(store.canUndo()).toBe(false);
+    expect(store.getEntries()).toEqual([]);
+    expect(parseReviewProgress(fakeLocalStorage.getItem("sinnotas-review-progress-v1")).entries).toEqual([]);
   });
 
   it("actualiza el evento del archivo aunque el objeto en memoria se haya clonado", async () => {

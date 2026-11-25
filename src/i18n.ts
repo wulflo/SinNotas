@@ -925,6 +925,16 @@ const englishBySpanish: Record<string, string> = {
   "El servicio devolvió una respuesta no válida.": "The service returned an invalid response.",
   "La búsqueda en línea solo está disponible en la aplicación.": "Online search is only available in the app.",
   "No se pudo completar la búsqueda.": "The search could not be completed.",
+  "examinadas": "examined",
+  "Se examinaron": "Examined",
+  "tarjetas, pero ninguna necesitaba cambios.": "cards, but none needed changes.",
+  "Tarjetas procesadas:": "Cards processed:",
+  "Borrar propiedades FSRS": "Clear FSRS properties",
+  "Propiedades FSRS borradas de": "FSRS properties cleared from",
+  "tarjeta(s).": "card(s).",
+  "todas las tarjetas": "all cards",
+  "la tarjeta seleccionada": "the selected card",
+  "No hay tarjetas detectadas.": "No cards detected.",
 };
 
 /**

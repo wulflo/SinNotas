@@ -4446,6 +4446,21 @@ fn merge_review_progress_json(existing: Option<&str>, incoming: &str) -> Result<
     .map_err(|error| error.to_string())
 }
 
+/// Borra por completo el diario de repasos.
+///
+/// A diferencia de `write_review_progress`, no fusiona: escribir un JSON vacío
+/// con aquel comando dejaría intactas las entradas existentes.
+#[tauri::command]
+async fn clear_review_progress(
+    state: tauri::State<'_, ActiveVault>,
+) -> Result<(), String> {
+    let storage = active_storage(&state)?;
+    validate_progress_relative_path(REVIEW_PROGRESS_PATH)?;
+    storage
+        .write_progress_file(REVIEW_PROGRESS_PATH, "{\"version\":1,\"entries\":[]}")
+        .await
+}
+
 /// Lee el diario compartido de `.sinnotas/progress/reviews.json`.
 #[tauri::command]
 async fn read_review_progress(
@@ -6038,6 +6053,7 @@ pub fn run() {
             save_page,
             read_review_progress,
             write_review_progress,
+            clear_review_progress,
             read_flashcard_decks,
             write_flashcard_decks,
             read_page_revisions,

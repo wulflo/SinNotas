@@ -21,7 +21,7 @@ empaquetan, enlazan o ejecutan con la aplicación.
 
 | Componente | Versión | Licencia | Uso en SinNotas |
 | --- | --- | --- | --- |
-| SinNotas | 0.5.2 | MIT | Aplicación |
+| SinNotas | 0.5.3 | MIT | Aplicación |
 | Tauri | 2.12.5 | Apache-2.0 OR MIT | Shell nativo |
 | Dependencias npm de runtime | 13 paquetes | MIT / Apache-2.0 / BSD-3-Clause / MPL-2.0 | Frontend |
 | Dependencias Rust de runtime | 507 crates de terceros (unión de todas las plataformas) | MIT / Apache-2.0 / BSD-3-Clause / ISC / Zlib / BSL-1.0 / MPL-2.0 / Unicode-3.0 / CC0-1.0 / CDLA-Permissive-2.0 | Backend |

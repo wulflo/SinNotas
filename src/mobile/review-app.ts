@@ -21,7 +21,7 @@ import {
 import { isRemoteImageSource, resolveAllowedRemoteImageUrl } from "../editor/url-safety";
 import { DocumentHistory, type DocumentHistoryEntry } from "../editor/history";
 import { sanitizeHtml } from "../editor/markdown";
-import { findNodeLocation } from "../editor/tree-engine";
+import { findNodeLocation, getAllBlocksFlat } from "../editor/tree-engine";
 import { initialVaultPages, VaultStore } from "../store/vault";
 import { ReviewProgressStore, type ReviewProgressEvent } from "../store/review-progress";
 import {
@@ -2116,6 +2116,10 @@ class MobileReviewApp {
         blockId: result.card.blockId,
         cardId: result.card.id,
         cardType: result.card.cardType,
+        cardFingerprint:
+          result.card.fingerprint ||
+          FlashcardsManager.cardFingerprint(previousContent, result.card.cardType),
+        at: result.fsrs.lastReviewDate,
         rating,
         before,
         after,
@@ -2285,27 +2289,54 @@ class MobileReviewApp {
     );
   }
 
-  private locateReviewBlock(event: ReviewProgressEvent): { page: PageData; block: BlockNode } | null {
-    const page =
+  private locateReviewBlock(
+    event: ReviewProgressEvent,
+    expected?: import("../views/flashcards-manager").CardScheduleSnapshot
+  ): { page: PageData; block: BlockNode } | null {
+    const matchesSnapshot = (block: BlockNode): boolean =>
+      !!expected &&
+      FlashcardsManager.scheduleSnapshotsEqual(
+        FlashcardsManager.readScheduleSnapshot(block.content),
+        expected
+      );
+    const matchesFingerprint = (block: BlockNode): boolean =>
+      !!event.cardFingerprint &&
+      FlashcardsManager.cardFingerprint(block.content, event.cardType) === event.cardFingerprint;
+
+    const preferredPage =
       this.pages.find((candidate) => candidate.path === event.pagePath) ||
       this.pages.find((candidate) => candidate.title === event.pageTitle);
-    if (!page) return null;
-    const location = findNodeLocation(page.blocks, event.blockId);
-    if (!location) return null;
-    return { page, block: location.parentList[location.index] };
+    if (preferredPage) {
+      const location = findNodeLocation(preferredPage.blocks, event.blockId);
+      if (location) {
+        const block = location.parentList[location.index];
+        if (matchesSnapshot(block) || matchesFingerprint(block)) {
+          return { page: preferredPage, block };
+        }
+      }
+    }
+    for (const page of this.pages) {
+      if (page.blocksLoaded === false) continue;
+      for (const block of getAllBlocksFlat(page.blocks)) {
+        if (!matchesFingerprint(block) && !matchesSnapshot(block)) continue;
+        if (!/card-s::|last-reviewed::|#card\b/i.test(block.content)) continue;
+        return { page, block };
+      }
+    }
+    return null;
   }
 
   private async applyReviewSnapshot(
     event: ReviewProgressEvent,
     direction: "undo" | "redo"
   ): Promise<boolean> {
-    const target = this.locateReviewBlock(event);
+    const expected = direction === "undo" ? event.after : event.before;
+    const next = direction === "undo" ? event.before : event.after;
+    const target = this.locateReviewBlock(event, expected);
     if (!target) {
       this.showToast("No se encontró la tarjeta del último repaso.");
       return false;
     }
-    const expected = direction === "undo" ? event.after : event.before;
-    const next = direction === "undo" ? event.before : event.after;
     const current = FlashcardsManager.readScheduleSnapshot(target.block.content);
     if (!FlashcardsManager.scheduleSnapshotsEqual(current, expected)) {
       this.showToast(
@@ -2377,19 +2408,13 @@ class MobileReviewApp {
       return true;
     }
     await this.reviewProgress.commitUndo(event);
-    const target = this.locateReviewBlock(event);
-    const refreshed = target
-      ? this.manager.refreshCardSchedule(
-          event.cardId,
-          target.block.content,
-          "new-first",
-          event.cardId,
-          false
-        )
-      : null;
-    if (!refreshed) {
-      this.manager.scanVault(this.pages, "new-first");
-      this.manager.refreshCard(this.pages, event.cardId, "new-first", false);
+    const target = this.locateReviewBlock(event, event.after);
+    if (target) {
+      const oldSuffix = `-${event.blockId}`;
+      const currentCardId = event.cardId.endsWith(oldSuffix)
+        ? `${event.cardId.slice(0, -oldSuffix.length)}-${target.block.id}`
+        : event.cardId;
+      this.manager.updateCardInSession(currentCardId, target.block.content, currentCardId, false);
     }
     this.render();
     this.updateHistoryButtons();
@@ -2410,19 +2435,13 @@ class MobileReviewApp {
       return true;
     }
     await this.reviewProgress.commitRedo(event);
-    const target = this.locateReviewBlock(event);
-    const refreshed = target
-      ? this.manager.refreshCardSchedule(
-          event.cardId,
-          target.block.content,
-          "new-first",
-          event.cardId,
-          false
-        )
-      : null;
-    if (!refreshed) {
-      this.manager.scanVault(this.pages, "new-first");
-      this.manager.refreshCard(this.pages, event.cardId, "new-first", false);
+    const target = this.locateReviewBlock(event, event.before);
+    if (target) {
+      const oldSuffix = `-${event.blockId}`;
+      const currentCardId = event.cardId.endsWith(oldSuffix)
+        ? `${event.cardId.slice(0, -oldSuffix.length)}-${target.block.id}`
+        : event.cardId;
+      this.manager.updateCardInSession(currentCardId, target.block.content, currentCardId, false);
     }
     this.render();
     this.updateHistoryButtons();

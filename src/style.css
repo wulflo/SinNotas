@@ -28,6 +28,10 @@
   --ls-menu-bg: #21252be6;
   --ls-menu-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
   
+  /* Fondo del panel flotante de propiedades de un bullet: más claro que la
+   * página para que se distinga aunque el tema use superficies translúcidas. */
+  --ls-properties-panel-bg: #232833;
+
   --ls-card-bg: #21252b;
   --ls-card-border: #353b45;
   
@@ -75,6 +79,7 @@
   --ls-bg-primary: #ffffff;
   --ls-bg-secondary: #f6f8fa;
   --ls-bg-tertiary: #eaeef2;
+  --ls-properties-panel-bg: #e4e9f2;
   --ls-bg-hover: #e1e4e8;
   --ls-border-color: #d1d5db;
   --ls-border-subtle: #e5e7eb;
@@ -3163,6 +3168,14 @@ body.is-bullet-selecting {
   top: 50%;
   right: 1px;
   transform: translateY(-50%);
+  /* Sin z-index propio, el texto de los bullets siguientes se pintaba encima
+     del panel abierto. Elevar el contexto completa la corrección del fondo. */
+  z-index: 1000;
+}
+
+/* El bullet que tiene abierto el panel debe apilarse por encima de los demás. */
+.block-item:has(.block-properties[open]) {
+  z-index: 1000;
 }
 
 .block-properties summary {
@@ -3199,15 +3212,26 @@ body.is-bullet-selecting {
   position: absolute;
   top: 20px;
   left: 0;
-  z-index: 20;
+  z-index: 1001;
   min-width: 180px;
   max-width: min(360px, 70vw);
   margin: 0;
   padding: 6px 9px;
-  border-left: 2px solid var(--ls-border-color);
+  border: 1px solid var(--ls-border-color, #d0d7de);
   border-radius: 0 6px 6px 6px;
-  background: var(--ls-bg-secondary);
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  /* Color propio del panel: ningún tema puede dejarlo transparente. */
+  background: var(--ls-properties-panel-bg, #e4e9f2) !important;
+  background-color: var(--ls-properties-panel-bg, #e4e9f2) !important;
+  background-image: none !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
+}
+
+/* Cada línea de propiedad hereda el fondo explícitamente: en algunos temas el
+ * contenedor se pinta bien pero las líneas siguen translúcidas. */
+.block-properties-list > div,
+.block-properties-list > span {
+  background-color: var(--ls-properties-panel-bg, #e4e9f2) !important;
+  background-image: none !important;
   color: var(--ls-text-muted);
   font-family: monospace;
   overflow-wrap: anywhere;
@@ -7157,7 +7181,10 @@ body.mobile-full-editor .flashcard-review-tools {
  * pantalla. El área de acciones queda siempre visible abajo. */
 #app.flashcard-focus-mode .flashcard-content {
   overflow-y: auto;
-  overscroll-behavior: contain;
+  /* Sin `overscroll-behavior: contain`: en WebView2 (Windows) el scroll
+   * anidado rebotaba con inercia al desplazarse con el joystick. La rueda y
+   * el joystick deben poder encadenarse al contenedor padre como en Linux. */
+  scroll-behavior: auto;
   scrollbar-gutter: stable;
   padding-right: 6px;
 }
@@ -7186,7 +7213,9 @@ body.mobile-full-editor .flashcard-review-tools {
   overflow-y: auto;
   /* Sin `overscroll-behavior: contain`: cuando la tarjeta no desborda, la
    * rueda debe seguir desplazando la vista de Flashcards en vez de quedarse
-   * atrapada sobre la tarjeta. */
+   * atrapada sobre la tarjeta. `scroll-behavior: auto` evita que un tema
+   * active desplazamientos suaves que pelean con el joystick (60 ms). */
+  scroll-behavior: auto;
   scrollbar-gutter: stable;
 }
 
@@ -8518,18 +8547,24 @@ body.mobile-full-editor .flashcard-review-tools {
   border-radius: 8px;
 }
 
+/* Mosaico de acciones: cada botón se ajusta a su texto en vez de ocupar
+ * toda la anchura del panel, que parecían tiras largas. */
 .advanced-actions {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr));
   gap: 8px;
+  align-items: start;
 }
 
 .advanced-actions .font-option-btn {
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
   min-height: 40px;
+  padding: 8px 12px;
   border-radius: 8px;
   text-align: left;
   justify-content: flex-start;
+  white-space: normal;
 }
 
 .flashcard-tab.active {

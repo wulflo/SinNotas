@@ -72,6 +72,46 @@ due-date:: ${schedule.dueDate}`;
   });
 });
 
+describe("FlashcardsManager - identidad estable y cola de sesión", () => {
+  it("la huella no cambia al reasignar el b-N ni al actualizar propiedades FSRS", () => {
+    const before = "Pregunta :: Respuesta #card\ncard-s:: 2.4\nlast-reviewed:: 2026-11-01T00:00:00.000Z";
+    const after = "Pregunta :: Respuesta #card\ncard-s:: 9.1\nlast-reviewed:: 2026-11-24T00:00:00.000Z";
+    const other = "Otra pregunta :: Otra respuesta #card\ncard-s:: 2.4";
+
+    expect(FlashcardsManager.cardFingerprint(before, "basic")).toBe(
+      FlashcardsManager.cardFingerprint(after, "basic")
+    );
+    expect(FlashcardsManager.cardFingerprint(before, "basic")).not.toBe(
+      FlashcardsManager.cardFingerprint(other, "basic")
+    );
+    expect(FlashcardsManager.cardFingerprint(before, "basic")).not.toBe(
+      FlashcardsManager.cardFingerprint(before, "cloze")
+    );
+  });
+
+  it("deshacer no reconstruye la cola: el contador de la sesión queda fijo", () => {
+    const manager = new FlashcardsManager();
+    manager.scanVault(pages, "new-first");
+    expect(manager.getCardsCount()).toBe(2);
+
+    const first = manager.getAllCards()[0];
+    const totalBefore = manager.getCardsCount();
+    const orderBefore = manager.getCards().map((card) => card.id);
+
+    // Programación "futura" que sacaría la tarjeta de la cola de vencidas.
+    const content = `${first.question ? "Pregunta A :: Respuesta A" : ""}
+last-reviewed:: ${new Date().toISOString()}
+interval-days:: 30
+due-date:: 2099-01-01T00:00:00.000Z`;
+    const updated = manager.updateCardInSession(first.id, content, first.id, false);
+
+    expect(updated).not.toBeNull();
+    expect(manager.getCardsCount()).toBe(totalBefore);
+    expect(manager.getCards().map((card) => card.id)).toEqual(orderBefore);
+    expect(manager.getCurrentCard()?.id).toBe(first.id);
+  });
+});
+
 describe("FlashcardsManager - reprogramación FSRS", () => {
   it("recalcula intervalo y vencimiento de tarjetas en Review", () => {
     const content = `Pregunta :: Respuesta
@@ -612,6 +652,53 @@ describe("FlashcardsManager - instantáneas FSRS para deshacer repasos", () => {
     const first = FlashcardsManager.readScheduleSnapshot(reviewedContent);
     const second = { ...first, reps: 2, lastReviewDate: "2026-10-25T10:00:00.000Z" };
     expect(FlashcardsManager.scheduleSnapshotsEqual(first, second)).toBe(false);
+  });
+
+  it("tolera diferencias de redondeo en los valores FSRS (fallo real al deshacer)", () => {
+    // Caso observado en una bóveda real: el diario guardó
+    // `interval-days:: 0.003819444444444444` y la nota contendía
+    // `0.0038194444444444443` tras un recálculo propio. El deshacer mostraba
+    // falsamente el aviso de «otro dispositivo».
+    const journal = FlashcardsManager.readScheduleSnapshot(
+      reviewedContent.replace(
+        "interval-days:: 0.006944444444444444",
+        "interval-days:: 0.003819444444444444"
+      )
+    );
+    const note = FlashcardsManager.readScheduleSnapshot(
+      reviewedContent.replace(
+        "interval-days:: 0.006944444444444444",
+        "interval-days:: 0.0038194444444444443"
+      )
+    );
+    expect(journal.intervalDays).not.toBe(note.intervalDays);
+    expect(FlashcardsManager.scheduleSnapshotsEqual(journal, note)).toBe(true);
+  });
+
+  it("tolera el mismo instante expresado con distinta representación ISO", () => {
+    const first = FlashcardsManager.readScheduleSnapshot(reviewedContent);
+    const second = {
+      ...first,
+      lastReviewDate: "2026-10-24T16:00:00.000+02:00",
+      dueDate: "2026-10-24T16:10:00.000+02:00",
+    };
+    expect(FlashcardsManager.scheduleSnapshotsEqual(first, second)).toBe(true);
+  });
+
+  it("lee números en notación científica sin truncarlos", () => {
+    const snapshot = FlashcardsManager.readScheduleSnapshot(
+      [
+        "Pregunta :: Respuesta #card",
+        "card-s:: 1.2e-7",
+        "card-d:: 5",
+        "card-s-fast:: 9.6e-8",
+        "last-reviewed:: 2026-10-24T14:00:00.000Z",
+        "interval-days:: 6.944444444444444e-7",
+      ].join("\n")
+    );
+    expect(snapshot.stability).toBe(1.2e-7);
+    expect(snapshot.stabilityFast).toBe(9.6e-8);
+    expect(snapshot.intervalDays).toBe(6.944444444444444e-7);
   });
 
   it("trata como iguales una instantánea antigua sin stabilityFast y la tarjeta normalizada", () => {

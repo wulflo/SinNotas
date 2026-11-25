@@ -124,6 +124,7 @@ import {
 } from "./views/graph-settings";
 import {
   FlashcardsManager,
+  type CardScheduleSnapshot,
   type FlashcardReviewOrder,
   type FlashcardPageStats,
 } from "./views/flashcards-manager";
@@ -893,6 +894,12 @@ const btnCleanUnusedAttachments = document.getElementById("btn-clean-unused-atta
 const unusedAttachmentsStatus = document.getElementById("unused-attachments-status") as HTMLParagraphElement;
 const btnClearCache = document.getElementById("btn-clear-cache") as HTMLButtonElement;
 const btnClearFlashcardStats = document.getElementById("btn-clear-flashcard-stats") as HTMLButtonElement;
+const btnClearReviewLog = document.getElementById("btn-clear-review-log") as HTMLButtonElement;
+const fsrsClearTargetSelect = document.getElementById("fsrs-clear-target") as HTMLSelectElement;
+const fsrsClearCardSelect = document.getElementById("fsrs-clear-card") as HTMLSelectElement;
+const fsrsClearCardRow = document.getElementById("fsrs-clear-card-row") as HTMLElement;
+const btnClearFsrsProperties = document.getElementById("btn-clear-fsrs-properties") as HTMLButtonElement;
+const fsrsClearStatus = document.getElementById("fsrs-clear-status") as HTMLElement;
 const btnClearAllFlashcards = document.getElementById("btn-clear-all-flashcards") as HTMLButtonElement;
 const clearAllFlashcardsStatus = document.getElementById("clear-all-flashcards-status") as HTMLParagraphElement;
 const btnDeleteAllSnapshots = document.getElementById("btn-delete-all-snapshots") as HTMLButtonElement;
@@ -3349,8 +3356,8 @@ btnFlashcardRecalc.addEventListener("click", async () => {
 
     let message =
       result.updatedCards > 0
-        ? `${translate("Tarjetas actualizadas:")} ${result.updatedCards}`
-        : translate("No había tarjetas que actualizar.");
+        ? `${translate("Tarjetas actualizadas:")} ${result.updatedCards} · ${result.processed} ${translate("examinadas")}`
+        : `${translate("Se examinaron")} ${result.processed} ${translate("tarjetas, pero ninguna necesitaba cambios.")}`;
     if (result.pastDueCards > 0) {
       message += ` ${translate("Aviso: algunas tarjetas quedan vencidas con el ancla actual. Usa «Desde hoy» para reprogramarlas desde ahora.").replace("{count}", String(result.pastDueCards))}`;
     }
@@ -3485,12 +3492,28 @@ function handleGamepadAxes(gamepad: Gamepad): void {
   const axes = gamepad.axes || [];
   let value = axes.length >= 2 ? axes[1] ?? 0 : 0;
   if (Math.abs(value) < 0.25 && axes.length >= 4) value = axes[3] ?? 0;
-  if (Math.abs(value) < 0.25) return;
+  if (!Number.isFinite(value) || Math.abs(value) < 0.25) return;
+
   const view = document.getElementById("view-flashcards");
-  const scrollRoot = view ? findScrollableAncestor(view) : null;
+  if (!view) return;
+  // Si el contenido de la tarjeta desborda, es el que debe moverse. Si no,
+  // se desplaza el primer ancestro con scroll. Elegir siempre el ancestro
+  // hacía que, en modo focus, se moviesen dos contenedores anidados: en
+  // WebView2 (Windows) el interior con `overscroll-behavior: contain`
+  // rebotaba y daba la sensación de inercia al soltar el joystick.
+  const cardContent = view.querySelector<HTMLElement>(".flashcard-content");
+  const scrollRoot =
+    cardContent && cardContent.scrollHeight > cardContent.clientHeight + 1
+      ? cardContent
+      : findScrollableAncestor(view);
   if (!scrollRoot) return;
+
+  const maxScroll = scrollRoot.scrollHeight - scrollRoot.clientHeight;
+  if (maxScroll <= 0) return;
   const speed = Math.sign(value) * Math.min(24, Math.ceil((Math.abs(value) - 0.25) * 40));
-  scrollRoot.scrollTop += speed;
+  const next = Math.max(0, Math.min(maxScroll, scrollRoot.scrollTop + speed));
+  if (next === scrollRoot.scrollTop) return;
+  scrollRoot.scrollTop = next;
 }
 
 function startGamepadPolling(): void {
@@ -3808,6 +3831,110 @@ btnClearFlashcardStats.addEventListener("click", async () => {
   saveFlashcardProgressStats();
   updateFlashcardProgressPanel();
   showToast("Estadísticas de repaso borradas.");
+});
+
+btnClearReviewLog.addEventListener("click", async () => {
+  const confirmed = await confirmAction(
+    "Se borrará TODO el historial de repasos (.sinnotas/progress/reviews.json), incluidos los registros de otros dispositivos. No se puede deshacer. Las propiedades FSRS de las notas no se modifican.",
+    "Borrar historial de repasos"
+  );
+  if (!confirmed) return;
+  try {
+    await reviewProgress.clear();
+    flashcardProgressStats = {
+      date: currentLocalDate(),
+      reviewsToday: 0,
+      totalReviews: 0,
+      focusSeconds: 0,
+      points: 0,
+    };
+    saveFlashcardProgressStats();
+    updateFlashcardProgressPanel();
+    updateReviewHistoryButtons();
+    renderFlashcardHeatmap();
+    showToast("Historial de repasos borrado.");
+  } catch (error) {
+    console.error("No se pudo borrar el historial de repasos:", error);
+    showToast("No se pudo borrar el historial de repasos.");
+  }
+});
+
+function populateFsrsClearCards(): void {
+  const cards = flashcardsManager.getAllCards();
+  fsrsClearCardSelect.replaceChildren();
+  if (cards.length === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = translate("No hay tarjetas detectadas.");
+    fsrsClearCardSelect.appendChild(option);
+    return;
+  }
+  for (const card of cards) {
+    const option = document.createElement("option");
+    option.value = card.id;
+    const question = card.question.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+    option.textContent = `${card.pageTitle} · ${question.slice(0, 70)}`;
+    fsrsClearCardSelect.appendChild(option);
+  }
+}
+
+fsrsClearTargetSelect.addEventListener("change", () => {
+  fsrsClearCardRow.hidden = fsrsClearTargetSelect.value !== "one";
+  if (fsrsClearTargetSelect.value === "one") populateFsrsClearCards();
+});
+
+btnClearFsrsProperties.addEventListener("click", async () => {
+  const all = fsrsClearTargetSelect.value !== "one";
+  let selectedCards: Flashcard[] | undefined;
+  if (!all) {
+    const cardId = fsrsClearCardSelect.value;
+    selectedCards = flashcardsManager.getAllCards().filter((card) => card.id === cardId);
+    if (!cardId || selectedCards.length === 0) {
+      fsrsClearStatus.textContent = translate("No hay tarjetas detectadas.");
+      return;
+    }
+  }
+  const target = all
+    ? translate("todas las tarjetas")
+    : translate("la tarjeta seleccionada");
+  const confirmed = await confirmAction(
+    `Se borrarán las propiedades FSRS de ${target}. Las tarjetas volverán a ser nuevas; el texto no se modifica. El proceso se hace por lotes. ¿Continuar?`,
+    "Borrar propiedades FSRS"
+  );
+  if (!confirmed) return;
+
+  btnClearFsrsProperties.disabled = true;
+  fsrsClearStatus.textContent = translate("Procesando...");
+  try {
+    const result = await runFlashcardMaintenance({
+      action: "reset",
+      parameters: flashcardsManager.getFSRSParameters(),
+      resolveDeckParameters: pageDeckFSRSSettings,
+      pages: vault.getPages(),
+      manager: flashcardsManager,
+      cards: selectedCards,
+      savePage: (page) => vault.savePage(page),
+      onProgress: (progress) => {
+        fsrsClearStatus.textContent = `${translate("Tarjetas procesadas:")} ${progress.processed}/${progress.total} · ${progress.updatedCards} ${translate("actualizadas")}`;
+      },
+    });
+    if (result.cancelled) {
+      fsrsClearStatus.textContent = translate("Recálculo cancelado.");
+      return;
+    }
+    if (result.updatedCards > 0) {
+      flashcardsManager.scanVault(vault.getPages(), flashcardReviewOrder);
+      if (currentView === "flashcards") startFlashcardsSession();
+      renderFlashcardExplorer();
+    }
+    fsrsClearStatus.textContent = `${translate("Propiedades FSRS borradas de")} ${result.updatedCards} ${translate("tarjeta(s).")}`;
+    showToast(fsrsClearStatus.textContent);
+  } catch (error) {
+    console.error("No se pudieron borrar las propiedades FSRS:", error);
+    fsrsClearStatus.textContent = translate("No se pudieron actualizar las propiedades de las tarjetas.");
+  } finally {
+    btnClearFsrsProperties.disabled = false;
+  }
 });
 
 btnClearAllFlashcards.addEventListener("click", async () => {
@@ -13404,56 +13531,132 @@ function applyFSRSRating(
     );
     saveFlashcardProgressStats();
     updateFlashcardProgressPanel();
-    const page = vault.getPageByTitle(card.pageTitle);
-    if (page) {
-      const loc = findNodeLocation(page.blocks, card.blockId);
-      if (loc) {
-        const block = loc.parentList[loc.index];
-        const before = FlashcardsManager.readScheduleSnapshot(block.content);
-        block.content = FlashcardsManager.updateBlockFSRS(
-          block.content,
-          result.fsrs,
-          result.intervalDays,
-          result.easeFactor
-        );
-        const after = FlashcardsManager.readScheduleSnapshot(block.content);
-        void vault
-          .savePage(page, true)
-          .then(() =>
-            reviewProgress.record({
-              pagePath: page.path,
-              pageTitle: page.title,
-              blockId: card.blockId,
-              cardId: card.id,
-              cardType: card.cardType,
-              rating,
-              before,
-              after,
-            })
-          )
-          .then(() => {
-            updateReviewHistoryButtons();
-            renderFlashcardHeatmap();
+    const target = findReviewCardBlock(card);
+    if (target) {
+      const { page, block } = target;
+      const previousContent = block.content;
+      const before = FlashcardsManager.readScheduleSnapshot(previousContent);
+      block.content = FlashcardsManager.updateBlockFSRS(
+        previousContent,
+        result.fsrs,
+        result.intervalDays,
+        result.easeFactor
+      );
+      const after = FlashcardsManager.readScheduleSnapshot(block.content);
+      void vault
+        .savePage(page, true)
+        .then(() =>
+          reviewProgress.record({
+            pagePath: page.path,
+            pageTitle: page.title,
+            blockId: card.blockId,
+            cardId: card.id,
+            cardType: card.cardType,
+            cardFingerprint: FlashcardsManager.cardFingerprint(previousContent, card.cardType),
+            at: result.fsrs.lastReviewDate,
+            rating,
+            before,
+            after,
           })
-          .catch((error: unknown) => {
-            console.error("No se pudo guardar el repaso en .sinnotas/progress/reviews.json:", error);
-          });
-      }
+        )
+        .then(() => {
+          updateReviewHistoryButtons();
+          renderFlashcardHeatmap();
+        })
+        .catch((error: unknown) => {
+          // Sin diario no hay deshacer posible: devuelve la tarjeta a su
+          // programación anterior y deja la respuesta visible para repetir
+          // la calificación, igual que hace la app móvil.
+          block.content = previousContent;
+          flashcardsManager.updateCardInSession(card.id, previousContent, card.id, true);
+          updateFlashcardUI();
+          console.error("No se pudo guardar el repaso en .sinnotas/progress/reviews.json:", error);
+          showToast(translate("No se pudo guardar el repaso. Revisa los permisos de la bóveda."));
+        });
     }
   }
 
   updateFlashcardUI();
 }
 
-/** Localiza la página y el bloque de un repaso guardado en el diario. */
-function locateReviewBlock(event: ReviewProgressEvent): { page: PageData; block: BlockNode } | null {
-  const page =
+/**
+ * Encuentra la nota de una tarjeta usando el `page.id` incrustado en su id
+ * (`fc-<tipo>-<page.id>-<b-N>`) antes que el título, que puede estar repetido.
+ * También valida la huella del bloque para no escribir en otra tarjeta si el
+ * `b-N` se reasignó al recargar la nota.
+ */
+function findReviewCardBlock(
+  card: Flashcard
+): { page: PageData; block: BlockNode } | null {
+  const pageIdMatch = card.id.match(/^fc-(?:image|cloze|basic)-(p-[^-]+)-/);
+  const page = (pageIdMatch && vault.getPages().find((candidate) => candidate.id === pageIdMatch[1]))
+    || vault.getPageByTitle(card.pageTitle);
+  if (!page) return null;
+  const location = findNodeLocation(page.blocks, card.blockId);
+  if (!location) return null;
+  const block = location.parentList[location.index];
+  if (
+    card.fingerprint &&
+    FlashcardsManager.cardFingerprint(block.content, card.cardType) !== card.fingerprint
+  ) {
+    // El id de bloque apunta a otra tarjeta: buscar por huella en esta nota.
+    const match = getAllBlocksFlat(page.blocks).find(
+      (candidate) =>
+        FlashcardsManager.cardFingerprint(candidate.content, card.cardType) === card.fingerprint
+    );
+    if (!match) return null;
+    return { page, block: match };
+  }
+  return { page, block };
+}
+
+/**
+ * Localiza la tarjeta de un repaso del diario.
+ *
+ * Los ids de bloque (`b-N`) se asignan por índice al parsear cada nota
+ * (`src-tauri/src/lib.rs`), así que cambian al insertar o borrar un bullet.
+ * Confiar solo en `blockId` puede aplicar la programación de un repaso a otra
+ * tarjeta. Por eso se valida la instantánea esperada y, si el bloque ya no
+ * coincide, se busca por la huella estable de la tarjeta en toda la bóveda.
+ */
+function locateReviewBlock(
+  event: ReviewProgressEvent,
+  expected: CardScheduleSnapshot = event.after
+): { page: PageData; block: BlockNode } | null {
+  const matchesSnapshot = (block: BlockNode): boolean =>
+    FlashcardsManager.scheduleSnapshotsEqual(
+      FlashcardsManager.readScheduleSnapshot(block.content),
+      expected
+    );
+  const matchesFingerprint = (block: BlockNode): boolean =>
+    !!event.cardFingerprint &&
+    FlashcardsManager.cardFingerprint(block.content, event.cardType) === event.cardFingerprint;
+
+  const preferredPage =
     vault.getPages().find((candidate) => candidate.path === event.pagePath) ||
     vault.getPageByTitle(event.pageTitle);
-  if (!page) return null;
-  const loc = findNodeLocation(page.blocks, event.blockId);
-  if (!loc) return null;
-  return { page, block: loc.parentList[loc.index] };
+  if (preferredPage) {
+    const loc = findNodeLocation(preferredPage.blocks, event.blockId);
+    if (loc) {
+      const block = loc.parentList[loc.index];
+      if (matchesSnapshot(block) || matchesFingerprint(block)) {
+        return { page: preferredPage, block };
+      }
+    }
+  }
+
+  // El id de bloque cambió (o la nota se movió): buscar la tarjeta real. La
+  // huella es estable y, en diarios antiguos sin huella, la instantánea
+  // esperada contiene `last-reviewed`, único por repaso.
+  for (const page of vault.getPages()) {
+    if (page.blocksLoaded === false) continue;
+    for (const block of getAllBlocksFlat(page.blocks)) {
+      if (!matchesFingerprint(block) && !matchesSnapshot(block)) continue;
+      if (!/card-s::|last-reviewed::|#card\b/i.test(block.content)) continue;
+      return { page, block };
+    }
+  }
+  return null;
 }
 
 /**
@@ -13465,13 +13668,13 @@ async function applyReviewSnapshot(
   event: ReviewProgressEvent,
   direction: "undo" | "redo"
 ): Promise<boolean> {
-  const target = locateReviewBlock(event);
+  const expected = direction === "undo" ? event.after : event.before;
+  const next = direction === "undo" ? event.before : event.after;
+  const target = locateReviewBlock(event, expected);
   if (!target) {
     showToast(translate("No se encontró la tarjeta del último repaso."));
     return false;
   }
-  const expected = direction === "undo" ? event.after : event.before;
-  const next = direction === "undo" ? event.before : event.after;
   const current = FlashcardsManager.readScheduleSnapshot(target.block.content);
   if (!FlashcardsManager.scheduleSnapshotsEqual(current, expected)) {
     showToast(
@@ -13542,23 +13745,33 @@ function refreshFlashcardsAfterReviewChange(
   event: ReviewProgressEvent,
   direction: "undo" | "redo"
 ): void {
-  if (currentView === "flashcards") {
-    const nextId = direction === "redo" ? flashcardsManager.getNextCardId(event.cardId) : null;
-    const activeCardId = direction === "undo" ? event.cardId : nextId;
-    const updated = locateReviewBlock(event);
-    const refreshed = updated
-      ? flashcardsManager.refreshCardSchedule(
-          event.cardId,
-          updated.block.content,
-          flashcardReviewOrder,
-          activeCardId,
-          false
-        )
-      : null;
-    if (refreshed) updateFlashcardUI();
-    else startFlashcardsSession();
-    renderFlashcardExplorer();
+  if (currentView !== "flashcards") return;
+  const expected = direction === "undo" ? event.after : event.before;
+  const target = locateReviewBlock(event, expected);
+  if (!target) {
+    startFlashcardsSession();
+    return;
   }
+
+  // `event.cardId` contiene un `b-N` que puede haber cambiado; se recalcula
+  // conservando el prefijo de tipo y el índice de oclusión.
+  const oldSuffix = `-${event.blockId}`;
+  const currentCardId = event.cardId.endsWith(oldSuffix)
+    ? `${event.cardId.slice(0, -oldSuffix.length)}-${target.block.id}`
+    : event.cardId;
+  const nextId = direction === "redo" ? flashcardsManager.getNextCardId(currentCardId) : null;
+  const activeCardId = direction === "undo" ? currentCardId : (nextId ?? currentCardId);
+
+  // No se reconstruye la cola: la sesión conserva sus tarjetas y su orden.
+  const refreshed = flashcardsManager.updateCardInSession(
+    currentCardId,
+    target.block.content,
+    activeCardId,
+    false
+  );
+  if (!refreshed) startFlashcardsSession();
+  updateFlashcardUI();
+  renderFlashcardExplorer();
 }
 
 async function undoLastReview(): Promise<void> {

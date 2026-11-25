@@ -703,6 +703,12 @@
                   </svg>
                 </a>
 
+                <div class="settings-section-title">Estadísticas de repaso</div>
+                <p class="settings-help">Reinicia los contadores de repasos de hoy, totales, minutos de enfoque y puntos. No modifica la programación FSRS de las tarjetas.</p>
+                <div class="advanced-actions">
+                  <button class="font-option-btn" id="btn-clear-flashcard-stats" type="button">Borrar estadísticas de repaso</button>
+                </div>
+
                 <div id="update-settings-section">
                   <div class="settings-section-title">Actualizaciones</div>
                   <p class="settings-help" id="update-settings-help">Sin Notas solo consulta GitHub cuando pulsás el botón. En escritorio, el paquete se verifica con la firma del actualizador antes de instalarse.</p>
@@ -737,15 +743,35 @@
                   <button class="font-option-btn" id="btn-clear-bullet-properties" type="button">Borrar propiedades de los bullets</button>
                   <button class="font-option-btn" id="btn-clean-unused-attachments" type="button">Eliminar imágenes no usadas de assets</button>
                   <button class="font-option-btn" id="btn-clear-cache" type="button">Borrar caché</button>
-                  <button class="font-option-btn" id="btn-clear-flashcard-stats" type="button">Borrar estadísticas de repaso</button>
                   <button class="font-option-btn snapshot-danger" id="btn-delete-all-snapshots" type="button">Borrar todos los snapshots</button>
                   <button class="font-option-btn" id="btn-reload-app" type="button">Recargar aplicación</button>
                 </div>
                 <p class="settings-help" id="unused-attachments-status" role="status" aria-live="polite"></p>
 
+                <div class="settings-section-title">Propiedades FSRS de las tarjetas</div>
+                <p class="settings-help">Borra la programación FSRS (<code>card-s::</code>, <code>card-d::</code>, <code>last-reviewed::</code>, etc.) de todas las tarjetas o de una sola. Las tarjetas vuelven a considerarse nuevas; el texto y las oclusiones no se tocan. El trabajo se hace por lotes para no saturar el equipo.</p>
+                <div class="sync-box">
+                  <div class="settings-row">
+                    <label for="fsrs-clear-target">Destino</label>
+                    <select id="fsrs-clear-target">
+                      <option value="all">Todas las tarjetas</option>
+                      <option value="one">Una tarjeta específica</option>
+                    </select>
+                  </div>
+                  <div class="settings-row" id="fsrs-clear-card-row" hidden>
+                    <label for="fsrs-clear-card">Tarjeta</label>
+                    <select id="fsrs-clear-card"></select>
+                  </div>
+                  <div class="advanced-actions">
+                    <button class="font-option-btn snapshot-danger" id="btn-clear-fsrs-properties" type="button">Borrar propiedades FSRS</button>
+                  </div>
+                  <p class="settings-help" id="fsrs-clear-status" role="status" aria-live="polite"></p>
+                </div>
+
                 <div class="settings-section-title">Flashcards</div>
                 <p class="settings-help">Quita los marcadores que generan tarjetas en todas las notas del vault (<code>#card</code>, resaltados <code>==…==</code>, cloze, separadores <code>::</code> y datos de repaso) sin borrar el contenido de los bullets.</p>
                 <div class="advanced-actions">
+                  <button class="font-option-btn snapshot-danger" id="btn-clear-review-log" type="button">Borrar historial de repasos (logs)</button>
                   <button class="font-option-btn snapshot-danger" id="btn-clear-all-flashcards" type="button">Quitar marcadores de flashcards</button>
                 </div>
                 <p class="settings-help" id="clear-all-flashcards-status" role="status" aria-live="polite"></p>

@@ -126,6 +126,8 @@ export interface Flashcard {
   parentContent?: string;
   /** Texto plano normalizado para la búsqueda del explorador (no se persiste). */
   searchText?: string;
+  /** Huella del texto sin FSRS; identifica la tarjeta aunque cambie el `b-N`. */
+  fingerprint?: string;
 }
 
 export interface ImageOcclusionRegion {

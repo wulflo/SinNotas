@@ -1,6 +1,6 @@
 import type { BlockNode, Flashcard, PageData } from "../types";
 import type { FSRSParameters } from "../editor/fsrs";
-import { findNodeLocation } from "../editor/tree-engine";
+import { findNodeLocation, getAllBlocksFlat } from "../editor/tree-engine";
 import { FlashcardsManager, type RescheduleFSRSOptions } from "./flashcards-manager";
 
 /**
@@ -47,6 +47,8 @@ export interface FlashcardMaintenanceOptions {
   pages: readonly PageData[];
   /** Solo se usa su `scanPages`, que no muta el estado del manager. */
   manager: Pick<FlashcardsManager, "scanPages">;
+  /** Si se indica, se procesan estas tarjetas en vez de escanear el vault. */
+  cards?: readonly Flashcard[];
   anchor?: RescheduleFSRSOptions["anchor"];
   /** Reloj inyectable para tests y para comparar vencimientos pasados. */
   now?: Date;
@@ -96,26 +98,45 @@ function readDueDate(content: string): number {
  * propiedades FSRS son una sola línea de Markdown: hay que escribirla una vez.
  */
 function groupCardsByBlock(pages: readonly PageData[], cards: readonly Flashcard[]): CardBlock[] {
+  const pageById = new Map(pages.map((page) => [page.id, page]));
   const pageByTitle = new Map<string, PageData>();
   pages.forEach((page) => pageByTitle.set(page.title.toLowerCase(), page));
 
   const grouped = new Map<string, CardBlock>();
   for (const card of cards) {
-    const key = `${card.pageTitle.toLowerCase()}\u0000${card.blockId}`;
+    // El `page.id` viaja en el cardId y es estable; el título puede repetirse.
+    const pageMatch = card.id.match(/^fc-(?:image|cloze|basic)-(p-[^-]+)-/);
+    const page =
+      (pageMatch && pageById.get(pageMatch[1])) ||
+      pageByTitle.get(card.pageTitle.toLowerCase());
+    if (!page) continue;
+
+    let block: BlockNode | undefined;
+    const location = findNodeLocation(page.blocks, card.blockId);
+    if (location) {
+      const candidate = location.parentList[location.index];
+      if (
+        !card.fingerprint ||
+        FlashcardsManager.cardFingerprint(candidate.content, card.cardType) === card.fingerprint
+      ) {
+        block = candidate;
+      }
+    }
+    if (!block && card.fingerprint) {
+      block = getAllBlocksFlat(page.blocks).find(
+        (candidate) =>
+          FlashcardsManager.cardFingerprint(candidate.content, card.cardType) === card.fingerprint
+      );
+    }
+    if (!block) continue;
+
+    const key = `${page.id}\u0000${block.id}`;
     const existing = grouped.get(key);
     if (existing) {
       existing.cards.push(card);
       continue;
     }
-    const page = pageByTitle.get(card.pageTitle.toLowerCase());
-    if (!page) continue;
-    const location = findNodeLocation(page.blocks, card.blockId);
-    if (!location) continue;
-    grouped.set(key, {
-      page,
-      block: location.parentList[location.index],
-      cards: [card],
-    });
+    grouped.set(key, { page, block, cards: [card] });
   }
   return Array.from(grouped.values());
 }
@@ -158,7 +179,7 @@ export async function runFlashcardMaintenance(
   const nowMs = (options.now ?? new Date()).getTime();
   const batchSize = normalizeBatchSize(options.batchSize);
   const yieldControl = options.yieldControl ?? defaultYieldControl;
-  const cards = options.manager.scanPages([...options.pages]);
+  const cards = options.cards ?? options.manager.scanPages([...options.pages]);
   const blocks = groupCardsByBlock(options.pages, cards);
 
   const total = blocks.length;

@@ -32,6 +32,9 @@ export interface ReviewProgressEvent {
   blockId: string;
   cardId: string;
   cardType: FlashcardType;
+  /** Huella del texto de la tarjeta sin FSRS; permite localizarla aunque
+   *  cambie el id de bloque (`b-N`) al recargar la nota. */
+  cardFingerprint?: string;
   rating: FSRSRating;
   before: CardScheduleSnapshot;
   after: CardScheduleSnapshot;
@@ -48,6 +51,7 @@ interface ReviewProgressInput {
   blockId: string;
   cardId: string;
   cardType: FlashcardType;
+  cardFingerprint?: string;
   rating: FSRSRating;
   before: CardScheduleSnapshot;
   after: CardScheduleSnapshot;
@@ -143,7 +147,10 @@ function sanitizeSnapshot(value: unknown): CardScheduleSnapshot {
   if (difficulty !== undefined && difficulty >= 1 && difficulty <= 10) {
     snapshot.difficulty = difficulty;
   }
-  if (stabilityFast !== undefined && stabilityFast > 0) {
+  // FSRS-7 puede producir un rastro rápido negativo. El motor ya lo trata como
+  // ausente al calcular, pero conservarlo evita que una instantánea leída del
+  // diario deje de coincidir con la tarjeta y bloquee el deshacer.
+  if (stabilityFast !== undefined) {
     snapshot.stabilityFast = stabilityFast;
   }
   if (reps !== undefined) snapshot.reps = Math.max(0, Math.floor(reps));
@@ -159,6 +166,26 @@ function sanitizeSnapshot(value: unknown): CardScheduleSnapshot {
   return snapshot;
 }
 
+/**
+ * Copia fiel de una instantánea recién leída de una nota.
+ *
+ * `sanitizeSnapshot` valida datos que vienen de un archivo compartido y por eso
+ * descarta valores fuera de rango. Aquí, en cambio, los valores acaban de
+ * leerlos `readScheduleSnapshot` del Markdown; si se descarta uno, `event.after`
+ * deja de coincidir con la tarjeta y deshacer muestra un falso conflicto.
+ */
+function copySnapshot(value: CardScheduleSnapshot): CardScheduleSnapshot {
+  const copy: Record<string, unknown> = {};
+  for (const [key, fieldValue] of Object.entries(value)) {
+    if (typeof fieldValue === "number" && Number.isFinite(fieldValue)) {
+      copy[key] = fieldValue;
+    } else if (typeof fieldValue === "string" && fieldValue.length > 0) {
+      copy[key] = fieldValue;
+    }
+  }
+  return copy as CardScheduleSnapshot;
+}
+
 function sanitizeEvent(value: unknown): ReviewProgressEvent | null {
   if (!value || typeof value !== "object") return null;
   const candidate = value as Record<string, unknown>;
@@ -171,6 +198,7 @@ function sanitizeEvent(value: unknown): ReviewProgressEvent | null {
   const pageTitle = safeString(candidate.pageTitle, 512);
   const blockId = safeString(candidate.blockId, 512);
   const cardId = safeString(candidate.cardId, 512);
+  const cardFingerprint = safeString(candidate.cardFingerprint, 64) ?? undefined;
   const cardType = candidate.cardType;
   const rating = candidate.rating;
   const state = candidate.state;
@@ -208,6 +236,7 @@ function sanitizeEvent(value: unknown): ReviewProgressEvent | null {
     blockId,
     cardId,
     cardType,
+    ...(cardFingerprint ? { cardFingerprint } : {}),
     rating,
     before: sanitizeSnapshot(candidate.before),
     after: sanitizeSnapshot(candidate.after),
@@ -342,6 +371,22 @@ export class ReviewProgressStore {
       .slice(-100);
   }
 
+  /**
+   * Borra todo el diario de repasos, incluidas las copias de otros dispositivos.
+   * Es una acción destructiva explícita: no se puede deshacer.
+   */
+  public async clear(): Promise<void> {
+    if (isTauri()) {
+      await invoke("clear_review_progress");
+    } else {
+      localStorage.removeItem(PROGRESS_STORAGE_KEY);
+    }
+    this.file = emptyFile();
+    this.undoStack = [];
+    this.redoStack = [];
+    this.loaded = true;
+  }
+
   public async record(input: ReviewProgressInput): Promise<ReviewProgressEvent> {
     await this.load();
     const now = new Date();
@@ -360,9 +405,10 @@ export class ReviewProgressStore {
       blockId: input.blockId,
       cardId: input.cardId,
       cardType: input.cardType,
+      ...(input.cardFingerprint ? { cardFingerprint: input.cardFingerprint } : {}),
       rating: input.rating,
-      before: sanitizeSnapshot(input.before),
-      after: sanitizeSnapshot(input.after),
+      before: copySnapshot(input.before),
+      after: copySnapshot(input.after),
     };
     this.file = mergeReviewProgress(this.file, { version: 1, entries: [event] });
     this.undoStack.push(event);
@@ -375,7 +421,14 @@ export class ReviewProgressStore {
    * debe devolverlo con `restoreUndo`. */
   public takeUndo(): ReviewProgressEvent | null {
     while (this.undoStack.length > 0) {
-      const event = this.undoStack.pop()!;
+      // `record()` es asíncrono: con varias calificaciones seguidas los
+      // eventos pueden entrar en la pila en orden de finalización de guardado,
+      // no de repaso. Deshacer debe seguir el orden real de las tarjetas.
+      let latestIndex = 0;
+      for (let index = 1; index < this.undoStack.length; index += 1) {
+        if (this.undoStack[index].at > this.undoStack[latestIndex].at) latestIndex = index;
+      }
+      const [event] = this.undoStack.splice(latestIndex, 1);
       const current = this.currentEvent(event.id);
       if (current?.state === "applied") return current;
     }
@@ -396,7 +449,13 @@ export class ReviewProgressStore {
 
   public takeRedo(): ReviewProgressEvent | null {
     while (this.redoStack.length > 0) {
-      const event = this.redoStack.pop()!;
+      let latestIndex = 0;
+      for (let index = 1; index < this.redoStack.length; index += 1) {
+        if (this.redoStack[index].updatedAt > this.redoStack[latestIndex].updatedAt) {
+          latestIndex = index;
+        }
+      }
+      const [event] = this.redoStack.splice(latestIndex, 1);
       const current = this.currentEvent(event.id);
       if (current?.state === "undone") return current;
     }

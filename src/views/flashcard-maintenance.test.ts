@@ -122,6 +122,35 @@ describe("runFlashcardMaintenance - lotes y progreso", () => {
   });
 });
 
+describe("runFlashcardMaintenance - tarjeta específica", () => {
+  it("procesa solo las tarjetas indicadas cuando se pasa `cards`", async () => {
+    const pages = [
+      makePage("p1", "Nota A", [
+        dueContent("2026-01-01T00:00:00.000Z", 10),
+        dueContent("2026-02-01T00:00:00.000Z", 5),
+      ]),
+    ];
+    const manager = new FlashcardsManager();
+    const cards = manager.scanPages(pages);
+    expect(cards).toHaveLength(2);
+
+    const result = await runFlashcardMaintenance({
+      action: "reset",
+      parameters,
+      pages,
+      manager,
+      cards: [cards[1]],
+      savePage: async () => {},
+    });
+
+    // Un solo bloque tocado: la otra tarjeta conserva su programación.
+    expect(result.processed).toBe(1);
+    expect(result.updatedCards).toBe(1);
+    expect(pages[0].blocks[0].content).toContain("last-reviewed::");
+    expect(pages[0].blocks[1].content).not.toContain("last-reviewed::");
+  });
+});
+
 describe("runFlashcardMaintenance - cancelación", () => {
   it("cancela a mitad sin guardar el lote incompleto", async () => {
     const pages = ["A", "B", "C"].map((title, index) =>

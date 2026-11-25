@@ -63,6 +63,32 @@ export interface CardScheduleSnapshot {
 }
 
 /**
+ * Compara dos números de programación con tolerancia relativa.
+ *
+ * FSRS recalcula intervalos y estabilidades desde otros valores, así que el
+ * mismo repaso puede quedar guardado con una diferencia de un último dígito
+ * (p. ej. `0.003819444444444444` frente a `0.0038194444444444443`). Exigir
+ * igualdad bit a bit hacía que deshacer mostrase falsamente el aviso de
+ * «otro dispositivo».
+ */
+function scheduleNumbersEqual(left: number | undefined, right: number | undefined): boolean {
+  if (left === undefined || right === undefined) return left === right;
+  if (!Number.isFinite(left) || !Number.isFinite(right)) return false;
+  if (left === right) return true;
+  const scale = Math.max(1, Math.abs(left), Math.abs(right));
+  return Math.abs(left - right) <= 1e-9 * scale;
+}
+
+/** Compara fechas ISO aunque difieran en la representación de la zona horaria. */
+function scheduleDatesEqual(left: string | undefined, right: string | undefined): boolean {
+  if (left === right) return true;
+  if (!left || !right) return false;
+  const leftTime = Date.parse(left);
+  const rightTime = Date.parse(right);
+  return Number.isFinite(leftTime) && Number.isFinite(rightTime) && leftTime === rightTime;
+}
+
+/**
  * Reconstruye el estado de una instantánea antigua que aún no guardaba
  * `card-state`. Las tarjetas con paso de aprendizaje son Learning, las que ya
  * tienen repasos son Review y el resto New.
@@ -623,15 +649,21 @@ export class FlashcardsManager {
       return match?.[1] || undefined;
     };
 
+    // `Number.toString()` usa notación científica para valores muy pequeños
+    // (p. ej. 1.2e-7). El patrón anterior (`[\d.]+`) se quedaba a mitad del
+    // número y corrompía la instantánea al deshacer.
+    const numberPattern = "([+-]?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)";
     const snapshot: CardScheduleSnapshot = {
-      stability: readNumber(/card-s::\s*([\d.]+)/i),
-      difficulty: readNumber(/card-d::\s*([\d.]+)/i),
-      stabilityFast: readNumber(/card-s-fast::\s*([\d.]+)/i),
+      stability: readNumber(new RegExp(`card-s::\\s*${numberPattern}`, "i")),
+      difficulty: readNumber(new RegExp(`card-d::\\s*${numberPattern}`, "i")),
+      stabilityFast: readNumber(new RegExp(`card-s-fast::\\s*${numberPattern}`, "i")),
       reps: readNumber(/card-reps::\s*(\d+)/i),
       lapses: readNumber(/card-lapses::\s*(\d+)/i),
       lastReviewDate: readText(/last-reviewed::\s*(\S+)/i),
-      intervalDays: readNumber(/(?:interval-days|card-last-interval)::\s*([\d.]+)/i),
-      easeFactor: readNumber(/ease-factor::\s*([\d.]+)/i),
+      intervalDays: readNumber(
+        new RegExp(`(?:interval-days|card-last-interval)::\\s*${numberPattern}`, "i")
+      ),
+      easeFactor: readNumber(new RegExp(`ease-factor::\\s*${numberPattern}`, "i")),
       dueDate: readText(/due-date::\s*(\S+)/i),
       state: readNumber(/card-state::\s*([0-3])/i) as CardState | undefined,
       learningStep: readNumber(/card-learn-step::\s*(\d+)/i),
@@ -701,6 +733,28 @@ export class FlashcardsManager {
     return `${cleaned}\n${lines.join("\n")}`;
   }
 
+  /**
+   * Huella estable de una tarjeta, sin propiedades FSRS.
+   *
+   * Los ids de bloque (`b-N`) se asignan por índice al parsear cada nota, así
+   * que cambian al insertar o borrar un bullet. El diario necesita una
+   * referencia que sobreviva a esos cambios para no aplicar un repaso a la
+   * tarjeta equivocada. Se guarda solo un hash, nunca el texto de la nota.
+   */
+  public static cardFingerprint(content: string, cardType: FlashcardType): string {
+    const visible = stripSystemProperties(content)
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+    let hash = 2166136261; // FNV-1a de 32 bits
+    const input = `${cardType}|${visible}`;
+    for (let index = 0; index < input.length; index += 1) {
+      hash ^= input.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
+  }
+
   /** Compara dos programaciones normalizando números y fechas. */
   public static scheduleSnapshotsEqual(
     left: CardScheduleSnapshot,
@@ -710,23 +764,27 @@ export class FlashcardsManager {
     // `readScheduleSnapshot` las normaliza a 0.8·S, así que la comparación debe
     // aplicar el mismo criterio o todos los repasos antiguos parecerían haber
     // cambiado en otro dispositivo y no se podrían deshacer.
-    const normalizedStabilityFast = (snapshot: CardScheduleSnapshot) =>
+    const normalizedStabilityFast = (snapshot: CardScheduleSnapshot): number | undefined =>
       snapshot.stabilityFast ??
-      (snapshot.stability !== undefined ? snapshot.stability * 0.8 : null);
-    const normalize = (snapshot: CardScheduleSnapshot) => ({
-      stability: snapshot.stability ?? null,
-      difficulty: snapshot.difficulty ?? null,
-      stabilityFast: normalizedStabilityFast(snapshot),
-      reps: snapshot.reps ?? null,
-      lapses: snapshot.lapses ?? null,
-      lastReviewDate: snapshot.lastReviewDate ?? null,
-      intervalDays: snapshot.intervalDays ?? null,
-      easeFactor: snapshot.easeFactor ?? null,
-      dueDate: snapshot.dueDate ?? null,
-      state: inferSnapshotState(snapshot) ?? null,
-      learningStep: snapshot.learningStep ?? null,
-    });
-    return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
+      (snapshot.stability !== undefined ? snapshot.stability * 0.8 : undefined);
+
+    const floatFields = ["stability", "difficulty", "stabilityFast", "intervalDays", "easeFactor"] as const;
+    for (const field of floatFields) {
+      const leftValue = field === "stabilityFast" ? normalizedStabilityFast(left) : left[field];
+      const rightValue = field === "stabilityFast" ? normalizedStabilityFast(right) : right[field];
+      if (!scheduleNumbersEqual(leftValue, rightValue)) return false;
+    }
+
+    const integerFields = ["reps", "lapses", "learningStep"] as const;
+    for (const field of integerFields) {
+      if ((left[field] ?? null) !== (right[field] ?? null)) return false;
+    }
+
+    if ((inferSnapshotState(left) ?? null) !== (inferSnapshotState(right) ?? null)) return false;
+    if (!scheduleDatesEqual(left.lastReviewDate, right.lastReviewDate)) return false;
+    if (!scheduleDatesEqual(left.dueDate, right.dueDate)) return false;
+
+    return true;
   }
 
   /** Format block content with FSRS properties appended or updated */
@@ -877,6 +935,37 @@ export class FlashcardsManager {
    * después, sobre el resultado, para que `allCards` siga reflejando la bóveda completa.
    */
   /**
+   * Actualiza la programación de una tarjeta SIN reconstruir la cola.
+   *
+   * `refreshCardSchedule` vuelve a filtrar por "vencida ahora" y, con el orden
+   * `mixed`, rebaraja la cola: al deshacer, el contador saltaba de "7 de 7" a
+   * "2 de 4" o "4 de 6" y parecía otra tarjeta. Durante una sesión de repaso
+   * el conjunto y el orden deben permanecer fijos.
+   */
+  public updateCardInSession(
+    cardId: string,
+    blockContent: string,
+    activeCardId: string | null = null,
+    revealed = false
+  ): Flashcard | null {
+    const card = this.allCards.find((candidate) => candidate.id === cardId);
+    if (!card) return null;
+    card.fsrs = this.parseBlockFSRS(blockContent);
+    card.lastIntervalDays = this.parseIntervalDays(blockContent);
+    card.easeFactor = this.parseEaseFactor(blockContent);
+    card.createdAt = this.parseCreatedAt(blockContent);
+    card.dueDate = this.parseDueDate(blockContent);
+
+    const activeId = activeCardId ?? cardId;
+    const index = this.reviewCards.findIndex((candidate) => candidate.id === activeId);
+    if (index >= 0) {
+      this.currentIndex = index;
+      this.isAnswerRevealed = revealed;
+    }
+    return card;
+  }
+
+  /**
    * Detecta tarjetas en un subconjunto de notas sin tocar el estado del
    * manager. Es la pieza que usa `FlashcardLoader` para escanear por lotes y
    * para cachear el resultado por versión del vault.
@@ -914,6 +1003,7 @@ export class FlashcardsManager {
             pageTitle: page.title,
             blockId: block.id,
             cardType: "image-occlusion",
+            fingerprint: FlashcardsManager.cardFingerprint(block.content, "image-occlusion"),
             question: "",
             answer: "",
             fsrs: this.parseBlockFSRS(block.content),
@@ -949,6 +1039,7 @@ export class FlashcardsManager {
             pageTitle: page.title,
             blockId: block.id,
             cardType: "cloze",
+            fingerprint: FlashcardsManager.cardFingerprint(block.content, "cloze"),
             question: questionHtml,
             answer: answerHtml,
             fsrs: this.parseBlockFSRS(block.content),
@@ -989,6 +1080,7 @@ export class FlashcardsManager {
               pageTitle: page.title,
               blockId: block.id,
               cardType: "basic",
+              fingerprint: FlashcardsManager.cardFingerprint(block.content, "basic"),
               question: renderMarkdownToHtml(question),
               answer: answer || renderMarkdownToHtml("Sin respuesta explícita."),
               fsrs: this.parseBlockFSRS(block.content),
