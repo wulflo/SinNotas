@@ -162,6 +162,11 @@ import { VirtualList } from "./views/virtual-list";
 import { ConceptMapView } from "./views/concept-map-view";
 import { migrateSelect, syncCustomSelect } from "./views/custom-select";
 import { buildReviewHeatmap, defaultHeatmapStart } from "./views/review-heatmap";
+import {
+  isFlashcardBlockContent,
+  removeFlashcardMarkers,
+  splitBlockProperties,
+} from "./editor/flashcard-markers";
 import { FSRS7_WEIGHT_COUNT, defaultFSRSParams, FSRSRating, type FSRSParameters } from "./editor/fsrs";
 import {
   formatLearningSteps,
@@ -492,12 +497,6 @@ const flashcardDeckCollapsed = new Set<string>();
  * hechos en otras; persiste hasta guardar el mazo. */
 const flashcardPagesDraftSelection = new Map<string, boolean>();
 
-/** Estado del selector de notas/mazos para borrar propiedades FSRS. Reutiliza
- * el mismo árbol paginado que el editor de mazos, pero con selección propia. */
-const fsrsClearSelectedTitles = new Set<string>();
-const fsrsClearCollapsedNodes = new Set<string>();
-let fsrsClearSearchText = "";
-let fsrsClearCurrentPage = 1;
 
 /* ==================== MAZOS PERSONALIZADOS ==================== */
 
@@ -902,10 +901,9 @@ const unusedAttachmentsStatus = document.getElementById("unused-attachments-stat
 const btnClearCache = document.getElementById("btn-clear-cache") as HTMLButtonElement;
 const btnClearFlashcardStats = document.getElementById("btn-clear-flashcard-stats") as HTMLButtonElement;
 const btnClearReviewLog = document.getElementById("btn-clear-review-log") as HTMLButtonElement;
+const flashcardClearTargetSelect = document.getElementById("flashcard-clear-target") as HTMLSelectElement;
+const flashcardClearPickerRow = document.getElementById("flashcard-clear-picker-row") as HTMLElement;
 const fsrsClearTargetSelect = document.getElementById("fsrs-clear-target") as HTMLSelectElement;
-const fsrsClearSearch = document.getElementById("fsrs-clear-search") as HTMLInputElement | null;
-const fsrsClearPickerList = document.getElementById("fsrs-clear-picker-list") as HTMLDivElement | null;
-const fsrsClearSelectionStatus = document.getElementById("fsrs-clear-selection-status") as HTMLElement | null;
 const fsrsClearCardRow = document.getElementById("fsrs-clear-card-row") as HTMLElement;
 const btnClearFsrsProperties = document.getElementById("btn-clear-fsrs-properties") as HTMLButtonElement;
 const fsrsClearStatus = document.getElementById("fsrs-clear-status") as HTMLElement;
@@ -3868,166 +3866,220 @@ btnClearReviewLog.addEventListener("click", async () => {
   }
 });
 
-/** Actualiza el resumen de notas elegidas en el selector de borrado. */
-function updateFsrsClearSelectionStatus(): void {
-  if (!fsrsClearSelectionStatus) return;
-  const count = fsrsClearSelectedTitles.size;
-  fsrsClearSelectionStatus.textContent = count === 0
-    ? translate("Ninguna nota seleccionada. Marca notas o mazos para borrar sus propiedades FSRS.")
-    : `${count} ${count === 1 ? translate("nota seleccionada") : translate("notas seleccionadas")}`;
+interface FlashcardScopePickerOptions {
+  listId: string;
+  searchId: string;
+  paginationId: string;
+  prevId: string;
+  nextId: string;
+  infoId: string;
+  statusId: string;
+  emptyStatus: string;
+  onRender?: () => void;
 }
 
-/** Marca/desmarca todas las notas de un mazo (incluidos sus submazos). */
-function setFsrsClearDeckSelection(node: DeckNode, selected: boolean): void {
-  for (const title of collectDeckPageTitles(node)) {
-    if (selected) fsrsClearSelectedTitles.add(title);
-    else fsrsClearSelectedTitles.delete(title);
-  }
+interface FlashcardScopePicker {
+  selectedTitles: Set<string>;
+  render(): void;
 }
 
 /**
- * Selector paginado de notas y mazos para borrar propiedades FSRS. Usa el mismo
- * árbol y paginación que el editor de mazos, pero con selección independiente;
- * así funciona igual con unas pocas notas que con miles de tarjetas.
+ * Selector paginado reutilizable de notas y mazos. Es el mismo árbol que usa el
+ * editor de mazos (búsqueda, contracción de submazos y paginación por raíces)
+ * compartido por todas las acciones de borrado de flashcards.
  */
-function renderFsrsClearPicker(): void {
-  if (!fsrsClearPickerList) return;
-  fsrsClearPickerList.replaceChildren();
+function createFlashcardScopePicker(options: FlashcardScopePickerOptions): FlashcardScopePicker {
+  const list = document.getElementById(options.listId) as HTMLDivElement | null;
+  const search = document.getElementById(options.searchId) as HTMLInputElement | null;
+  const pagination = document.getElementById(options.paginationId);
+  const prev = document.getElementById(options.prevId) as HTMLButtonElement | null;
+  const next = document.getElementById(options.nextId) as HTMLButtonElement | null;
+  const info = document.getElementById(options.infoId);
+  const status = document.getElementById(options.statusId);
 
-  const pages = flashcardsManager.getPagesWithCards();
-  if (pages.length === 0) {
-    ensureFlashcardScan({
-      onDone: () => {
-        if (fsrsClearTargetSelect.value === "one") renderFsrsClearPicker();
-      },
-    });
-    const waiting = document.createElement("div");
-    waiting.className = "settings-help";
-    waiting.innerText = translate("Escaneando notas… la lista aparecerá en breve.");
-    fsrsClearPickerList.appendChild(waiting);
-    updateFsrsClearSelectionStatus();
-    return;
-  }
+  const selectedTitles = new Set<string>();
+  const collapsedNodes = new Set<string>();
+  let searchText = "";
+  let currentPage = 1;
 
-  const validTitles = new Set(
-    pages.map((title) => normalizeDeckTitle(title).toLowerCase())
-  );
-  for (const title of [...fsrsClearSelectedTitles]) {
-    if (!validTitles.has(normalizeDeckTitle(title).toLowerCase())) {
-      fsrsClearSelectedTitles.delete(title);
+  const updateStatus = (): void => {
+    if (!status) return;
+    const count = selectedTitles.size;
+    status.textContent = count === 0
+      ? translate(options.emptyStatus)
+      : `${count} ${count === 1 ? translate("nota seleccionada") : translate("notas seleccionadas")}`;
+  };
+
+  const setDeckSelection = (node: DeckNode, selected: boolean): void => {
+    for (const title of collectDeckPageTitles(node)) {
+      if (selected) selectedTitles.add(title);
+      else selectedTitles.delete(title);
     }
-  }
+  };
 
-  const tree = buildDeckTree(pages, {
-    cardCount: (title) => flashcardsManager.getCardCountForPage(title),
-  });
-  sortDeckTree(tree, compareDeckNodesByName);
-  const search = searchDeckTree(tree, fsrsClearSearchText);
-  const visibleRoots = visibleDeckRoots(tree, search);
-  const totalPages = Math.max(1, Math.ceil(visibleRoots.length / FLASHCARD_PAGES_PER_PAGE));
-  if (fsrsClearCurrentPage > totalPages) fsrsClearCurrentPage = totalPages;
-  if (fsrsClearCurrentPage < 1) fsrsClearCurrentPage = 1;
+  const render = (): void => {
+    options.onRender?.();
+    if (!list) return;
+    list.replaceChildren();
 
-  const pagination = document.getElementById("fsrs-clear-pagination");
-  const prev = document.getElementById("fsrs-clear-prev") as HTMLButtonElement | null;
-  const next = document.getElementById("fsrs-clear-next") as HTMLButtonElement | null;
-  const info = document.getElementById("fsrs-clear-page-info");
-  if (pagination) pagination.hidden = totalPages <= 1;
-  if (prev) prev.disabled = fsrsClearCurrentPage === 1;
-  if (next) next.disabled = fsrsClearCurrentPage === totalPages;
-  if (info) info.textContent = `Página ${fsrsClearCurrentPage} de ${totalPages}`;
+    const pages = flashcardsManager.getPagesWithCards();
+    if (pages.length === 0) {
+      ensureFlashcardScan({ onDone: () => render() });
+      const waiting = document.createElement("div");
+      waiting.className = "settings-help";
+      waiting.innerText = translate("Escaneando notas… la lista aparecerá en breve.");
+      list.appendChild(waiting);
+      updateStatus();
+      return;
+    }
 
-  if (visibleRoots.length === 0) {
-    const empty = document.createElement("div");
-    empty.className = "settings-help";
-    empty.innerText = translate("No hay mazos ni notas que coincidan con la búsqueda.");
-    fsrsClearPickerList.appendChild(empty);
-    updateFsrsClearSelectionStatus();
-    return;
-  }
+    const validTitles = new Set(pages.map((title) => normalizeDeckTitle(title).toLowerCase()));
+    for (const title of [...selectedTitles]) {
+      if (!validTitles.has(normalizeDeckTitle(title).toLowerCase())) selectedTitles.delete(title);
+    }
 
-  const start = (fsrsClearCurrentPage - 1) * FLASHCARD_PAGES_PER_PAGE;
-  const rows = flattenDeckRows(
-    visibleRoots.slice(start, start + FLASHCARD_PAGES_PER_PAGE),
-    search,
-    (nodeId) => fsrsClearCollapsedNodes.has(nodeId)
-  );
+    const tree = buildDeckTree(pages, {
+      cardCount: (title) => flashcardsManager.getCardCountForPage(title),
+    });
+    sortDeckTree(tree, compareDeckNodesByName);
+    const found = searchDeckTree(tree, searchText);
+    const visibleRoots = visibleDeckRoots(tree, found);
+    const totalPages = Math.max(1, Math.ceil(visibleRoots.length / FLASHCARD_PAGES_PER_PAGE));
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
 
-  rows.forEach(({ node, depth }) => {
-    const row = document.createElement("div");
-    row.className = "flashcard-deck-row";
-    row.style.setProperty("--deck-depth", String(depth));
-    row.setAttribute("role", "treeitem");
-    row.setAttribute("aria-level", String(depth + 1));
-    row.title = node.path.join(DECK_SEPARATOR);
+    if (pagination) pagination.hidden = totalPages <= 1;
+    if (prev) prev.disabled = currentPage === 1;
+    if (next) next.disabled = currentPage === totalPages;
+    if (info) info.textContent = `Página ${currentPage} de ${totalPages}`;
 
-    if (node.children.length > 0) {
-      const collapsed = fsrsClearCollapsedNodes.has(node.id);
-      const toggle = document.createElement("button");
-      toggle.type = "button";
-      toggle.className = "flashcard-deck-toggle";
-      toggle.setAttribute("aria-label", collapsed ? "Expandir mazo" : "Contraer mazo");
-      toggle.setAttribute("aria-expanded", String(!collapsed));
-      toggle.textContent = collapsed ? "▸" : "▾";
-      toggle.addEventListener("click", () => {
-        if (fsrsClearCollapsedNodes.has(node.id)) fsrsClearCollapsedNodes.delete(node.id);
-        else fsrsClearCollapsedNodes.add(node.id);
-        renderFsrsClearPicker();
+    if (visibleRoots.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "settings-help";
+      empty.innerText = translate("No hay mazos ni notas que coincidan con la búsqueda.");
+      list.appendChild(empty);
+      updateStatus();
+      return;
+    }
+
+    const start = (currentPage - 1) * FLASHCARD_PAGES_PER_PAGE;
+    const rows = flattenDeckRows(
+      visibleRoots.slice(start, start + FLASHCARD_PAGES_PER_PAGE),
+      found,
+      (nodeId) => collapsedNodes.has(nodeId)
+    );
+
+    rows.forEach(({ node, depth }) => {
+      const row = document.createElement("div");
+      row.className = "flashcard-deck-row";
+      row.style.setProperty("--deck-depth", String(depth));
+      row.setAttribute("role", "treeitem");
+      row.setAttribute("aria-level", String(depth + 1));
+      row.title = node.path.join(DECK_SEPARATOR);
+
+      if (node.children.length > 0) {
+        const collapsed = collapsedNodes.has(node.id);
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "flashcard-deck-toggle";
+        toggle.setAttribute("aria-label", collapsed ? "Expandir mazo" : "Contraer mazo");
+        toggle.setAttribute("aria-expanded", String(!collapsed));
+        toggle.textContent = collapsed ? "▸" : "▾";
+        toggle.addEventListener("click", () => {
+          if (collapsedNodes.has(node.id)) collapsedNodes.delete(node.id);
+          else collapsedNodes.add(node.id);
+          render();
+        });
+        row.appendChild(toggle);
+      } else {
+        const spacer = document.createElement("span");
+        spacer.className = "flashcard-deck-toggle is-placeholder";
+        spacer.setAttribute("aria-hidden", "true");
+        row.appendChild(spacer);
+      }
+
+      const label = document.createElement("label");
+      label.className = "flashcard-deck-label";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.setAttribute("aria-label", node.path.join(DECK_SEPARATOR));
+      const state = getDeckSelectionState(node, (title) => selectedTitles.has(title));
+      checkbox.checked = state === "checked";
+      checkbox.indeterminate = state === "indeterminate";
+      checkbox.addEventListener("change", () => {
+        setDeckSelection(node, checkbox.checked);
+        render();
       });
-      row.appendChild(toggle);
-    } else {
-      const spacer = document.createElement("span");
-      spacer.className = "flashcard-deck-toggle is-placeholder";
-      spacer.setAttribute("aria-hidden", "true");
-      row.appendChild(spacer);
-    }
+      const name = document.createElement("span");
+      name.className = "flashcard-deck-name";
+      name.textContent = node.name;
+      label.append(checkbox, name);
+      row.appendChild(label);
 
-    const label = document.createElement("label");
-    label.className = "flashcard-deck-label";
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.setAttribute("aria-label", node.path.join(DECK_SEPARATOR));
-    const state = getDeckSelectionState(node, (title) => fsrsClearSelectedTitles.has(title));
-    checkbox.checked = state === "checked";
-    checkbox.indeterminate = state === "indeterminate";
-    checkbox.addEventListener("change", () => {
-      setFsrsClearDeckSelection(node, checkbox.checked);
-      renderFsrsClearPicker();
+      const count = document.createElement("span");
+      count.className = "flashcard-deck-count";
+      const cardLabel = translate(node.totalCardCount === 1 ? "tarjeta" : "tarjetas");
+      const noteLabel = translate(node.totalPageCount === 1 ? "nota" : "notas");
+      count.textContent = node.totalPageCount > 1
+        ? `${node.totalCardCount} ${cardLabel} · ${node.totalPageCount} ${noteLabel}`
+        : `${node.totalCardCount} ${cardLabel}`;
+      row.appendChild(count);
+      list.appendChild(row);
     });
-    const name = document.createElement("span");
-    name.className = "flashcard-deck-name";
-    name.textContent = node.name;
-    label.append(checkbox, name);
-    row.appendChild(label);
 
-    const count = document.createElement("span");
-    count.className = "flashcard-deck-count";
-    const cardLabel = translate(node.totalCardCount === 1 ? "tarjeta" : "tarjetas");
-    const noteLabel = translate(node.totalPageCount === 1 ? "nota" : "notas");
-    count.textContent = node.totalPageCount > 1
-      ? `${node.totalCardCount} ${cardLabel} · ${node.totalPageCount} ${noteLabel}`
-      : `${node.totalCardCount} ${cardLabel}`;
-    row.appendChild(count);
-    fsrsClearPickerList.appendChild(row);
+    updateStatus();
+  };
+
+  search?.addEventListener("input", () => {
+    searchText = search.value.trim();
+    currentPage = 1;
+    render();
+  });
+  prev?.addEventListener("click", () => {
+    if (currentPage > 1) {
+      currentPage -= 1;
+      render();
+    }
+  });
+  next?.addEventListener("click", () => {
+    currentPage += 1;
+    render();
   });
 
-  updateFsrsClearSelectionStatus();
+  return { selectedTitles, render };
 }
 
-fsrsClearSearch?.addEventListener("input", () => {
-  fsrsClearSearchText = fsrsClearSearch.value.trim();
-  fsrsClearCurrentPage = 1;
-  renderFsrsClearPicker();
+const fsrsClearPicker = createFlashcardScopePicker({
+  listId: "fsrs-clear-picker-list",
+  searchId: "fsrs-clear-search",
+  paginationId: "fsrs-clear-pagination",
+  prevId: "fsrs-clear-prev",
+  nextId: "fsrs-clear-next",
+  infoId: "fsrs-clear-page-info",
+  statusId: "fsrs-clear-selection-status",
+  emptyStatus: "Ninguna nota seleccionada. Marca notas o mazos para borrar sus propiedades FSRS.",
 });
-document.getElementById("fsrs-clear-prev")?.addEventListener("click", () => {
-  if (fsrsClearCurrentPage > 1) {
-    fsrsClearCurrentPage -= 1;
-    renderFsrsClearPicker();
-  }
+
+function renderFsrsClearPicker(): void {
+  fsrsClearPicker.render();
+}
+
+const flashcardClearPicker = createFlashcardScopePicker({
+  listId: "flashcard-clear-picker-list",
+  searchId: "flashcard-clear-search",
+  paginationId: "flashcard-clear-pagination",
+  prevId: "flashcard-clear-prev",
+  nextId: "flashcard-clear-next",
+  infoId: "flashcard-clear-page-info",
+  statusId: "flashcard-clear-selection-status",
+  emptyStatus: "Ninguna nota seleccionada. Marca notas o mazos para quitar sus marcadores de flashcard.",
 });
-document.getElementById("fsrs-clear-next")?.addEventListener("click", () => {
-  fsrsClearCurrentPage += 1;
-  renderFsrsClearPicker();
+
+flashcardClearTargetSelect?.addEventListener("change", () => {
+  const selected = flashcardClearTargetSelect.value === "selected";
+  flashcardClearPickerRow.hidden = !selected;
+  if (selected) flashcardClearPicker.render();
+  syncCustomSelect(flashcardClearTargetSelect);
 });
 
 fsrsClearTargetSelect.addEventListener("change", () => {
@@ -4041,7 +4093,7 @@ btnClearFsrsProperties.addEventListener("click", async () => {
   let selectedCards: Flashcard[] | undefined;
   if (!all) {
     selectedCards = flashcardsManager.getAllCards().filter((card) =>
-      fsrsClearSelectedTitles.has(card.pageTitle)
+      fsrsClearPicker.selectedTitles.has(card.pageTitle)
     );
     if (selectedCards.length === 0) {
       fsrsClearStatus.textContent = translate(
@@ -4094,13 +4146,26 @@ btnClearFsrsProperties.addEventListener("click", async () => {
 });
 
 btnClearAllFlashcards.addEventListener("click", async () => {
+  const bySelection = flashcardClearTargetSelect?.value === "selected";
+  const selected = bySelection ? flashcardClearPicker.selectedTitles : null;
+  if (bySelection && (!selected || selected.size === 0)) {
+    clearAllFlashcardsStatus.textContent = translate(
+      "Selecciona al menos una nota o un mazo antes de quitar los marcadores."
+    );
+    return;
+  }
+  const targetText = bySelection
+    ? `${selected?.size ?? 0} ${translate("notas seleccionadas")}`
+    : translate("todas las notas del vault");
   const confirmed = await confirmAction(
-    "Se quitarán los marcadores de todas las flashcards del vault (#card, resaltados ==…==, cloze, separadores :: y datos de repaso). El contenido de los bullets se conservará. ¿Continuar?",
+    `Se quitarán los marcadores de flashcards de ${targetText} (#card, resaltados ==…==, cloze, separadores :: y datos de repaso). El contenido y la jerarquía de los bullets se conservarán. ¿Continuar?`,
     "Eliminar flashcards"
   );
   if (!confirmed) return;
 
-  const pages = vault.getPages();
+  const pages = vault.getPages().filter(
+    (page) => !selected || selected.has(page.title)
+  );
   let removed = 0;
   pages.forEach((page) => {
     getAllBlocksFlat(page.blocks).forEach((block) => {
@@ -4113,8 +4178,10 @@ btnClearAllFlashcards.addEventListener("click", async () => {
   });
 
   if (removed === 0) {
-    clearAllFlashcardsStatus.textContent = "No se encontraron flashcards en el vault.";
-    showToast("No se encontraron flashcards en el vault.");
+    clearAllFlashcardsStatus.textContent = bySelection
+      ? "No se encontraron flashcards en las notas seleccionadas."
+      : "No se encontraron flashcards en el vault.";
+    showToast(clearAllFlashcardsStatus.textContent);
     return;
   }
 
@@ -6120,16 +6187,6 @@ function setCaretOffset(element: HTMLElement, offset: number) {
   sel.addRange(range);
 }
 
-function splitBlockProperties(content: string): { text: string; properties: string[] } {
-  const textLines: string[] = [];
-  const properties: string[] = [];
-  content.split(/\r?\n/).forEach((line) => {
-    if (/^[\w-]+::\s*.*$/i.test(line.trim())) properties.push(line.trim());
-    else textLines.push(line);
-  });
-  return { text: textLines.join("\n"), properties };
-}
-
 function splitTaskPrefix(content: string): { prefix: string; text: string } {
   const match = content.match(/^(TODO|LATER|DOING|NOW|DONE)\s+/i);
   return match
@@ -6145,17 +6202,6 @@ function setVisibleBlockContent(node: BlockNode, text: string): void {
   const { properties } = splitBlockProperties(node.content);
   const { prefix } = splitTaskPrefix(splitBlockProperties(node.content).text);
   node.content = `${prefix}${text}${properties.length ? `\n${properties.join("\n")}` : ""}`;
-}
-
-function isFlashcardBlockContent(content: string): boolean {
-  const { text, properties } = splitBlockProperties(content);
-  return (
-    /#card\b/i.test(text) ||
-    text.includes("::") ||
-    /\{\{(?:c\d+::|cloze\s+)/i.test(text) ||
-    /==.*?==/.test(text) ||
-    properties.some((property) => /^image-occlusions::/i.test(property))
-  );
 }
 
 function ensureBlockCreatedAt(node: BlockNode): void {
@@ -7441,37 +7487,6 @@ function outdentSelectedBullets(page: PageData = getSelectionPage()): boolean {
   void vault.savePage(page);
   renderBlocksTree();
   return true;
-}
-
-/**
- * Quita de un bullet los marcadores que lo convierten en flashcard (`#card`,
- * resaltados/cloze y sus propiedades de programación) conservando el texto.
- */
-function removeFlashcardMarkers(content: string): string {
-  const cardPropertyPattern =
-    /^(?:card-[a-z-]+|last-reviewed|interval-days|ease-factor|due-date|image-occlusions)::/i;
-  const keptLines = content
-    .split(/\r?\n/)
-    .filter((line) => !cardPropertyPattern.test(line.trim()));
-  // Separar propiedades del texto visible: solo se transforma el texto.
-  const { text, properties } = splitBlockProperties(keptLines.join("\n"));
-  let visible = text;
-  // Cloze estilo Anki: {{c1::texto}}, {{cloze texto}} o {{texto}} → texto.
-  visible = visible.replace(/\{\{(?:c\d+::|cloze\s+)?([^}\n]*)\}\}/gi, "$1");
-  // Resaltado usado como cloze: ==texto== → texto.
-  visible = visible.replace(/==([^=\n]+)==/g, "$1");
-  // Etiquetas de tarjeta.
-  visible = stripCardTag(visible).replace(/#flashcards?\b/gi, "");
-  // El separador `::` también genera una tarjeta básica; se conserva como
-  // puntuación normal para que el bullet siga siendo legible.
-  visible = visible.replace(/\s*::\s*/g, " : ");
-  const cleaned = visible
-    .split(/\r?\n/)
-    .map((line) => line.replace(/[ \t]+$/g, ""))
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-  return [cleaned, ...properties].filter((part) => part.length > 0).join("\n");
 }
 
 /**
@@ -17137,6 +17152,7 @@ function migrateDesktopSelects(): void {
   migrateSelect(allPagesSortSelect);
   migrateSelect(flashcardHeatmapStyleSelect);
   migrateSelect(fsrsClearTargetSelect);
+  migrateSelect(flashcardClearTargetSelect);
   migrateSelect(imageOcclusionShapeSelect);
   migrateSelect(gamepadControllerTypeSelect);
   gamepadMappingSelects.forEach((select) => migrateSelect(select));

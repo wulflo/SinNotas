@@ -779,13 +779,38 @@
                   <p class="settings-help" id="fsrs-clear-status" role="status" aria-live="polite"></p>
                 </div>
 
-                <div class="settings-section-title">Flashcards</div>
-                <p class="settings-help">Quita los marcadores que generan tarjetas en todas las notas del vault (<code>#card</code>, resaltados <code>==…==</code>, cloze, separadores <code>::</code> y datos de repaso) sin borrar el contenido de los bullets.</p>
-                <div class="advanced-actions">
-                  <button class="font-option-btn snapshot-danger" id="btn-clear-review-log" type="button">Borrar historial de repasos (logs)</button>
-                  <button class="font-option-btn snapshot-danger" id="btn-clear-all-flashcards" type="button">Quitar marcadores de flashcards</button>
+                <div class="settings-section-title">Borrado centralizado de flashcards</div>
+                <p class="settings-help">Quita los marcadores que generan tarjetas (<code>#card</code>, resaltados <code>==…==</code>, cloze, separadores <code>::</code> y datos de repaso) sin borrar el contenido ni la jerarquía de los bullets. Puedes aplicarlo a todo el vault o elegir notas y mazos concretos en el selector paginado. El botón del explorador y la opción del menú contextual usan esta misma acción.</p>
+                <div class="sync-box">
+                  <div class="settings-row">
+                    <label for="flashcard-clear-target">Destino</label>
+                    <select id="flashcard-clear-target">
+                      <option value="all">Todas las notas</option>
+                      <option value="selected">Notas o mazos seleccionados</option>
+                    </select>
+                  </div>
+                  <div id="flashcard-clear-picker-row" class="fsrs-clear-picker" hidden>
+                    <div class="settings-row">
+                      <label for="flashcard-clear-search">Nota o mazo</label>
+                      <input type="text" id="flashcard-clear-search" placeholder="Buscar nota o mazo..." autocomplete="off" />
+                    </div>
+                    <div class="flashcard-pages-list" id="flashcard-clear-picker-list" role="tree" aria-multiselectable="true" aria-label="Notas y mazos cuyas flashcards se van a quitar"></div>
+                    <div class="flashcard-pages-pagination" id="flashcard-clear-pagination" hidden>
+                      <button class="btn-pagination" id="flashcard-clear-prev" type="button" disabled>← Anterior</button>
+                      <span class="pagination-info" id="flashcard-clear-page-info">Página 1 de 1</span>
+                      <button class="btn-pagination" id="flashcard-clear-next" type="button" disabled>Siguiente →</button>
+                    </div>
+                    <p class="settings-help" id="flashcard-clear-selection-status" role="status" aria-live="polite"></p>
+                  </div>
+                  <div class="advanced-actions">
+                    <button class="font-option-btn snapshot-danger" id="btn-clear-all-flashcards" type="button">Quitar marcadores de flashcards</button>
+                  </div>
                 </div>
                 <p class="settings-help" id="clear-all-flashcards-status" role="status" aria-live="polite"></p>
+                <div class="settings-section-title">Historial de repasos</div>
+                <div class="advanced-actions">
+                  <button class="font-option-btn snapshot-danger" id="btn-clear-review-log" type="button">Borrar historial de repasos (logs)</button>
+                </div>
               </section>
             </div>
             </div>
