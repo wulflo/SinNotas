@@ -2,7 +2,7 @@
 
 > **Índice técnico extremadamente detallado de Sin Notas.**
 >
-> Versión del código indexada: **0.5.5** (`package.json`, `src-tauri/tauri.conf.json`, `docs/SinNotas.md`).
+> Versión del código indexada: **0.5.6** (`package.json`, `src-tauri/tauri.conf.json`, `docs/SinNotas.md`).
 > Fecha del índice: **2026-11-25**.
 >
 > Este documento **no modifica ni describe cambios en el código**: es solo un mapa de referencia.
@@ -18,7 +18,7 @@
 
 | Notación | Significado |
 | :--- | :--- |
-| `ruta/archivo.ts:123` | Archivo y línea aproximada donde empieza el símbolo. Las líneas son las de la versión 0.5.5 y pueden moverse con edits posteriores; el **nombre del símbolo** es el dato estable. |
+| `ruta/archivo.ts:123` | Archivo y línea aproximada donde empieza el símbolo. Las líneas son las de la versión 0.5.6 y pueden moverse con edits posteriores; el **nombre del símbolo** es el dato estable. |
 | `símbolo()` | Función o método exportado. Si va precedido de `privado:` no se exporta. |
 | `#[tauri::command]` | Función Rust expuesta al frontend mediante `invoke("nombre")`. |
 | `LNNN` | Número de línea dentro del archivo que se está describiendo. |
@@ -924,7 +924,7 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 
 ### 13.1 Arquitectura
 
-El crate `sin-notas` v0.5.5 (`lib` = `sin_notas_lib`) tiene en `lib.rs`:
+El crate `sin-notas` v0.5.6 (`lib` = `sin_notas_lib`) tiene en `lib.rs`:
 - **Trait `VaultStorage` (L38)** con dos implementaciones: `FsStorage` (L109, filesystem, escritorio y vault interno móvil) y `SafStorage` (L274, Android SAF vía `tauri-plugin-android-fs`; `rename_note` = leer+escribir+borrar porque SAF no tiene rename atómico).
 - **Estado global**: `ActiveVault` (600), `ApprovedVaultRoots` (613), `SnapshotGate` (1358), `VaultCacheState` (1837), registrados con `.manage()` en `run()` (6007–6009).
 - **Runtime de caché** `VaultCacheRuntime` (1839): caché en disco + watcher `notify` + índice plegado + deltas al frontend.
