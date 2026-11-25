@@ -15,12 +15,17 @@
   margin: 0;
   padding: 28px clamp(18px, 3vw, 48px) 0;
   box-sizing: border-box;
+  /* El layout responde al ancho REAL de la vista (con sidebar abierta queda
+   * mucho más estrecha que la ventana), no al ancho de la ventana. */
+  container-type: inline-size;
+  container-name: bibliography-shell;
 }
 
 .bib-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
-  gap: 22px;
+  gap: 16px 22px;
   padding-bottom: 16px;
 }
 
@@ -66,7 +71,8 @@
 
 .bib-stats {
   display: flex;
-  gap: 18px;
+  flex-wrap: wrap;
+  gap: 12px 18px;
   margin-left: auto;
 }
 
@@ -114,8 +120,9 @@
 
 .bib-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 10px 12px;
   padding: 10px 0 16px;
   border-bottom: 1px solid var(--ls-border-subtle);
 }
@@ -1176,5 +1183,41 @@
 
   .bib-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Con sidebar abierta la vista puede tener 500 px aunque la ventana mida 800:
+ * estas reglas se basan en el ancho de la vista, no en el de la ventana. */
+@container bibliography-shell (max-width: 760px) {
+  .bib-header {
+    align-items: flex-start;
+  }
+
+  .bib-stats {
+    order: 3;
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .bib-add-button {
+    margin-left: auto;
+  }
+
+  .bib-search {
+    flex: 1 1 100%;
+    max-width: none;
+  }
+
+  .bib-filter-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .bib-toolbar > .custom-select {
+    margin-left: 0;
+  }
+
+  .bib-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   }
 }
