@@ -1,5 +1,6 @@
 import { translate } from "../i18n";
 import type { PageData } from "../types";
+import { migrateSelect, syncCustomSelect } from "./custom-select";
 import {
   BIBLIOGRAPHY_STATUSES,
   BIBLIOGRAPHY_STATUS_LABELS,
@@ -198,6 +199,7 @@ export class BibliographyView {
       this.statusFilter = this.statusSelect.value as StatusFilter;
       this.renderGrid();
     });
+    migrateSelect(this.statusSelect);
 
     toolbar.append(search, this.filterTabs, this.statusSelect);
 
@@ -499,6 +501,7 @@ export class BibliographyView {
       const status = statusSelect.value as BibliographyStatus;
       this.queuePatch({ status });
     });
+    migrateSelect(statusSelect);
     const statusChip = el(
       "span",
       `bib-status-pill bib-status--${item.status}`,
@@ -659,6 +662,7 @@ export class BibliographyView {
     this.detail.statusChip.className = `bib-status-pill bib-status--${updated.status}`;
     this.detail.statusChip.textContent = statusLabel(updated.status);
     this.detail.statusSelect.value = updated.status;
+    syncCustomSelect(this.detail.statusSelect);
     this.detail.meta.textContent = metaText(updated) || " ";
     this.detail.ratingRow.querySelectorAll<HTMLButtonElement>(".bib-star").forEach((star, index) => {
       const active = index < updated.rating;
@@ -757,6 +761,7 @@ export class BibliographyView {
       option.value = type;
       typeSelect.append(option);
     }
+    migrateSelect(typeSelect);
 
     const authorInput = el("input", "bib-input");
     authorInput.type = "text";
@@ -867,6 +872,7 @@ export class BibliographyView {
       lookupMode.append(option);
     }
     lookupMode.setAttribute("aria-label", translate("Modo de búsqueda"));
+    migrateSelect(lookupMode);
 
     const lookupButton = el(
       "button",
@@ -913,6 +919,7 @@ export class BibliographyView {
             const input = lookupResultToInput(result);
             titleInput.value = input.title;
             typeSelect.value = input.type;
+        syncCustomSelect(typeSelect);
             authorInput.value = input.author || "";
             yearInput.value = input.year || "";
             totalInput.value =

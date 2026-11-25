@@ -214,6 +214,22 @@
   max-width: 170px;
 }
 
+/* El filtro de estados usa el CustomSelect de la app: mismo tamaño y
+ * alineación que el select nativo al que sustituye. */
+.bib-toolbar > .custom-select {
+  margin-left: auto;
+  max-width: 170px;
+  min-width: 130px;
+  font-size: calc(12.5px * var(--ls-font-scale, 1));
+}
+
+.bib-field > .custom-select,
+.bib-lookup-row > .custom-select {
+  width: 100%;
+  min-width: 0;
+  font-size: calc(12.5px * var(--ls-font-scale, 1));
+}
+
 .bib-scroll {
   flex: 1;
   min-height: 0;
@@ -1120,7 +1136,8 @@
     max-width: none;
   }
 
-  .bib-status-filter {
+  .bib-status-filter,
+  .bib-toolbar > .custom-select {
     margin-left: 0;
   }
 
