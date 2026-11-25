@@ -789,7 +789,6 @@ const contextTextSelection = document.getElementById("context-text-selection") a
 const ctxIndentBtn = document.getElementById("ctx-indent") as HTMLButtonElement | null;
 const ctxOutdentBtn = document.getElementById("ctx-outdent") as HTMLButtonElement | null;
 const sidebarContextMenu = document.getElementById("sidebar-context-menu") as HTMLDivElement;
-const navigationContextMenu = document.getElementById("navigation-context-menu") as HTMLDivElement;
 const btnToggleSidebar = document.getElementById("btn-toggle-sidebar") as HTMLButtonElement;
 const btnWindowMinimize = document.getElementById("btn-window-minimize") as HTMLButtonElement | null;
 const btnWindowMaximize = document.getElementById("btn-window-maximize") as HTMLButtonElement | null;
@@ -10696,7 +10695,6 @@ function showTableContextMenu(table: HTMLTableElement, cell: HTMLTableCellElemen
     closeDisplayMenu(contextMenu);
     closeDisplayMenu(bulletContextMenu);
     closeDisplayMenu(sidebarContextMenu);
-    closeDisplayMenu(navigationContextMenu);
     openDisplayMenu(menu, "block");
     positionContextMenu(menu, x, y);
   });
@@ -10797,7 +10795,6 @@ function showBlockContextMenu(x: number, y: number) {
   runModalBoundary("el menú contextual", hideAllContextMenus, () => {
     closeDisplayMenu(bulletContextMenu);
     closeDisplayMenu(sidebarContextMenu);
-    closeDisplayMenu(navigationContextMenu);
     if (tableContextMenu) closeDisplayMenu(tableContextMenu);
     contextMenu.classList.remove("submenus-left");
     closeAllContextSubmenus(contextMenu);
@@ -10814,7 +10811,6 @@ function showBulletContextMenu(x: number, y: number) {
   runModalBoundary("el menú contextual", hideAllContextMenus, () => {
     closeDisplayMenu(contextMenu);
     closeDisplayMenu(sidebarContextMenu);
-    closeDisplayMenu(navigationContextMenu);
     if (tableContextMenu) closeDisplayMenu(tableContextMenu);
     bulletContextMenu.classList.remove("submenus-left");
     closeAllContextSubmenus(bulletContextMenu);
@@ -10885,7 +10881,6 @@ function hideAllContextMenus() {
   closeDisplayMenu(contextMenu);
   closeDisplayMenu(bulletContextMenu);
   closeDisplayMenu(sidebarContextMenu);
-  closeDisplayMenu(navigationContextMenu);
   if (tableContextMenu) closeDisplayMenu(tableContextMenu);
   closeAllContextSubmenus();
   contextMenu.classList.remove("submenus-left");
@@ -10903,7 +10898,6 @@ window.addEventListener("click", (e) => {
     !contextMenu.contains(e.target as Node) &&
     !bulletContextMenu.contains(e.target as Node) &&
     !sidebarContextMenu.contains(e.target as Node) &&
-    !navigationContextMenu.contains(e.target as Node) &&
     !(tableContextMenu && tableContextMenu.contains(e.target as Node))
   ) {
     hideAllContextMenus();
@@ -10922,77 +10916,29 @@ const closeMenuOnAction = (event: MouseEvent) => {
 contextMenu.addEventListener("click", closeMenuOnAction);
 bulletContextMenu.addEventListener("click", closeMenuOnAction);
 sidebarContextMenu.addEventListener("click", closeMenuOnAction);
-navigationContextMenu.addEventListener("click", closeMenuOnAction);
 initializeContextSubmenus(contextMenu);
 initializeContextSubmenus(bulletContextMenu);
 
-/* ==================== NAVIGATION CONTEXT MENU ====================
- * Replaces the webview's native context menu (Back/Forward/Reload/Inspect)
- * with an in-app menu that follows the active color theme. */
-function showNavigationContextMenu(x: number, y: number) {
-  runModalBoundary("el menú de navegación", hideAllContextMenus, () => {
-    closeDisplayMenu(contextMenu);
-    closeDisplayMenu(bulletContextMenu);
-    closeDisplayMenu(sidebarContextMenu);
-    if (tableContextMenu) closeDisplayMenu(tableContextMenu);
-    openDisplayMenu(navigationContextMenu, "flex");
-    positionContextMenu(navigationContextMenu, x, y);
-  });
-}
-
+/* El menú contextual de Navegación (Atrás/Adelante/Recargar) se eliminó: los
+ * botones de la cabecera siguen haciendo lo mismo. Solo se suprime el menú
+ * nativo del WebView en las zonas que no son campos de formulario, y se
+ * cierran los menús propios que pudiera haber abiertos. */
 const graphCanvasEl = document.getElementById("graph-canvas");
 document.addEventListener("contextmenu", (event) => {
-  if (graphCanvasEl && graphCanvasEl.contains(event.target as Node)) { event.preventDefault(); return; }
+  if (graphCanvasEl && graphCanvasEl.contains(event.target as Node)) {
+    event.preventDefault();
+    return;
+  }
   const target = event.target;
   const isFormField = target instanceof HTMLInputElement ||
     target instanceof HTMLTextAreaElement ||
     target instanceof HTMLSelectElement ||
-    // Other editable zones (e.g. the page title) keep the native cut/copy/paste menu.
-    // The block editor has its own handler that stops propagation before this listener.
-    (target instanceof HTMLElement && target.isContentEditable && !target.closest(".block-editor"));
+    (target instanceof HTMLElement &&
+      target.isContentEditable &&
+      !target.closest(".block-editor"));
   if (isFormField) return;
   event.preventDefault();
-  const x = event.clientX;
-  const y = event.clientY;
-  // An app menu handler already ran synchronously for this event and is open.
-  // Menus are hidden by CSS (not inline), so computed style is required here.
-  const anyAppMenuVisible = [
-    contextMenu,
-    bulletContextMenu,
-    sidebarContextMenu,
-    tableContextMenu,
-  ].some(
-    (menu) =>
-      menu !== null &&
-      !menu.classList.contains("is-menu-closing") &&
-      getComputedStyle(menu).display !== "none"
-  );
-  if (anyAppMenuVisible) return;
-  // Right-clicking while our navigation menu is open just repositions it.
-  if (
-    getComputedStyle(navigationContextMenu).display !== "none" &&
-    !navigationContextMenu.classList.contains("is-menu-closing")
-  ) {
-    hideAllContextMenus();
-  }
-  showNavigationContextMenu(x, y);
-});
-
-document.getElementById("navctx-back")?.addEventListener("click", () => {
-  if (navigationHistoryIndex > 0) restoreNavigationHistory(navigationHistoryIndex - 1);
   hideAllContextMenus();
-});
-
-document.getElementById("navctx-forward")?.addEventListener("click", () => {
-  if (navigationHistoryIndex < navigationHistory.length - 1) {
-    restoreNavigationHistory(navigationHistoryIndex + 1);
-  }
-  hideAllContextMenus();
-});
-
-document.getElementById("navctx-reload")?.addEventListener("click", () => {
-  hideAllContextMenus();
-  window.location.reload();
 });
 
 async function copyOrCutContextSelection(cut: boolean): Promise<void> {
