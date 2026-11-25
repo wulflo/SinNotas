@@ -37,7 +37,7 @@ Los idiomas soportados son `es`, `en` y `zh` (además de `auto`), gestionados en
 
 - `npx tsc --noEmit` y `npm test`.
 - Recorrer con el idioma cambiado la vista afectada y, como mínimo, Ajustes > Avanzado.
-- Si el cambio afecta a símbolos documentados, actualizar `docs/Estructure.md` (skill `Estructure`).
+- Si el cambio afecta a símbolos documentados, actualizar la skill `estructure`.
 
 ## Referencias rápidas
 

@@ -1090,7 +1090,7 @@ Todas las acciones de terceros están pineadas a SHA; `npm ci --ignore-scripts`;
 | `docs/KEYSTORES.md` | 140 | Regla de oro, backup GPG, key nueva vs legacy, 5 secretos, verificación local. |
 | `docs/BENCHMARK-2026-10-29.md` | 84 | Resultados JS, caché Rust y vault sintética. |
 | `PRIVACY_POLICY.md` / `THIRD_PARTY_LICENSES.md` | 31 / 1.494 | Privacidad e inventario de licencias (507 crates, PDFium, FSRS, fuentes KaTeX). |
-| `.agents/skills/` | — | Skills del proyecto, en la ruta compatible con varios agentes (OpenCode también las descubre aquí): `estilo-ui`, `busqueda-incremental`, `traducciones-ui`, `guia-de-uso`, `vault-performance-guard`, `tauri-desktop` (config/CSP, ACL, IPC, plugins y build), `calidad-pruebas` (Vitest/Rust, depuración y refactor), `verificacion-manual` (navegador y matriz Tauri) y `mantenimiento-skills` (crear y revisar skills). |
+| `.agents/skills/` | — | Skills del proyecto, en la ruta compatible con varios agentes (OpenCode también las descubre aquí): `estructure` (este índice), `estilo-ui`, `busqueda-incremental`, `traducciones-ui`, `guia-de-uso`, `vault-performance-guard`, `tauri-desktop` (config/CSP, ACL, IPC, plugins y build), `calidad-pruebas` (Vitest/Rust, depuración y refactor), `verificacion-manual` (navegador y matriz Tauri), `mantenimiento-skills` (crear y revisar skills) y `fsrs7-audit` (repaso FSRS-7). |
 
 ---
 

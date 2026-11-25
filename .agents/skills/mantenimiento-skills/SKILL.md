@@ -49,7 +49,7 @@ Clasificación: `error` (la skill lleva a un resultado erróneo, fallo o brecha 
 - Comprobar que no existe otra con el mismo ID ni dominio solapado (`ls .agents/skills`).
 - Probar el disparo con frases reales del usuario en español, no solo con la ejecución: una skill perfecta que nunca se activa no aporta nada.
 - Si la skill se origina en un pack descargado, conservar atribución y licencia (`LICENSE.txt` cuando corresponda) en un apartado «Origen».
-- Actualizar `docs/Estructure.md` (índice técnico) y la checklist de la fase en `~/Descargas/` con el commit y el diff.
+- Actualizar la skill `estructure` (índice técnico en `references/Estructure.md`) y la checklist de la fase en `~/Descargas/` con el commit y el diff.
 - Verificar con `git diff --check` y `grep -RIn` que no queden referencias a la ruta antigua.
 - Las sesiones ya abiertas necesitan `/reload`; las nuevas descubren la skill sola.
 
@@ -59,4 +59,4 @@ Clasificación: `error` (la skill lleva a un resultado erróneo, fallo o brecha 
 
 ## Referencias
 
-Documentación oficial: <https://opencode.ai/docs/skills> (descubrimiento, precedencia, IDs y frontmatter). Índice local: `docs/Estructure.md`.
+Documentación oficial: <https://opencode.ai/docs/skills> (descubrimiento, precedencia, IDs y frontmatter). Índice local: skill `estructure`.

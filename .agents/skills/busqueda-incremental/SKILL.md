@@ -44,4 +44,4 @@ Propósito: que un buscador con bóvedas grandes no congele la UI ni sature la m
 | Paginación por raíces de mazos | `src/views/flashcard-decks.ts`, `desktop.ts renderFlashcardPagesFilter` |
 | Buscador por tandas | `desktop.ts createReferenceNotePicker` |
 | Hidración por lotes | `src/store/vault.ts`, `src/views/flashcard-loader.ts` |
-| Mapa general | `docs/Estructure.md` §5.2, §6.4, §7 |
+| Mapa general | skill `estructure` → `references/Estructure.md` §5.2, §6.4, §7 |

@@ -31,8 +31,8 @@ se renombra un control o se modifica un flujo visible.
    - **Atajos de teclado:** `index.html` → shortcuts modal y `src/desktop.ts`.
 
 4. **No duplicar el índice técnico**
-   - Las rutas de código, comandos Tauri y claves de almacenamiento van en `docs/Estructure.md`
-     (skill `Estructure`), no en la guía de uso.
+   - Las rutas de código, comandos Tauri y claves de almacenamiento van en la skill
+     `estructure`, no en la guía de uso.
    - La guía responde a «¿cómo se usa?»; el índice a «¿dónde está?».
 
 5. **Verificación final**
@@ -46,5 +46,5 @@ se renombra un control o se modifica un flujo visible.
 | Guía ES | `docs/GUIA-DE-USO.md` |
 | Guía EN | `docs/USER-GUIDE.md` |
 | Visión general y atajos | `README.md` |
-| Índice técnico | `docs/Estructure.md` |
+| Índice técnico | skill `estructure` |
 | Trazación de fases | `docs/CHECKLIST-CONSOLIDADO.md` |

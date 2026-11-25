@@ -40,7 +40,7 @@ Propósito: evitar que aparezcan controles con el estilo del sistema operativo o
 
 6. **Verificación final**
    - `npx tsc --noEmit` y `npm test`.
-   - Si el cambio afecta a símbolos documentados, actualizar `docs/Estructure.md` (skill `Estructure`).
+   - Si el cambio afecta a símbolos documentados, actualizar la skill `estructure`.
 
 ## Referencias rápidas
 
@@ -50,4 +50,4 @@ Propósito: evitar que aparezcan controles con el estilo del sistema operativo o
 | Tokens y temas | `src/style.css` (`--ls-*`), `src/material-aero.css`, `src/theme-lino.css`, `src/theme-dracula.css` |
 | Reglas de controles | `src/style.css` (SETTINGS DROPDOWN, CustomSelect, settings inputs) |
 | Ejemplo de toolbar agrupado | `desktop.ts` → `createTableToolbar` |
-| Mapa de estilos | `docs/Estructure.md` §11.3 |
+| Mapa de estilos | skill `estructure` → `references/Estructure.md` §11.3 |
