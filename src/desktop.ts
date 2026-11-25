@@ -11267,14 +11267,16 @@ document.getElementById("ctx-text-paste-plain")?.addEventListener("click", () =>
 
 /**
  * Lee el portapapeles para el menú (fuera del evento paste no hay
- * clipboardData): primero se intenta la lectura rica de la Clipboard API
- * (con límite de tiempo; en algunos webviews no se concede) y como respaldo
- * el plugin oficial de Tauri o readText, ambos de solo texto.
+ * clipboardData): en el navegador se intenta la lectura rica de la Clipboard
+ * API (con límite de tiempo); en Tauri se omite porque navigator.clipboard.read()
+ * pide permiso al WebView2 en Windows y ese permiso no es necesario: el plugin
+ * clipboard-manager ya está autorizado en capabilities/default.json. El
+ * pegado con formato rico por teclado sigue usando event.clipboardData.
  */
 async function readClipboardForPaste(): Promise<{ text: string; html: string } | null> {
   try {
     const clipboard = navigator.clipboard;
-    if (clipboard?.read) {
+    if (!isTauri() && clipboard?.read) {
       const richRead = (async (): Promise<{ text: string; html: string } | null> => {
         const items = await clipboard.read();
         let text = "";
@@ -11330,8 +11332,15 @@ async function pasteContextSelection(withFormat: boolean): Promise<void> {
   // En un bloque de imagen el pegado vive en su propio flujo auditado; aquí
   // el pegado de texto no debe tocar el contenido de imagen.
   if (block.type === "image") return;
-  const content = getVisibleBlockContent(block.content);
 
+  // En Tauri, usar el mismo camino que Ctrl+V: el plugin readImage ya tiene
+  // permiso concedido (clipboard-manager:allow-read-image) y no dispara el
+  // diálogo de permisos del WebView. force=true evita el debounce del pegado
+  // por teclado; si no hay imagen, readImage falla en silencio y se continúa
+  // con la ruta de texto de abajo.
+  if (isTauri() && await pasteNativeClipboardImage(blockId, true, page)) return;
+
+  const content = getVisibleBlockContent(block.content);
   const clipboard = await readClipboardForPaste();
   const payload = clipboard ? (withFormat
     ? (clipboard.html ? sanitizePastedHtmlToMarkdown(clipboard.html) || clipboard.text : clipboard.text)
