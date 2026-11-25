@@ -413,7 +413,16 @@ export class ReviewProgressStore {
     this.file = mergeReviewProgress(this.file, { version: 1, entries: [event] });
     this.undoStack.push(event);
     this.redoStack = [];
-    await this.persist();
+    try {
+      await this.persist();
+    } catch (error) {
+      // Si falla la escritura (Tauri o localStorage), deshacemos también el
+      // evento en memoria: los llamadores de desktop/review ya revierten la
+      // tarjeta al recibir el error y no debe quedar un repaso "fantasma".
+      this.file = { ...this.file, entries: this.file.entries.filter((item) => item.id !== event.id) };
+      this.undoStack = this.undoStack.filter((item) => item.id !== event.id);
+      throw error;
+    }
     return event;
   }
 
@@ -519,6 +528,10 @@ export class ReviewProgressStore {
       }
     } catch (error) {
       console.error("No se pudo guardar el diario de repasos en .sinnotas/progress/reviews.json:", error);
+      // Propagar: los catch() de desktop.ts y review-app.ts revierten la
+      // tarjeta y avisan al usuario. Tragar el error hacía que la UI aparentara
+      // guardar el repaso aunque reviews.json no se hubiera escrito.
+      throw error;
     }
   }
 }
