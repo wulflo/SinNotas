@@ -54,6 +54,24 @@ describe("migrateSelect", () => {
     expect(migrateSelect(null)).toBeNull();
   });
 
+  it("no esconde un select que aún no tiene padre", () => {
+    const select = document.createElement("select");
+    const option = document.createElement("option");
+    option.value = "a";
+    option.textContent = "Opción A";
+    select.append(option);
+
+    expect(migrateSelect(select)).toBeNull();
+    expect(select.style.display).not.toBe("none");
+    expect(select.hasAttribute("data-custom-select-applied")).toBe(false);
+
+    // Cuando se inserta más tarde, la migración funciona con normalidad.
+    document.body.appendChild(select);
+    const custom = migrateSelect(select);
+    expect(custom).not.toBeNull();
+    expect(select.style.display).toBe("none");
+  });
+
   it("al hacer clic abre el menú, selecciona la opción y despacha change", () => {
     const select = makeSelect([{ value: "a", label: "Opción A" }, { value: "b", label: "Opción B" }], "");
     const custom = migrateSelect(select)!;

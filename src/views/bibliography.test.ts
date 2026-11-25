@@ -19,6 +19,27 @@ import {
   setBibliographyNoteParent,
   setFrontmatterValues,
 } from "./bibliography";
+import { lookupResultToInput, type BibliographyLookupResult } from "./bibliography-lookup";
+
+function lookupResult(overrides: Partial<BibliographyLookupResult> = {}): BibliographyLookupResult {
+  return {
+    provider: "crossref",
+    kind: "book",
+    title: "Recurso de prueba",
+    subtitle: "",
+    authors: "",
+    year: "",
+    publisher: "",
+    container: "",
+    doi: "",
+    isbn: "",
+    url: "",
+    pages: 0,
+    coverUrl: "",
+    abstractText: "",
+    ...overrides,
+  };
+}
 
 function page(overrides: Partial<PageData> = {}): PageData {
   return {
@@ -89,6 +110,17 @@ describe("frontmatter de bibliografía", () => {
     expect(item.current).toBe(0);
     expect(item.author).toBe("Ursula K. Le Guin");
     expect(isBibliographyPage(page({ frontmatter }))).toBe(true);
+  });
+
+  it("registra el tipo detectado por el buscador automático en bib-tipo", () => {
+    // El buscador solo rellena el formulario; la propiedad se escribe al crear
+    // el recurso. Verificamos la cadena completa lookup -> frontmatter -> item.
+    for (const kind of ["video", "article", "webpage"] as const) {
+      const input = lookupResultToInput(lookupResult({ kind }));
+      const frontmatter = createBibliographyFrontmatter({ ...input, title: input.title });
+      expect(readFrontmatterValue(frontmatter, "bib-tipo")).toBe(kind);
+      expect(bibliographyItemFromPage(page({ frontmatter })).type).toBe(kind);
+    }
   });
 });
 
