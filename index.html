@@ -691,26 +691,6 @@
               </section>
 
               <section class="settings-tab-panel" role="tabpanel" data-settings-panel="advanced" hidden>
-                <a
-                  class="settings-docs-link"
-                  id="btn-usage-docs"
-                  href="https://github.com/wulflo/SinNotas/blob/master/docs/GUIA-DE-USO.md"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <span>Documentación de uso</span>
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M14 4h6v6M20 4l-9 9"></path>
-                    <path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"></path>
-                  </svg>
-                </a>
-
-                <div class="settings-section-title">Estadísticas de repaso</div>
-                <p class="settings-help">Reinicia los contadores de repasos de hoy, totales, minutos de enfoque y puntos. No modifica la programación FSRS de las tarjetas.</p>
-                <div class="advanced-actions">
-                  <button class="font-option-btn" id="btn-clear-flashcard-stats" type="button">Borrar estadísticas de repaso</button>
-                </div>
-
                 <div id="update-settings-section">
                   <div class="settings-section-title">Actualizaciones</div>
                   <p class="settings-help" id="update-settings-help">Sin Notas solo consulta GitHub cuando pulsás el botón. En escritorio, el paquete se verifica con la firma del actualizador antes de instalarse.</p>
@@ -739,16 +719,28 @@
                   </div>
                 </div>
 
-                <div class="settings-section-title">Mantenimiento</div>
-                <p class="settings-help">Estas acciones no eliminan tus notas. La limpieza de adjuntos solo borra imágenes de <code>assets</code> que no estén referenciadas en ninguna nota.</p>
+                <a
+                  class="settings-docs-link"
+                  id="btn-usage-docs"
+                  href="https://github.com/wulflo/SinNotas/blob/master/docs/GUIA-DE-USO.md"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <span>Documentación de uso</span>
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M14 4h6v6M20 4l-9 9"></path>
+                    <path d="M18 13v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h6"></path>
+                  </svg>
+                </a>
+
+                <div class="settings-section-title">Repaso</div>
+                <p class="settings-help">Estadísticas, programación FSRS y tarjetas del repaso.</p>
+
+                <div class="settings-section-title">Estadísticas de repaso</div>
+                <p class="settings-help">Reinicia los contadores de repasos de hoy, totales, minutos de enfoque y puntos. No modifica la programación FSRS de las tarjetas.</p>
                 <div class="advanced-actions">
-                  <button class="font-option-btn" id="btn-clear-bullet-properties" type="button">Borrar propiedades de los bullets</button>
-                  <button class="font-option-btn" id="btn-clean-unused-attachments" type="button">Eliminar imágenes no usadas de assets</button>
-                  <button class="font-option-btn" id="btn-clear-cache" type="button">Borrar caché</button>
-                  <button class="font-option-btn snapshot-danger" id="btn-delete-all-snapshots" type="button">Borrar todos los snapshots</button>
-                  <button class="font-option-btn" id="btn-reload-app" type="button">Recargar aplicación</button>
+                  <button class="font-option-btn" id="btn-clear-flashcard-stats" type="button">Borrar estadísticas de repaso</button>
                 </div>
-                <p class="settings-help" id="unused-attachments-status" role="status" aria-live="polite"></p>
 
                 <div class="settings-section-title">Propiedades FSRS de las tarjetas</div>
                 <p class="settings-help">Borra la programación FSRS (<code>card-s::</code>, <code>card-d::</code>, <code>last-reviewed::</code>, etc.) de todas las tarjetas o de una sola. Las tarjetas vuelven a considerarse nuevas; el texto y las oclusiones no se tocan. El trabajo se hace por lotes para no saturar el equipo.</p>
@@ -813,6 +805,17 @@
                 <div class="advanced-actions">
                   <button class="font-option-btn snapshot-danger" id="btn-clear-review-log" type="button">Borrar historial de repasos (logs)</button>
                 </div>
+
+                <div class="settings-section-title">Mantenimiento</div>
+                <p class="settings-help">Estas acciones no eliminan tus notas. La limpieza de adjuntos solo borra imágenes de <code>assets</code> que no estén referenciadas en ninguna nota.</p>
+                <div class="advanced-actions">
+                  <button class="font-option-btn" id="btn-clear-bullet-properties" type="button">Borrar propiedades de los bullets</button>
+                  <button class="font-option-btn" id="btn-clean-unused-attachments" type="button">Eliminar imágenes no usadas de assets</button>
+                  <button class="font-option-btn" id="btn-clear-cache" type="button">Borrar caché</button>
+                  <button class="font-option-btn snapshot-danger" id="btn-delete-all-snapshots" type="button">Borrar todos los snapshots</button>
+                  <button class="font-option-btn" id="btn-reload-app" type="button">Recargar aplicación</button>
+                </div>
+                <p class="settings-help" id="unused-attachments-status" role="status" aria-live="polite"></p>
               </section>
             </div>
             </div>
