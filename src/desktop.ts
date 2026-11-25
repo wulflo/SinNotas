@@ -7446,6 +7446,23 @@ function selectBulletRange(anchorId: string, focusId: string, extend = false, pa
   refreshBulletSelection();
 }
 
+/** Ctrl/Cmd+clic alterna un bullet en la selección sin borrar los demás. */
+function toggleBulletSelection(id: string, page: PageData = currentPage): void {
+  const visible = getFlatVisibleBlocks(page.blocks);
+  const order = new Map(visible.map((block, index) => [block.id, index]));
+  if (!order.has(id)) return;
+  const index = selectedBulletIds.indexOf(id);
+  if (index >= 0) {
+    selectedBulletIds = selectedBulletIds.filter((selected) => selected !== id);
+  } else {
+    selectedBulletIds = [...selectedBulletIds, id].sort(
+      (left, right) => (order.get(left) ?? 0) - (order.get(right) ?? 0)
+    );
+  }
+  bulletSelectionAnchorId = id;
+  refreshBulletSelection();
+}
+
 async function copySelectedBullets(page: PageData = getSelectionPage()): Promise<boolean> {
   const roots = getSelectedBlockRoots(page.blocks, new Set(selectedBulletIds));
   if (roots.length === 0) return false;
@@ -7662,6 +7679,8 @@ function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = 
   bullet.addEventListener("click", (event: MouseEvent) => {
     if (event.shiftKey) {
       selectBulletRange(bulletSelectionAnchorId || node.id, node.id, false, page);
+    } else if (event.ctrlKey || event.metaKey) {
+      toggleBulletSelection(node.id, page);
     } else {
       clearBulletSelection();
       bulletSelectionAnchorId = node.id;
@@ -7912,6 +7931,8 @@ function renderBlockNode(node: BlockNode, parent: HTMLElement, page: PageData = 
       }
       if (event.shiftKey) {
         selectBulletRange(bulletSelectionAnchorId || node.id, node.id, false, page);
+      } else if (event.ctrlKey || event.metaKey) {
+        toggleBulletSelection(node.id, page);
       } else {
         clearBulletSelection();
         bulletSelectionAnchorId = node.id;
@@ -8152,6 +8173,8 @@ function installBlockSelectionHandler(root: HTMLElement): void {
     }
     if (event.shiftKey) {
       selectBulletRange(bulletSelectionAnchorId || id, id);
+    } else if (event.ctrlKey || event.metaKey) {
+      toggleBulletSelection(id);
     } else {
       clearBulletSelection();
       bulletSelectionAnchorId = id;
