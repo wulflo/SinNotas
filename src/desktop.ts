@@ -4238,7 +4238,13 @@ btnClearAllFlashcards.addEventListener("click", async () => {
     }
     flashcardLoader.invalidate();
     renderSidebar();
-    if (flashcardExplorerActive) renderFlashcardExplorer();
+    if (flashcardExplorerActive) {
+      renderFlashcardExplorer();
+    } else if (currentView === "flashcards") {
+      // invalidate() no notifica al manager: la sesión ya abierta seguía con
+      // las tarjetas borradas y permitía calificarlas sin guardar nada.
+      startFlashcardsSession();
+    }
     clearAllFlashcardsStatus.textContent = `Se quitaron los marcadores de ${removed} flashcard(s).`;
     showToast(`Flashcards eliminadas: ${removed}.`);
   } catch (error) {
