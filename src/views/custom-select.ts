@@ -90,6 +90,9 @@ export class CustomSelect {
     const menu = document.createElement("div");
     menu.className = "custom-select-menu";
     menu.setAttribute("role", "listbox");
+    // El menú vive en <body>, fuera del modal de bibliografía (z-index 3200/3300).
+    // Sin este ajuste la lista se dibuja debajo del velo y parece que no abre.
+    if (this.select.closest(".bib-modal-backdrop")) menu.style.zIndex = "3400";
     menu.style.visibility = "hidden";
     const items = Array.from(this.select.options).map((option) => this.buildItem(option));
     if (items.length > 0) menu.append(...items);
@@ -240,6 +243,11 @@ export function migrateSelect(
   const existing = migratedSelects.get(select);
   if (existing) return existing;
   if (select.getAttribute(APPLIED_MARKER)) return null;
+  // fromSelect inserta el botón con parentElement.insertBefore(). Si el select
+  // aún no se ha añadido al DOM, esconderlo aquí lo dejaría sin control visible.
+  // El llamador debe migrarlo después de insertarlo; mientras tanto se devuelve
+  // null y el select nativo sigue funcionando.
+  if (!select.parentElement) return null;
   const custom = CustomSelect.fromSelect(select);
   migratedSelects.set(select, custom);
   return custom;

@@ -199,9 +199,12 @@ export class BibliographyView {
       this.statusFilter = this.statusSelect.value as StatusFilter;
       this.renderGrid();
     });
-    migrateSelect(this.statusSelect);
 
     toolbar.append(search, this.filterTabs, this.statusSelect);
+    // migrateSelect necesita que el <select> ya tenga padre: CustomSelect
+    // inserta el botón con parentElement.insertBefore(). Migrarlo antes dejaba
+    // el nativo oculto y sin reemplazo, por lo que el filtro desaparecía.
+    migrateSelect(this.statusSelect);
 
     const scroll = el("div", "bib-scroll");
     this.grid = el("div", "bib-grid");
@@ -761,7 +764,6 @@ export class BibliographyView {
       option.value = type;
       typeSelect.append(option);
     }
-    migrateSelect(typeSelect);
 
     const authorInput = el("input", "bib-input");
     authorInput.type = "text";
@@ -872,7 +874,6 @@ export class BibliographyView {
       lookupMode.append(option);
     }
     lookupMode.setAttribute("aria-label", translate("Modo de búsqueda"));
-    migrateSelect(lookupMode);
 
     const lookupButton = el(
       "button",
@@ -919,7 +920,7 @@ export class BibliographyView {
             const input = lookupResultToInput(result);
             titleInput.value = input.title;
             typeSelect.value = input.type;
-        syncCustomSelect(typeSelect);
+            syncCustomSelect(typeSelect);
             authorInput.value = input.author || "";
             yearInput.value = input.year || "";
             totalInput.value =
@@ -1026,6 +1027,11 @@ export class BibliographyView {
       if (event.target === overlay) this.closeAddDialog();
     });
     this.root.append(overlay);
+    // Los selectores ya están en el DOM: ahora CustomSelect puede insertar sus
+    // botones junto a ellos. Antes se migraban huérfanos y el campo «Tipo» y el
+    // «Modo de búsqueda» quedaban invisibles.
+    migrateSelect(typeSelect);
+    migrateSelect(lookupMode);
     this.addOverlay = overlay;
     this.addKeyHandler = (event: KeyboardEvent): void => {
       if (event.key === "Escape") this.closeAddDialog();
