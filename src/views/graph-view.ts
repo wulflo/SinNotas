@@ -72,6 +72,8 @@ export class GraphView {
   private draggedNode: GraphNode | null = null;
   private pressedNode: GraphNode | null = null;
   private selectedNode: GraphNode | null = null;
+  /** Nodo que debe permanecer centrado mientras avanza la física. */
+  private followTitle: string | null = null;
   private onNodeSelectCallback: (pageTitle: string) => void;
   private scale = 1;
   private offsetX = 0;
@@ -203,10 +205,30 @@ export class GraphView {
   }
 
   public resetView(): void {
+    this.followTitle = null;
     this.scale = 1;
     this.offsetX = 0;
     this.offsetY = 0;
     this.requestRender();
+  }
+
+  /**
+   * Centra un nodo en el lienzo. Mientras la física siga moviéndolo se
+   * reaplica el centrado en cada paso; cualquier gesto del usuario lo cancela.
+   */
+  public centerOn(title: string): void {
+    const node = this.nodesByTitle.get(title);
+    if (!node) return;
+    this.followTitle = title;
+    this.applyCenter(node);
+    this.requestRender();
+  }
+
+  private applyCenter(node: GraphNode): void {
+    const width = (this.canvas.width || 800) / this.dpr;
+    const height = (this.canvas.height || 600) / this.dpr;
+    this.offsetX = width / 2 - node.x * this.scale;
+    this.offsetY = height / 2 - node.y * this.scale;
   }
 
   public resetInteraction(): void {
@@ -473,6 +495,11 @@ export class GraphView {
           // Un error de física no debe matar el bucle para siempre.
           console.error("[graph] physics step failed", err);
           this.simulationRunning = false;
+        }
+        if (this.followTitle) {
+          const followed = this.nodesByTitle.get(this.followTitle);
+          if (followed) this.applyCenter(followed);
+          else this.followTitle = null;
         }
       }
     }
@@ -954,6 +981,7 @@ export class GraphView {
   private setupEvents() {
     this.canvas.addEventListener("wheel", (event) => {
       event.preventDefault();
+      this.followTitle = null;
       const rect = this.canvas.getBoundingClientRect();
       const factor = event.deltaY < 0 ? 1.12 : 1 / 1.12;
       this.zoomAt(event.clientX - rect.left, event.clientY - rect.top, factor);
@@ -998,6 +1026,7 @@ export class GraphView {
     });
 
     this.canvas.addEventListener("mousedown", (e) => {
+      this.followTitle = null;
       const rect = this.canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;

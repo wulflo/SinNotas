@@ -9465,7 +9465,7 @@ body.editor-split-active #view-editor .canvas-wrapper {
 .reference-pane-graph canvas {
   display: block;
   width: 100%;
-  height: 190px;
+  height: 170px;
   touch-action: none;
 }
 
@@ -9475,13 +9475,18 @@ body.editor-split-active #view-editor .canvas-wrapper {
   flex-direction: column;
   gap: 12px;
   min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
 }
 
 .reference-slot {
   display: flex;
-  flex: 1 1 0;
+  /* Altura mínima para que la nota se pueda recorrer con scroll en vez de
+   * quedar comprimida cuando el grafo ocupa la parte superior. */
+  flex: 1 0 200px;
   flex-direction: column;
-  min-height: 0;
+  min-height: 200px;
   overflow: hidden;
   border: 1px solid var(--ls-border-subtle);
   border-radius: 12px;
@@ -9616,6 +9621,23 @@ body.editor-split-active #view-editor .canvas-wrapper {
   flex: 0 0 auto;
   color: var(--ls-text-muted);
   font-size: calc(10px * var(--ls-font-scale, 1));
+}
+
+.reference-note-more {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-top: 1px solid var(--ls-border-subtle);
+  background: transparent;
+  color: var(--ls-accent);
+  font: inherit;
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  cursor: pointer;
+}
+
+.reference-note-more:hover {
+  background: var(--ls-accent-subtle);
 }
 
 .reference-note-results-empty {

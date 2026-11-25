@@ -14291,6 +14291,7 @@ async function applyGraphPages(): Promise<void> {
       edges ?? undefined
     );
     graphView.selectNode(graphNeighborhoodOrigin);
+    graphView.centerOn(graphNeighborhoodOrigin);
   } else {
     graphView.updateData(allPages, edges ?? undefined);
   }
@@ -16328,6 +16329,8 @@ const SPLIT_REFERENCE_KEY = "sinnotas-split-reference-page";
 const SPLIT_REFERENCE_LIST_KEY = "sinnotas-split-reference-pages";
 const SPLIT_OPEN_KEY = "sinnotas-split-open";
 const MAX_REFERENCE_NOTES = 2;
+/** Resultados montados por tanda en el buscador de notas de referencia. */
+const REFERENCE_RESULTS_CHUNK = 20;
 
 /** Flag de emergencia: `localStorage["sinnotas-split-view"] = "false"` lo oculta. */
 function splitViewEnabled(): boolean {
@@ -16527,37 +16530,71 @@ function createReferenceNotePicker(
       empty.className = "reference-note-results-empty";
       empty.textContent = translate("No hay notas coincidentes.");
       results.appendChild(empty);
-    } else {
-      activeChoices.forEach((page) => {
-        const option = document.createElement("button");
-        option.type = "button";
-        option.className = "reference-note-option";
-        option.setAttribute("role", "option");
-        option.setAttribute("aria-selected", String(page.title === selectedTitle));
-        const label = document.createElement("span");
-        label.className = "reference-note-option-title";
-        label.textContent = pageDisplayTitle(page);
-        const meta = document.createElement("span");
-        meta.className = "reference-note-option-meta";
-        meta.textContent = page.isJournal ? translate("Diario") : translate("Página");
-        option.append(label, meta);
-        // `pointerdown` evita que el blur del input cierre la lista antes del clic.
-        option.addEventListener("pointerdown", (event) => {
-          event.preventDefault();
-          choose(page.title);
-        });
-        results.appendChild(option);
-      });
+      results.hidden = false;
+      fitResultsToSlot();
+      return;
     }
+
+    // Solo se monta un trozo de la lista: con vaults grandes crear un botón
+    // por nota congelaba la interfaz al enfocar el buscador.
+    const createOption = (page: PageData): HTMLButtonElement => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "reference-note-option";
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", String(page.title === selectedTitle));
+      const label = document.createElement("span");
+      label.className = "reference-note-option-title";
+      label.textContent = pageDisplayTitle(page);
+      const meta = document.createElement("span");
+      meta.className = "reference-note-option-meta";
+      meta.textContent = page.isJournal ? translate("Diario") : translate("Página");
+      option.append(label, meta);
+      // `pointerdown` evita que el blur del input cierre la lista antes del clic.
+      option.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        choose(page.title);
+      });
+      return option;
+    };
+
+    let shown = 0;
+    const appendChunk = (): void => {
+      const more = results.querySelector<HTMLButtonElement>(".reference-note-more");
+      if (more) more.remove();
+      const chunk = activeChoices.slice(shown, shown + REFERENCE_RESULTS_CHUNK);
+      chunk.forEach((page) => results.appendChild(createOption(page)));
+      shown += chunk.length;
+      if (shown < activeChoices.length) {
+        const moreButton = document.createElement("button");
+        moreButton.type = "button";
+        moreButton.className = "reference-note-more";
+        moreButton.textContent = translate("Mostrar más") +
+          ` (${activeChoices.length - shown})`;
+        moreButton.addEventListener("pointerdown", (event) => event.preventDefault());
+        moreButton.addEventListener("click", (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          appendChunk();
+          fitResultsToSlot();
+        });
+        results.appendChild(moreButton);
+      }
+    };
+    appendChunk();
     results.hidden = false;
     fitResultsToSlot();
   };
 
+  let searchDebounce: number | null = null;
   input.addEventListener("focus", () => {
     if (selectedDisplayTitle && input.value === selectedDisplayTitle) input.select();
     renderResults("");
   });
-  input.addEventListener("input", () => renderResults(input.value));
+  input.addEventListener("input", () => {
+    if (searchDebounce !== null) window.clearTimeout(searchDebounce);
+    searchDebounce = window.setTimeout(() => renderResults(input.value), 120);
+  });
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -16723,7 +16760,10 @@ async function renderReferenceGraph(): Promise<void> {
     edges ?? undefined
   );
   referenceGraphView.resetView();
-  if (origin) referenceGraphView.selectNode(origin);
+  if (origin) {
+    referenceGraphView.selectNode(origin);
+    referenceGraphView.centerOn(origin);
+  }
   referenceGraphView.resize();
 }
 
