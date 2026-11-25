@@ -992,8 +992,10 @@ export class FlashcardsManager {
         const imageOcclusions = this.parseImageOcclusions(block.content);
         const hasCardTag = /#card\b/i.test(rawContent);
         const hasDoubleColon = rawContent.includes("::");
-        const hasAnkiCloze = /\{\{(?:c\d+::|cloze\s+)?(.*?)\}\}/i.test(rawContent);
-        const hasMdCloze = /==(.*?)==/.test(rawContent);
+        // Cotas iguales a las del renderer (markdown.ts:MAX_INLINE_CAPTURE):
+        // `(.*?)` sin cota hace backtracking cuadrático con `{{` repetido.
+        const hasAnkiCloze = /\{\{(?:c\d+::|cloze\s+)?[^}\n]{1,500}\}\}/i.test(rawContent);
+        const hasMdCloze = /==[^=\n]{1,500}==/.test(rawContent);
         const createdAt = this.parseCreatedAt(block.content);
         const parentContent = this.describeParentBlock(parent);
 

@@ -19,6 +19,7 @@ describe("isFlashcardBlockContent", () => {
     expect(isFlashcardBlockContent("Texto #card")).toBe(true);
     expect(isFlashcardBlockContent("Pregunta :: Respuesta")).toBe(true);
     expect(isFlashcardBlockContent("{{c1::Respuesta}}")).toBe(true);
+    expect(isFlashcardBlockContent("{{Respuesta}}")).toBe(true);
     expect(isFlashcardBlockContent("==Respuesta==")).toBe(true);
     expect(isFlashcardBlockContent("image-occlusions:: []")).toBe(true);
     expect(isFlashcardBlockContent("Texto normal")).toBe(false);

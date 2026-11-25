@@ -26,7 +26,9 @@ export function isFlashcardBlockContent(content: string): boolean {
   return (
     /#card\b/i.test(text) ||
     text.includes("::") ||
-    /\{\{(?:c\d+::|cloze\s+)/i.test(text) ||
+    // El recolector acepta cualquier cloze `{{texto}}`, con o sin prefijo, y
+    // con la misma cota de 500 caracteres que el renderer (markdown.ts).
+    /\{\{(?:c\d+::|cloze\s+)?[^}\n]{1,500}\}\}/i.test(text) ||
     /==.*?==/.test(text) ||
     properties.some((property) => /^image-occlusions::/i.test(property)) ||
     // `Pregunta::Respuesta` y `clave:: valor` se clasifican como propiedades

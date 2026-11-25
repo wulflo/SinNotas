@@ -34,6 +34,27 @@ const pages: PageData[] = [
   makePage("p2", "Nota B", "Pregunta B :: Respuesta B"),
 ];
 
+describe("detección de cloze", () => {
+  it("detecta {{texto}} sin prefijo de tipo", () => {
+    const manager = new FlashcardsManager();
+    manager.scanVault([makePage("p-cloze", "Cloze", "{{Respuesta}}")], "new-first");
+
+    expect(manager.getAllCards()).toHaveLength(1);
+    expect(manager.getAllCards()[0].cardType).toBe("cloze");
+  });
+
+  it("no hace backtracking catastrófico con llaves sin cerrar", () => {
+    const manager = new FlashcardsManager();
+    const malicious = makePage("p-redos", "ReDoS", "{{ ".repeat(10_000));
+    const start = performance.now();
+
+    manager.scanVault([malicious], "new-first");
+
+    expect(performance.now() - start).toBeLessThan(500);
+    expect(manager.getAllCards()).toHaveLength(0);
+  });
+});
+
 describe("FlashcardsManager - refresco incremental tras deshacer", () => {
   const pages: PageData[] = [
     makePage("p1", "Nota A", "Pregunta A :: Respuesta A"),
