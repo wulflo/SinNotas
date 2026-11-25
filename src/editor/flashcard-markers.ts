@@ -4,7 +4,7 @@
  * DOM y para que todas las rutas de borrado (menú contextual, explorador,
  * mantenimiento y ajustes avanzados) usen exactamente la misma primitiva.
  */
-import { stripCardTag } from "./markdown";
+import { isSystemPropertyLine, stripCardTag } from "./markdown";
 
 /** Separa las líneas `clave:: valor` del texto visible de un bloque. */
 export function splitBlockProperties(content: string): { text: string; properties: string[] } {
@@ -28,7 +28,12 @@ export function isFlashcardBlockContent(content: string): boolean {
     text.includes("::") ||
     /\{\{(?:c\d+::|cloze\s+)/i.test(text) ||
     /==.*?==/.test(text) ||
-    properties.some((property) => /^image-occlusions::/i.test(property))
+    properties.some((property) => /^image-occlusions::/i.test(property)) ||
+    // `Pregunta::Respuesta` y `clave:: valor` se clasifican como propiedades
+    // por splitBlockProperties, pero el recolector (stripSystemProperties +
+    // includes("::")) sí los considera tarjetas básicas. Sin esta comprobación
+    // esa tarjeta no se podía quitar desde Ajustes ni desde el explorador.
+    properties.some((property) => !isSystemPropertyLine(property) && property.includes("::"))
   );
 }
 
@@ -42,9 +47,14 @@ export function removeFlashcardMarkers(content: string): string {
   const keptLines = content
     .split(/\r?\n/)
     .filter((line) => !cardPropertyPattern.test(line.trim()));
-  const { text, properties } = splitBlockProperties(keptLines.join("\n"));
+  const { properties } = splitBlockProperties(keptLines.join("\n"));
+  // Solo las propiedades de sistema se conservan como propiedades. Una línea
+  // `clave:: valor` que no sea de sistema es texto visible con un separador de
+  // tarjeta: hay que convertirlo en puntuación, igual que en las líneas de texto.
+  const systemProperties = properties.filter((property) => isSystemPropertyLine(property));
+  const visibleSource = keptLines.filter((line) => !systemProperties.includes(line.trim()));
 
-  const visibleLines = text.split(/\r?\n/).map((line) => {
+  const visibleLines = visibleSource.map((line) => {
     // La indentación es estructural en el outliner: se preserva tal cual.
     const indentation = line.match(/^[ \t]*/)?.[0] ?? "";
     let body = line.slice(indentation.length);
@@ -66,5 +76,5 @@ export function removeFlashcardMarkers(content: string): string {
     visibleLines.pop();
   }
 
-  return [visibleLines.join("\n"), ...properties].filter((part) => part.length > 0).join("\n");
+  return [visibleLines.join("\n"), ...systemProperties].filter((part) => part.length > 0).join("\n");
 }

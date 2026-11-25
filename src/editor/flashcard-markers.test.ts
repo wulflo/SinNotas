@@ -23,6 +23,12 @@ describe("isFlashcardBlockContent", () => {
     expect(isFlashcardBlockContent("image-occlusions:: []")).toBe(true);
     expect(isFlashcardBlockContent("Texto normal")).toBe(false);
   });
+
+  it("detecta tarjetas básicas sin espacios alrededor de ::", () => {
+    expect(isFlashcardBlockContent("Pregunta::Respuesta")).toBe(true);
+    expect(isFlashcardBlockContent("clave:: valor #card")).toBe(true);
+    expect(isFlashcardBlockContent("created-at:: 2026-01-01")).toBe(false);
+  });
 });
 
 describe("removeFlashcardMarkers", () => {
@@ -44,6 +50,11 @@ describe("removeFlashcardMarkers", () => {
   it("conserva las propiedades que no son de programación", () => {
     const input = "Pregunta #card\ncreated-at:: 2026-01-01\ncard-d:: 5";
     expect(removeFlashcardMarkers(input)).toBe("Pregunta\ncreated-at:: 2026-01-01");
+  });
+
+  it("quita el separador de una tarjeta básica sin espacios", () => {
+    expect(removeFlashcardMarkers("Pregunta::Respuesta")).toBe("Pregunta : Respuesta");
+    expect(removeFlashcardMarkers("clave:: valor #card\n  - hijo")).toBe("clave : valor\n  - hijo");
   });
 
   it("no modifica un bloque sin marcadores", () => {
