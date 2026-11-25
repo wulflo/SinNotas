@@ -5496,7 +5496,7 @@ function createEditorTableCell(
   cell.className = "table-cell";
   cell.contentEditable = "true";
   cell.dataset.colIndex = String(colIndex);
-  cell.addEventListener("focusin", () => {
+  cell.addEventListener("mousedown", () => {
     const table = cell.closest<HTMLTableElement>("table.markdown-block-table");
     const blockItem = cell.closest<HTMLElement>(".block-item");
     const blockId = blockItem?.dataset.id;
