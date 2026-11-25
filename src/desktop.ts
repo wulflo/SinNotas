@@ -11612,7 +11612,9 @@ document.getElementById("ctx-cloze")?.addEventListener("click", () => {
     } else {
       setVisibleBlockContent(node, `==${text}==`);
     }
-    if (!getVisibleBlockContent(node.content).includes("#card")) {
+    // El propio `==...==` ya genera tarjeta; no añadir `#card` si el bloque ya
+    // era una tarjeta (p. ej. con `::`) para no cambiar su huella.
+    if (!isFlashcardBlockContent(node.content)) {
       setVisibleBlockContent(node, `${getVisibleBlockContent(node.content)} #card`);
     }
     ensureBlockCreatedAt(node);
@@ -11629,13 +11631,17 @@ document.getElementById("ctx-flashcard")?.addEventListener("click", () => {
   const loc = findNodeLocation(page.blocks, contextTargetBlockId);
   if (loc) {
     const node = loc.parentList[loc.index];
-    const text = getVisibleBlockContent(node.content);
-    if (!/#card\b/i.test(text)) {
+    // Misma regla que el atajo: `::`, cloze y oclusiones ya son tarjetas y
+    // añadir `#card` cambiaría la pregunta y la huella del diario.
+    if (isFlashcardBlockContent(node.content)) {
+      showToast("El bloque principal ya es una tarjeta o está vacío.");
+    } else {
+      const text = getVisibleBlockContent(node.content);
       setVisibleBlockContent(node, `${text} #card`);
+      ensureBlockCreatedAt(node);
+      vault.savePage(page);
+      renderBlocksTree();
     }
-    ensureBlockCreatedAt(node);
-    vault.savePage(page);
-    renderBlocksTree();
   }
   hideAllContextMenus();
 });
