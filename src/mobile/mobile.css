@@ -260,12 +260,20 @@ body.mobile-review-body {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 0 1 auto;
   min-width: 0;
+  box-sizing: border-box;
+  /* El padding antes quedaba al navegador: con el borde de foco y el logo de
+   * 40 px, el botón se recortaba en android estrechos. */
+  padding: 4px 6px;
+  margin: -4px -6px;
 }
 
 .mobile-logo {
   display: grid;
   place-items: center;
+  flex: 0 0 40px;
+  box-sizing: border-box;
   width: 40px;
   height: 40px;
   border-radius: 13px;
