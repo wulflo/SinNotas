@@ -207,6 +207,8 @@ PDFium is not committed to the repository. The release workflows fetch the match
 | **↑ / ↓** | Move the caret between blocks when it is at the start or end of the current block. |
 | **? (Help button)** | Open the keyboard-shortcuts dialog from the editor header. |
 
+The navigation, find-in-note, select-all and flashcard shortcuts can be changed in **Settings → Shortcuts**. A combination already assigned to another action (or reserved, such as Copy/Paste) is rejected; ↺ restores the default.
+
 ## 🧪 Tests and benchmarks
 
 ```bash

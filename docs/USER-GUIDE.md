@@ -125,9 +125,12 @@ Android the full editor keeps the same behavior.
 - **Enter** splits the bullet at the cursor or creates the next one.
 - **Shift + Enter** inserts a line break inside the same bullet.
 - **Tab** and **Shift + Tab** indent and outdent.
-- Drag a bullet's handle to move it together with its whole hierarchy.
+- Hold the left mouse button on a bullet's handle and drag to move it together
+  with its whole hierarchy; drop it on another bullet to place it before, after
+  or inside it.
 - Select several bullets by clicking and dragging, or with **Shift** and drag, to
-  copy, cut, move or delete them as a block.
+  copy, cut, move or delete them as a block. Dragging the handle of a bullet that
+  is already selected moves the whole group while keeping its order.
 
 ### Formatting
 
@@ -225,6 +228,8 @@ to the daily note.
 ### Bibliography
 
 - Each resource uses `bib-*` properties in a note's frontmatter.
+- The **Reviewing** status works for books, videos and any other resource type;
+  it does not imply reading text.
 - You can store local or validated remote cover images.
 - Child notes are linked with sanitized wikilinks.
 - The **Add resource** button searches by DOI, ISBN-10/13 or keywords.
@@ -381,6 +386,15 @@ Pomodoro**.
 - **Review:** card order, FSRS (retention, maximum interval, steps and
   parameters), due date recalculation, keyboard shortcuts and gamepad.
 - **Pomodoro:** timer durations and behavior.
+
+### Shortcuts
+
+- Change the main shortcuts in this tab: click the combination next to an
+  action and press the keys you want; it is saved immediately.
+- If the combination is already used by another action (or reserved, such as
+  Copy/Paste), it is rejected with a notice; the ↺ button restores the default.
+- The **Keyboard shortcuts** dialog always shows the active combinations.
+  Review rating keys are configured in **Flashcards › Review**.
 
 ### Saving
 

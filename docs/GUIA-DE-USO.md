@@ -128,9 +128,12 @@ En Android el editor completo mantiene el mismo comportamiento.
 - **Enter** divide el bullet en la posición del cursor o crea el siguiente.
 - **Shift + Enter** inserta un salto de línea dentro del mismo bullet.
 - **Tab** y **Shift + Tab** indentan y desindentan.
-- Arrastra el tirador de un bullet para moverlo con toda su jerarquía.
+- Mantén pulsado el botón izquierdo sobre el tirador de un bullet y arrastra
+  para moverlo con toda su jerarquía; suelta sobre otro bullet para antes,
+  después o dentro de él.
 - Selecciona varios bullets con clic y arrastre o con **Shift** y arrastra para
-  copiarlos, cortarlos, moverlos o borrarlos en bloque.
+  copiarlos, cortarlos, moverlos o borrarlos en bloque. Si arrastras el tirador
+  de uno que ya está seleccionado, se mueve todo el grupo manteniendo el orden.
 
 ### Formato
 
@@ -227,6 +230,8 @@ completadas y añadir tareas a la nota diaria.
 ### Bibliografía
 
 - Cada recurso usa propiedades `bib-*` en el frontmatter de una nota.
+- El estado de consulta **Revisando** sirve para libros, vídeos y cualquier otro
+  tipo de recurso; no implica necesariamente leer texto.
 - Puedes guardar portadas locales o remotas validadas.
 - Las notas hijas se enlazan con wikilinks saneados.
 - El botón **Añadir recurso** busca por DOI, ISBN-10/13 o palabras clave.
@@ -386,6 +391,15 @@ contador progresivo, sonido y visibilidad en la barra superior) están en
 - **Repaso:** orden de las tarjetas, FSRS (retención, intervalo máximo, pasos y
   parámetros), recálculo de vencimientos, atajos de teclado y mando.
 - **Pomodoro:** duraciones y comportamiento del temporizador.
+
+### Atajos
+
+- Puedes cambiar los atajos principales desde esta pestaña: pulsa la combinación
+  que quieras asignar junto a la acción y se guarda de inmediato.
+- Si la combinación ya la usa otra acción (o una reservada, como Copiar/Pegar),
+  se rechaza con un aviso; el botón ↺ restablece el valor original.
+- El diálogo **Atajos de teclado** muestra siempre las combinaciones vigentes.
+  Las teclas de calificación de repaso se configuran en **Flashcards › Repaso**.
 
 ### Guardado
 
