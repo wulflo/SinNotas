@@ -4514,8 +4514,10 @@ body.is-bullet-selecting {
   padding: 0 12px 10px;
 }
 
-/* Paginador compacto: < x/X > en lugar de «Anterior · Página x de X · Siguiente». */
-.kanban-pagination .btn-pagination {
+/* Paginador compacto compartido por Tareas y Diarios: < x/X > en lugar de
+   «Anterior · Página x de X · Siguiente», con el mismo padding reducido. */
+.kanban-pagination .btn-pagination,
+.journals-pagination .btn-pagination {
   min-width: 34px;
   min-height: 28px;
   padding: 5px 8px;
