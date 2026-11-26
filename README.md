@@ -12,7 +12,7 @@
     <img src="https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20Android-6b7280?style=flat-square" alt="Platforms">
     <img src="https://img.shields.io/badge/Tauri-v2-24c8d8?style=flat-square&logo=tauri&logoColor=white" alt="Tauri v2">
     <img src="https://img.shields.io/badge/Rust-stable-b7410e?style=flat-square&logo=rust&logoColor=white" alt="Rust">
-    <img src="https://img.shields.io/badge/Node.js-22.12%2B-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js">
+    <img src="https://img.shields.io/badge/Node.js-24%2B-339933?style=flat-square&logo=node.js&logoColor=white" alt="Node.js">
   </p>
 
   <p>
@@ -126,7 +126,7 @@
 
 ### Requirements
 
-- **Node.js 22.12 or newer** (Vitest 5 requires it).
+- **Node.js 24 or newer** (required by `package.json` engines and CI).
 - **Rust stable** with `rustup`.
 - The platform webview and system packages. Linux dependencies are listed below; Windows and Android prerequisites are in their build sections.
 

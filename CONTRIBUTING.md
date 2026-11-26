@@ -23,7 +23,7 @@ For large features, refactors or changes that touch the data format, **open an i
 
 ### 1. Prerequisites
 
-- **Node.js 22.12 or newer** (Vitest 5 requires it).
+- **Node.js 24 or newer** (required by `package.json` engines and CI).
 - **Rust stable** with `rustup`.
 - The system dependencies for your platform. The per-distribution Linux commands are in the [README quick start](README.md#-quick-start).
 

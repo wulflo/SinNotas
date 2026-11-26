@@ -531,7 +531,7 @@ Los resultados registrados están en [BENCHMARK-2026-10-29.md](BENCHMARK-2026-10
 
 ## Requisitos y comandos
 
-- Node.js 22.12 o superior.
+- Node.js 24 o superior.
 - Rust estable.
 - JDK 17 o superior para Android.
 - Android SDK/NDK para compilar la APK.

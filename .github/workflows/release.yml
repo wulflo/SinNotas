@@ -41,8 +41,10 @@ jobs:
           TAURI_VERSION="$(node -p "require('./src-tauri/tauri.conf.json').version")"
           PACKAGE_VERSION="$(node -p "require('./package.json').version")"
           CARGO_VERSION="$(sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' src-tauri/Cargo.toml | head -n 1)"
+          CARGO_LOCK_VERSION="$(sed -n '/^name = "sin-notas"$/{n;s/^version = "\([^"]*\)".*/\1/p;}' src-tauri/Cargo.lock | head -n 1)"
+          SNAP_VERSION="$(sed -n "s/^version: '\([^']*\)'.*/\1/p" snapcraft.yaml | head -n 1)"
           failed=0
-          for pair in "tauri.conf.json:$TAURI_VERSION" "package.json:$PACKAGE_VERSION" "Cargo.toml:$CARGO_VERSION"; do
+          for pair in "tauri.conf.json:$TAURI_VERSION" "package.json:$PACKAGE_VERSION" "Cargo.toml:$CARGO_VERSION" "Cargo.lock:$CARGO_LOCK_VERSION" "snapcraft.yaml:$SNAP_VERSION"; do
             file="${pair%%:*}"
             version="${pair#*:}"
             if [ "$version" != "$TAG_VERSION" ]; then
@@ -54,7 +56,7 @@ jobs:
             echo "Actualizá las versiones del proyecto antes de publicar el tag." >&2
             exit 1
           fi
-          echo "Versión v$TAG_VERSION coincide con tauri.conf.json, package.json y Cargo.toml."
+          echo "Versión v$TAG_VERSION coincide con tauri.conf.json, package.json, Cargo.toml, Cargo.lock y snapcraft.yaml."
 
       - name: Run TypeScript type check
         run: npx tsc --noEmit
