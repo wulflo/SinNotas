@@ -13240,7 +13240,7 @@ function setFlashcardFocusMode(enabled: boolean): void {
   document.getElementById("app")?.classList.toggle("flashcard-focus-mode", enabled);
   flashcardFocusToggle.setAttribute("aria-pressed", String(enabled));
   flashcardFocusToggle.classList.toggle("active", enabled);
-  flashcardFocusToggle.textContent = enabled ? "Salir de focus" : "Modo focus";
+  flashcardFocusToggle.textContent = translate("Focus");
   repaintMainSurface();
 }
 
