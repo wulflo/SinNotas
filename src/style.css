@@ -1524,6 +1524,13 @@ body.sidebar-resizing * {
   -webkit-app-region: no-drag;
 }
 
+/* `display:flex` de .btn-icon gana al [hidden] del UA: sin esto, los botones
+ * marcados como ocultos por código (p. ej. #btn-split-view con el flag
+ * sinnotas-split-view=false) seguirían visibles. */
+.btn-icon[hidden] {
+  display: none;
+}
+
 .btn-icon {
   background: none;
   border: 1px solid transparent;
