@@ -7895,6 +7895,12 @@ body.mobile-full-editor .flashcard-review-tools {
   display: block;
 }
 
+/* En oclusión de imagen la respuesta es la propia imagen sin máscaras: no hay
+   texto inferior, así que mostrar el borde superior dejaría una línea suelta. */
+.card-answer.visible:empty {
+  display: none;
+}
+
 /* Cloze revelado: solo la respuesta completa, sin el hueco vacío encima. */
 .card-question.cloze-hidden {
   display: none;
