@@ -131,7 +131,7 @@ describe("createCardMiniEditorTextarea", () => {
     document.body.appendChild(textarea);
     Object.defineProperty(textarea, "scrollHeight", { value: 180, configurable: true });
     resizeCardMiniEditorTextarea(textarea);
-    expect(textarea.style.height).toBe("180px");
+    expect(textarea.style.height).toBe("182px");
 
     textarea.value = "Corto";
     Object.defineProperty(textarea, "scrollHeight", { value: 20, configurable: true });

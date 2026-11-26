@@ -91,12 +91,25 @@ const MINI_EDITOR_TEXTAREA_MIN_HEIGHT = 44;
  * insertar el textarea en el DOM (donde `scrollHeight` ya es fiable).
  */
 export function resizeCardMiniEditorTextarea(textarea: HTMLTextAreaElement): void {
-  // border-box evita que el padding se sume dos veces al medir; sin scrollbar
-  // interna el contenido no se corta aunque haya varias líneas.
-  textarea.style.boxSizing = "border-box";
-  textarea.style.overflowY = "hidden";
-  textarea.style.height = "auto";
-  textarea.style.height = `${Math.max(textarea.scrollHeight, MINI_EDITOR_TEXTAREA_MIN_HEIGHT)}px`;
+  const apply = () => {
+    // border-box evita que el padding se sume dos veces al medir; +2 px cubre
+    // el redondeo de line-height que recortaba la última línea de los cloze.
+    textarea.style.boxSizing = "border-box";
+    textarea.style.overflowY = "hidden";
+    textarea.style.height = "auto";
+    textarea.style.height = `${Math.max(
+      textarea.scrollHeight + 2,
+      MINI_EDITOR_TEXTAREA_MIN_HEIGHT
+    )}px`;
+  };
+  apply();
+  // La primera medida puede haberse hecho antes de que el wrap/fuente estuviera
+  // listo: repetir en el siguiente frame evita que se corte la última línea.
+  if (typeof requestAnimationFrame === "function") {
+    requestAnimationFrame(() => {
+      if (textarea.isConnected) apply();
+    });
+  }
 }
 
 /** Textarea de una fila del minieditor, con el mismo cableado en ambas superficies. */
