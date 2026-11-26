@@ -4,11 +4,11 @@
 use crate::{
     active_root, format_utc_timestamp, now_millis, parse_markdown_with_frontmatter,
     resolve_note_path, resolve_vault_path, serialize_page_to_markdown, stable_content_hash,
-    write_file_atomically, ActiveVault, PageRevision, RestoredSnapshot,
-    SnapshotConfig, SnapshotGate, SnapshotNoteSummary, SnapshotRecord, SnapshotState,
-    INTERNAL_FOLDER, PROGRESS_FOLDER, SNAPSHOT_CLOCK_TOLERANCE_MS, SNAPSHOT_CONFIG_FILE,
-    SNAPSHOT_FOLDER, SNAPSHOT_FORMAT_VERSION, SNAPSHOT_MAX_BYTES, SNAPSHOT_MAX_DAYS,
-    SNAPSHOT_MAX_FILES_PER_NOTE, SNAPSHOT_RETENTION_MS, SNAPSHOT_SEQUENCE,
+    write_file_atomically, ActiveVault, PageRevision, RestoredSnapshot, SnapshotConfig,
+    SnapshotGate, SnapshotNoteSummary, SnapshotRecord, SnapshotState, INTERNAL_FOLDER,
+    PROGRESS_FOLDER, SNAPSHOT_CLOCK_TOLERANCE_MS, SNAPSHOT_CONFIG_FILE, SNAPSHOT_FOLDER,
+    SNAPSHOT_FORMAT_VERSION, SNAPSHOT_MAX_BYTES, SNAPSHOT_MAX_DAYS, SNAPSHOT_MAX_FILES_PER_NOTE,
+    SNAPSHOT_RETENTION_MS, SNAPSHOT_SEQUENCE,
 };
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -162,14 +162,21 @@ pub(crate) fn snapshot_note_relative_path(root: &Path, note_path: &Path) -> Resu
 /// Cada nota guarda su propia configuración dentro de `.sinnotas/chronos/<nota>/`.
 /// Así el interruptor y el vencimiento son independientes por página y viajan
 /// con la nota cuando se renombra.
-pub(crate) fn snapshot_config_path_for_note(root: &Path, note_path: &Path) -> Result<PathBuf, String> {
+pub(crate) fn snapshot_config_path_for_note(
+    root: &Path,
+    note_path: &Path,
+) -> Result<PathBuf, String> {
     Ok(snapshot_dir_for_note(root, note_path)?.join(SNAPSHOT_CONFIG_FILE))
 }
 
 /// Mueve los snapshots cuando se renombra una nota. Si el destino ya tiene
 /// archivos (por ejemplo, una nota borrada y recreada), se combinan sin
 /// sobrescribir snapshots existentes.
-pub(crate) fn move_snapshot_dir_for_note(root: &Path, old_note: &Path, new_note: &Path) -> Result<(), String> {
+pub(crate) fn move_snapshot_dir_for_note(
+    root: &Path,
+    old_note: &Path,
+    new_note: &Path,
+) -> Result<(), String> {
     let old_dir = snapshot_dir_for_note(root, old_note)?;
     let new_dir = snapshot_dir_for_note(root, new_note)?;
     if old_dir == new_dir || !old_dir.is_dir() {
@@ -237,7 +244,10 @@ pub(crate) fn read_snapshot_config_from_path(path: &Path) -> SnapshotConfig {
     }
 }
 
-pub(crate) fn read_note_snapshot_config(root: &Path, note_path: &Path) -> Result<SnapshotConfig, String> {
+pub(crate) fn read_note_snapshot_config(
+    root: &Path,
+    note_path: &Path,
+) -> Result<SnapshotConfig, String> {
     let path = snapshot_config_path_for_note(root, note_path)?;
     Ok(read_snapshot_config_from_path(&path))
 }
@@ -827,7 +837,10 @@ pub(crate) fn activate_snapshots_in_root(
 }
 
 /// Desactiva una nota y elimina todas sus versiones guardadas.
-pub(crate) fn disable_snapshots_in_root(root: &Path, note_path: &Path) -> Result<SnapshotState, String> {
+pub(crate) fn disable_snapshots_in_root(
+    root: &Path,
+    note_path: &Path,
+) -> Result<SnapshotState, String> {
     if !path_is_markdown_note(note_path) {
         return Err("Los snapshots solo existen para notas .md.".to_string());
     }
@@ -839,7 +852,9 @@ pub(crate) fn disable_snapshots_in_root(root: &Path, note_path: &Path) -> Result
     snapshot_state_for_note(root, note_path, &config)
 }
 
-pub(crate) fn list_active_snapshot_notes_from_root(root: &Path) -> Result<Vec<SnapshotNoteSummary>, String> {
+pub(crate) fn list_active_snapshot_notes_from_root(
+    root: &Path,
+) -> Result<Vec<SnapshotNoteSummary>, String> {
     let now = now_millis()?;
     let mut notes = Vec::new();
     for config_path in snapshot_config_files(root) {

@@ -118,7 +118,10 @@ pub(crate) fn folded_bytes_to_utf16_index(folded: &str, byte_index: usize) -> us
 
 /// Recorre el árbol de bloques y devuelve el nodo cuyo id coincide (para
 /// servir el "best block" de un hit sin otra pasada del front).
-pub(crate) fn find_block_by_id<'local>(nodes: &'local [BlockNode], id: &str) -> Option<&'local BlockNode> {
+pub(crate) fn find_block_by_id<'local>(
+    nodes: &'local [BlockNode],
+    id: &str,
+) -> Option<&'local BlockNode> {
     for node in nodes {
         if node.id == id {
             return Some(node);
@@ -180,7 +183,10 @@ pub(crate) fn run_content_search(
                 index: folded_bytes_to_utf16_index(&block.folded, found_bytes),
                 match_length,
             };
-            if best.as_ref().is_none_or(|current| current.count < candidate.count) {
+            if best
+                .as_ref()
+                .is_none_or(|current| current.count < candidate.count)
+            {
                 best = Some(candidate);
             }
         }
@@ -191,7 +197,7 @@ pub(crate) fn run_content_search(
 
     // Orden estable: más apariciones primero, desempate alfabético.
     let order_candidates = |left: &(String, ContentSearchCandidate),
-                           right: &(String, ContentSearchCandidate)| {
+                            right: &(String, ContentSearchCandidate)| {
         right
             .1
             .count

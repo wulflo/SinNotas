@@ -333,6 +333,7 @@ graphSettingsPanel.addEventListener("click", (event) => {
 });
 
 syncGraphSettingsUi();
+graphSettingsUiReady = true;
 
 /** Sincroniza los controles del panel de grafo mientras esté abierto. */
 export function syncGraphSettingsUiIfPanelOpen(): void {
