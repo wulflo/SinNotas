@@ -6093,15 +6093,17 @@ body.is-bullet-selecting {
 }
 
 .card-editor-dialog {
-  width: min(620px, calc(100vw - 32px));
-  max-height: min(88vh, 760px);
-  padding: 20px;
+  width: min(900px, calc(100vw - 32px));
+  height: min(92dvh, 900px);
+  max-height: none;
+  padding: 20px 24px;
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
 .card-editor-body {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   gap: 14px;

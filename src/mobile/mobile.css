@@ -1120,6 +1120,43 @@ body.mobile-review-body {
   animation: mobile-sheet-up 180ms ease;
 }
 
+/* Editor de tarjeta: hoja casi completa; solo scrollea el cuerpo, no la
+ * cabecera ni los botones de guardar/cancelar. */
+.mobile-editor-scrim[data-editor] {
+  padding: 8px;
+  padding-bottom: max(8px, var(--mobile-safe-area-bottom));
+}
+
+.mobile-editor-scrim[data-editor] .mobile-editor {
+  width: 100%;
+  max-width: 760px;
+  height: min(94dvh, 900px);
+  max-height: none;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.mobile-editor-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.mobile-editor-scrim[data-editor] .mobile-editor-header {
+  flex: 0 0 auto;
+  margin-bottom: 10px;
+}
+
+.mobile-editor-scrim[data-editor] .mobile-editor-actions {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--mobile-border);
+}
+
 .mobile-editor-header {
   display: flex;
   align-items: center;

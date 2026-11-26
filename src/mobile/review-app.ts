@@ -521,6 +521,7 @@ class MobileReviewApp {
             <h2 id="mobile-editor-title">Editar tarjeta</h2>
             <button class="mobile-icon-button" type="button" data-action="close-editor" aria-label="Cerrar editor">${MOBILE_ICONS.close}</button>
           </header>
+          <div class="mobile-editor-scroll">
           <label class="mobile-editor-field" data-question-field>
             <span>Pregunta</span>
             <textarea data-edit-question rows="3" spellcheck="false"></textarea>
@@ -538,6 +539,7 @@ class MobileReviewApp {
             <div class="mobile-card-editor-rows" data-card-edit-rows></div>
           </div>
           <p class="mobile-editor-hint">Solo se modifica este bloque. Se conservan las propiedades FSRS, la etiqueta #card y el resto de la nota.</p>
+          </div>
           <footer class="mobile-editor-actions">
             <button class="mobile-secondary" type="button" data-action="close-editor">Cancelar</button>
             <button class="mobile-primary" type="button" data-action="save-editor" data-save-editor>Guardar</button>
