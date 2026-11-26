@@ -10695,7 +10695,13 @@ function kanbanPageFor(status: KanbanStatus, tasks: KanbanTask[]): KanbanTask[] 
   if (pagination) pagination.hidden = totalPages <= 1;
   if (prev) prev.disabled = kanbanCurrentPage[status] === 1;
   if (next) next.disabled = kanbanCurrentPage[status] === totalPages;
-  if (info) info.textContent = `Página ${kanbanCurrentPage[status]} de ${totalPages}`;
+  if (info) {
+    info.textContent = `${kanbanCurrentPage[status]}/${totalPages}`;
+    info.setAttribute(
+      "aria-label",
+      `${translate("Página")} ${kanbanCurrentPage[status]}/${totalPages}`
+    );
+  }
 
   return tasks.slice(start, start + KANBAN_TASKS_PER_PAGE);
 }
