@@ -23,7 +23,7 @@ import {
 import { isRemoteImageSource, resolveAllowedRemoteImageUrl } from "../editor/url-safety";
 import { DocumentHistory, type DocumentHistoryEntry } from "../editor/history";
 import { sanitizeHtml } from "../editor/markdown";
-import { findNodeLocation, getAllBlocksFlat } from "../editor/tree-engine";
+import { findNodeLocation } from "../editor/tree-engine";
 import { initialVaultPages, isSafVaultRoot, VaultStore } from "../store/vault";
 import { ReviewProgressStore, type ReviewProgressEvent } from "../store/review-progress";
 import {
@@ -50,6 +50,11 @@ import {
 } from "../views/card-mini-editor";
 import type { BlockNode, Flashcard, FlashcardType, ImageOcclusionRegion, PageData } from "../types";
 import { FlashcardsManager, type FlashcardPageStats } from "../views/flashcards-manager";
+import {
+  findReviewCardTarget,
+  locateReviewBlock as locateReviewBlockShared,
+  reviewCardIdForBlock,
+} from "../views/review-target";
 import {
   buildDeckTree,
   collectDeckPageTitles,
@@ -2093,23 +2098,10 @@ class MobileReviewApp {
   private findReviewTarget(
     card: Flashcard
   ): { page: PageData; block: BlockNode } | null {
-    const pageIdMatch = card.id.match(/^fc-(?:image|cloze|basic)-(p-[^-]+)-/);
-    const page = (pageIdMatch && this.pages.find((candidate) => candidate.id === pageIdMatch[1]))
-      || this.pages.find((candidate) => candidate.title === card.pageTitle);
-    if (!page) return null;
-    const location = findNodeLocation(page.blocks, card.blockId);
-    const block = location?.parentList[location.index];
-    if (block && (!card.fingerprint
-      || FlashcardsManager.cardFingerprint(block.content, card.cardType) === card.fingerprint)) {
-      return { page, block };
-    }
-    // El blockId puede reasignarse al recargar: buscar por huella solo dentro
-    // de la nota correcta evita escribir en otra tarjeta con el mismo título.
-    const fallback = getAllBlocksFlat(page.blocks).find((candidate) =>
-      card.fingerprint
-      && FlashcardsManager.cardFingerprint(candidate.content, card.cardType) === card.fingerprint
-    );
-    return fallback ? { page, block: fallback } : null;
+    return findReviewCardTarget(card, this.pages, {
+      findPageByTitle: (title) => this.pages.find((candidate) => candidate.title === title),
+      fallbackWhenBlockMissing: true,
+    });
   }
 
   private async rate(rating: FSRSRating): Promise<void> {
@@ -2413,37 +2405,10 @@ class MobileReviewApp {
     event: ReviewProgressEvent,
     expected?: import("../views/flashcards-manager").CardScheduleSnapshot
   ): { page: PageData; block: BlockNode } | null {
-    const matchesSnapshot = (block: BlockNode): boolean =>
-      !!expected &&
-      FlashcardsManager.scheduleSnapshotsEqual(
-        FlashcardsManager.readScheduleSnapshot(block.content),
-        expected
-      );
-    const matchesFingerprint = (block: BlockNode): boolean =>
-      !!event.cardFingerprint &&
-      FlashcardsManager.cardFingerprint(block.content, event.cardType) === event.cardFingerprint;
-
-    const preferredPage =
-      this.pages.find((candidate) => candidate.path === event.pagePath) ||
-      this.pages.find((candidate) => candidate.title === event.pageTitle);
-    if (preferredPage) {
-      const location = findNodeLocation(preferredPage.blocks, event.blockId);
-      if (location) {
-        const block = location.parentList[location.index];
-        if (matchesSnapshot(block) || matchesFingerprint(block)) {
-          return { page: preferredPage, block };
-        }
-      }
-    }
-    for (const page of this.pages) {
-      if (page.blocksLoaded === false) continue;
-      for (const block of getAllBlocksFlat(page.blocks)) {
-        if (!matchesFingerprint(block) && !matchesSnapshot(block)) continue;
-        if (!/card-s::|last-reviewed::|#card\b/i.test(block.content)) continue;
-        return { page, block };
-      }
-    }
-    return null;
+    return locateReviewBlockShared(event, this.pages, {
+      findPageByTitle: (title) => this.pages.find((candidate) => candidate.title === title),
+      expected,
+    });
   }
 
   private async applyReviewSnapshot(
@@ -2530,10 +2495,7 @@ class MobileReviewApp {
     await this.reviewProgress.commitUndo(event);
     const target = this.locateReviewBlock(event, event.after);
     if (target) {
-      const oldSuffix = `-${event.blockId}`;
-      const currentCardId = event.cardId.endsWith(oldSuffix)
-        ? `${event.cardId.slice(0, -oldSuffix.length)}-${target.block.id}`
-        : event.cardId;
+      const currentCardId = reviewCardIdForBlock(event.cardId, event.blockId, target.block.id);
       this.manager.updateCardInSession(currentCardId, target.block.content, currentCardId, false);
     }
     this.render();
@@ -2557,10 +2519,7 @@ class MobileReviewApp {
     await this.reviewProgress.commitRedo(event);
     const target = this.locateReviewBlock(event, event.before);
     if (target) {
-      const oldSuffix = `-${event.blockId}`;
-      const currentCardId = event.cardId.endsWith(oldSuffix)
-        ? `${event.cardId.slice(0, -oldSuffix.length)}-${target.block.id}`
-        : event.cardId;
+      const currentCardId = reviewCardIdForBlock(event.cardId, event.blockId, target.block.id);
       this.manager.updateCardInSession(currentCardId, target.block.content, currentCardId, false);
     }
     this.render();

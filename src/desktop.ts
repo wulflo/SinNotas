@@ -140,6 +140,11 @@ import {
 } from "./views/card-mini-editor";
 import { KanbanManager } from "./views/kanban-view";
 import { completedTasksToRemove, groupTasksByPage } from "./views/kanban-cleanup";
+import {
+  findReviewCardTarget,
+  locateReviewBlock as locateReviewBlockShared,
+  reviewCardIdForBlock,
+} from "./views/review-target";
 import { PdfReaderView } from "./views/pdf-view";
 import { BibliographyView, type BibliographyHost } from "./views/bibliography-view";
 import {
@@ -14427,26 +14432,9 @@ function applyFSRSRating(
 function findReviewCardBlock(
   card: Flashcard
 ): { page: PageData; block: BlockNode } | null {
-  const pageIdMatch = card.id.match(/^fc-(?:image|cloze|basic)-(p-[^-]+)-/);
-  const page = (pageIdMatch && vault.getPages().find((candidate) => candidate.id === pageIdMatch[1]))
-    || vault.getPageByTitle(card.pageTitle);
-  if (!page) return null;
-  const location = findNodeLocation(page.blocks, card.blockId);
-  if (!location) return null;
-  const block = location.parentList[location.index];
-  if (
-    card.fingerprint &&
-    FlashcardsManager.cardFingerprint(block.content, card.cardType) !== card.fingerprint
-  ) {
-    // El id de bloque apunta a otra tarjeta: buscar por huella en esta nota.
-    const match = getAllBlocksFlat(page.blocks).find(
-      (candidate) =>
-        FlashcardsManager.cardFingerprint(candidate.content, card.cardType) === card.fingerprint
-    );
-    if (!match) return null;
-    return { page, block: match };
-  }
-  return { page, block };
+  return findReviewCardTarget(card, vault.getPages(), {
+    findPageByTitle: (title) => vault.getPageByTitle(title),
+  });
 }
 
 /* ==================== EDITOR DE TARJETA EN EL REPASO ==================== */
@@ -14671,40 +14659,10 @@ function locateReviewBlock(
   event: ReviewProgressEvent,
   expected: CardScheduleSnapshot = event.after
 ): { page: PageData; block: BlockNode } | null {
-  const matchesSnapshot = (block: BlockNode): boolean =>
-    FlashcardsManager.scheduleSnapshotsEqual(
-      FlashcardsManager.readScheduleSnapshot(block.content),
-      expected
-    );
-  const matchesFingerprint = (block: BlockNode): boolean =>
-    !!event.cardFingerprint &&
-    FlashcardsManager.cardFingerprint(block.content, event.cardType) === event.cardFingerprint;
-
-  const preferredPage =
-    vault.getPages().find((candidate) => candidate.path === event.pagePath) ||
-    vault.getPageByTitle(event.pageTitle);
-  if (preferredPage) {
-    const loc = findNodeLocation(preferredPage.blocks, event.blockId);
-    if (loc) {
-      const block = loc.parentList[loc.index];
-      if (matchesSnapshot(block) || matchesFingerprint(block)) {
-        return { page: preferredPage, block };
-      }
-    }
-  }
-
-  // El id de bloque cambió (o la nota se movió): buscar la tarjeta real. La
-  // huella es estable y, en diarios antiguos sin huella, la instantánea
-  // esperada contiene `last-reviewed`, único por repaso.
-  for (const page of vault.getPages()) {
-    if (page.blocksLoaded === false) continue;
-    for (const block of getAllBlocksFlat(page.blocks)) {
-      if (!matchesFingerprint(block) && !matchesSnapshot(block)) continue;
-      if (!/card-s::|last-reviewed::|#card\b/i.test(block.content)) continue;
-      return { page, block };
-    }
-  }
-  return null;
+  return locateReviewBlockShared(event, vault.getPages(), {
+    findPageByTitle: (title) => vault.getPageByTitle(title),
+    expected,
+  });
 }
 
 /**
@@ -14803,10 +14761,7 @@ function refreshFlashcardsAfterReviewChange(
 
   // `event.cardId` contiene un `b-N` que puede haber cambiado; se recalcula
   // conservando el prefijo de tipo y el índice de oclusión.
-  const oldSuffix = `-${event.blockId}`;
-  const currentCardId = event.cardId.endsWith(oldSuffix)
-    ? `${event.cardId.slice(0, -oldSuffix.length)}-${target.block.id}`
-    : event.cardId;
+  const currentCardId = reviewCardIdForBlock(event.cardId, event.blockId, target.block.id);
   const nextId = direction === "redo" ? flashcardsManager.getNextCardId(currentCardId) : null;
   const activeCardId = direction === "undo" ? currentCardId : (nextId ?? currentCardId);
 
