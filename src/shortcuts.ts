@@ -54,7 +54,7 @@ export const SHORTCUT_DEFINITIONS: readonly ShortcutDefinition[] = [
   { id: "selectAdjacentDown", label: "Seleccionar bullets contiguos hacia abajo", defaultBinding: "Shift+ArrowDown" },
   { id: "selectAll", label: "Seleccionar todos los bullets de la página", defaultBinding: "Mod+Shift+A" },
   { id: "mergePrevious", label: "Unir con el bullet anterior", defaultBinding: "Backspace" },
-  { id: "copyBullets", label: "Copiar bullets seleccionados", defaultBinding: "Mod+C" },
+  { id: "copyBullets", label: "Copiar bullets", defaultBinding: "Mod+C" },
   { id: "cutBullets", label: "Cortar bullets seleccionados", defaultBinding: "Mod+X" },
   { id: "deleteBullets", label: "Borrar bullets seleccionados", defaultBinding: "Delete" },
   { id: "createCard", label: "Crear tarjeta básica desde la selección", defaultBinding: "Mod+Shift+C" },

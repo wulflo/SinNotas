@@ -11349,7 +11349,7 @@ function showBlockContextMenu(x: number, y: number) {
     const copyBulletsLabel = document.getElementById("ctx-copy-bullets-label");
     if (copyBulletsLabel) {
       copyBulletsLabel.textContent = translate(
-        selectedBulletIds.length > 1 ? "Copiar bullets seleccionados" : "Copiar bullet"
+        "Copiar bullets"
       );
     }
     contextImageOcclusion.hidden = contextImageSource === null;
@@ -11374,7 +11374,7 @@ function showBulletContextMenu(x: number, y: number) {
     const copyLabel = document.getElementById("ctx-copy-label");
     const cutLabel = document.getElementById("ctx-cut-label");
     const deleteLabel = document.getElementById("ctx-delete-label");
-    if (copyLabel) copyLabel.textContent = translate(hasMultipleBullets ? "Copiar bullets seleccionados" : "Copiar bullet");
+    if (copyLabel) copyLabel.textContent = translate(hasMultipleBullets ? "Copiar bullets" : "Copiar bullet");
     if (cutLabel) cutLabel.textContent = translate(hasMultipleBullets ? "Cortar bullets seleccionados" : "Cortar bullet");
     if (deleteLabel) deleteLabel.textContent = translate(hasMultipleBullets ? "Borrar bullets seleccionados" : "Borrar bullet");
     const dueItem = document.getElementById("ctx-due-date");

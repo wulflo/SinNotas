@@ -91,6 +91,10 @@ const MINI_EDITOR_TEXTAREA_MIN_HEIGHT = 44;
  * insertar el textarea en el DOM (donde `scrollHeight` ya es fiable).
  */
 export function resizeCardMiniEditorTextarea(textarea: HTMLTextAreaElement): void {
+  // border-box evita que el padding se sume dos veces al medir; sin scrollbar
+  // interna el contenido no se corta aunque haya varias líneas.
+  textarea.style.boxSizing = "border-box";
+  textarea.style.overflowY = "hidden";
   textarea.style.height = "auto";
   textarea.style.height = `${Math.max(textarea.scrollHeight, MINI_EDITOR_TEXTAREA_MIN_HEIGHT)}px`;
 }

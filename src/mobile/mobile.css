@@ -1228,6 +1228,9 @@ body.mobile-review-body {
   min-height: 44px;
   padding: 8px 10px;
   height: auto;
+  box-sizing: border-box;
+  overflow-y: hidden;
+  resize: none;
 }
 
 .mobile-card-editor-row textarea[readonly] {
@@ -1238,7 +1241,10 @@ body.mobile-review-body {
 .mobile-card-editor-row-actions {
   display: flex;
   flex: 0 0 auto;
-  flex-direction: column;
+  /* En horizontal: dos botones apilados hacían la fila más alta que el
+   * textarea y dejaban un hueco irregular debajo de cada box. */
+  flex-direction: row;
+  align-items: flex-start;
   gap: 2px;
 }
 
