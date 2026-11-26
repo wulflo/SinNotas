@@ -1,10 +1,32 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.5.6 · **Fecha:** 2026-11-25
+**Versión:** 0.5.7 · **Fecha:** 2026-11-26
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
 escritorio completa y una APK Android centrada en el repaso de flashcards.
+
+## Cambios en 0.5.7
+
+- El grafo del panel de referencias se actualiza al cambiar de nota, sin cerrar
+  y volver a abrir el panel.
+- «Editar tarjeta» en el repaso: básica con dos campos, cloze con minieditor del
+  bullet y sus hijos (indentación incluida) y oclusión con editor responsive;
+  disponible también en la superficie de repaso/APK.
+- Escritura y SAF: imágenes de oclusión legibles con bóveda SAF en Android,
+  diario de repasos serializado y JSON corrupto detectado, permiso persistente
+  no fatal y scope del asset protocol revocado al cambiar de bóveda.
+- Android: herramientas de la nota debajo del título en pantallas angostas y
+  botón de colapsar la sidebar sin recorte.
+- Panel de referencias: botón para ver las notas 1/2 completas, con scroll de la
+  sección en vez de un visor interior truncado.
+- Notas semilla actualizadas: cloze con resaltado `==...==` y contenido actual.
+- Grafo: halo del color de acento en vez de un anillo que tapaba la etiqueta;
+  backlinks con LaTeX y wikilinks sin corchetes.
+- Kanban: paginador `< x/X >`, iconos SVG que siguen el acento, borrado de
+  completadas de los últimos 7/30 días y espaciado uniforme entre tarjetas.
+- Mantenimiento: lógica compartida entre escritorio y APK, tests de cableado DOM
+  y CSS de iconos unificado.
 
 ## Stack y estructura
 
@@ -648,7 +670,7 @@ declara `runFullTrust`.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Última release publicada: `0.5.6` (`versionCode 5006`)
+- Última release publicada: `0.5.7` (`versionCode 5007`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):
