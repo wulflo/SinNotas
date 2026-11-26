@@ -7916,6 +7916,10 @@ body.mobile-full-editor .flashcard-review-tools {
   width: 100%;
   height: 100%;
   display: block;
+  /* Sin esto el WebView/Android roba el swipe para scrollear .view-panel y el
+     pinch para hacer zoom de página; el canvas nunca recibe los pointer moves. */
+  touch-action: none;
+  user-select: none;
 }
 
 .graph-legend {

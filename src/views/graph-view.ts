@@ -80,6 +80,9 @@ export class GraphView {
   private offsetY = 0;
   private marquee: { x1: number; y1: number; x2: number; y2: number } | null = null;
   private pointerStart: { x: number; y: number } | null = null;
+  /** Puntos táctiles activos (dedos) y línea base de la pinza, solo para pointerType === "touch". */
+  private touchPoints = new Map<number, { x: number; y: number }>();
+  private touchPinch: { distance: number; x: number; y: number } | null = null;
   private suppressClick = false;
   private nodeDragMoved = false;
   private simulationRunning = false;
@@ -239,6 +242,8 @@ export class GraphView {
     this.suppressClick = false;
     this.marquee = null;
     this.pointerStart = null;
+    this.touchPoints.clear();
+    this.touchPinch = null;
     this.canvas.style.cursor = "default";
   }
 
@@ -1140,5 +1145,105 @@ export class GraphView {
       }
       try { (window as any).__graphClickBackground?.(); } catch {}
     });
+
+    this.setupTouchEvents();
+  }
+
+  /**
+   * Gestos táctiles (Android/WebView): el navegador convierte el toque simple en
+   * eventos de ratón compatibles (click, mousedown) pero nunca genera `wheel` ni
+   * botones 2/4, así que el pan y el zoom del código de ratón son inalcanzables.
+   * Escuchamos `pointer*` solo para `touch` para no duplicar los gestos de ratón.
+   */
+  private setupTouchEvents() {
+    const localPoint = (event: PointerEvent) => {
+      const rect = this.canvas.getBoundingClientRect();
+      return { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    };
+
+    /** Media de los dedos activos y distancia entre los dos primeros. */
+    const touchMetrics = () => {
+      const points = [...this.touchPoints.values()];
+      if (points.length === 0) return null;
+      if (points.length === 1) return { count: 1, x: points[0].x, y: points[0].y, distance: 0 };
+      const [a, b] = points;
+      return {
+        count: points.length,
+        x: (a.x + b.x) / 2,
+        y: (a.y + b.y) / 2,
+        distance: Math.hypot(a.x - b.x, a.y - b.y),
+      };
+    };
+
+    this.canvas.addEventListener("pointerdown", (event) => {
+      if (event.pointerType !== "touch") return;
+      this.touchPoints.set(event.pointerId, localPoint(event));
+      try { this.canvas.setPointerCapture(event.pointerId); } catch { /* WebView antiguo */ }
+      this.followTitle = null;
+      // Los mousedown compatibles pueden iniciar marquee/arrastre; el gesto
+      // táctil siempre es pan/zoom, nunca selección rectangular ni arrastre.
+      this.marquee = null;
+      this.draggedNode = null;
+      this.pressedNode = null;
+      this.nodeDragMoved = false;
+      const metrics = touchMetrics();
+      this.touchPinch = metrics && metrics.count >= 2
+        ? { distance: metrics.distance, x: metrics.x, y: metrics.y }
+        : null;
+    });
+
+    this.canvas.addEventListener("pointermove", (event) => {
+      if (event.pointerType !== "touch" || !this.touchPoints.has(event.pointerId)) return;
+      const previous = this.touchPoints.get(event.pointerId)!;
+      const point = localPoint(event);
+      const metrics = touchMetrics();
+      this.touchPoints.set(event.pointerId, point);
+      // Impide que los mousemove compatibles reconstruyan un marquee y disparen
+      // zoom de rectángulo al soltar el dedo.
+      this.marquee = null;
+      this.draggedNode = null;
+      if (!metrics) return;
+
+      if (metrics.count >= 2) {
+        if (this.touchPinch) {
+          const factor = this.touchPinch.distance > 0 && metrics.distance > 0
+            ? metrics.distance / this.touchPinch.distance
+            : 1;
+          this.offsetX += metrics.x - this.touchPinch.x;
+          this.offsetY += metrics.y - this.touchPinch.y;
+          this.zoomAt(metrics.x, metrics.y, factor);
+        }
+        this.touchPinch = { distance: metrics.distance, x: metrics.x, y: metrics.y };
+        this.suppressClick = true;
+      } else {
+        this.touchPinch = null;
+        const dx = point.x - previous.x;
+        const dy = point.y - previous.y;
+        if (dx !== 0 || dy !== 0) {
+          this.offsetX += dx;
+          this.offsetY += dy;
+          if (Math.hypot(dx, dy) > 2) this.suppressClick = true;
+        }
+      }
+      this.canvas.style.cursor = "grabbing";
+      this.requestRender();
+    });
+
+    const finishTouch = (event: PointerEvent) => {
+      if (event.pointerType !== "touch" || !this.touchPoints.has(event.pointerId)) return;
+      this.touchPoints.delete(event.pointerId);
+      try { this.canvas.releasePointerCapture(event.pointerId); } catch { /* ya liberado */ }
+      const metrics = touchMetrics();
+      if (metrics && metrics.count >= 2) {
+        // De 3 dedos a 2: nueva línea base de pinza.
+        this.touchPinch = { distance: metrics.distance, x: metrics.x, y: metrics.y };
+      } else {
+        // De 2 dedos a 1: reinicia la línea base para evitar un salto al panear.
+        this.touchPinch = null;
+        if (!metrics) this.canvas.style.cursor = this.hoveredNode ? "pointer" : "default";
+      }
+    };
+    this.canvas.addEventListener("pointerup", finishTouch);
+    this.canvas.addEventListener("pointercancel", finishTouch);
   }
 }

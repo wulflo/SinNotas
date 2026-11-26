@@ -1,7 +1,8 @@
 /**
  * Banco de pruebas EN VIVO para GraphView (abrir: http://localhost:1420/graph-harness.html)
- * Simula gestos reales (mousedown/mousemove/mouseup/click/wheel/dblclick) y
- * verifica selección, zoom, pan, arrastre, color y estabilidad tras el settle.
+ * Simula gestos reales (mousedown/mousemove/mouseup/click/wheel/dblclick y
+ * pointerdown/pointermove/pointerup táctiles) y verifica selección, zoom, pan,
+ * arrastre, color y estabilidad tras el settle.
  */
 import { GraphView } from "../views/graph-view";
 import type { PageData } from "../types";
@@ -74,6 +75,14 @@ function mouse(type: string, x: number, y: number, opts: { button?: number; butt
     clientX: r.left + x, clientY: r.top + y, button: btn, buttons: btns,
   });
   canvas.dispatchEvent(evt);
+}
+function pointer(type: string, id: number, x: number, y: number) {
+  const r = rect();
+  canvas.dispatchEvent(new PointerEvent(type, {
+    bubbles: true, cancelable: true, view: window,
+    pointerId: id, pointerType: "touch", isPrimary: id === 1,
+    clientX: r.left + x, clientY: r.top + y,
+  }));
 }
 function clickNode(title: string) {
   const s = screenOf(title);
@@ -182,6 +191,40 @@ async function run() {
   mouse("dblclick", 400, 300);
   await waitFrame();
   log("K dblclick resetea zoom/pan", view.getScale() === 1 && view.getOffset().x === 0 && view.getOffset().y === 0);
+
+  // M): pan táctil con un dedo (Android/WebView)
+  const offM0 = view.getOffset();
+  const rcM0 = view.getRenderCount();
+  pointer("pointerdown", 11, 300, 250);
+  for (let i = 1; i <= 6; i++) pointer("pointermove", 11, 300 + i * 10, 250 + i * 5);
+  pointer("pointerup", 11, 360, 280);
+  await waitFrame();
+  const offM1 = view.getOffset();
+  log("M pan con 1 dedo táctil", offM1.x > offM0.x + 40 && offM1.y > offM0.y + 20 && view.getRenderCount() > rcM0);
+  log("M2 puntos táctiles liberados al soltar", (view as any).touchPoints.size === 0);
+
+  // N): zoom con pinza de dos dedos
+  const scN0 = view.getScale();
+  pointer("pointerdown", 21, 280, 250);
+  pointer("pointerdown", 22, 320, 250);
+  for (let i = 1; i <= 6; i++) {
+    pointer("pointermove", 21, 280 - i * 10, 250);
+    pointer("pointermove", 22, 320 + i * 10, 250);
+  }
+  pointer("pointerup", 21, 220, 250);
+  pointer("pointerup", 22, 380, 250);
+  await waitFrame();
+  log("N pinza de 2 dedos hace zoom", view.getScale() > scN0 * 1.3 && (view as any).touchPoints.size === 0);
+
+  // O): el toque simple sigue seleccionando (click compatible del WebView)
+  const rcO0 = view.getRenderCount();
+  pointer("pointerdown", 31, 400, 300);
+  pointer("pointermove", 31, 404, 302);
+  pointer("pointerup", 31, 404, 302);
+  canvas.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, view: window, clientX: rect().left + 404, clientY: rect().top + 302, button: 0, buttons: 0 }));
+  clickNode("P8");
+  await waitFrame();
+  log("O selección por toque tras pan/zoom", (window as any).__lastSelect === "P8" && view.getRenderCount() > rcO0);
 
   // L): estabilidad — sin bucle infinito de render en reposo
   // Esperar a que la física se asiente de verdad (alpha mínimo + energía baja)
