@@ -6492,14 +6492,17 @@ body.is-bullet-selecting {
 
 /* En el repaso la tarjeta ocupa todo el ancho disponible: el tope genérico de
    620px dejaba la oclusión en una columna estrecha con grandes huecos a los
-   lados. Aquí la imagen crece con la tarjeta y solo se limita por la altura
-   útil (cabecera, zoom y botones de valoración siguen visibles). */
+   lados. Aquí solo se amplían los topes: las imágenes pequeñas conservan su
+   tamaño natural y las grandes aprovechan el ancho/alto disponible. El límite
+   es una fracción de la altura de la ventana (no `90vh - px fijos`, que
+   encogía la imagen en ventanas bajas). El área de imagen sigue teniendo
+   scroll propio, así que los controles y el botón de respuesta no se mueven. */
 #card-question .flashcard-image-preview {
   max-width: 100%;
 }
 
 #card-question .flashcard-image-preview > img {
-  max-height: max(260px, calc(90vh - 230px));
+  max-height: max(220px, 72vh);
 }
 
 /* Contenedor de repaso de oclusiones: la estructura es viewport (fijo, sin
