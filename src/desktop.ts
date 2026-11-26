@@ -640,6 +640,8 @@ let contextImageSource: string | null = null;
 let imageInsertTargetBlockId: string | null = null;
 let imageInsertOpensOcclusion = false;
 let imageOcclusionTarget: { blockId: string; source: string } | null = null;
+/** Cuando el editor se abre desde el repaso, hay que conservar la tarjeta activa. */
+let imageOcclusionFromReview: { cardId: string; revealed: boolean } | null = null;
 let imageOcclusionRegions: ImageOcclusionRegion[] = [];
 let imageOcclusionDraft: ImageOcclusionRegion | null = null;
 let imageOcclusionPolygonPoints: Array<{ x: number; y: number }> = [];
@@ -11967,6 +11969,14 @@ function openImageOcclusionEditor(blockId: string, source: string): void {
     imageOcclusionHintInput.value = "";
     imageOcclusionImage.removeAttribute("src");
     imageOcclusionOverlay.classList.add("image-block-loading");
+    const fromReview = imageOcclusionFromReview !== null;
+    imageOcclusionOverlay.classList.toggle("is-review-occlusion", fromReview);
+    const saveOcclusionButton = document.getElementById("btn-save-image-occlusion") as HTMLButtonElement | null;
+    if (saveOcclusionButton) {
+      saveOcclusionButton.innerText = fromReview
+        ? translate("Guardar y volver al repaso")
+        : "Guardar oclusiones";
+    }
     mountOverlay(imageOcclusionOverlay);
     imageOcclusionImage.onload = () => {
       if (imageOcclusionTarget?.blockId === blockId && imageOcclusionTarget.source === source) {
@@ -12004,6 +12014,7 @@ async function saveImageOcclusionEditor(): Promise<void> {
   }
 
   const saveButton = document.getElementById("btn-save-image-occlusion") as HTMLButtonElement;
+  const wasFromReview = imageOcclusionFromReview !== null;
   const originalLabel = saveButton.innerText;
   saveButton.disabled = true;
   saveButton.innerText = "Guardando...";
@@ -12012,8 +12023,15 @@ async function saveImageOcclusionEditor(): Promise<void> {
     saveBlockImageOcclusions(node, imageOcclusionTarget.source, imageOcclusionRegions);
     if (imageOcclusionRegions.length > 0) ensureBlockCreatedAt(node);
     await vault.savePage(targetPage, true);
-    renderBlocksTree();
-    startFlashcardsSession();
+    if (wasFromReview) {
+      documentHistory.capture(targetPage.id, targetPage.blocks, targetPage.title);
+      const { cardId, revealed } = imageOcclusionFromReview!;
+      flashcardsManager.refreshCard(vault.getPages(), cardId, flashcardReviewOrder, revealed);
+      updateFlashcardUI();
+    } else {
+      renderBlocksTree();
+      startFlashcardsSession();
+    }
     showToast(`${imageOcclusionRegions.length} oclusión(es) guardada(s) en ${targetPage.title}.`);
     closeImageOcclusionEditor();
   } catch (error) {
@@ -12021,12 +12039,16 @@ async function saveImageOcclusionEditor(): Promise<void> {
     showToast("No se pudieron guardar las oclusiones. Revisa los permisos de escritura del vault e inténtalo de nuevo.");
   } finally {
     saveButton.disabled = false;
-    saveButton.innerText = originalLabel;
+    saveButton.innerText = wasFromReview ? "Guardar oclusiones" : originalLabel;
   }
 }
 
 function closeImageOcclusionEditor(): void {
   unmountOverlay(imageOcclusionOverlay);
+  imageOcclusionOverlay.classList.remove("is-review-occlusion");
+  imageOcclusionFromReview = null;
+  const saveOcclusionButton = document.getElementById("btn-save-image-occlusion") as HTMLButtonElement | null;
+  if (saveOcclusionButton) saveOcclusionButton.innerText = "Guardar oclusiones";
   imageOcclusionTarget = null;
   imageOcclusionRegions = [];
   imageOcclusionDraft = null;
@@ -14036,7 +14058,12 @@ function updateFlashcardUI() {
       : "BÁSICA";
   cardSourceEl.innerText = `Origen: ${card.pageTitle}`;
   cardFsrsBadge.innerText = `S: ${card.fsrs.stability}d • D: ${card.fsrs.difficulty} • Reps: ${card.fsrs.reps}`;
-  if (btnEditFlashcard) btnEditFlashcard.hidden = card.cardType === "image-occlusion";
+  if (btnEditFlashcard) {
+    const label = card.cardType === "image-occlusion" ? "Editar oclusión" : "Editar tarjeta";
+    btnEditFlashcard.hidden = false;
+    btnEditFlashcard.title = translate(label);
+    btnEditFlashcard.setAttribute("aria-label", translate(label));
+  }
   syncCardParentContext(card);
 
   cardQuestionEl.replaceChildren();
@@ -14432,8 +14459,11 @@ function renderCardEditorRows(block: BlockNode, includeRoot: boolean): void {
 function openCardEditor(): void {
   if (flashcardLoading || !cardEditorOverlay) return;
   const card = flashcardsManager.getCurrentCard();
-  // La oclusión tiene su propio editor responsive (F2b).
-  if (!card || card.cardType === "image-occlusion") return;
+  if (!card) return;
+  if (card.cardType === "image-occlusion") {
+    openReviewOcclusionEditor(card);
+    return;
+  }
   const target = findReviewCardBlock(card);
   if (!target) {
     showToast(translate("No se encontró el bloque de la tarjeta."));
@@ -14468,6 +14498,26 @@ function openCardEditor(): void {
 function closeCardEditor(): void {
   cardEditorTarget = null;
   if (cardEditorOverlay) unmountOverlay(cardEditorOverlay);
+}
+
+/** Abre el editor de oclusión de escritorio sin perder la tarjeta en repaso. */
+function openReviewOcclusionEditor(card: Flashcard): void {
+  const target = findReviewCardBlock(card);
+  if (!target) {
+    showToast(translate("No se encontró el bloque de la tarjeta."));
+    return;
+  }
+  const source = card.imageSource
+    || parseImageOcclusions(target.block.content).find((region) => region.source)?.source;
+  if (!source) {
+    showToast(translate("No se encontró el bloque de la tarjeta."));
+    return;
+  }
+  imageOcclusionFromReview = {
+    cardId: card.id,
+    revealed: flashcardsManager.isRevealed(),
+  };
+  openImageOcclusionEditor(target.block.id, source);
 }
 
 async function saveCardEditor(): Promise<void> {

@@ -6043,6 +6043,50 @@ body.is-bullet-selecting {
   resize: none;
 }
 
+/* El editor de oclusión del repaso usa el mismo diálogo, pero como hoja
+ * inferior: el canvas y la lista siguen siendo los de escritorio. */
+.image-occlusion-overlay.is-review-occlusion {
+  align-items: flex-end;
+  padding: 0;
+}
+
+.image-occlusion-overlay.is-review-occlusion .image-occlusion-dialog {
+  width: 100%;
+  max-width: none;
+  max-height: min(94dvh, 900px);
+  padding: 16px 14px calc(16px + env(safe-area-inset-bottom, 0px));
+  border-radius: 20px 20px 0 0;
+  gap: 12px;
+}
+
+.image-occlusion-overlay.is-review-occlusion .image-occlusion-stage,
+.image-occlusion-overlay.is-review-occlusion .image-occlusion-stage img {
+  max-height: 42dvh;
+}
+
+.image-occlusion-overlay.is-review-occlusion .image-occlusion-toolbar {
+  flex-wrap: nowrap;
+  align-items: center;
+  overflow-x: auto;
+  padding: 8px;
+}
+
+.image-occlusion-overlay.is-review-occlusion .image-occlusion-toolbar > label,
+.image-occlusion-overlay.is-review-occlusion .image-occlusion-toolbar > .image-occlusion-tool-group,
+.image-occlusion-overlay.is-review-occlusion .image-occlusion-scale-tools {
+  flex: 0 0 auto;
+}
+
+.image-occlusion-overlay.is-review-occlusion .image-occlusion-instructions {
+  display: none;
+}
+
+.image-occlusion-overlay.is-review-occlusion .image-occlusion-footer {
+  position: sticky;
+  bottom: 0;
+  background: var(--ls-bg-primary);
+}
+
 /* ==================== KEYBOARD SHORTCUTS MODAL ==================== */
 #shortcuts-modal-overlay {
   z-index: 2300;
