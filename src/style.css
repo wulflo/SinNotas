@@ -9251,6 +9251,20 @@ body.mobile-full-editor .flashcard-review-tools {
   .graph-range-control span {
     grid-column: 1 / -1;
   }
+
+  .page-title-row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .page-title-row .page-title {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .page-title-action {
+    margin-top: 0;
+  }
 }
 
 /* ==================== MÓVIL: EDITOR COMPLETO ==================== */
@@ -9284,6 +9298,41 @@ body.mobile-full-editor .headbar {
   height: calc(var(--ls-headbar-height) + var(--mobile-full-safe-top));
   padding: var(--mobile-full-safe-top) max(16px, var(--mobile-full-safe-right)) 0
     max(16px, var(--mobile-full-safe-left));
+}
+
+/* El botón de colapsar la sidebar se recortaba a la derecha: el contenedor
+ * tenía `overflow:hidden` y la caja no coincidía con su `flex-basis`. */
+body.mobile-full-editor .headbar-left {
+  overflow: visible;
+}
+
+body.mobile-full-editor .window-controls {
+  display: none;
+}
+
+body.mobile-full-editor #btn-toggle-sidebar {
+  box-sizing: border-box;
+  flex: 0 0 38px;
+  min-width: 38px;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+}
+
+/* En Android (y en pantallas angostas) las herramientas de la nota pasan a una
+ * línea propia debajo del título, en vez de encoger el h1 hasta que haga wrap. */
+body.mobile-full-editor .page-title-row {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+body.mobile-full-editor .page-title-row .page-title {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+body.mobile-full-editor .page-title-action {
+  margin-top: 0;
 }
 
 body.mobile-full-editor .sidebar-left {
@@ -9325,9 +9374,12 @@ body.mobile-full-editor .content-scroll {
   }
 
   body.mobile-full-editor #btn-toggle-sidebar {
-    flex-basis: 38px;
+    flex: 0 0 38px;
+    min-width: 38px;
     width: 38px;
     height: 38px;
+    padding: 0;
+    box-sizing: border-box;
   }
 
   body.mobile-full-editor .content-scroll {
