@@ -96,6 +96,7 @@ import { FlashcardDeckRepository } from "./store/flashcard-deck-storage";
 import { collectOutgoingLinks } from "./store/wikilinks";
 import { connectedPageTitles, referenceGraphPages } from "./views/graph-neighborhood";
 import { renderBacklinkSnippetHtml, wireBacklinkWikilinks } from "./views/backlink-render";
+import { createPageIcon } from "./views/page-icon";
 import { selectSidebarPages } from "./store/sidebar-selection";
 import {
   ContentSearchIndex,
@@ -9736,7 +9737,10 @@ function renderBacklinks() {
 
         const source = document.createElement("div");
         source.className = "backlink-source";
-        source.append(`📄 ${ref.source_page} `);
+        source.append(
+          createPageIcon(Boolean(vault.getPageByTitle(ref.source_page)?.isJournal)),
+          ` ${ref.source_page} `
+        );
         const lineInfo = document.createElement("span");
         lineInfo.style.color = "var(--ls-text-muted)";
         lineInfo.style.fontSize = scaledFontSize(11);
@@ -10762,7 +10766,10 @@ function createKanbanCard(task: KanbanTask): HTMLElement {
 
   const pill = document.createElement("span");
   pill.className = "kanban-source-pill";
-  pill.innerText = `📄 ${task.pageTitle}`;
+  pill.append(
+    createPageIcon(Boolean(vault.getPageByTitle(task.pageTitle)?.isJournal)),
+    ` ${task.pageTitle}`
+  );
   pill.addEventListener("click", () => {
     loadPage(task.pageTitle);
   });
@@ -15708,12 +15715,9 @@ function renderAllPagesView() {
     linkCell.className = "page-link-cell";
     linkCell.dataset.title = p.title;
 
-    // Icono SVG según tipo de nota, en color accent.
-    const iconWrap = document.createElement("span");
-    iconWrap.className = "page-icon";
-    iconWrap.innerHTML = p.isJournal
-      ? '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M16 2v4M8 2v4M3 9h18"></path><path d="M8 13h3M8 17h6"></path></svg>'
-      : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13h8M8 17h8"></path></svg>';
+    // Icono SVG según tipo de nota, en color accent (mismo helper que el
+    // panel de referencias y el tablero Kanban).
+    const iconWrap = createPageIcon(Boolean(p.isJournal));
 
     const title = document.createElement("span");
     const displayTitle = pageDisplayTitle(p);

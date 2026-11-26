@@ -3887,6 +3887,22 @@ body.is-bullet-selecting {
   gap: 6px;
 }
 
+/* El icono hereda el color del contenedor (acento en retroenlaces, acento al
+ * pasar el ratón en el pill de tareas), como en «Todas las páginas». */
+.backlink-source .page-icon,
+.kanban-source-pill .page-icon {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: inherit;
+}
+
+.backlink-source .page-icon svg,
+.kanban-source-pill .page-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
 .backlink-snippet {
   font-size: calc(14px * var(--ls-font-scale, 1));
   color: var(--ls-text-primary);
@@ -4590,6 +4606,9 @@ body.is-bullet-selecting {
 }
 
 .kanban-source-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   max-width: 100%;
   overflow: hidden;
   padding: 2px 7px;
