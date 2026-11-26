@@ -5237,6 +5237,61 @@ body.is-bullet-selecting {
   box-shadow: var(--ls-menu-shadow);
 }
 
+/* La imagen ocupa todo el alto disponible y las herramientas pasan a una
+ * columna lateral; así una imagen alta se recorre dentro del viewport en vez
+ * de comprimirse en un recuadro de 58vh con overflow:hidden. */
+.image-occlusion-dialog:not(.app-dialog) {
+  width: min(1400px, 100%);
+  height: min(96dvh, 1000px);
+  max-height: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(250px, 24vw, 330px);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 12px;
+  padding: 14px 16px;
+  overflow: hidden;
+}
+
+.image-occlusion-header {
+  grid-column: 1 / -1;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ls-border-subtle);
+}
+
+.image-occlusion-viewport {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  border-radius: 12px;
+  background: var(--ls-bg-secondary);
+  touch-action: pan-x pan-y;
+  overscroll-behavior: contain;
+}
+
+.image-occlusion-sidebar {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+@media (max-width: 720px) {
+  .image-occlusion-dialog:not(.app-dialog) {
+    height: min(94dvh, 1000px);
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+
+  .image-occlusion-sidebar {
+    max-height: 32dvh;
+  }
+}
+
 .app-dialog {
   width: min(440px, 100%);
 }
@@ -5545,19 +5600,24 @@ body.is-bullet-selecting {
 
 .image-occlusion-stage {
   position: relative;
-  align-self: center;
-  max-width: 100%;
-  max-height: 58vh;
-  overflow: hidden;
+  flex: 0 0 auto;
+  width: max-content;
+  height: max-content;
+  max-width: none;
+  max-height: none;
+  margin: auto;
+  overflow: visible;
   cursor: crosshair;
+  /* El dibujo con puntero necesita que el WebView no intercepte el gesto;
+     el scroll se hace con rueda/barrilla sobre .image-occlusion-viewport. */
   touch-action: none;
   user-select: none;
 }
 
 .image-occlusion-stage img {
   display: block;
-  max-width: 100%;
-  max-height: 58vh;
+  max-width: none;
+  max-height: none;
   border-radius: 12px;
   pointer-events: none;
 }
@@ -5801,6 +5861,12 @@ body.is-bullet-selecting {
 
 .image-occlusion-footer {
   justify-content: flex-end;
+  flex-wrap: nowrap;
+}
+
+.image-occlusion-footer button {
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .app-dialog input {
@@ -6139,15 +6205,11 @@ body.is-bullet-selecting {
 .image-occlusion-overlay.is-review-occlusion .image-occlusion-dialog {
   width: 100%;
   max-width: none;
-  max-height: min(94dvh, 900px);
+  height: min(94dvh, 1000px);
+  max-height: none;
   padding: 16px 14px calc(16px + env(safe-area-inset-bottom, 0px));
   border-radius: 20px 20px 0 0;
-  gap: 12px;
-}
-
-.image-occlusion-overlay.is-review-occlusion .image-occlusion-stage,
-.image-occlusion-overlay.is-review-occlusion .image-occlusion-stage img {
-  max-height: 42dvh;
+  gap: 10px;
 }
 
 .image-occlusion-overlay.is-review-occlusion .image-occlusion-toolbar {
