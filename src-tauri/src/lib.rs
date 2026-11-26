@@ -1582,6 +1582,9 @@ const REVIEW_PROGRESS_MAX_ENTRIES: usize = 4000;
 const REVIEW_PROGRESS_MAX_AGE_DAYS: i64 = 365;
 /// Límite del archivo de mazos: 1 MB es de sobra para miles de selecciones.
 const FLASHCARD_DECKS_MAX_BYTES: usize = 1024 * 1024;
+/// Serializa el read→merge→write del diario: dos calificaciones rápidas (o un
+/// repaso y un ajuste) no deben sobrescribirse entre sí. SAF no es atómico.
+static REVIEW_PROGRESS_WRITE_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 
 /// Solo se permiten archivos internos fijos y conocidos. No se aceptan rutas
 /// arbitrarias, `..`, URIs ni nombres temporales.
@@ -3668,9 +3671,15 @@ async fn pick_vault_root(
         else {
             return Ok(None);
         };
-        app.android_fs()
+        // Best-effort: hay providers SAF que no conceden permiso persistente.
+        // La bóveda sigue usable en la sesión; si se pierde tras reiniciar, el
+        // usuario podrá volver a elegirla desde el gate de bóveda.
+        if let Err(error) = app
+            .android_fs()
             .grant_persistable_dir_access(&dir_path, PersistableAccessMode::ReadAndWrite)
-            .map_err(|error| format!("No se pudo conservar el permiso de la carpeta: {error}"))?;
+        {
+            eprintln!("No se pudo conservar el permiso SAF de la carpeta: {error}");
+        }
         let serialized = tauri_plugin_android_fs::convert_dir_path_to_string(&dir_path)
             .map_err(|error| format!("La ruta SAF no es válida: {error}"))?;
         Ok(Some(serialized))
@@ -3766,6 +3775,14 @@ async fn load_vault(
     // Switching away from a local vault must stop its watcher and drop the
     // previous cache before the new root is scanned.
     cache_state.deactivate();
+
+    // Revocar el scope del asset protocol de la bóveda anterior también al
+    // cambiar a SAF: si no, una bóveda local ya cerrada seguiría accesible.
+    if let Ok(Some(prev_scope_root)) = active_asset_scope_root(&state) {
+        let _ = app
+            .asset_protocol_scope()
+            .forbid_directory(&prev_scope_root, true);
+    }
 
     // El selector SAF del plugin 2.x devuelve un `DirPath` serializado como
     // JSON, no como una URI `content://` plana.
@@ -3880,13 +3897,6 @@ async fn load_vault(
             Some(path) => PathBuf::from(path),
             None => app.path().app_data_dir().map_err(|err| err.to_string())?,
         };
-
-        // Revocar el directorio anterior del asset protocol scope (si existe)
-        if let Ok(Some(prev_scope_root)) = active_asset_scope_root(&state) {
-            let _ = app
-                .asset_protocol_scope()
-                .forbid_directory(&prev_scope_root, true);
-        }
 
         // Para bóvedas no predeterminadas: la carpeta DEBE existir ya.
         // No creamos directorios antes de pedir aprobación.
@@ -4428,9 +4438,12 @@ fn merge_review_progress_json(existing: Option<&str>, incoming: &str) -> Result<
     };
 
     if let Some(raw) = existing {
-        if let Ok(value) = serde_json::from_str::<serde_json::Value>(raw) {
-            collect(&value)?;
-        }
+        // Antes se ignoraba en silencio: un archivo truncado (típico de SAF)
+        // hacía perder todo el historial sin avisar al usuario.
+        let value = serde_json::from_str::<serde_json::Value>(raw).map_err(|_| {
+            "El diario de repasos está dañado. Bórralo desde Ajustes antes de seguir.".to_string()
+        })?;
+        collect(&value)?;
     }
     collect(&incoming_value)?;
 
@@ -4462,6 +4475,7 @@ fn merge_review_progress_json(existing: Option<&str>, incoming: &str) -> Result<
 async fn clear_review_progress(
     state: tauri::State<'_, ActiveVault>,
 ) -> Result<(), String> {
+    let _write_guard = REVIEW_PROGRESS_WRITE_LOCK.lock().await;
     let storage = active_storage(&state)?;
     validate_progress_relative_path(REVIEW_PROGRESS_PATH)?;
     storage
@@ -4487,6 +4501,7 @@ async fn write_review_progress(
     if contents.len() > REVIEW_PROGRESS_MAX_BYTES {
         return Err("El diario de repasos supera el límite permitido.".to_string());
     }
+    let _write_guard = REVIEW_PROGRESS_WRITE_LOCK.lock().await;
     let storage = active_storage(&state)?;
     let existing = storage.read_progress_file(REVIEW_PROGRESS_PATH).await?;
     let merged = merge_review_progress_json(existing.as_deref(), &contents)?;
@@ -7495,6 +7510,25 @@ mod tests {
         assert!(validate_progress_relative_path("../reviews.json").is_err());
         assert!(validate_progress_relative_path("progress/other.json").is_err());
         assert!(validate_progress_relative_path(".sinnotas/flashcards/other.json").is_err());
+    }
+
+    #[test]
+    fn review_progress_merge_does_not_silently_drop_corrupt_history() {
+        let incoming = serde_json::json!({
+            "version": 1,
+            "entries": [{
+                "id": "new",
+                "at": "2026-01-01T00:00:00.000Z",
+                "updatedAt": "2026-01-01T00:00:00.000Z",
+                "state": "applied"
+            }]
+        })
+        .to_string();
+        // Un archivo truncado por una escritura SAF a mitad no debe hacerse
+        // pasar por "sin historial" y sobrescribirse sin avisar.
+        let error = merge_review_progress_json(Some("{\"version\":1,\"entries\":["), &incoming)
+            .expect_err("un JSON corrupto debe rechazarse");
+        assert!(error.contains("dañado"), "{error}");
     }
 
     #[test]
