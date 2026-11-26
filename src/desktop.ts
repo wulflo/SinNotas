@@ -101,6 +101,10 @@ import {
   createImageBlobUrl,
   imageUrlLoads as probeImageUrl,
 } from "./views/image-source";
+import {
+  createReferenceExpandButton,
+  toggleReferenceExpanded,
+} from "./views/reference-slot-state";
 import { selectSidebarPages } from "./store/sidebar-selection";
 import {
   ContentSearchIndex,
@@ -140,6 +144,7 @@ import {
   applyCardMiniEditor,
   cardMiniEditorRows,
   changeCardMiniEditorIndent,
+  createCardMiniEditorTextarea,
   type CardMiniEditorRow,
 } from "./views/card-mini-editor";
 import { KanbanManager } from "./views/kanban-view";
@@ -14467,14 +14472,10 @@ function renderCardEditorRows(block: BlockNode, includeRoot: boolean): void {
     bullet.setAttribute("aria-hidden", "true");
     bullet.textContent = "•";
 
-    const textarea = document.createElement("textarea");
-    textarea.rows = 2;
-    textarea.value = row.text;
-    textarea.readOnly = row.isImage;
-    textarea.setAttribute("aria-label", `${translate("Bullet")} ${row.depth + 1}`);
-    textarea.addEventListener("input", () => {
-      row.text = textarea.value;
-    });
+    const textarea = createCardMiniEditorTextarea(
+      row,
+      `${translate("Bullet")} ${row.depth + 1}`
+    );
 
     line.append(bullet, textarea);
 
@@ -17096,7 +17097,7 @@ function readReferenceNoteTitles(): string[] {
 
 let referenceNoteTitles: string[] = readReferenceNoteTitles();
 /** Ranuras 1/2 que el usuario ha pedido ver sin truncar. */
-const expandedReferenceSlots = new Set<number>();
+let expandedReferenceSlots = new Set<number>();
 
 function persistReferenceNoteTitles(): void {
   const titles = referenceNoteTitles
@@ -17371,19 +17372,17 @@ function createReferenceSlot(index: number, selectedTitle: string): HTMLElement 
     renderReferenceSlots();
   });
 
-  const expand = document.createElement("button");
-  expand.type = "button";
-  expand.className = "btn-icon reference-slot-expand";
-  const expandLabel = translate(expanded ? "Ver nota truncada" : "Ver nota sin truncar");
-  expand.title = expandLabel;
-  expand.setAttribute("aria-label", expandLabel);
-  expand.setAttribute("aria-pressed", String(expanded));
-  expand.textContent = expanded ? "⤡" : "⤢";
-  expand.addEventListener("click", () => {
-    if (expandedReferenceSlots.has(index)) expandedReferenceSlots.delete(index);
-    else expandedReferenceSlots.add(index);
-    renderReferenceSlots();
-  });
+  const expand = createReferenceExpandButton(
+    expanded,
+    {
+      expand: translate("Ver nota sin truncar"),
+      collapse: translate("Ver nota truncada"),
+    },
+    () => {
+      expandedReferenceSlots = toggleReferenceExpanded(expandedReferenceSlots, index);
+      renderReferenceSlots();
+    }
+  );
 
   header.append(label, expand, remove);
 

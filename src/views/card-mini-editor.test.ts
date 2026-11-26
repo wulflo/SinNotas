@@ -1,9 +1,11 @@
+// @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import type { BlockNode } from "../types";
 import {
   applyCardMiniEditor,
   cardMiniEditorRows,
   changeCardMiniEditorIndent,
+  createCardMiniEditorTextarea,
 } from "./card-mini-editor";
 
 function block(id: string, content: string, children: BlockNode[] = []): BlockNode {
@@ -85,6 +87,26 @@ describe("applyCardMiniEditor", () => {
     );
     expect(updated.content.split("\n")[0]).toBe("Nueva :: Otra #card");
     expect(updated.content).toContain("card-s:: 4");
+  });
+});
+
+describe("createCardMiniEditorTextarea", () => {
+  it("cablea valor, solo lectura y escritura de vuelta en la fila", () => {
+    const row = { id: "b-1", depth: 1, text: "Hijo", isImage: false };
+    const textarea = createCardMiniEditorTextarea(row, "Bullet 2");
+    expect(Number(textarea.rows)).toBe(2);
+    expect(textarea.value).toBe("Hijo");
+    expect(textarea.readOnly).toBe(false);
+    expect(textarea.getAttribute("aria-label")).toBe("Bullet 2");
+
+    textarea.value = "Hijo editado";
+    textarea.dispatchEvent(new Event("input"));
+    expect(row.text).toBe("Hijo editado");
+  });
+
+  it("marca las filas de imagen como solo lectura", () => {
+    const row = { id: "b-img", depth: 1, text: "🖼 Mapa", isImage: true };
+    expect(createCardMiniEditorTextarea(row, "Bullet 2").readOnly).toBe(true);
   });
 });
 

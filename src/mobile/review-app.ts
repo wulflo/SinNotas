@@ -46,6 +46,7 @@ import {
   applyCardMiniEditor,
   cardMiniEditorRows,
   changeCardMiniEditorIndent,
+  createCardMiniEditorTextarea,
   type CardMiniEditorRow,
 } from "../views/card-mini-editor";
 import type { BlockNode, Flashcard, FlashcardType, ImageOcclusionRegion, PageData } from "../types";
@@ -2196,14 +2197,10 @@ class MobileReviewApp {
       line.className = "mobile-card-editor-row";
       line.style.setProperty("--card-edit-depth", String(row.depth));
 
-      const textarea = document.createElement("textarea");
-      textarea.rows = 2;
-      textarea.value = row.text;
-      textarea.readOnly = row.isImage;
-      textarea.setAttribute("aria-label", `${translate("Bullet")} ${row.depth + 1}`);
-      textarea.addEventListener("input", () => {
-        row.text = textarea.value;
-      });
+      const textarea = createCardMiniEditorTextarea(
+        row,
+        `${translate("Bullet")} ${row.depth + 1}`
+      );
 
       const actions = document.createElement("div");
       actions.className = "mobile-card-editor-row-actions";

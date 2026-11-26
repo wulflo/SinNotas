@@ -83,6 +83,22 @@ export function applyCardMiniEditor(
   return clone;
 }
 
+/** Textarea de una fila del minieditor, con el mismo cableado en ambas superficies. */
+export function createCardMiniEditorTextarea(
+  row: CardMiniEditorRow,
+  ariaLabel: string
+): HTMLTextAreaElement {
+  const textarea = document.createElement("textarea");
+  textarea.rows = 2;
+  textarea.value = row.text;
+  textarea.readOnly = row.isImage;
+  textarea.setAttribute("aria-label", ariaLabel);
+  textarea.addEventListener("input", () => {
+    row.text = textarea.value;
+  });
+  return textarea;
+}
+
 /** Cambia la indentación de una fila dentro del subtree de la tarjeta. */
 export function changeCardMiniEditorIndent(
   block: BlockNode,
