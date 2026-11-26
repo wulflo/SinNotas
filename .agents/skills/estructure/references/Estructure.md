@@ -3,7 +3,7 @@
 > **Índice técnico extremadamente detallado de Sin Notas.**
 >
 > Versión del código indexada: **0.5.6** (`package.json`, `src-tauri/tauri.conf.json`, `docs/SinNotas.md`).
-> Fecha del índice: **2026-11-25**.
+> Fecha del índice: **2026-11-26**.
 >
 > Este documento **no modifica ni describe cambios en el código**: es solo un mapa de referencia.
 > Responde a la pregunta _«¿dónde está la pieza que hace que funcione cada cosa?»_.
@@ -302,7 +302,7 @@ Tecla 1/2/3/4 o botón → src/desktop.ts:13508 applyFSRSRating()
 | `url-safety.ts` | 170 | Validación anti-SSRF de URLs de imágenes. |
 | `*.test.ts` (11 archivos) | 1.821 | Ver detalle en §4 y §15. |
 
-#### `src/store/` — 10 archivos
+#### `src/store/` — 11 archivos
 
 | Archivo | Líneas | Rol |
 | :--- | ---: | :--- |
@@ -315,16 +315,19 @@ Tecla 1/2/3/4 o botón → src/desktop.ts:13508 applyFSRSRating()
 | `sidebar-selection.ts` | 40 | Selección de nota en la barra lateral. |
 | `wikilinks.ts` | 53 | Resolución de `[[enlaces]]`. |
 | `vault-replace.test.ts` | 80 | Test de reemplazo de bóveda. |
+| `saf-root.test.ts` | 21 | `isSafVaultRoot`: detecta la raíz SAF serializada. |
 | `*.test.ts` (6 más) | 1.186 | Ver §5 y §15. |
 
-#### `src/views/` — 36 archivos
+#### `src/views/` — 43 archivos
 
 | Archivo | Líneas | Rol |
 | :--- | ---: | :--- |
 | `all-pages.ts` | 182 | Tabla "Todas las páginas" con orden y paginación. |
+| `backlink-render.ts` | 24 | Render de snippets con LaTeX/wikilinks sin corchetes y navegación. |
 | `bibliography-lookup.ts` | 315 | Búsqueda remota de metadatos (DOI/ISBN/palabras). |
 | `bibliography.ts` | 395 | Modelo y propiedades `bib-*`. |
 | `bibliography-view.ts` | 1.168 | UI de bibliografía. |
+| `card-mini-editor.ts` | 111 | Subtree de la tarjeta en filas editables (básica/cloze) y su indentación. |
 | `concept-map-view.ts` | 716 | Mapa conceptual de bullets en canvas. |
 | `custom-select.ts` | 252 | `<select>` personalizado acorde al tema. |
 | `flashcard-decks.ts` | 281 | UI del selector de mazos. |
@@ -336,11 +339,16 @@ Tecla 1/2/3/4 o botón → src/desktop.ts:13508 applyFSRSRating()
 | `graph-physics.ts` | 539 | Motor de física force-directed. |
 | `graph-settings.ts` | 326 | Parámetros del grafo y persistencia. |
 | `graph-view.ts` | 1.117 | Render/interacción del grafo en canvas. |
+| `image-source.ts` | 41 | MIME, Blob y prueba de carga de imágenes compartidas. |
+| `kanban-cleanup.ts` | 52 | Selección y agrupación de tareas DONE a borrar por antigüedad. |
 | `kanban-view.ts` | 302 | Tarjetas y su render en el tablero. |
+| `page-icon.ts` | 20 | Icono SVG de nota/diario en color de acento. |
 | `pdf-view.ts` | 965 | Lector PDF: lista, render, texto, capturas. |
+| `reference-slot-state.ts` | 33 | Estado y botón de «ver referencia sin truncar». |
 | `review-heatmap.ts` | 98 | Mapa de calor de repasos. |
-| `virtual-list.ts` | 353 | Lista virtual reutilizable. |
-| `*.test.ts` (17 archivos) | 3.000+ | Ver §6 y §15. |
+| `review-target.ts` | 108 | Resolución compartida de nota/bloque de una tarjeta y del diario. |
+| `virtual-list.ts` | 362 | Lista virtual reutilizable (offsets correctos tras medir filas). |
+| `*.test.ts` (24 archivos) | 3.000+ | Ver §6 y §15. |
 
 #### `src/services/` y `src/mobile/`
 
@@ -618,6 +626,8 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 **Constantes:** `MAX_LOADED_PAGES = 120` (L258, LRU), `SAVE_DEBOUNCE_MS = 300` (L261), y las claves de la §3.2.
 
 **`initialVaultPages` (L28–248):** vault semilla de 4 notas (`p-welcome`, `p-journals`, `p-rust`, `p-flashcards`) con ejemplos de wikilinks, `#card`, `{{cloze }}`, `==resaltado==`, propiedades `::` y estados TODO/DONE/NOW/LATER.
+
+**`isSafVaultRoot(rootPath)`:** detecta la raíz SAF serializada (`{"topTreeUri":"content://…"}`) para que las imágenes se lean por IPC (`read_image_data`) en vez de `join(root, rel)`. Test: `store/saf-root.test.ts`.
 
 **`isMetadataOnlyBoot()` (L272):** lee `sinnotas-metadata-boot`; `"off"` → false, cualquier otro valor o error → **true por defecto**. Es el interruptor del arranque rápido (FASE 4).
 
