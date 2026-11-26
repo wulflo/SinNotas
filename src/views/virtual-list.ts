@@ -214,7 +214,15 @@ export class VirtualList<T> {
       const measured = entry.borderBoxSize?.[0]?.blockSize ?? row.getBoundingClientRect().height;
       if (this.updateHeight(index, key, measured)) changed = true;
     }
-    if (changed) this.scheduleRender();
+    if (changed) {
+      // La altura cacheada cambió: reconstruir los offsets ya, no solo en el
+      // siguiente renderWindow (que no detectaría el cambio y dejaría huecos
+      // desiguales entre filas ya medidas).
+      this.offsets = buildOffsets(this.heights);
+      this.spacer.style.height = `${this.offsets[this.offsets.length - 1]}px`;
+      this.positionRows();
+      this.scheduleRender();
+    }
   };
 
   private scheduleRender(): void {
