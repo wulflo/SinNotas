@@ -83,18 +83,33 @@ export function applyCardMiniEditor(
   return clone;
 }
 
+const MINI_EDITOR_TEXTAREA_MIN_HEIGHT = 44;
+
+/**
+ * Ajusta la altura de un textarea al contenido para que los bullets hijos con
+ * texto largo no se truncen dentro de su propia caja. Debe llamarse después de
+ * insertar el textarea en el DOM (donde `scrollHeight` ya es fiable).
+ */
+export function resizeCardMiniEditorTextarea(textarea: HTMLTextAreaElement): void {
+  textarea.style.height = "auto";
+  textarea.style.height = `${Math.max(textarea.scrollHeight, MINI_EDITOR_TEXTAREA_MIN_HEIGHT)}px`;
+}
+
 /** Textarea de una fila del minieditor, con el mismo cableado en ambas superficies. */
 export function createCardMiniEditorTextarea(
   row: CardMiniEditorRow,
   ariaLabel: string
 ): HTMLTextAreaElement {
   const textarea = document.createElement("textarea");
-  textarea.rows = 2;
+  // La altura la marca `resizeCardMiniEditorTextarea`; `rows=2` recortaba el
+  // texto de los bullets hijos y dejaba huecos desiguales entre cajas.
+  textarea.rows = 1;
   textarea.value = row.text;
   textarea.readOnly = row.isImage;
   textarea.setAttribute("aria-label", ariaLabel);
   textarea.addEventListener("input", () => {
     row.text = textarea.value;
+    resizeCardMiniEditorTextarea(textarea);
   });
   return textarea;
 }

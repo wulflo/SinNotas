@@ -145,6 +145,7 @@ import {
   cardMiniEditorRows,
   changeCardMiniEditorIndent,
   createCardMiniEditorTextarea,
+  resizeCardMiniEditorTextarea,
   type CardMiniEditorRow,
 } from "./views/card-mini-editor";
 import { KanbanManager } from "./views/kanban-view";
@@ -14508,6 +14509,7 @@ function renderCardEditorRows(block: BlockNode, includeRoot: boolean): void {
     }
 
     cardEditorRows.appendChild(line);
+    resizeCardMiniEditorTextarea(textarea);
   });
 }
 
@@ -14526,8 +14528,12 @@ function openCardEditor(): void {
   }
   const isBasic = card.cardType === "basic";
   const fields = FlashcardsManager.readEditableFields(target.block.content, card.cardType);
+  // En una tarjeta básica con bullets hijos la respuesta ya son los hijos
+  // (scanPages usa formatChildAnswerList); mostrar «Respuesta» es un cuadro
+  // vacío que además invita a sobreescribirla. Solo se muestra si hay `::`.
+  const answerFromChildren = isBasic && target.block.children.length > 0 && !fields.answer;
   if (cardEditorQuestionField) cardEditorQuestionField.hidden = !isBasic;
-  if (cardEditorAnswerField) cardEditorAnswerField.hidden = !isBasic;
+  if (cardEditorAnswerField) cardEditorAnswerField.hidden = !isBasic || answerFromChildren;
   // En cloze la raíz se edita dentro del minieditor, junto a sus bullets hijos.
   if (cardEditorTextField) cardEditorTextField.hidden = true;
   if (cardEditorQuestion) cardEditorQuestion.value = fields.question;
@@ -14545,7 +14551,8 @@ function openCardEditor(): void {
   renderCardEditorRows(target.block, !isBasic);
   mountOverlay(cardEditorOverlay);
   window.setTimeout(() => {
-    if (isBasic) cardEditorAnswer?.focus();
+    if (isBasic && !cardEditorAnswerField?.hidden) cardEditorAnswer?.focus();
+    else if (isBasic) cardEditorQuestion?.focus();
     else cardEditorRows?.querySelector<HTMLTextAreaElement>("textarea:not([readonly])")?.focus();
   }, 30);
 }

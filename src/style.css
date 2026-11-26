@@ -6142,9 +6142,9 @@ body.is-bullet-selecting {
 .card-editor-children {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   border-top: 1px solid var(--ls-border-subtle);
-  padding-top: 12px;
+  padding-top: 6px;
 }
 
 .card-editor-section-title {
@@ -6158,14 +6158,14 @@ body.is-bullet-selecting {
 .card-editor-rows {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .card-editor-row {
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  padding-left: calc(var(--card-edit-depth, 0) * 18px);
+  padding-left: calc(var(--card-edit-depth, 0) * 14px);
 }
 
 .card-editor-row-bullet {
@@ -6178,6 +6178,9 @@ body.is-bullet-selecting {
   flex: 1 1 auto;
   min-width: 0;
   min-height: 44px;
+  /* La altura exacta la calcula resizeCardMiniEditorTextarea() tras insertar;
+     `resize:vertical` se conserva solo como salida manual. */
+  height: auto;
 }
 
 .card-editor-row-actions {

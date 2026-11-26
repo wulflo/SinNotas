@@ -6,6 +6,7 @@ import {
   cardMiniEditorRows,
   changeCardMiniEditorIndent,
   createCardMiniEditorTextarea,
+  resizeCardMiniEditorTextarea,
 } from "./card-mini-editor";
 
 function block(id: string, content: string, children: BlockNode[] = []): BlockNode {
@@ -88,13 +89,28 @@ describe("applyCardMiniEditor", () => {
     expect(updated.content.split("\n")[0]).toBe("Nueva :: Otra #card");
     expect(updated.content).toContain("card-s:: 4");
   });
+
+  it("no escribe un `::` vacío cuando la respuesta son los bullets hijos", () => {
+    const basic = block("b-basic", "¿Qué es FSRS? #card", [
+      block("b-hijo", "Un algoritmo de repaso"),
+    ]);
+    const updated = applyCardMiniEditor(
+      basic,
+      "basic",
+      { question: "¿Qué es FSRS?", answer: "", text: "" },
+      cardMiniEditorRows(basic, false)
+    );
+    expect(updated.content.split("\n")[0]).not.toContain("::");
+    expect(updated.content).toContain("#card");
+    expect(updated.children[0].content).toContain("Un algoritmo de repaso");
+  });
 });
 
 describe("createCardMiniEditorTextarea", () => {
   it("cablea valor, solo lectura y escritura de vuelta en la fila", () => {
     const row = { id: "b-1", depth: 1, text: "Hijo", isImage: false };
     const textarea = createCardMiniEditorTextarea(row, "Bullet 2");
-    expect(Number(textarea.rows)).toBe(2);
+    expect(Number(textarea.rows)).toBe(1);
     expect(textarea.value).toBe("Hijo");
     expect(textarea.readOnly).toBe(false);
     expect(textarea.getAttribute("aria-label")).toBe("Bullet 2");
@@ -107,6 +123,21 @@ describe("createCardMiniEditorTextarea", () => {
   it("marca las filas de imagen como solo lectura", () => {
     const row = { id: "b-img", depth: 1, text: "🖼 Mapa", isImage: true };
     expect(createCardMiniEditorTextarea(row, "Bullet 2").readOnly).toBe(true);
+  });
+
+  it("crece con el contenido y vuelve al mínimo al borrar el texto", () => {
+    const row = { id: "b-1", depth: 1, text: "Hijo", isImage: false };
+    const textarea = createCardMiniEditorTextarea(row, "Bullet 2");
+    document.body.appendChild(textarea);
+    Object.defineProperty(textarea, "scrollHeight", { value: 180, configurable: true });
+    resizeCardMiniEditorTextarea(textarea);
+    expect(textarea.style.height).toBe("180px");
+
+    textarea.value = "Corto";
+    Object.defineProperty(textarea, "scrollHeight", { value: 20, configurable: true });
+    textarea.dispatchEvent(new Event("input"));
+    expect(textarea.style.height).toBe("44px");
+    textarea.remove();
   });
 });
 

@@ -47,6 +47,7 @@ import {
   cardMiniEditorRows,
   changeCardMiniEditorIndent,
   createCardMiniEditorTextarea,
+  resizeCardMiniEditorTextarea,
   type CardMiniEditorRow,
 } from "../views/card-mini-editor";
 import type { BlockNode, Flashcard, FlashcardType, ImageOcclusionRegion, PageData } from "../types";
@@ -2230,6 +2231,7 @@ class MobileReviewApp {
 
       line.append(textarea, actions);
       this.refs.cardEditorRows.appendChild(line);
+      resizeCardMiniEditorTextarea(textarea);
     });
   }
 
@@ -2247,8 +2249,11 @@ class MobileReviewApp {
 
     const fields = FlashcardsManager.readEditableFields(block.content, card.cardType);
     const isBasic = card.cardType === "basic";
+    // Igual que en escritorio: si hay bullets hijos, ellos son la respuesta;
+    // el cuadro «Respuesta» quedaría vacío y es engañoso.
+    const answerFromChildren = isBasic && block.children.length > 0 && !fields.answer;
     this.refs.questionField.hidden = !isBasic;
-    this.refs.answerField.hidden = !isBasic;
+    this.refs.answerField.hidden = !isBasic || answerFromChildren;
     // En cloze el bullet de la card se edita en el minieditor, junto a sus hijos.
     this.refs.textField.hidden = true;
     this.refs.questionInput.value = fields.question;
