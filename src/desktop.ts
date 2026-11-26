@@ -97,6 +97,7 @@ import { collectOutgoingLinks } from "./store/wikilinks";
 import { connectedPageTitles, referenceGraphPages } from "./views/graph-neighborhood";
 import { renderBacklinkSnippetHtml, wireBacklinkWikilinks } from "./views/backlink-render";
 import { createPageIcon } from "./views/page-icon";
+import { paginateNotes } from "./mobile/notes-pagination";
 import {
   createImageBlobUrl,
   imageUrlLoads as probeImageUrl,
@@ -334,9 +335,30 @@ const vault = new VaultStore();
 const documentHistory = new DocumentHistory();
 let currentPage: PageData = vault.getPageByTitle("Welcome to SinNotas") || vault.getPages()[0];
 let currentView: ViewType = "editor";
-/** Página actual del listado de diarios existentes. */
-let journalsPage = 1;
-const JOURNALS_PAGE_SIZE = 10;
+/** Página actual del listado de diarios existentes (persistida entre sesiones). */
+const JOURNALS_PAGE_STORAGE_KEY = "sinnotas-journals-page";
+const JOURNALS_PAGE_SIZE = 20;
+
+function readJournalsPage(): number {
+  try {
+    const stored = Number(localStorage.getItem(JOURNALS_PAGE_STORAGE_KEY));
+    return Number.isFinite(stored) && stored > 0 ? Math.trunc(stored) : 1;
+  } catch {
+    return 1;
+  }
+}
+
+function saveJournalsPage(page: number): void {
+  try {
+    localStorage.setItem(JOURNALS_PAGE_STORAGE_KEY, String(page));
+  } catch {
+    // La paginación sigue funcionando en memoria si no se puede persistir.
+  }
+}
+
+let journalsPage = readJournalsPage();
+/** Generación de precarga: evita encolar tareas de páginas ya abandonadas. */
+let journalsPrewarmGeneration = 0;
 /** Temporizador de debounce para renombrar la nota al editar su título. */
 let pageTitleRenameTimer: number | null = null;
 /** Nota para la que se agendó el renombrado pendiente. */
@@ -16007,6 +16029,9 @@ function renderJournalCalendar(container: HTMLElement, journalPages: PageData[])
     }
     day.addEventListener("click", () => {
       const page = vault.createJournal(dateKey);
+      // El diario nuevo es el más reciente: debe aparecer en la primera página.
+      journalsPage = 1;
+      saveJournalsPage(1);
       loadPage(page.title);
     });
     grid.appendChild(day);
@@ -16014,6 +16039,32 @@ function renderJournalCalendar(container: HTMLElement, journalPages: PageData[])
 
   calendar.append(header, grid);
   container.appendChild(calendar);
+}
+
+/**
+ * Precarga en tiempo muerto los diarios de la página siguiente: con el arranque
+ * metadata-only, `ensurePageLoaded` hidrata sus bloques antes de que el usuario
+ * pulse «Siguiente», para que la paginación no espere a disco.
+ */
+function scheduleJournalsNextPagePrewarm(
+  pages: PageData[],
+  currentPage: number,
+  totalPages: number
+): void {
+  const nextPage = currentPage + 1;
+  if (totalPages <= 1 || nextPage > totalPages) return;
+  const generation = ++journalsPrewarmGeneration;
+  const run = () => {
+    if (generation !== journalsPrewarmGeneration) return;
+    for (const page of paginateNotes(pages, nextPage, JOURNALS_PAGE_SIZE).items) {
+      if (page.blocksLoaded === false) void vault.ensurePageLoaded(page);
+    }
+  };
+  const idle = (window as any).requestIdleCallback as
+    | ((callback: () => void, options?: { timeout: number }) => number)
+    | undefined;
+  if (typeof idle === "function") idle(run, { timeout: 1500 });
+  else window.setTimeout(run, 400);
 }
 
 function renderJournalsView() {
@@ -16056,13 +16107,15 @@ function renderJournalsView() {
   listHeader.append(listTitle, listCount);
   entriesContainer.appendChild(listHeader);
 
-  const totalPages = Math.max(1, Math.ceil(journalPages.length / JOURNALS_PAGE_SIZE));
-  journalsPage = Math.min(Math.max(1, journalsPage), totalPages);
-  const start = (journalsPage - 1) * JOURNALS_PAGE_SIZE;
+  const paged = paginateNotes(journalPages, journalsPage, JOURNALS_PAGE_SIZE);
+  const totalPages = paged.totalPages;
+  journalsPage = paged.currentPage;
+  saveJournalsPage(journalsPage);
 
   const list = document.createElement("ul");
   list.className = "journals-list";
-  journalPages.slice(start, start + JOURNALS_PAGE_SIZE).forEach((journal) => {
+  list.id = "journals-list";
+  paged.items.forEach((journal) => {
     const item = document.createElement("li");
     const button = document.createElement("button");
     button.type = "button";
@@ -16112,10 +16165,15 @@ function renderJournalsView() {
       journalsPage = Math.min(totalPages, journalsPage + 1);
       renderJournalsView();
     });
+    pagination.id = "journals-pagination";
+    previous.id = "journals-prev";
+    info.id = "journals-page-info";
+    next.id = "journals-next";
     pagination.append(previous, info, next);
     entriesContainer.appendChild(pagination);
   }
 
+  scheduleJournalsNextPagePrewarm(journalPages, journalsPage, totalPages);
   if (scrollRoot) scrollRoot.scrollTop = previousScrollTop;
 }
 
