@@ -6490,6 +6490,18 @@ body.is-bullet-selecting {
   max-width: min(100%, 420px);
 }
 
+/* En el repaso la tarjeta ocupa todo el ancho disponible: el tope genérico de
+   620px dejaba la oclusión en una columna estrecha con grandes huecos a los
+   lados. Aquí la imagen crece con la tarjeta y solo se limita por la altura
+   útil (cabecera, zoom y botones de valoración siguen visibles). */
+#card-question .flashcard-image-preview {
+  max-width: 100%;
+}
+
+#card-question .flashcard-image-preview > img {
+  max-height: max(260px, calc(90vh - 230px));
+}
+
 /* Contenedor de repaso de oclusiones: la estructura es viewport (fijo, sin
    scroll) > scroller (área de imagen desplazable) > preview. Así el zoom grande
    se desplaza dentro del área de imagen con barras visibles en ambos ejes, sin
