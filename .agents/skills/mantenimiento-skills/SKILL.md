@@ -55,7 +55,7 @@ Clasificación: `error` (la skill lleva a un resultado erróneo, fallo o brecha 
 
 ## 5. Skills actuales en este repo
 
-`busqueda-incremental`, `estilo-ui`, `traducciones-ui`, `guia-de-uso`, `vault-performance-guard`, `tauri-desktop`, `calidad-pruebas`, `verificacion-manual` y esta misma.
+`busqueda-incremental`, `estilo-ui`, `diseno-visual` (crítica visual con evidencia), `traducciones-ui`, `guia-de-uso`, `vault-performance-guard`, `tauri-desktop`, `calidad-pruebas`, `verificacion-manual` y esta misma.
 
 ## Referencias
 

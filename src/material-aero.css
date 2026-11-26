@@ -395,7 +395,7 @@ body {
 /* ==================== NAVEGACIÓN MATERIAL 3 ==================== */
 
 .sidebar-nav {
-  gap: 4px;
+  gap: calc(var(--ls-sidebar-nav-gap, 10px) - 4px);
   padding: 8px 10px;
 }
 

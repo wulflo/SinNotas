@@ -54,6 +54,12 @@
   --ls-cloze-revealed-color: #98c379;
   
   --ls-sidebar-width: 260px;
+  /* Respiración de la barra lateral: buscador separado de la cabecera y de la
+     navegación, y hueco moderado entre iconos del mosaico. */
+  --ls-sidebar-search-gap-top: 10px;
+  --ls-sidebar-search-pad-top: 18px;
+  --ls-sidebar-search-pad-bottom: 14px;
+  --ls-sidebar-nav-gap: 10px;
   --ls-headbar-height: 48px;
   --ls-font-size-ui: 15px;
   --ls-font-size-editor: 15px;
@@ -819,8 +825,8 @@ body.sidebar-resizing * {
 .sidebar-search-container {
   /* Separación del nombre de la app y de las subsecciones: antes el buscador
    * quedaba pegado a la cabecera y la lista se veía compactada. */
-  margin-top: 6px;
-  padding: 14px 14px 10px;
+  margin-top: var(--ls-sidebar-search-gap-top);
+  padding: var(--ls-sidebar-search-pad-top) 14px var(--ls-sidebar-search-pad-bottom);
   position: relative;
 }
 
@@ -974,7 +980,7 @@ body.sidebar-resizing * {
   padding: 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: calc(var(--ls-sidebar-nav-gap) - 6px);
 }
 
 .nav-item {
@@ -10188,7 +10194,7 @@ body.editor-split-active #view-editor .canvas-wrapper {
 .sidebar-nav {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
+  gap: var(--ls-sidebar-nav-gap);
   padding: 8px 10px;
 }
 
@@ -10292,7 +10298,7 @@ body.editor-split-active #view-editor .canvas-wrapper {
 
   .sidebar-nav {
     grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
+    gap: calc(var(--ls-sidebar-nav-gap) - 4px);
     padding-inline: 8px;
   }
 
@@ -10350,7 +10356,7 @@ body.editor-split-active #view-editor .canvas-wrapper {
 @container (min-width: 430px) {
   .sidebar-nav {
     grid-template-columns: repeat(6, minmax(0, 1fr));
-    gap: 5px;
+    gap: calc(var(--ls-sidebar-nav-gap) - 5px);
     padding-inline: 8px;
   }
 
