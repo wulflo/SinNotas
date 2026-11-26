@@ -60,6 +60,10 @@
   --ls-sidebar-search-pad-top: 18px;
   --ls-sidebar-search-pad-bottom: 14px;
   --ls-sidebar-nav-gap: 10px;
+  /* Rediseño: radios y altura de los controles de la barra lateral. */
+  --ls-sidebar-radius: 10px;
+  --ls-sidebar-tile-height: 52px;
+  --ls-headbar-radius: 8px;
   --ls-headbar-height: 48px;
   --ls-font-size-ui: 15px;
   --ls-font-size-editor: 15px;
@@ -669,7 +673,7 @@ body.sidebar-resizing * {
   width: clamp(24px, calc(18px + 9px * var(--ls-font-scale, 1)), 40px);
   height: clamp(24px, calc(18px + 9px * var(--ls-font-scale, 1)), 40px);
   background: linear-gradient(135deg, color-mix(in srgb, var(--ls-accent) 92%, #ffffff 8%), var(--ls-accent));
-  border-radius: 7px;
+  border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -837,17 +841,20 @@ body.sidebar-resizing * {
 
 .sidebar-search-input {
   width: 100%;
-  background-color: var(--ls-bg-secondary);
-  border: 1px solid color-mix(in srgb, var(--ls-accent) 32%, var(--ls-border-color));
-  border-radius: 6px;
+  min-height: 44px;
+  box-sizing: border-box;
+  background-color: var(--md-surface-container-high);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--ls-sidebar-radius);
   padding:
-    7px
+    10px
     12px
-    7px
-    clamp(30px, calc(24px + 7px * var(--ls-font-scale, 1)), 46px);
+    10px
+    clamp(34px, calc(28px + 7px * var(--ls-font-scale, 1)), 50px);
   font-size: var(--ls-font-size-ui);
-  color: var(--ls-text-title);
+  color: var(--md-on-surface);
   outline: none;
+  box-shadow: 0 6px 18px -16px color-mix(in srgb, var(--ls-accent) 70%, transparent);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
@@ -868,17 +875,17 @@ body.sidebar-resizing * {
 
 .sidebar-search-icon {
   position: absolute;
-  left: 8px;
+  left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--ls-text-muted);
+  color: var(--ls-accent);
   font-size: calc(11px * var(--ls-font-scale, 1));
 }
 
 /* Omnibar Floating Dropdown Results */
 .search-results-dropdown {
   position: absolute;
-  top: 40px;
+  top: calc(100% + 6px);
   left: 0;
   width: 100%;
   max-height: 260px;
@@ -1023,18 +1030,21 @@ body.sidebar-resizing * {
 }
 
 .sidebar-section-title {
-  padding: 14px 16px 8px;
-  font-size: var(--ls-font-size-ui);
-  font-weight: 600;
-  text-transform: none;
-  letter-spacing: normal;
+  padding: 18px 16px 8px;
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
   color: var(--ls-text-muted);
 }
 
 .pages-list {
   flex: 1;
   overflow-y: auto;
-  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px 10px;
 }
 
 .sidebar-footer {
@@ -1091,11 +1101,12 @@ body.sidebar-resizing * {
   align-items: center;
   gap: 8px;
   width: 100%;
-  padding: 9px 10px;
-  border: 1px solid var(--ls-border-subtle);
-  border-radius: 7px;
-  background: var(--ls-bg-primary);
-  color: var(--ls-text-title);
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--ls-sidebar-radius);
+  background: var(--md-surface-container-low);
+  color: var(--md-on-surface);
   text-align: left;
   font: inherit;
   font-size: var(--ls-font-size-ui);
@@ -1146,8 +1157,9 @@ body.sidebar-resizing * {
 
 .vault-tree-page {
   min-width: 0;
-  padding-top: 6px;
-  padding-bottom: 6px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  border-radius: 10px;
 }
 
 .vault-tree-page-icon {
@@ -1407,9 +1419,10 @@ body.sidebar-resizing * {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  background: transparent;
-  border-radius: 8px;
+  padding: 3px 6px;
+  background: color-mix(in srgb, var(--md-surface-container) 70%, transparent);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 10px;
   font-size: calc(13px * var(--ls-font-scale, 1));
   font-weight: 600;
   color: var(--ls-text-primary);
@@ -1431,7 +1444,7 @@ body.sidebar-resizing * {
   justify-content: center;
   padding: 4px 10px;
   border: 1px solid transparent;
-  border-radius: var(--ma-radius-md, 8px);
+  border-radius: 8px;
   background: none;
   color: var(--ls-text-muted);
   font: inherit;
@@ -1481,7 +1494,7 @@ body.sidebar-resizing * {
 .headbar-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   /* Sin `min-width: 0` un flex item no puede encogerse por debajo del ancho
      intrínseco de su contenido: un título largo empujaría `.headbar-actions`
      fuera de la barra. */
@@ -1499,13 +1512,22 @@ body.sidebar-resizing * {
 .nav-history {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--ls-headbar-radius);
+  background: color-mix(in srgb, var(--md-surface-container) 70%, transparent);
 }
 
 .headbar-page-breadcrumb {
   font-size: calc(13.5px * var(--ls-font-scale, 1));
-  font-weight: 600;
+  font-weight: 650;
+  letter-spacing: -0.01em;
   color: var(--ls-text-title);
+  padding: 6px 12px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--md-surface-container) 65%, transparent);
   /* `text-overflow` no recorta el texto de un contenedor flex; con `block`
      el título largo termina en puntos suspensivos y nunca empuja la barra. */
   display: block;
@@ -1522,6 +1544,16 @@ body.sidebar-resizing * {
 
 .headbar [data-tauri-no-drag] {
   -webkit-app-region: no-drag;
+}
+
+/* En vistas sin título (Diarios, Tareas…) el breadcrumb queda vacío: no debe
+ * dibujarse una barra transversal gris. */
+.headbar-page-breadcrumb:empty {
+  display: none;
+}
+
+.headbar .btn-icon {
+  border-radius: var(--ls-headbar-radius);
 }
 
 /* `display:flex` de .btn-icon gana al [hidden] del UA: sin esto, los botones
@@ -1607,7 +1639,7 @@ body.sidebar-resizing * {
 .headbar-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   position: relative;
   flex: 0 0 auto;
 }
@@ -1615,8 +1647,12 @@ body.sidebar-resizing * {
 .window-controls {
   display: flex;
   align-items: center;
-  gap: 0;
+  gap: 2px;
   margin-left: 6px;
+  padding: 2px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--ls-headbar-radius);
+  background: color-mix(in srgb, var(--md-surface-container) 70%, transparent);
 }
 
 .btn-window-control {
@@ -1630,7 +1666,7 @@ body.sidebar-resizing * {
   background: transparent;
   color: var(--ls-text-secondary);
   cursor: default;
-  border-radius: 4px;
+  border-radius: 8px;
   transition: background-color 0.12s ease, color 0.12s ease;
 }
 
@@ -1853,26 +1889,34 @@ select {
   background-color: var(--ls-accent);
 }
 
+/* Los paneles largos (Ajustes y Ayuda de atajos) necesitan un canal propio:
+   sin él la barra queda pegada al último control y parece parte del contenido. */
+.settings-overlay .settings-tab-panel,
+.shortcuts-modal-body {
+  padding-right: 20px;
+  scrollbar-gutter: stable;
+}
+
 /* Barras de desplazamiento compactas dentro de Configuración */
 .settings-dropdown-menu::-webkit-scrollbar,
 .settings-tab-panel::-webkit-scrollbar,
 .settings-tabs::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 .settings-dropdown-menu::-webkit-scrollbar-track,
 .settings-tab-panel::-webkit-scrollbar-track,
 .settings-tabs::-webkit-scrollbar-track {
   background: transparent;
-  margin: 6px 0;
+  margin: 8px 2px;
 }
 
 .settings-dropdown-menu::-webkit-scrollbar-thumb,
 .settings-tab-panel::-webkit-scrollbar-thumb,
 .settings-tabs::-webkit-scrollbar-thumb {
   background-color: var(--ls-accent);
-  border-left: 2px solid transparent;
+  border: 2px solid transparent;
   border-radius: 999px;
   background-clip: padding-box;
 }
@@ -6287,22 +6331,22 @@ body.is-bullet-selecting {
   overflow-y: auto;
   /* En WebKitGTK la barra es una capa superpuesta: este padding evita que
    * los atajos queden debajo de ella y deja aire a su izquierda. */
-  padding-right: 10px;
+  padding-right: 20px;
   scrollbar-gutter: stable;
 }
 
 .shortcuts-modal-body::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 
 .shortcuts-modal-body::-webkit-scrollbar-track {
   background: transparent;
-  margin: 6px 0;
+  margin: 8px 2px;
 }
 
 .shortcuts-modal-body::-webkit-scrollbar-thumb {
   background-color: var(--ls-accent);
-  border-left: 2px solid transparent;
+  border: 2px solid transparent;
   border-radius: 999px;
   background-clip: padding-box;
 }
@@ -8988,12 +9032,15 @@ body.mobile-full-editor .flashcard-review-tools {
   font-weight: 500;
 }
 
-.sidebar-left .nav-item,
 .sidebar-left .vault-tree-folder > summary,
-.sidebar-left .vault-tree-page,
+.sidebar-left .vault-tree-page {
+  border-radius: 10px;
+}
+
+.sidebar-left .nav-item,
 .sidebar-left .vault-switch-button,
 .sidebar-left .sidebar-search-input {
-  border-radius: 8px;
+  border-radius: var(--ls-sidebar-radius);
 }
 
 .settings-tab {
@@ -10225,12 +10272,14 @@ body.editor-split-active #view-editor .canvas-wrapper {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 58px;
+  min-height: var(--ls-sidebar-tile-height);
+  box-sizing: border-box;
   padding: 10px 6px;
-  border: 1px solid color-mix(in srgb, var(--ls-accent) 12%, var(--ls-border-subtle));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--ls-bg-tertiary) 58%, transparent);
+  border: 1px solid var(--md-outline-variant);
+  border-radius: var(--ls-sidebar-radius);
+  background: color-mix(in srgb, var(--md-surface-container-low) 70%, transparent);
   color: var(--ls-text-primary);
+  box-shadow: 0 8px 20px -18px color-mix(in srgb, var(--ls-accent) 80%, transparent);
   transition:
     background-color 0.2s ease,
     border-color 0.2s ease,
@@ -10240,8 +10289,8 @@ body.editor-split-active #view-editor .canvas-wrapper {
 }
 
 .sidebar-nav .nav-item > svg {
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
 }
 
 .sidebar-nav .nav-item:hover,

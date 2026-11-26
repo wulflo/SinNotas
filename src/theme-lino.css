@@ -293,3 +293,23 @@
 :root[data-visual="lino"][data-theme="light"] {
   --ls-accent-subtle: color-mix(in srgb, var(--ls-accent) 14%, transparent);
 }
+
+/* Simple: los grupos de la barra superior y del mosaico vuelven a ser planos,
+   sin superficies grises apiladas ni sombras de acento. */
+:root[data-visual="lino"] .nav-history,
+:root[data-visual="lino"] .pomodoro-mini,
+:root[data-visual="lino"] .window-controls,
+:root[data-visual="lino"] .headbar-page-breadcrumb,
+:root[data-visual="lino"] .sidebar-nav .nav-item,
+:root[data-visual="lino"] .sidebar-search-input,
+:root[data-visual="lino"] .vault-switch-button {
+  background: transparent;
+  border-color: var(--md-outline-variant);
+  box-shadow: none;
+}
+
+:root[data-visual="lino"] .sidebar-left,
+:root[data-visual="lino"] .sidebar-header {
+  background: var(--md-surface);
+  box-shadow: none;
+}
