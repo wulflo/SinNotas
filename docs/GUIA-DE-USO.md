@@ -286,6 +286,12 @@ Puedes deshacer y rehacer el último repaso con los botones de la cabecera o con
 los atajos configurados. El contador y el anillo de progreso muestran cuántas
 tarjetas quedan en la sesión.
 
+Durante la sesión puedes pulsar **Editar tarjeta** (o **Editar oclusión** en una
+tarjeta de imagen). En una básica se editan pregunta y respuesta; en una cloze se
+abre un minieditor con el bullet de la tarjeta y sus bullets hijos, respetando la
+indentación; en una oclusión se abre el editor de imagen. Al guardar se
+conservan las propiedades FSRS y la tarjeta sigue en su posición de la cola.
+
 ### Atajos de repaso
 
 Los atajos de teclado se configuran en **Ajustes › Flashcards › Repaso**. Por

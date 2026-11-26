@@ -283,6 +283,12 @@ You can undo and redo the last review with the header buttons or the configured
 shortcuts. The counter and the progress ring show how many cards are left in the
 session.
 
+During a session you can press **Edit card** (**Edit occlusion** for an image
+card). Basic cards expose their question and answer; cloze cards open a mini
+editor with the card's bullet and its child bullets, preserving indentation;
+occlusion cards open the image editor. Saving keeps FSRS properties and leaves
+the card in its place in the queue.
+
 ### Review shortcuts
 
 Keyboard shortcuts are configured in **Settings › Flashcards › Review**. By
