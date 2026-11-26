@@ -103,6 +103,13 @@ import {
   pageDisplayTitle,
   renderJournalsView,
 } from "./views/journals-view";
+import { showToast } from "./ui/toast";
+import {
+  configureNavigationHistory,
+  readLastNavigation,
+  recordNavigationHistory,
+  resetNavigationHistory,
+} from "./ui/navigation-history";
 import {
   createImageBlobUrl,
   imageUrlLoads as probeImageUrl,
@@ -835,7 +842,6 @@ const btnToggleSidebar = document.getElementById("btn-toggle-sidebar") as HTMLBu
 const btnWindowMinimize = document.getElementById("btn-window-minimize") as HTMLButtonElement | null;
 const btnWindowMaximize = document.getElementById("btn-window-maximize") as HTMLButtonElement | null;
 const btnWindowClose = document.getElementById("btn-window-close") as HTMLButtonElement | null;
-const toastNotification = document.getElementById("toast-notification") as HTMLDivElement;
 const activeVaultName = document.getElementById("active-vault-name") as HTMLSpanElement;
 const btnSelectVault = document.getElementById("btn-select-vault") as HTMLButtonElement;
 const vaultManagerOverlay = document.getElementById("vault-manager-overlay") as HTMLDivElement;
@@ -1068,8 +1074,6 @@ const navKanban = document.getElementById("nav-kanban") as HTMLElement;
 const navAllPages = document.getElementById("nav-all-pages") as HTMLElement;
 const navBibliography = document.getElementById("nav-bibliography") as HTMLElement;
 const navPdf = document.getElementById("nav-pdf") as HTMLElement;
-const btnHistoryBack = document.getElementById("btn-history-back") as HTMLButtonElement;
-const btnHistoryForward = document.getElementById("btn-history-forward") as HTMLButtonElement;
 
 // View Panels
 const viewEditor = document.getElementById("view-editor") as HTMLElement;
@@ -1262,21 +1266,6 @@ window.addEventListener("unhandledrejection", (event) => {
   showToast("Ocurrió un error en un diálogo. Se cerró para liberar la interfaz.");
 });
 
-/* ==================== TOAST NOTIFICATION ==================== */
-let toastTimeout: number | null = null;
-function showToast(message: string, duration = 2500) {
-  if (toastTimeout) clearTimeout(toastTimeout);
-  toastNotification.innerText = message;
-  toastNotification.classList.add("visible");
-  toastTimeout = window.setTimeout(() => {
-    toastNotification.classList.remove("visible");
-  }, duration);
-}
-
-window.addEventListener("vault-operation-error", (event) => {
-  const message = (event as CustomEvent<string>).detail;
-  if (message) showToast(message);
-});
 
 /* ==================== GUARDADO AL CERRAR ==================== */
 // Web: intentar volcar las ediciones diferidas antes de abandonar la página.
@@ -4956,112 +4945,6 @@ btnEnterReviewMode?.addEventListener("click", () => {
   window.location.reload();
 });
 
-/* ==================== NAVIGATION HISTORY (BACK / FORWARD) ==================== */
-interface NavigationHistoryEntry {
-  view: ViewType;
-  pageId: string;
-}
-
-const navigationHistory: NavigationHistoryEntry[] = [];
-let navigationHistoryIndex = -1;
-
-/** Última vista y página abiertas, para volver a ellas tras recargar la app. */
-const LAST_VIEW_STORAGE_KEY = "sinnotas-last-view";
-const LAST_PAGE_STORAGE_KEY = "sinnotas-last-page-id";
-
-function persistLastNavigation(): void {
-  try {
-    localStorage.setItem(LAST_VIEW_STORAGE_KEY, currentView);
-    localStorage.setItem(LAST_PAGE_STORAGE_KEY, currentPage.id);
-  } catch {}
-}
-
-function readLastNavigation(): { view: ViewType; pageId: string } | null {
-  try {
-    const view = localStorage.getItem(LAST_VIEW_STORAGE_KEY);
-    const pageId = localStorage.getItem(LAST_PAGE_STORAGE_KEY);
-    if (!view || !pageId) return null;
-    const validViews: ViewType[] = [
-      "editor",
-      "journals",
-      "flashcards",
-      "graph",
-      "kanban",
-      "all-pages",
-      "bibliography",
-      "pdf",
-    ];
-    if (!validViews.includes(view as ViewType)) return null;
-    return { view: view as ViewType, pageId };
-  } catch {
-    return null;
-  }
-}
-let restoringNavigationHistory = false;
-
-function updateHistoryButtons(): void {
-  btnHistoryBack.disabled = navigationHistoryIndex <= 0;
-  btnHistoryForward.disabled =
-    navigationHistoryIndex < 0 || navigationHistoryIndex >= navigationHistory.length - 1;
-}
-
-function recordNavigationHistory(): void {
-  if (restoringNavigationHistory) return;
-  const entry: NavigationHistoryEntry = { view: currentView, pageId: currentPage.id };
-  const currentEntry = navigationHistory[navigationHistoryIndex];
-  if (currentEntry && currentEntry.view === entry.view && currentEntry.pageId === entry.pageId) {
-    updateHistoryButtons();
-    return;
-  }
-  navigationHistory.splice(navigationHistoryIndex + 1);
-  navigationHistory.push(entry);
-  navigationHistoryIndex = navigationHistory.length - 1;
-  updateHistoryButtons();
-  persistLastNavigation();
-}
-
-function resetNavigationHistory(): void {
-  navigationHistory.length = 0;
-  navigationHistoryIndex = -1;
-  recordNavigationHistory();
-}
-
-function restoreNavigationHistory(index: number): void {
-  const entry = navigationHistory[index];
-  if (!entry || index === navigationHistoryIndex) return;
-
-  const page = vault.getPages().find((candidate) => candidate.id === entry.pageId);
-  if (entry.view === "editor" && !page) {
-    // The page no longer exists (deleted or vault changed): drop stale entries.
-    navigationHistory.splice(index, 1);
-    if (index < navigationHistoryIndex) navigationHistoryIndex -= 1;
-    updateHistoryButtons();
-    return;
-  }
-
-  restoringNavigationHistory = true;
-  try {
-    navigationHistoryIndex = index;
-    if (page && page.id !== currentPage.id) currentPage = page;
-    if (entry.view === "editor") cursorState = null;
-    switchView(entry.view);
-  } finally {
-    restoringNavigationHistory = false;
-  }
-  updateHistoryButtons();
-}
-
-btnHistoryBack.addEventListener("click", () => {
-  if (navigationHistoryIndex > 0) restoreNavigationHistory(navigationHistoryIndex - 1);
-});
-
-btnHistoryForward.addEventListener("click", () => {
-  if (navigationHistoryIndex < navigationHistory.length - 1) {
-    restoreNavigationHistory(navigationHistoryIndex + 1);
-  }
-});
-
-updateHistoryButtons();
 
 /* ==================== NAVIGATION & VIEWS ==================== */
 function switchView(view: ViewType) {
@@ -9938,6 +9821,14 @@ async function loadPage(title: string): Promise<void> {
 }
 
 configureJournalsView({ vault, loadPage });
+configureNavigationHistory({
+  getView: () => currentView,
+  getPage: () => currentPage,
+  setPage: (page) => { currentPage = page; },
+  clearCursor: () => { cursorState = null; },
+  getPages: () => vault.getPages(),
+  switchView: (view) => switchView(view),
+});
 
 async function openPage(page: PageData): Promise<void> {
   currentPage = page;
