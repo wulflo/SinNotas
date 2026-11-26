@@ -17077,6 +17077,8 @@ function readReferenceNoteTitles(): string[] {
 }
 
 let referenceNoteTitles: string[] = readReferenceNoteTitles();
+/** Ranuras 1/2 que el usuario ha pedido ver sin truncar. */
+const expandedReferenceSlots = new Set<number>();
 
 function persistReferenceNoteTitles(): void {
   const titles = referenceNoteTitles
@@ -17325,7 +17327,8 @@ function createReferenceNotePicker(
 
 function createReferenceSlot(index: number, selectedTitle: string): HTMLElement {
   const slot = document.createElement("section");
-  slot.className = "reference-slot";
+  const expanded = expandedReferenceSlots.has(index);
+  slot.className = expanded ? "reference-slot is-expanded" : "reference-slot";
   slot.dataset.referenceIndex = String(index);
   slot.setAttribute("aria-label", `${translate("Nota de referencia")} ${index + 1}`);
 
@@ -17344,12 +17347,27 @@ function createReferenceSlot(index: number, selectedTitle: string): HTMLElement 
   remove.textContent = "×";
   remove.addEventListener("click", () => {
     referenceNoteTitles.splice(index, 1);
+    expandedReferenceSlots.delete(index);
     if (referenceNoteTitles.length === 0) referenceNoteTitles = [""];
     persistReferenceNoteTitles();
     renderReferenceSlots();
   });
 
-  header.append(label, remove);
+  const expand = document.createElement("button");
+  expand.type = "button";
+  expand.className = "btn-icon reference-slot-expand";
+  const expandLabel = translate(expanded ? "Ver nota truncada" : "Ver nota sin truncar");
+  expand.title = expandLabel;
+  expand.setAttribute("aria-label", expandLabel);
+  expand.setAttribute("aria-pressed", String(expanded));
+  expand.textContent = expanded ? "⤡" : "⤢";
+  expand.addEventListener("click", () => {
+    if (expandedReferenceSlots.has(index)) expandedReferenceSlots.delete(index);
+    else expandedReferenceSlots.add(index);
+    renderReferenceSlots();
+  });
+
+  header.append(label, expand, remove);
 
   const picker = createReferenceNotePicker(index, selectedTitle);
 
@@ -17379,6 +17397,18 @@ function createReferenceSlot(index: number, selectedTitle: string): HTMLElement 
     } else {
       body.appendChild(pageBody);
     }
+  }
+
+  // En arranque metadata-only los bloques pueden no estar residentes: sin
+  // esta rehidratación, "ver sin truncar" mostraría una nota vacía.
+  if (page && page.blocksLoaded === false) {
+    void vault.ensurePageLoaded(page).then(() => {
+      if (referenceNoteTitles[index] === selectedTitle && referencePane && !referencePane.hidden) {
+        renderReferenceSlots();
+      }
+    }).catch((error: unknown) => {
+      console.error("No se pudo cargar la nota de referencia:", error);
+    });
   }
 
   slot.append(header, picker, body);

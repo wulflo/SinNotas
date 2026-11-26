@@ -9906,6 +9906,19 @@ body.editor-split-active #view-editor .canvas-wrapper {
   padding: 0 10px 12px;
 }
 
+/* Botón «ver sin truncar»: la ranura deja de tener tope y todo el scroll lo
+ * hace el cuerpo, sin contenedores anidados que corten el recorrido. */
+.reference-slot.is-expanded {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: hidden;
+}
+
+.reference-slot.is-expanded .reference-slot-body {
+  max-height: none;
+}
+
 .reference-page {
   min-width: 0;
 }
@@ -9984,6 +9997,15 @@ body.editor-split-active #view-editor .canvas-wrapper {
 
   .reference-slot-body {
     max-height: 42vh;
+  }
+
+  .reference-slot.is-expanded {
+    flex: 0 0 auto;
+    height: min(78vh, 900px);
+  }
+
+  .reference-slot.is-expanded .reference-slot-body {
+    max-height: none;
   }
 }
 
