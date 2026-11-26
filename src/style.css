@@ -8912,7 +8912,10 @@ body.mobile-full-editor .flashcard-review-tools {
   display: grid;
   place-items: center;
   min-width: 0;
+  box-sizing: border-box;
   aspect-ratio: 1;
+  /* El número sube y el marcador baja: antes ambos quedaban casi pegados. */
+  padding-bottom: 8px;
   border: 0;
   border-radius: 8px;
   background: transparent;
@@ -8952,9 +8955,9 @@ body.mobile-full-editor .flashcard-review-tools {
 
 .journal-calendar-marker {
   position: absolute;
-  bottom: 12%;
-  width: 4px;
-  height: 4px;
+  bottom: 6%;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: currentColor;
 }
