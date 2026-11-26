@@ -1,6 +1,6 @@
 # Checklist Consolidado — SinNotas
 
-**Estado global:** documento único de seguimiento · **Última actualización:** 2026-11-23
+**Estado global:** documento único de seguimiento · **Última actualización:** 2026-11-26
 **Ámbito:** escritorio Tauri, APK Android de repaso, backend Rust y documentación.
 **Origen:** fusión de los 11 archivos `CHECKLIST-*.md` que existían en `docs/` (2026-11-23). Los originales se eliminaron; este archivo es la **única fuente de verdad**.
 **Uso:** ↑ [Parte I — Resumen](#1-parte-i--resumen-ejecutivo) · [Parte II — Detalle](#2-parte-ii--detalle-por-área) · [Reglas de edición](#0-reglas-de-edición-lectura-obligatoria-antes-de-tocar-este-archivo)
@@ -60,6 +60,7 @@
 | --- | --- | --- | --- | --- |
 | 2026-11-23 | — | Fusión de los 11 checklist en un único documento; originales eliminados; enlaces actualizados en `README.md`, `docs/SinNotas.md`, `src/editor/fsrs.ts`, `src/style.css` e `index.html`. | Revisión de enlaces y estructura del documento | `5f4d4ac` |
 | 2026-11-23 | — | Benchmark renombrado a `docs/BENCHMARK-2026-10-29.md`; referencias del consolidado, `README.md` y `docs/SinNotas.md` apuntan al nuevo nombre. | Comprobación de enlaces locales y `git diff --check` | (este commit) |
+| 2026-11-26 | — | Seguimiento externo acordado para las fases de UI móvil, oclusión y editor de tarjetas: `~/Descargas/Checklist-Fases-UI-SinNotas-2026-11-26.md` (diffs en `~/Descargas/diffs/`). Motivo: el usuario quiere retomar desde Descargas sin depender de este documento; responsable: Alonso. Este consolidado conserva solo el puntero, no el detalle. | Creación del archivo externo y de la carpeta de diffs; `git diff --check` | (este commit) |
 
 > Al añadir filas, mantener el orden cronológico (más reciente abajo). No resumir dos cambios distintos en una sola fila.
 
