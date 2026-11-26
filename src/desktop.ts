@@ -114,6 +114,7 @@ import {
   syncGraphSettingsUi,
   syncGraphSettingsUiIfPanelOpen,
 } from "./views/graph-settings-ui";
+import { closeCardEditor, configureCardEditor } from "./review/card-editor";
 import { showToast } from "./ui/toast";
 import {
   configureNavigationHistory,
@@ -156,14 +157,6 @@ import {
   type FlashcardPageStats,
 } from "./views/flashcards-manager";
 import { FlashcardLoader, type FlashcardLoadProgress } from "./views/flashcard-loader";
-import {
-  applyCardMiniEditor,
-  cardMiniEditorRows,
-  changeCardMiniEditorIndent,
-  createCardMiniEditorTextarea,
-  resizeCardMiniEditorTextarea,
-  type CardMiniEditorRow,
-} from "./views/card-mini-editor";
 import { KanbanManager } from "./views/kanban-view";
 import { completedTasksToRemove, groupTasksByPage } from "./views/kanban-cleanup";
 import {
@@ -9668,6 +9661,20 @@ async function loadPage(title: string): Promise<void> {
 }
 
 configureJournalsView({ vault, loadPage });
+configureCardEditor({
+  findReviewCardBlock,
+  getPages: () => vault.getPages(),
+  savePage: (page, flush) => vault.savePage(page, flush),
+  captureHistory: (id, blocks, title) => documentHistory.capture(id, blocks, title),
+  getFlashcardsManager: () => flashcardsManager,
+  getReviewOrder: () => flashcardReviewOrder,
+  isFlashcardLoading: () => flashcardLoading,
+  setImageOcclusionFromReview: (value) => { imageOcclusionFromReview = value; },
+  openImageOcclusionEditor,
+  updateFlashcardUI,
+  mountOverlay,
+  unmountOverlay,
+});
 configureGraphSettingsUi({ getGraphView: () => graphView });
 configureAllPagesView({
   getPages: () => vault.getPages(),
@@ -12489,18 +12496,6 @@ const cardAnswerEl = document.getElementById("card-answer") as HTMLDivElement;
 const cardParentContextEl = document.getElementById("card-parent-context") as HTMLDivElement | null;
 const btnShowAnswer = document.getElementById("btn-show-answer") as HTMLButtonElement;
 const btnEditFlashcard = document.getElementById("btn-edit-flashcard") as HTMLButtonElement | null;
-const cardEditorTitle = document.getElementById("card-editor-title") as HTMLHeadingElement | null;
-const cardEditorQuestionField = document.getElementById("card-editor-question-field") as HTMLLabelElement | null;
-const cardEditorAnswerField = document.getElementById("card-editor-answer-field") as HTMLLabelElement | null;
-const cardEditorTextField = document.getElementById("card-editor-text-field") as HTMLLabelElement | null;
-const cardEditorQuestion = document.getElementById("card-editor-question") as HTMLTextAreaElement | null;
-const cardEditorAnswer = document.getElementById("card-editor-answer") as HTMLTextAreaElement | null;
-const cardEditorText = document.getElementById("card-editor-text") as HTMLTextAreaElement | null;
-const cardEditorChildren = document.getElementById("card-editor-children") as HTMLDivElement | null;
-const cardEditorRows = document.getElementById("card-editor-rows") as HTMLDivElement | null;
-const btnSaveCardEditor = document.getElementById("btn-save-card-editor") as HTMLButtonElement | null;
-const btnCancelCardEditor = document.getElementById("btn-cancel-card-editor") as HTMLButtonElement | null;
-const btnCloseCardEditor = document.getElementById("btn-close-card-editor") as HTMLButtonElement | null;
 
 /**
  * En cloze la respuesta contiene el texto completo con los huecos resueltos.
@@ -14229,217 +14224,6 @@ function findReviewCardBlock(
     findPageByTitle: (title) => vault.getPageByTitle(title),
   });
 }
-
-/* ==================== EDITOR DE TARJETA EN EL REPASO ==================== */
-
-interface CardEditorTarget {
-  cardId: string;
-  pageId: string;
-  blockId: string;
-  cardType: Flashcard["cardType"];
-  initialBlock: BlockNode;
-  currentBlock: BlockNode;
-}
-
-let cardEditorTarget: CardEditorTarget | null = null;
-let cardEditorRowsState: CardMiniEditorRow[] = [];
-
-function cardEditorFields(): { question: string; answer: string; text: string } {
-  return {
-    question: cardEditorQuestion?.value ?? "",
-    answer: cardEditorAnswer?.value ?? "",
-    text: cardEditorText?.value ?? "",
-  };
-}
-
-/** Vuelca los campos y las filas del minieditor en la copia de trabajo. */
-function commitCardEditorFields(): void {
-  if (!cardEditorTarget) return;
-  cardEditorTarget.currentBlock = applyCardMiniEditor(
-    cardEditorTarget.currentBlock,
-    cardEditorTarget.cardType,
-    cardEditorFields(),
-    cardEditorRowsState
-  );
-}
-
-function renderCardEditorRows(block: BlockNode, includeRoot: boolean): void {
-  if (!cardEditorRows) return;
-  cardEditorRowsState = cardMiniEditorRows(block, includeRoot);
-  if (cardEditorChildren) cardEditorChildren.hidden = cardEditorRowsState.length === 0;
-  cardEditorRows.replaceChildren();
-  cardEditorRowsState.forEach((row) => {
-    const line = document.createElement("div");
-    line.className = "card-editor-row";
-    line.style.setProperty("--card-edit-depth", String(row.depth));
-
-    const bullet = document.createElement("span");
-    bullet.className = "card-editor-row-bullet";
-    bullet.setAttribute("aria-hidden", "true");
-    bullet.textContent = "•";
-
-    const textarea = createCardMiniEditorTextarea(
-      row,
-      `${translate("Bullet")} ${row.depth + 1}`
-    );
-
-    line.append(bullet, textarea);
-
-    if (!row.isImage && row.depth > 0) {
-      const actions = document.createElement("div");
-      actions.className = "card-editor-row-actions";
-      (["in", "out"] as const).forEach((direction) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "btn-icon";
-        button.textContent = direction === "in" ? "↳" : "↰";
-        button.title = translate(direction === "in" ? "Indentar" : "Desindentar");
-        button.setAttribute("aria-label", button.title);
-        button.addEventListener("click", () => {
-          commitCardEditorFields();
-          if (!cardEditorTarget) return;
-          cardEditorTarget.currentBlock = changeCardMiniEditorIndent(
-            cardEditorTarget.currentBlock,
-            row.id,
-            direction
-          );
-          renderCardEditorRows(
-            cardEditorTarget.currentBlock,
-            cardEditorTarget.cardType !== "basic"
-          );
-        });
-        actions.appendChild(button);
-      });
-      line.appendChild(actions);
-    }
-
-    cardEditorRows.appendChild(line);
-    resizeCardMiniEditorTextarea(textarea);
-  });
-}
-
-function openCardEditor(): void {
-  if (flashcardLoading || !cardEditorOverlay) return;
-  const card = flashcardsManager.getCurrentCard();
-  if (!card) return;
-  if (card.cardType === "image-occlusion") {
-    openReviewOcclusionEditor(card);
-    return;
-  }
-  const target = findReviewCardBlock(card);
-  if (!target) {
-    showToast(translate("No se encontró el bloque de la tarjeta."));
-    return;
-  }
-  const isBasic = card.cardType === "basic";
-  const fields = FlashcardsManager.readEditableFields(target.block.content, card.cardType);
-  // En una tarjeta básica con bullets hijos la respuesta ya son los hijos
-  // (scanPages usa formatChildAnswerList); mostrar «Respuesta» es un cuadro
-  // vacío que además invita a sobreescribirla. Solo se muestra si hay `::`.
-  const answerFromChildren = isBasic && target.block.children.length > 0 && !fields.answer;
-  if (cardEditorQuestionField) cardEditorQuestionField.hidden = !isBasic;
-  if (cardEditorAnswerField) cardEditorAnswerField.hidden = !isBasic || answerFromChildren;
-  // En cloze la raíz se edita dentro del minieditor, junto a sus bullets hijos.
-  if (cardEditorTextField) cardEditorTextField.hidden = true;
-  if (cardEditorQuestion) cardEditorQuestion.value = fields.question;
-  if (cardEditorAnswer) cardEditorAnswer.value = fields.answer;
-  if (cardEditorText) cardEditorText.value = fields.text;
-  if (cardEditorTitle) cardEditorTitle.innerText = translate("Editar tarjeta");
-  cardEditorTarget = {
-    cardId: card.id,
-    pageId: target.page.id,
-    blockId: card.blockId,
-    cardType: card.cardType,
-    initialBlock: target.block,
-    currentBlock: target.block,
-  };
-  renderCardEditorRows(target.block, !isBasic);
-  mountOverlay(cardEditorOverlay);
-  window.setTimeout(() => {
-    if (isBasic && !cardEditorAnswerField?.hidden) cardEditorAnswer?.focus();
-    else if (isBasic) cardEditorQuestion?.focus();
-    else cardEditorRows?.querySelector<HTMLTextAreaElement>("textarea:not([readonly])")?.focus();
-  }, 30);
-}
-
-function closeCardEditor(): void {
-  cardEditorTarget = null;
-  if (cardEditorOverlay) unmountOverlay(cardEditorOverlay);
-}
-
-/** Abre el editor de oclusión de escritorio sin perder la tarjeta en repaso. */
-function openReviewOcclusionEditor(card: Flashcard): void {
-  const target = findReviewCardBlock(card);
-  if (!target) {
-    showToast(translate("No se encontró el bloque de la tarjeta."));
-    return;
-  }
-  const source = card.imageSource
-    || parseImageOcclusions(target.block.content).find((region) => region.source)?.source;
-  if (!source) {
-    showToast(translate("No se encontró el bloque de la tarjeta."));
-    return;
-  }
-  imageOcclusionFromReview = {
-    cardId: card.id,
-    revealed: flashcardsManager.isRevealed(),
-  };
-  openImageOcclusionEditor(target.block.id, source);
-}
-
-async function saveCardEditor(): Promise<void> {
-  if (!cardEditorTarget || !btnSaveCardEditor) return;
-  commitCardEditorFields();
-  const { cardId, pageId, blockId, cardType, currentBlock } = cardEditorTarget;
-  const fields = cardEditorFields();
-  const required = cardType === "basic"
-    ? fields.question.trim()
-    : FlashcardsManager.readEditableFields(currentBlock.content, "cloze").text.trim();
-  if (!required) {
-    showToast(translate(cardType === "basic"
-      ? "La pregunta no puede estar vacía."
-      : "El texto no puede estar vacío."));
-    return;
-  }
-  const page = vault.getPages().find((candidate) => candidate.id === pageId);
-  if (!page) {
-    showToast(translate("La nota ya no está disponible."));
-    return;
-  }
-  const location = findNodeLocation(page.blocks, blockId);
-  if (!location) {
-    showToast(translate("No se encontró el bloque de la tarjeta."));
-    return;
-  }
-  const previous = location.parentList[location.index];
-  location.parentList[location.index] = currentBlock;
-  btnSaveCardEditor.disabled = true;
-  try {
-    await vault.savePage(page, true);
-    documentHistory.capture(page.id, page.blocks, page.title);
-    const revealed = flashcardsManager.isRevealed();
-    flashcardsManager.refreshCard(vault.getPages(), cardId, flashcardReviewOrder, revealed);
-    closeCardEditor();
-    updateFlashcardUI();
-    showToast(translate("Tarjeta guardada. Propiedades y nota intactas."));
-  } catch (error) {
-    location.parentList[location.index] = previous;
-    console.error("No se pudo guardar la edición de la tarjeta:", error);
-    showToast(translate("No se pudo guardar la tarjeta. Revisa los permisos de la bóveda."));
-  } finally {
-    btnSaveCardEditor.disabled = false;
-  }
-}
-
-btnEditFlashcard?.addEventListener("click", openCardEditor);
-btnCloseCardEditor?.addEventListener("click", closeCardEditor);
-btnCancelCardEditor?.addEventListener("click", closeCardEditor);
-btnSaveCardEditor?.addEventListener("click", () => {
-  void saveCardEditor();
-});
-cardEditorOverlay?.addEventListener("click", (event) => {
-  if (event.target === cardEditorOverlay) closeCardEditor();
-});
 
 /**
  * Localiza la tarjeta de un repaso del diario.
