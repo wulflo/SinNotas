@@ -9627,6 +9627,19 @@ function handleEditorKeyDown(e: KeyboardEvent, blockId: string, page: PageData =
     return;
   }
 
+ // 1b. Mover a la izquierda con Alt + Flecha Izquierda (simétrico de Alt+→).
+ if (e.key === "ArrowLeft" && e.altKey) {
+   e.preventDefault();
+   const newTree = outdentBlock(page.blocks, blockId);
+   if (newTree) {
+     page.blocks = newTree;
+     cursorState = { blockId, offset };
+     vault.savePage(page);
+     renderBlocksTree();
+   }
+   return;
+ }
+
  // 2. Mover a la derecha con TAB simple (evalúa key o code)
 if (matchesShortcut(e, "indent")) {
   e.preventDefault();
@@ -15105,6 +15118,7 @@ function renderGraphView() {
     (window as any).__graphClickBackground = () => closeGraphPreview();
   }
   graphView.resize();
+  graphView.notifyVisible();
   // Repintar solo cuando la bóveda cambió (estructural: reemplazo/borrado/
   // renombrado/delta; o contenido: epoch de alguna nota) o cuando se entra/
   // sale de la vecindad. Volver a la pestaña del grafo ya no reconstruye

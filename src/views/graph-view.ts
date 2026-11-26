@@ -216,6 +216,17 @@ export class GraphView {
   }
 
   /**
+   * Avisa de que la vista vuelve a estar activa. El IntersectionObserver puede
+   * haberse quedado en `isVisible=false` mientras el panel estaba oculto, lo
+   * que impedía despertar la física al arrastrar un nodo.
+   */
+  public notifyVisible(): void {
+    this.isVisible = true;
+    if (this.shouldSimulate()) this.startSimulation();
+    this.requestRender();
+  }
+
+  /**
    * Centra un nodo en el lienzo. Mientras la física siga moviéndolo se
    * reaplica el centrado en cada paso; cualquier gesto del usuario lo cancela.
    */
