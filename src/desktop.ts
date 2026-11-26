@@ -16168,9 +16168,11 @@ function renderJournalsView() {
   pagination.id = "journals-pagination";
   const previous = document.createElement("button");
   previous.type = "button";
-  previous.className = "font-option-btn";
+  previous.className = "btn-pagination";
   previous.id = "journals-prev";
-  previous.textContent = translate("Anterior");
+  previous.textContent = "<";
+  previous.title = translate("Página anterior");
+  previous.setAttribute("aria-label", previous.title);
   previous.disabled = journalsPage === 1;
   previous.addEventListener("click", () => {
     journalsPage = Math.max(1, journalsPage - 1);
@@ -16182,9 +16184,11 @@ function renderJournalsView() {
   info.textContent = `${translate("Página")} ${journalsPage}/${totalPages} · ${paged.start + 1}–${paged.end} / ${journalPages.length}`;
   const next = document.createElement("button");
   next.type = "button";
-  next.className = "font-option-btn";
+  next.className = "btn-pagination";
   next.id = "journals-next";
-  next.textContent = translate("Siguiente");
+  next.textContent = ">";
+  next.title = translate("Página siguiente");
+  next.setAttribute("aria-label", next.title);
   next.disabled = journalsPage === totalPages;
   next.addEventListener("click", () => {
     journalsPage = Math.min(totalPages, journalsPage + 1);
