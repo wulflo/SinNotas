@@ -170,9 +170,18 @@
   -webkit-backdrop-filter: none;
 }
 
-:root[data-visual="lino"] #view-flashcards,
-:root[data-visual="lino"] #view-journals {
+:root[data-visual="lino"] #view-flashcards {
   background: none;
+}
+
+:root[data-visual="lino"] #view-journals {
+  background: transparent;
+}
+
+:root[data-visual="lino"] #view-journals .journals-list-item {
+  background: transparent;
+  border-color: var(--md-outline-variant);
+  box-shadow: none;
 }
 
 :root[data-visual="lino"] .main-container::before,

@@ -337,7 +337,29 @@ let currentPage: PageData = vault.getPageByTitle("Welcome to SinNotas") || vault
 let currentView: ViewType = "editor";
 /** Página actual del listado de diarios existentes (persistida entre sesiones). */
 const JOURNALS_PAGE_STORAGE_KEY = "sinnotas-journals-page";
-const JOURNALS_PAGE_SIZE = 20;
+const JOURNALS_PAGE_SIZES = [10, 20, 50] as const;
+const JOURNALS_PAGE_SIZE_KEY = "sinnotas-journals-page-size";
+
+function readJournalsPageSize(): number {
+  try {
+    const stored = Number(localStorage.getItem(JOURNALS_PAGE_SIZE_KEY));
+    return JOURNALS_PAGE_SIZES.includes(stored as (typeof JOURNALS_PAGE_SIZES)[number])
+      ? stored
+      : 20;
+  } catch {
+    return 20;
+  }
+}
+
+function saveJournalsPageSize(size: number): void {
+  try {
+    localStorage.setItem(JOURNALS_PAGE_SIZE_KEY, String(size));
+  } catch {
+    // El límite sigue activo en memoria.
+  }
+}
+
+let journalsPageSize = readJournalsPageSize();
 
 function readJournalsPage(): number {
   try {
@@ -16056,7 +16078,7 @@ function scheduleJournalsNextPagePrewarm(
   const generation = ++journalsPrewarmGeneration;
   const run = () => {
     if (generation !== journalsPrewarmGeneration) return;
-    for (const page of paginateNotes(pages, nextPage, JOURNALS_PAGE_SIZE).items) {
+    for (const page of paginateNotes(pages, nextPage, journalsPageSize).items) {
       if (page.blocksLoaded === false) void vault.ensurePageLoaded(page);
     }
   };
@@ -16107,10 +16129,70 @@ function renderJournalsView() {
   listHeader.append(listTitle, listCount);
   entriesContainer.appendChild(listHeader);
 
-  const paged = paginateNotes(journalPages, journalsPage, JOURNALS_PAGE_SIZE);
+  const paged = paginateNotes(journalPages, journalsPage, journalsPageSize);
   const totalPages = paged.totalPages;
   journalsPage = paged.currentPage;
   saveJournalsPage(journalsPage);
+
+  // Controles visibles justo debajo del título: tamaño de página y paginador,
+  // para que el límite de carga sea evidente aunque haya cientos de diarios.
+  const controls = document.createElement("div");
+  controls.className = "journals-list-controls";
+  controls.id = "journals-controls";
+
+  const sizeGroup = document.createElement("div");
+  sizeGroup.className = "journals-size-group";
+  const sizeCaption = document.createElement("span");
+  sizeCaption.className = "journals-controls-caption";
+  sizeCaption.textContent = translate("Por página");
+  sizeGroup.appendChild(sizeCaption);
+  JOURNALS_PAGE_SIZES.forEach((size) => {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `journals-size-chip${size === journalsPageSize ? " active" : ""}`;
+    chip.textContent = String(size);
+    chip.title = `${size}`;
+    chip.addEventListener("click", () => {
+      journalsPageSize = size;
+      saveJournalsPageSize(size);
+      journalsPage = 1;
+      saveJournalsPage(1);
+      renderJournalsView();
+    });
+    sizeGroup.appendChild(chip);
+  });
+  controls.appendChild(sizeGroup);
+
+  const pagination = document.createElement("div");
+  pagination.className = "journals-pagination";
+  pagination.id = "journals-pagination";
+  const previous = document.createElement("button");
+  previous.type = "button";
+  previous.className = "font-option-btn";
+  previous.id = "journals-prev";
+  previous.textContent = translate("Anterior");
+  previous.disabled = journalsPage === 1;
+  previous.addEventListener("click", () => {
+    journalsPage = Math.max(1, journalsPage - 1);
+    renderJournalsView();
+  });
+  const info = document.createElement("span");
+  info.className = "journals-pagination-info";
+  info.id = "journals-page-info";
+  info.textContent = `${translate("Página")} ${journalsPage}/${totalPages} · ${paged.start + 1}–${paged.end} / ${journalPages.length}`;
+  const next = document.createElement("button");
+  next.type = "button";
+  next.className = "font-option-btn";
+  next.id = "journals-next";
+  next.textContent = translate("Siguiente");
+  next.disabled = journalsPage === totalPages;
+  next.addEventListener("click", () => {
+    journalsPage = Math.min(totalPages, journalsPage + 1);
+    renderJournalsView();
+  });
+  pagination.append(previous, info, next);
+  controls.appendChild(pagination);
+  entriesContainer.appendChild(controls);
 
   const list = document.createElement("ul");
   list.className = "journals-list";
@@ -16121,6 +16203,8 @@ function renderJournalsView() {
     button.type = "button";
     button.className = "journals-list-item";
     button.title = `Abrir ${journal.title}`;
+    const icon = createPageIcon(true);
+    icon.classList.add("journals-list-icon");
     const label = document.createElement("span");
     label.className = "journals-list-label";
     label.textContent = journalDateLabel(journal);
@@ -16132,7 +16216,7 @@ function renderJournalsView() {
         ? journal.blockCount ?? 0
         : getAllBlocksFlat(journal.blocks).length;
     meta.textContent = `${bulletCount} ${bulletCount === 1 ? "bullet" : "bullets"}`;
-    button.append(label, meta);
+    button.append(icon, label, meta);
     button.addEventListener("click", () => {
       loadPage(journal.title);
     });
@@ -16140,38 +16224,6 @@ function renderJournalsView() {
     list.appendChild(item);
   });
   entriesContainer.appendChild(list);
-
-  if (totalPages > 1) {
-    const pagination = document.createElement("div");
-    pagination.className = "journals-pagination";
-    const previous = document.createElement("button");
-    previous.type = "button";
-    previous.className = "font-option-btn";
-    previous.textContent = translate("Anterior");
-    previous.disabled = journalsPage === 1;
-    previous.addEventListener("click", () => {
-      journalsPage = Math.max(1, journalsPage - 1);
-      renderJournalsView();
-    });
-    const info = document.createElement("span");
-    info.className = "journals-pagination-info";
-    info.textContent = `${translate("Página")} ${journalsPage} / ${totalPages}`;
-    const next = document.createElement("button");
-    next.type = "button";
-    next.className = "font-option-btn";
-    next.textContent = translate("Siguiente");
-    next.disabled = journalsPage === totalPages;
-    next.addEventListener("click", () => {
-      journalsPage = Math.min(totalPages, journalsPage + 1);
-      renderJournalsView();
-    });
-    pagination.id = "journals-pagination";
-    previous.id = "journals-prev";
-    info.id = "journals-page-info";
-    next.id = "journals-next";
-    pagination.append(previous, info, next);
-    entriesContainer.appendChild(pagination);
-  }
 
   scheduleJournalsNextPagePrewarm(journalPages, journalsPage, totalPages);
   if (scrollRoot) scrollRoot.scrollTop = previousScrollTop;

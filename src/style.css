@@ -64,6 +64,14 @@
   --ls-sidebar-radius: 10px;
   --ls-sidebar-tile-height: 52px;
   --ls-headbar-radius: 8px;
+  /* Diarios: superficies derivadas de los roles del tema (Aero/Simple/Drácula
+     los redefinen en claro y oscuro), para que la vista no se confunda con el
+     editor ni dependa de un degradado fijo. */
+  --md-journals-view-bg: var(--md-surface-container-high);
+  --md-journals-panel-bg: var(--md-surface-container-low);
+  --md-journals-item-bg: var(--md-surface-container);
+  --md-journals-item-hover-bg: var(--md-primary-container);
+  --md-journals-item-border: var(--md-outline-variant);
   --ls-headbar-height: 48px;
   --ls-font-size-ui: 15px;
   --ls-font-size-editor: 15px;
@@ -6554,22 +6562,10 @@ body.is-bullet-selecting {
     transparent;
 }
 
+/* Sin tinte propio: la vista usa la misma superficie neutral que el editor;
+   la jerarquía la crean los paneles y las filas, no un fondo coloreado. */
 #view-journals {
-  background: radial-gradient(
-      1100px 760px at 45% 0%,
-      color-mix(in srgb, var(--ls-accent) 11%, transparent),
-      transparent 70%
-    ),
-    transparent;
-}
-
-[data-theme="light"] #view-journals {
-  background: radial-gradient(
-      1100px 760px at 45% 0%,
-      color-mix(in srgb, var(--ls-accent) 13%, transparent),
-      transparent 72%
-    ),
-    transparent;
+  background: transparent;
 }
 
 .flashcards-container {
@@ -8805,68 +8801,125 @@ body.mobile-full-editor .flashcard-review-tools {
   list-style: none;
 }
 
-.journals-list-item {
+/* Especificidad de ID para ganar a la capa Aero (que antes imponía un fondo
+   semitransparente y anulaba el borde izquierdo de acento). */
+#view-journals .journals-list-item {
   display: flex;
   width: 100%;
+  box-sizing: border-box;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
-  border: 1px solid var(--ls-border-subtle);
-  border-left: 3px solid var(--ls-accent);
-  border-radius: 10px;
-  /* Fondo con el mismo efecto de acento que los días del calendario que
-   * tienen diario, para que los diarios listados destaquen visualmente. */
-  background: var(--ls-accent-subtle);
-  color: var(--ls-text-primary);
+  padding: 11px 14px;
+  border: 1px solid var(--md-journals-item-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--md-journals-item-bg) 70%, transparent);
+  color: var(--md-on-surface);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  box-shadow: 0 1px 3px color-mix(in srgb, var(--ls-text-title) 6%, transparent);
-  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+  box-shadow: none;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
-.journals-list-item:hover {
-  border-color: var(--ls-accent);
-  background: var(--ls-accent-subtle);
+#view-journals .journals-list-item:hover,
+#view-journals .journals-list-item:focus-visible {
+  border-color: var(--md-primary);
+  background: var(--md-journals-item-hover-bg);
+  color: var(--md-on-primary-container);
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--ls-accent) 14%, transparent);
+  outline: none;
+}
+
+.journals-list-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  color: var(--md-primary);
+}
+
+.journals-list-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .journals-list-label {
   display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-transform: capitalize;
 }
 
-.journals-list-label::before {
-  content: "📅";
-  flex: 0 0 auto;
-  font-size: 0.95em;
-  line-height: 1;
-}
-
 .journals-list-meta {
   flex: none;
-  color: var(--ls-text-muted);
-  font-size: calc(12px * var(--ls-font-scale, 1));
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--md-surface-container-low) 70%, transparent);
+  color: var(--md-on-surface-variant);
+  font-size: calc(11px * var(--ls-font-scale, 1));
 }
 
+.journals-list-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 0 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--md-journals-item-border);
+  border-radius: var(--ls-headbar-radius);
+  background: color-mix(in srgb, var(--md-journals-panel-bg) 70%, transparent);
+}
+
+.journals-size-group,
 .journals-pagination {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 16px;
+  gap: 6px;
 }
 
+.journals-controls-caption,
 .journals-pagination-info {
-  color: var(--ls-text-muted);
-  font-size: calc(12px * var(--ls-font-scale, 1));
+  color: var(--md-on-surface-variant);
+  font-size: calc(11px * var(--ls-font-scale, 1));
+}
+
+.journals-size-chip {
+  min-width: 30px;
+  min-height: 28px;
+  padding: 3px 8px;
+  border: 1px solid var(--md-outline-variant);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--md-on-surface-variant);
+  font: inherit;
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  cursor: pointer;
+}
+
+.journals-size-chip.active,
+.journals-size-chip:hover {
+  border-color: var(--md-primary);
+  background: var(--md-journals-item-hover-bg);
+  color: var(--md-on-primary-container);
+}
+
+.journals-pagination .font-option-btn {
+  border-radius: 8px;
 }
 
 .journal-calendar-header {

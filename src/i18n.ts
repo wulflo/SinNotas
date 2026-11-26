@@ -4,6 +4,8 @@ export type LanguagePreference = "auto" | InterfaceLanguage;
 const englishBySpanish: Record<string, string> = {
   "Editor": "Editor",
   "Diarios": "Journals",
+  "Diarios existentes": "Existing journals",
+  "Por página": "Per page",
   "Páginas": "Pages",
   "Vista gráfica": "Graph view",
   "Haz clic en un nodo para ver su contenido · Arrastra para mover · Doble clic para restablecer": "Click a node to preview its content · Drag to move · Double-click to reset",
@@ -1007,6 +1009,8 @@ const englishBySpanish: Record<string, string> = {
 const chineseBySpanish: Record<string, string> = {
   "Editor": "编辑器",
   "Diarios": "日记",
+  "Diarios existentes": "现有日记",
+  "Por página": "每页",
   "Páginas": "页面",
   "Vista gráfica": "图谱视图",
   "Haz clic en un nodo para ver su contenido · Arrastra para mover · Doble clic para restablecer": "点击节点预览内容 · 拖动以移动 · 双击以重置",
