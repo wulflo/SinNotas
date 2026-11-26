@@ -95,6 +95,7 @@ import {
 import { FlashcardDeckRepository } from "./store/flashcard-deck-storage";
 import { collectOutgoingLinks } from "./store/wikilinks";
 import { connectedPageTitles, referenceGraphPages } from "./views/graph-neighborhood";
+import { renderBacklinkSnippetHtml, wireBacklinkWikilinks } from "./views/backlink-render";
 import { selectSidebarPages } from "./store/sidebar-selection";
 import {
   ContentSearchIndex,
@@ -9748,24 +9749,10 @@ function renderBacklinks() {
         const snippet = document.createElement("div");
         snippet.className = "backlink-snippet";
 
-        const escaped = ref.snippet
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/"/g, "&quot;")
-          .replace(/'/g, "&#39;");
-        snippet.innerHTML = escaped.replace(
-          /\[\[(.*?)\]\]/g,
-          '<span class="wikilink-pill" data-page="$1">[[$1]]</span>'
-        );
-
-        snippet.querySelectorAll(".wikilink-pill").forEach((pill) => {
-          pill.addEventListener("click", (e) => {
-            e.stopPropagation();
-            const target = (pill as HTMLElement).dataset.page;
-            if (target) loadPage(target);
-          });
-        });
+        // Mismo render que el editor: LaTeX, markdown inline y wikilinks sin
+        // corchetes (con alias si lo tienen), pero con destino navegable.
+        snippet.innerHTML = renderBacklinkSnippetHtml(ref.snippet);
+        wireBacklinkWikilinks(snippet, (title) => loadPage(title));
 
         card.appendChild(source);
         card.appendChild(snippet);
@@ -9840,9 +9827,16 @@ function paintOutgoingLinks(outgoing: ReturnType<typeof collectOutgoingLinks>): 
 
     const snippet = document.createElement("div");
     snippet.className = "backlink-snippet";
-    snippet.textContent = ref.alias
-      ? `${translate("Alias")}: ${ref.alias}`
-      : ref.snippet.trim();
+    if (ref.alias) {
+      const alias = document.createElement("span");
+      alias.className = "outgoing-alias-label";
+      alias.textContent = `${translate("Alias")}: ${ref.alias}`;
+      snippet.appendChild(alias);
+    }
+    const rendered = document.createElement("span");
+    rendered.innerHTML = renderBacklinkSnippetHtml(ref.snippet.trim());
+    snippet.appendChild(rendered);
+    wireBacklinkWikilinks(snippet, (title) => loadPage(title));
 
     card.appendChild(target);
     card.appendChild(snippet);

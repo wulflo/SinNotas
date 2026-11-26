@@ -23,6 +23,26 @@ describe("renderMarkdownToHtml math", () => {
     expect(escaped).not.toContain('class="math-inline"');
     expect(escaped).toContain("$5");
   });
+
+  it("oculta los corchetes del wikilink y conserva el alias y el destino", () => {
+    const html = renderMarkdownToHtml("Ver [[Rust Core|el backend]]", {
+      wikilinkTarget: true,
+    });
+    expect(html).toContain('class="markdown-wikilink" data-page="Rust Core" role="link"');
+    expect(html).toContain("el backend");
+    expect(html).not.toContain("[[");
+    expect(html).not.toContain("]]");
+  });
+
+  it("el render de backlinks mezcla LaTeX y wikilinks sin corchetes", () => {
+    const html = renderMarkdownToHtml("Con $a^2$ mira [[Rust Core]]", {
+      wikilinkTarget: true,
+    });
+    expect(html).toContain("katex");
+    expect(html).toContain('data-page="Rust Core"');
+    expect(html).not.toContain("[[Rust Core]]");
+  });
+
 });
 
 describe("renderMarkdownToHtml code", () => {

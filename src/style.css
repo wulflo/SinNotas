@@ -3902,6 +3902,27 @@ body.is-bullet-selecting {
   border-radius: 3px;
 }
 
+/* El snippet usa el mismo render que el editor; el wikilink no lleva corchetes
+ * y se marca como accionable para abrir la nota destino. */
+.backlink-snippet .markdown-wikilink {
+  cursor: pointer;
+}
+
+.backlink-snippet .markdown-wikilink:hover {
+  text-decoration: underline;
+}
+
+.backlink-snippet .math-inline,
+.backlink-snippet .math-display {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.outgoing-alias-label {
+  color: var(--ls-text-muted);
+  margin-right: 6px;
+}
+
 .empty-backlinks {
   font-size: calc(13px * var(--ls-font-scale, 1));
   color: var(--ls-text-muted);

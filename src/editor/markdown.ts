@@ -9,6 +9,8 @@ import {
 
 export interface MarkdownRenderOptions {
   cloze?: "gap" | "reveal";
+  /** Añade `data-page` al wikilink para poder navegar desde snippets de solo lectura. */
+  wikilinkTarget?: boolean;
 }
 
 const MARKDOWN_SANITIZE_CONFIG = {
@@ -65,6 +67,7 @@ const MARKDOWN_SANITIZE_CONFIG = {
   ],
   ALLOWED_ATTR: [
     "class",
+    "role",
     "href",
     "title",
     "alt",
@@ -174,7 +177,7 @@ function renderInline(text: string, options: MarkdownRenderOptions): string {
     // Código inline: `...` (max 500 chars)
     { regex: new RegExp("`([^`\n]{1," + M + "})`", "g"), type: "code" },
     // Wikilink: [[target|label]] o [[target]] (max 500 chars cada parte)
-    { regex: new RegExp("\\[\\[([^\\]\\n]{1," + M + "})(?:\\|([^\\]\\n]{1," + M + "}))?\\]\\]", "g"), type: "wikilink" },
+    { regex: new RegExp("\\[\\[([^\\]|\\n]{1," + M + "})(?:\\|([^\\]\\n]{1," + M + "}))?\\]\\]", "g"), type: "wikilink" },
     // Cloze Anki: {{c1::...}} o {{cloze ...}} o {{...}} (max 500 chars contenido)
     { regex: new RegExp("\\{\\{(?:c\\d+::|cloze\\s+)?([^}\\n]{1," + M + "})\\}\\}", "g"), type: "cloze" },
     // Negrita: **...** o __...__ (max 500 chars)
@@ -236,8 +239,12 @@ function renderInline(text: string, options: MarkdownRenderOptions): string {
         html += `<code class="code-inline">${escapeHtml(g1!)}</code>`;
         break;
       case "wikilink": {
+        const target = g1!.trim();
         const label = (g2 || g1!).trim();
-        html += `<span class="markdown-wikilink">${escapeHtml(label)}</span>`;
+        const dataPage = options.wikilinkTarget
+          ? ` data-page="${escapeHtml(target)}" role="link"`
+          : "";
+        html += `<span class="markdown-wikilink"${dataPage}>${escapeHtml(label)}</span>`;
         break;
       }
       case "cloze": {
