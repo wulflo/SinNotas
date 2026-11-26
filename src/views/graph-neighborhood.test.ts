@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { BlockNode, PageData } from "../types";
-import { connectedPageTitles } from "./graph-neighborhood";
+import { connectedPageTitles, referenceGraphPages } from "./graph-neighborhood";
 
 function block(id: string, content: string): BlockNode {
   return { id, type: "text", content, children: [] };
@@ -56,5 +56,30 @@ describe("connectedPageTitles", () => {
     // Los destinos que no corresponden a ninguna nota se siguen descartando.
     const conFantasma = new Map<string, string[]>([["A", ["Fantasma", "B"]]]);
     expect([...connectedPageTitles(noti, "A", 1, conFantasma)]).toEqual(["A", "B"]);
+  });
+});
+
+describe("referenceGraphPages", () => {
+  const pages = [
+    page("A", "[[B]]"),
+    page("B", "[[C]]"),
+    page("C", ""),
+    page("D", "[[A]]"),
+  ];
+
+  it("recalcula la vecindad al cambiar de nota abierta", () => {
+    const desdeA = referenceGraphPages(pages, "A").map((p) => p.title);
+    expect(desdeA).toEqual(["A", "B", "D"]);
+
+    const desdeB = referenceGraphPages(pages, "B").map((p) => p.title);
+    expect(desdeB).toEqual(["A", "B", "C"]);
+    expect(desdeB).not.toContain("D");
+  });
+
+  it("devuelve solo el origen cuando no hay enlaces y nada si no hay nota", () => {
+    expect(referenceGraphPages([page("Sola", "")], "Sola").map((p) => p.title)).toEqual([
+      "Sola",
+    ]);
+    expect(referenceGraphPages(pages, null)).toEqual([]);
   });
 });

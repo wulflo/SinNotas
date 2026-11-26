@@ -64,3 +64,20 @@ export function connectedPageTitles(
 
   return connected;
 }
+
+/**
+ * Páginas que debe pintar el grafo de referencias de la sidebar: la vecindad de
+ * 1 salto de `origin`, ya filtradas y en el orden original de la bóveda.
+ * Se extrae como función pura para poder comprobar que al cambiar de nota se
+ * recalcula la vecindad de la nueva (y no se conserva la anterior).
+ */
+export function referenceGraphPages(
+  pages: readonly PageData[],
+  origin: string | null,
+  links?: ReadonlyMap<string, readonly string[]>
+): PageData[] {
+  if (!origin) return [];
+  const connected = connectedPageTitles(pages, origin, 1, links);
+  if (connected.size === 0) return [];
+  return pages.filter((page) => connected.has(page.title));
+}

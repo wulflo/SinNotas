@@ -94,7 +94,7 @@ import {
 } from "./store/flashcard-decks";
 import { FlashcardDeckRepository } from "./store/flashcard-deck-storage";
 import { collectOutgoingLinks } from "./store/wikilinks";
-import { connectedPageTitles } from "./views/graph-neighborhood";
+import { connectedPageTitles, referenceGraphPages } from "./views/graph-neighborhood";
 import { selectSidebarPages } from "./store/sidebar-selection";
 import {
   ContentSearchIndex,
@@ -9896,6 +9896,7 @@ function renderEditor() {
   }
   renderBlocksTree();
   scheduleRenderBacklinks();
+  refreshReferenceGraphForCurrentPage();
   noteScrollNav?.refresh();
   // Si la barra de búsqueda interna está abierta, sus coincidencias dependen
   // del contenido de la nota: recalcularlas al abrir otra página (T20).
@@ -17185,6 +17186,8 @@ function closeReferencePane(): void {
 
 let referenceGraphView: GraphView | null = null;
 let referenceGraphRun = 0;
+/** Última nota pintada en el grafo de la sidebar (evita renders redundantes). */
+let referenceGraphOrigin: string | null = null;
 
 /** Dibuja en la sidebar derecha la vecindad de 1 salto de la nota abierta. */
 async function renderReferenceGraph(): Promise<void> {
@@ -17198,12 +17201,8 @@ async function renderReferenceGraph(): Promise<void> {
   const edges = await buildGraphEdges();
   if (run !== referenceGraphRun || !referenceGraphView) return;
   const origin = currentPage?.title ?? null;
-  const allPages = vault.getPages();
-  const connected = origin
-    ? connectedPageTitles(allPages, origin, 1, edges ?? undefined)
-    : new Set<string>();
   referenceGraphView.updateData(
-    connected.size > 0 ? allPages.filter((page) => connected.has(page.title)) : [],
+    referenceGraphPages(vault.getPages(), origin, edges ?? undefined),
     edges ?? undefined
   );
   referenceGraphView.resetView();
@@ -17212,6 +17211,18 @@ async function renderReferenceGraph(): Promise<void> {
     referenceGraphView.centerOn(origin);
   }
   referenceGraphView.resize();
+  referenceGraphOrigin = origin;
+}
+
+/**
+ * Al cambiar de nota en el editor, el grafo de la sidebar debe seguir a la
+ * nota abierta. Se llama desde renderEditor(), punto común de loadPage,
+ * openPage, historial y restauración; con el panel cerrado no hace nada.
+ */
+function refreshReferenceGraphForCurrentPage(): void {
+  if (!referenceGraphSection || referenceGraphSection.hidden) return;
+  if ((currentPage?.title ?? null) === referenceGraphOrigin) return;
+  void renderReferenceGraph();
 }
 
 /** Abre las referencias con el grafo en la parte superior. */
