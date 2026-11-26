@@ -11942,9 +11942,26 @@ document.getElementById("ctx-delete")?.addEventListener("click", () => {
 
 function renderImageOcclusionEditor(): void {
   imageOcclusionLayer.replaceChildren();
-  appendOcclusionMasks(imageOcclusionLayer, imageOcclusionRegions);
+  // Misma caja de referencia que imagePoint(): el rect de la imagen. Antes se
+  // usaba el layer, que podía ser más ancho que la imagen y desplazaba la
+  // punta del cursor respecto al borde dibujado.
+  appendOcclusionMasks(
+    imageOcclusionLayer,
+    imageOcclusionRegions,
+    imageOcclusionImage,
+    "image-occlusion-mask",
+    undefined,
+    true
+  );
   if (imageOcclusionDraft) {
-    appendOcclusionMasks(imageOcclusionLayer, [imageOcclusionDraft]);
+    appendOcclusionMasks(
+      imageOcclusionLayer,
+      [imageOcclusionDraft],
+      imageOcclusionImage,
+      "image-occlusion-mask",
+      undefined,
+      true
+    );
   }
 
 

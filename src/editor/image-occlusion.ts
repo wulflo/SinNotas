@@ -216,8 +216,12 @@ export function appendOcclusionMasks(
   fill = false
 ): void {
   const svgNamespace = "http://www.w3.org/2000/svg";
-  const viewWidth = imageElement ? imageElement.clientWidth : (layer.clientWidth || 1000);
-  const viewHeight = imageElement ? imageElement.clientHeight : (layer.clientHeight || 1000);
+  // Antes de que cargue la imagen clientWidth es 0: caer al layer evita un
+  // viewBox "0 0 0 0" que dejaría las máscaras en posiciones imposibles.
+  const imageWidth = imageElement?.clientWidth ?? 0;
+  const imageHeight = imageElement?.clientHeight ?? 0;
+  const viewWidth = imageWidth > 0 ? imageWidth : (layer.clientWidth || 1000);
+  const viewHeight = imageHeight > 0 ? imageHeight : (layer.clientHeight || 1000);
   const svg = document.createElementNS(svgNamespace, "svg");
   svg.classList.add("image-occlusion-layer");
   svg.setAttribute("viewBox", `0 0 ${viewWidth} ${viewHeight}`);

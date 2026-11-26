@@ -3032,6 +3032,8 @@ class MobileReviewApp {
     image.onerror = null;
     image.removeAttribute("src");
     this.refs.occlusionStage.classList.remove("has-error");
+    this.refs.occlusionStage.style.removeProperty("width");
+    this.refs.occlusionStage.style.removeProperty("height");
     this.refs.occlusionMasks.replaceChildren();
 
     this.refs.occlusionEditor.hidden = false;
@@ -3040,6 +3042,10 @@ class MobileReviewApp {
 
     image.onload = () => {
       if (!this.occlusionEditing || this.occlusionEditing.cardId !== card.id) return;
+      // El stage, las máscaras y el tirador deben medir exactamente lo que mide
+      // la imagen pintada; si no, las fracciones 0..1 se desplazan.
+      this.refs.occlusionStage.style.width = `${image.clientWidth}px`;
+      this.refs.occlusionStage.style.height = `${image.clientHeight}px`;
       this.renderOcclusionEditor();
       this.refs.occlusionHandle.focus();
     };
@@ -3083,7 +3089,8 @@ class MobileReviewApp {
         displayRegions,
         image,
         "image-occlusion-mask",
-        context.draft
+        context.draft,
+        true
       );
     }
 
@@ -3101,7 +3108,7 @@ class MobileReviewApp {
   private startOcclusionDrag(event: PointerEvent, mode: OcclusionDragState["mode"]): void {
     if (!this.occlusionEditing) return;
     if (event.pointerType === "mouse" && event.button !== 0) return;
-    const rect = this.refs.occlusionStage.getBoundingClientRect();
+    const rect = this.refs.occlusionImage.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return;
 
     event.preventDefault();
@@ -3260,6 +3267,8 @@ class MobileReviewApp {
     this.refs.occlusionImage.onload = null;
     this.refs.occlusionImage.onerror = null;
     this.refs.occlusionImage.removeAttribute("src");
+    this.refs.occlusionStage.style.removeProperty("width");
+    this.refs.occlusionStage.style.removeProperty("height");
     this.refs.occlusionMasks.replaceChildren();
     this.refs.occlusionEditor.hidden = true;
     this.refs.occlusionStage.classList.remove("has-error");

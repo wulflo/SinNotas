@@ -1,5 +1,7 @@
+// @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import {
+  appendOcclusionMasks,
   clampImageOcclusionRegion,
   occlusionRegionsMatch,
   parseImageOcclusions,
@@ -41,6 +43,37 @@ describe("occlusionRegionsMatch", () => {
     expect(occlusionRegionsMatch(base, { ...base })).toBe(true);
     expect(occlusionRegionsMatch(base, { ...base, hint: "B" })).toBe(false);
     expect(occlusionRegionsMatch(base, { ...base, points: [{ x: 0.9, y: 0.9 }] })).toBe(false);
+  });
+});
+
+describe("appendOcclusionMasks", () => {
+  it("usa el rect de la imagen como viewBox y estira el SVG a la capa", () => {
+    const layer = document.createElement("div");
+    Object.defineProperty(layer, "clientWidth", { value: 300, configurable: true });
+    Object.defineProperty(layer, "clientHeight", { value: 200, configurable: true });
+    const image = document.createElement("img");
+    Object.defineProperty(image, "clientWidth", { value: 120, configurable: true });
+    Object.defineProperty(image, "clientHeight", { value: 80, configurable: true });
+
+    appendOcclusionMasks(layer, [first], image, "image-occlusion-mask", undefined, true);
+
+    const svg = layer.querySelector("svg")!;
+    expect(svg.getAttribute("viewBox")).toBe("0 0 120 80");
+    expect(svg.getAttribute("width")).toBe("100%");
+    const mask = layer.querySelector(".image-occlusion-mask")!;
+    expect(mask.getAttribute("x")).toBe(String(0.1 * 120));
+    expect(mask.getAttribute("y")).toBe(String(0.2 * 80));
+  });
+
+  it("cae a la capa si la imagen todavía no tiene dimensiones", () => {
+    const layer = document.createElement("div");
+    Object.defineProperty(layer, "clientWidth", { value: 640, configurable: true });
+    Object.defineProperty(layer, "clientHeight", { value: 480, configurable: true });
+    const image = document.createElement("img");
+
+    appendOcclusionMasks(layer, [first], image);
+
+    expect(layer.querySelector("svg")!.getAttribute("viewBox")).toBe("0 0 640 480");
   });
 });
 
