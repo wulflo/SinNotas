@@ -998,6 +998,12 @@
                       <output class="flashcard-size-value" id="card-font-size-value" aria-live="polite">1 em</output>
                       <button class="btn-icon flashcard-size-button" id="btn-card-font-increase" type="button" aria-label="Aumentar texto de la tarjeta" title="Aumentar texto de la tarjeta">+</button>
                     </div>
+                    <button class="btn-icon flashcard-settings-shortcut" id="btn-edit-flashcard" type="button" title="Editar tarjeta" aria-label="Editar tarjeta">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M12 20h9"></path>
+                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+                      </svg>
+                    </button>
                     <div class="flashcard-settings-shortcuts" role="group" aria-label="Ajustes de Flashcards">
                       <button class="btn-icon flashcard-settings-shortcut" id="btn-open-flashcard-settings" type="button" title="Ajustes de Flashcards" aria-label="Abrir ajustes de Flashcards">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -1739,6 +1745,38 @@
             <div class="shortcut-row"><span>Calificar la tarjeta</span><kbd>1 / 2 / 3 / 4</kbd></div>
             <p class="shortcuts-note">Las teclas de calificación se configuran en Ajustes → Flashcards.</p>
           </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- EDITOR DE TARJETA EN EL REPASO (básica / cloze) -->
+    <div class="m3-scrim card-editor-overlay" id="card-editor-overlay" hidden>
+      <div class="card-editor-dialog m3-surface" role="dialog" aria-modal="true" aria-labelledby="card-editor-title">
+        <div class="settings-dialog-header">
+          <h2 class="m3-dialog-title" id="card-editor-title">Editar tarjeta</h2>
+          <button class="btn-icon" id="btn-close-card-editor" type="button" title="Cerrar editor de tarjeta" aria-label="Cerrar editor de tarjeta">×</button>
+        </div>
+        <div class="card-editor-body">
+          <label class="card-editor-field" id="card-editor-question-field">
+            <span data-i18n="Pregunta">Pregunta</span>
+            <textarea id="card-editor-question" rows="3" spellcheck="true"></textarea>
+          </label>
+          <label class="card-editor-field" id="card-editor-answer-field">
+            <span data-i18n="Respuesta">Respuesta</span>
+            <textarea id="card-editor-answer" rows="3" spellcheck="true"></textarea>
+          </label>
+          <label class="card-editor-field" id="card-editor-text-field" hidden>
+            <span data-i18n="Texto de la tarjeta">Texto de la tarjeta</span>
+            <textarea id="card-editor-text" rows="4" spellcheck="true"></textarea>
+          </label>
+          <div class="card-editor-children" id="card-editor-children" hidden>
+            <span class="card-editor-section-title" id="card-editor-children-title" data-i18n="Bullets hijos">Bullets hijos</span>
+            <div class="card-editor-rows" id="card-editor-rows"></div>
+          </div>
+        </div>
+        <div class="settings-dialog-actions">
+          <button class="btn-secondary" id="btn-cancel-card-editor" type="button" data-i18n="Cancelar">Cancelar</button>
+          <button class="btn-primary" id="btn-save-card-editor" type="button" data-i18n="Guardar">Guardar</button>
         </div>
       </div>
     </div>

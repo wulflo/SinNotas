@@ -5935,6 +5935,114 @@ body.is-bullet-selecting {
   padding-top: 2px;
 }
 
+/* ==================== EDITOR DE TARJETA EN EL REPASO ==================== */
+#card-editor-overlay {
+  z-index: 2300;
+}
+
+.card-editor-dialog {
+  width: min(620px, calc(100vw - 32px));
+  max-height: min(88vh, 760px);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.card-editor-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.card-editor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: var(--ls-font-size-ui);
+  color: var(--ls-text-secondary);
+}
+
+.card-editor-field textarea,
+.card-editor-row textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--ls-border);
+  border-radius: 8px;
+  background: var(--ls-bg-primary);
+  color: var(--ls-text-primary);
+  font: inherit;
+  resize: vertical;
+}
+
+.card-editor-field textarea:focus-visible,
+.card-editor-row textarea:focus-visible {
+  outline: 2px solid var(--ls-accent);
+  outline-offset: 1px;
+}
+
+.card-editor-children {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-top: 1px solid var(--ls-border-subtle);
+  padding-top: 12px;
+}
+
+.card-editor-section-title {
+  color: var(--ls-text-muted);
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.card-editor-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-editor-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding-left: calc(var(--card-edit-depth, 0) * 18px);
+}
+
+.card-editor-row-bullet {
+  flex: 0 0 auto;
+  padding-top: 10px;
+  color: var(--ls-accent);
+}
+
+.card-editor-row textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 44px;
+}
+
+.card-editor-row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-editor-row-actions .btn-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.card-editor-row textarea[readonly] {
+  opacity: 0.7;
+  resize: none;
+}
+
 /* ==================== KEYBOARD SHORTCUTS MODAL ==================== */
 #shortcuts-modal-overlay {
   z-index: 2300;
