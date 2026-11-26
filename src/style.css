@@ -3891,16 +3891,9 @@ body.is-bullet-selecting {
  * pasar el ratón en el pill de tareas), como en «Todas las páginas». */
 .backlink-source .page-icon,
 .kanban-source-pill .page-icon {
-  width: 16px;
-  height: 16px;
-  flex: 0 0 16px;
+  --page-icon-size: 16px;
+  --page-icon-svg-size: 16px;
   color: inherit;
-}
-
-.backlink-source .page-icon svg,
-.kanban-source-pill .page-icon svg {
-  width: 16px;
-  height: 16px;
 }
 
 .backlink-snippet {
@@ -8463,10 +8456,12 @@ body.mobile-full-editor .flashcard-review-tools {
 
 /* Icono de página dentro de la tabla, en color accent */
 .page-icon {
+  --page-icon-size: 20px;
+  --page-icon-svg-size: 18px;
   display: inline-flex;
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
+  width: var(--page-icon-size);
+  height: var(--page-icon-size);
+  flex: 0 0 var(--page-icon-size);
   align-items: center;
   justify-content: center;
   color: var(--ls-text-muted);
@@ -8474,8 +8469,8 @@ body.mobile-full-editor .flashcard-review-tools {
 }
 .page-icon svg {
   display: block;
-  width: 18px;
-  height: 18px;
+  width: var(--page-icon-svg-size);
+  height: var(--page-icon-svg-size);
   fill: none;
   stroke: currentColor;
   stroke-width: 1.7;
