@@ -11342,6 +11342,16 @@ function showBlockContextMenu(x: number, y: number) {
     contextMenu.classList.remove("submenus-left");
     closeAllContextSubmenus(contextMenu);
     contextTextSelection.hidden = getSelectedContextText() === null;
+    // Con bullets seleccionados (pero sin selección de texto) ofrecer copiar el
+    // subtree, igual que hace el menú del icono de bullet.
+    const copyBullets = document.getElementById("ctx-copy-bullets");
+    if (copyBullets) copyBullets.hidden = selectedBulletIds.length === 0 || getSelectedContextText() !== null;
+    const copyBulletsLabel = document.getElementById("ctx-copy-bullets-label");
+    if (copyBulletsLabel) {
+      copyBulletsLabel.textContent = translate(
+        selectedBulletIds.length > 1 ? "Copiar bullets seleccionados" : "Copiar bullet"
+      );
+    }
     contextImageOcclusion.hidden = contextImageSource === null;
     const title = contextMenu.querySelector<HTMLElement>(".context-menu-title");
     if (title) title.textContent = translate(contextImageSource === null ? "Texto" : "Imagen");
@@ -11429,6 +11439,8 @@ function hideAllContextMenus() {
   contextMenu.classList.remove("submenus-left");
   bulletContextMenu.classList.remove("submenus-left");
   contextTextSelection.hidden = true;
+  const copyBullets = document.getElementById("ctx-copy-bullets");
+  if (copyBullets) copyBullets.hidden = true;
   contextTargetBlockId = null;
   contextTargetPage = null;
   contextImageSource = null;
@@ -11531,6 +11543,10 @@ function deleteContextSelection(): void {
 
 document.getElementById("ctx-text-copy")?.addEventListener("click", () => {
   void copyOrCutContextSelection(false);
+});
+document.getElementById("ctx-copy-bullets")?.addEventListener("click", () => {
+  void copySelectedBullets();
+  hideAllContextMenus();
 });
 document.getElementById("ctx-text-cut")?.addEventListener("click", () => {
   void copyOrCutContextSelection(true);
