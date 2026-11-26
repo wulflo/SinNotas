@@ -4458,8 +4458,9 @@ body.is-bullet-selecting {
 
 /* Paginador compacto: < x/X > en lugar de «Anterior · Página x de X · Siguiente». */
 .kanban-pagination .btn-pagination {
-  min-width: 36px;
-  padding: 6px 10px;
+  min-width: 34px;
+  min-height: 28px;
+  padding: 5px 8px;
   font-size: calc(15px * var(--ls-font-scale, 1));
   font-weight: 700;
   line-height: 1;
