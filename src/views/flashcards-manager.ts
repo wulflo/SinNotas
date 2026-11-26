@@ -282,6 +282,21 @@ export class FlashcardsManager {
     return { total, due, new: newCards };
   }
 
+  /** Suma todas las entradas del mapa (usado por «Todos los mazos»). */
+  public static sumAllCardStats(
+    statsByPage: ReadonlyMap<string, FlashcardPageStats>
+  ): FlashcardPageStats {
+    let total = 0;
+    let due = 0;
+    let newCards = 0;
+    for (const entry of statsByPage.values()) {
+      total += entry.total;
+      due += entry.due;
+      newCards += entry.new;
+    }
+    return { total, due, new: newCards };
+  }
+
   /**
    * Lee una propiedad solo si es una línea `clave:: valor`. Sin el anclaje,
    * un `hint` de `image-occlusions::` o una pregunta que mencionara `card-s::`

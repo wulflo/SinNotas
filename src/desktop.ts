@@ -97,6 +97,10 @@ import { collectOutgoingLinks } from "./store/wikilinks";
 import { connectedPageTitles, referenceGraphPages } from "./views/graph-neighborhood";
 import { renderBacklinkSnippetHtml, wireBacklinkWikilinks } from "./views/backlink-render";
 import { createPageIcon } from "./views/page-icon";
+import {
+  createImageBlobUrl,
+  imageUrlLoads as probeImageUrl,
+} from "./views/image-source";
 import { selectSidebarPages } from "./store/sidebar-selection";
 import {
   ContentSearchIndex,
@@ -2303,15 +2307,7 @@ function flashcardDeckStats(
 function allFlashcardStats(
   statsByPage: ReadonlyMap<string, FlashcardPageStats>
 ): FlashcardPageStats {
-  let total = 0;
-  let due = 0;
-  let newCards = 0;
-  for (const entry of statsByPage.values()) {
-    total += entry.total;
-    due += entry.due;
-    newCards += entry.new;
-  }
-  return { total, due, new: newCards };
+  return FlashcardsManager.sumAllCardStats(statsByPage);
 }
 
 function deckStatsLabel(stats: FlashcardPageStats): string {
@@ -6704,12 +6700,9 @@ async function resolveImageUrl(source: string): Promise<string | null> {
 }
 
 async function imageUrlLoads(url: string): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const probe = new Image();
-    probe.onload = () => resolve();
-    probe.onerror = () => reject(new Error(`No se pudo cargar la imagen desde ${url}`));
-    probe.src = url;
-  });
+  if (!(await probeImageUrl(url))) {
+    throw new Error(`No se pudo cargar la imagen desde ${url}`);
+  }
 }
 
 async function resolveDisplayImageUrl(source: string): Promise<string> {
@@ -6732,18 +6725,7 @@ async function resolveDisplayImageUrl(source: string): Promise<string> {
     try {
       const bytes = await invoke<number[]>("read_image_data", { source });
       const extension = imageExtension(source) || "png";
-      const mimeTypes: Record<string, string> = {
-        png: "image/png",
-        jpg: "image/jpeg",
-        jpeg: "image/jpeg",
-        webp: "image/webp",
-        svg: "image/svg+xml",
-        gif: "image/gif",
-        bmp: "image/bmp",
-      };
-      const blobUrl = URL.createObjectURL(new Blob([Uint8Array.from(bytes)], {
-        type: mimeTypes[extension] || "application/octet-stream",
-      }));
+      const blobUrl = createImageBlobUrl(bytes, extension);
       try {
         await imageUrlLoads(blobUrl);
       } catch (error) {

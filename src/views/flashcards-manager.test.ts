@@ -608,6 +608,17 @@ describe("FlashcardsManager - filtro de notas", () => {
   });
 });
 
+describe("FlashcardsManager.sumAllCardStats", () => {
+  it("suma total, pendientes y nuevas de todas las páginas", () => {
+    const stats = new Map([
+      ["A", { total: 4, due: 2, new: 1 }],
+      ["B", { total: 6, due: 3, new: 2 }],
+    ]);
+    expect(FlashcardsManager.sumAllCardStats(stats)).toEqual({ total: 10, due: 5, new: 3 });
+    expect(FlashcardsManager.sumAllCardStats(new Map())).toEqual({ total: 0, due: 0, new: 0 });
+  });
+});
+
 describe("FlashcardsManager - edición de tarjetas", () => {
   it("edita pregunta y respuesta conservando propiedades FSRS y la etiqueta #card", () => {
     const content = [

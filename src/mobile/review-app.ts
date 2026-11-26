@@ -56,6 +56,11 @@ import {
   reviewCardIdForBlock,
 } from "../views/review-target";
 import {
+  createImageBlobUrl,
+  decodeImageSource,
+  imageUrlLoads as probeImageUrl,
+} from "../views/image-source";
+import {
   buildDeckTree,
   collectDeckPageTitles,
   flattenDeckRows,
@@ -274,16 +279,6 @@ const MOBILE_ICONS = {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
       <path d="m5 12 4 4L19 6"></path>
     </svg>`,
-};
-
-const IMAGE_MIME_TYPES: Record<string, string> = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  webp: "image/webp",
-  svg: "image/svg+xml",
-  gif: "image/gif",
-  bmp: "image/bmp",
 };
 
 function requireElement<T extends Element>(root: ParentNode, selector: string): T {
@@ -1587,15 +1582,7 @@ class MobileReviewApp {
   }
 
   private allDeckStats(statsByPage: ReadonlyMap<string, FlashcardPageStats>): FlashcardPageStats {
-    let total = 0;
-    let due = 0;
-    let newCards = 0;
-    for (const entry of statsByPage.values()) {
-      total += entry.total;
-      due += entry.due;
-      newCards += entry.new;
-    }
-    return { total, due, new: newCards };
+    return FlashcardsManager.sumAllCardStats(statsByPage);
   }
 
   private createDeckCard(
@@ -3561,12 +3548,7 @@ class MobileReviewApp {
    * por IPC (igual que hace `resolveDisplayImageUrl` en escritorio).
    */
   private imageUrlLoads(url: string): Promise<boolean> {
-    return new Promise((resolve) => {
-      const probe = new Image();
-      probe.onload = () => resolve(true);
-      probe.onerror = () => resolve(false);
-      probe.src = url;
-    });
+    return probeImageUrl(url);
   }
 
   private async resolveImageUrl(source?: string): Promise<string | null> {
@@ -3585,12 +3567,8 @@ class MobileReviewApp {
     const cachedFallback = this.imageFallbackUrls.get(source);
     if (cachedFallback) return cachedFallback;
 
-    let decoded = source;
-    try {
-      decoded = decodeURIComponent(source);
-    } catch {
-      // Se conserva la ruta literal si los escapes URI no son válidos.
-    }
+    // Si los escapes URI no son válidos se conserva la ruta literal.
+    const decoded = decodeImageSource(source);
 
     if (!isTauri()) return decoded;
 
@@ -3601,9 +3579,7 @@ class MobileReviewApp {
       try {
         const bytes = await invoke<number[]>("read_image_data", { source: relative });
         const extension = decoded.split(/[?#]/, 1)[0].split(".").pop()?.toLowerCase() || "png";
-        const url = URL.createObjectURL(new Blob([Uint8Array.from(bytes)], {
-          type: IMAGE_MIME_TYPES[extension] || "application/octet-stream",
-        }));
+        const url = createImageBlobUrl(bytes, extension);
         this.imageFallbackUrls.set(source, url);
         return url;
       } catch (error) {
@@ -3636,10 +3612,7 @@ class MobileReviewApp {
     try {
       const bytes = await invoke<number[]>("read_image_data", { source: absolute });
       const extension = decoded.split(/[?#]/, 1)[0].split(".").pop()?.toLowerCase() || "png";
-      const blob = new Blob([Uint8Array.from(bytes)], {
-        type: IMAGE_MIME_TYPES[extension] || "application/octet-stream",
-      });
-      const url = URL.createObjectURL(blob);
+      const url = createImageBlobUrl(bytes, extension);
       this.imageFallbackUrls.set(source, url);
       return url;
     } catch (error) {
