@@ -5622,10 +5622,18 @@ body.is-bullet-selecting {
 
 .image-occlusion-stage img {
   display: block;
+  /* Aprovecha el ancho disponible sin estirar: `height:auto` conserva la
+     proporción y el stage sigue midiendo exactamente la imagen pintada. */
+  width: min(1000px, calc(100vw - 360px));
+  height: auto;
   max-width: none;
   max-height: none;
   border-radius: 12px;
   pointer-events: none;
+}
+
+.image-occlusion-overlay.is-review-occlusion .image-occlusion-stage img {
+  width: min(900px, calc(100vw - 40px));
 }
 
 .image-occlusion-overlay.image-block-loading .image-occlusion-stage,
@@ -6444,6 +6452,10 @@ body.is-bullet-selecting {
 .flashcard-image-viewport.is-zoomed .flashcard-image-scroller {
   max-height: 62vh;
   cursor: grab;
+  /* Con zoom sobran dos barras (horizontal y vertical) dentro del box, además
+     de la general de la app. La horizontal se oculta pero se sigue pudiendo
+     desplazar arrastrando (el pan del preview) con scrollLeft. */
+  overflow-x: hidden;
 }
 
 .flashcard-image-viewport.is-panning .flashcard-image-scroller {
