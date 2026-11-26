@@ -9906,17 +9906,20 @@ body.editor-split-active #view-editor .canvas-wrapper {
   padding: 0 10px 12px;
 }
 
-/* Botón «ver sin truncar»: la ranura deja de tener tope y todo el scroll lo
- * hace el cuerpo, sin contenedores anidados que corten el recorrido. */
+/* Botón «ver sin truncar»: la nota crece hasta su altura completa y el
+ * recorrido lo hace la sección de referencias (o la vista apilada), no una
+ * caja interior con doble scroll que volvía a truncar el contenido. */
 .reference-slot.is-expanded {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   max-height: none;
-  overflow: hidden;
+  height: auto;
+  overflow: visible;
 }
 
 .reference-slot.is-expanded .reference-slot-body {
   max-height: none;
+  overflow: visible;
 }
 
 .reference-page {
@@ -10001,11 +10004,12 @@ body.editor-split-active #view-editor .canvas-wrapper {
 
   .reference-slot.is-expanded {
     flex: 0 0 auto;
-    height: min(78vh, 900px);
+    height: auto;
   }
 
   .reference-slot.is-expanded .reference-slot-body {
     max-height: none;
+    overflow: visible;
   }
 }
 
