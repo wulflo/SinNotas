@@ -855,6 +855,11 @@ export class GraphView {
     const lineColor = isLight ? "rgba(0,0,0,0.12)" : "rgba(255,255,255,0.12)";
     const lineHighlight = isLight ? "#2563eb" : "#61afef";
     const textColor = isLight ? "#1f2937" : "#e5e9f0";
+    // El foco se marca con un halo suave del acento del tema, no con un trazo
+    // alrededor del círculo que tapaba la etiqueta del nodo.
+    const accentColor =
+      getComputedStyle(document.documentElement).getPropertyValue("--ls-accent").trim() ||
+      lineHighlight;
 
     // Cache node map for O(1) link rendering
     this.renderNodeMap.clear();
@@ -916,27 +921,19 @@ export class GraphView {
       const isSelected = this.selectedNode === node;
       const isJournal = node.isJournal;
 
-      if (isSelected) {
-        ctx.beginPath();
-        ctx.arc(node.x, node.y, node.radius + 7, 0, Math.PI * 2);
-        ctx.strokeStyle = lineHighlight;
-        ctx.lineWidth = this.settings.linkHighlightWidth;
-        ctx.stroke();
-      }
-
       ctx.beginPath();
-      ctx.arc(node.x, node.y, node.radius + (isHovered ? 3 : 0), 0, Math.PI * 2);
+      ctx.arc(node.x, node.y, node.radius + (isHovered ? 2 : 0), 0, Math.PI * 2);
 
       const nodeColor = node.computedColor || (isJournal ? (isLight ? "#f59e0b" : "#e5c07b") : (isLight ? "#2563eb" : "#61afef"));
       ctx.fillStyle = nodeColor;
+      if (isSelected || isHovered) {
+        ctx.shadowColor = accentColor;
+        ctx.shadowBlur = isSelected ? 20 : 12;
+      }
 
       ctx.fill();
-
-      if (isHovered) {
-        ctx.strokeStyle = "#ffffff";
-        ctx.lineWidth = 2;
-        ctx.stroke();
-      }
+      ctx.shadowBlur = 0;
+      ctx.shadowColor = "transparent";
 
       // Etiqueta: hover y selección siempre visibles (alpha 1, fuente mayor);
       // el resto hace fundido con labelAlpha y se salta si es 0. El fillStyle
