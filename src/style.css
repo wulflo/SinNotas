@@ -9381,6 +9381,16 @@ body.mobile-full-editor .desktop-review-only {
   display: none;
 }
 
+/* En pantalla vertical el mosaico de la sidebar no debe ofrecer Documentos y
+ * el panel de herramientas de la nota no debe ofrecer grafo/referencias: se
+ * abren paneles laterales que no caben. Se ocultan aquí (no en TS) para que
+ * el escritorio y la build de repaso sigan intactos. */
+body.mobile-full-editor .sidebar-nav #nav-pdf,
+body.mobile-full-editor #btn-graph-neighborhood,
+body.mobile-full-editor #btn-split-view {
+  display: none;
+}
+
 body.mobile-full-editor #app {
   flex-direction: column;
   height: 100dvh;

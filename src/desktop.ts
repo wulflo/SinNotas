@@ -17550,6 +17550,9 @@ btnCloseReferenceGraph?.addEventListener("click", hideReferenceGraph);
 /** Restaura el panel tras recargar; solo si el flag sigue activo. */
 function restoreEditorSplitView(): void {
   if (!btnSplitView) return;
+  // En el editor completo de Android el botón está oculto por CSS; tampoco
+  // debe reaparecer el panel de referencias guardado de otra sesión.
+  if (document.body.classList.contains("mobile-full-editor")) return;
   if (!splitViewEnabled()) {
     btnSplitView.hidden = true;
     return;
