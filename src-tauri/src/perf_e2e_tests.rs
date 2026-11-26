@@ -29,7 +29,8 @@
 //! editor. El arnés es una cota inferior del tiempo de app.
 
 use crate::metadata_cache::{self, CacheScanOutput};
-use crate::{graph_links_from_cache, run_content_search};
+use crate::content_search::run_content_search;
+use crate::graph_links_from_cache;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
