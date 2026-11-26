@@ -34,8 +34,15 @@ describe("normalización de atajos", () => {
     expect(normalizeShortcutEvent(key({ key: "Shift", code: "ShiftLeft", shiftKey: true }))).toBeNull();
   });
 
-  it("formatea Mod como Ctrl/Cmd", () => {
+  it("acepta teclas sueltas cuando se piden explícitamente", () => {
+    expect(normalizeShortcutEvent(key({ key: "Enter", code: "Enter" }), true)).toBe("Enter");
+    expect(normalizeShortcutEvent(key({ key: "Tab", code: "Tab", shiftKey: true }), true))
+      .toBe("Shift+Tab");
+  });
+
+  it("formatea Mod como Ctrl/Cmd y las flechas como símbolos", () => {
     expect(formatShortcut("Mod+Shift+C")).toBe("Ctrl/Cmd+Shift+C");
+    expect(formatShortcut("Shift+ArrowUp")).toBe("Shift+↑");
   });
 });
 
@@ -60,8 +67,10 @@ describe("asignación de atajos", () => {
     expect(validateShortcut("createCard", "Mod+V")).toMatchObject({ ok: false, reason: "reserved" });
   });
 
-  it("rechaza combinaciones sin modificador", () => {
+  it("rechaza combinaciones sin modificador salvo en atajos de una tecla", () => {
     expect(validateShortcut("createCard", null)).toMatchObject({ ok: false, reason: "invalid" });
+    expect(validateShortcut("createCard", "Enter")).toMatchObject({ ok: false, reason: "invalid" });
+    expect(validateShortcut("newBullet", "Enter")).toEqual({ ok: true });
   });
 
   it("guarda, aplica y restablece una combinación válida", () => {

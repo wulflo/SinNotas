@@ -4698,13 +4698,13 @@ window.addEventListener("keydown", (event) => {
     renderShortcutSettings();
     return;
   }
-  const result = assignBinding(capturingShortcutId, normalizeShortcutEvent(event));
+  const result = assignBinding(capturingShortcutId, normalizeShortcutEvent(event, true));
   if (!result.ok) {
     const reasonKey = result.reason === "duplicate"
       ? "Ese atajo ya está en uso por"
       : result.reason === "reserved"
         ? "Ese atajo está reservado por"
-        : "La combinación debe incluir Ctrl/Cmd o Alt.";
+        : "Combinación no válida para este atajo.";
     const conflict = result.conflictLabel ? ` ${translate(result.conflictLabel)}` : "";
     showToast(`${translate(reasonKey)}${conflict}`);
     return;
@@ -4932,7 +4932,7 @@ function closeMobileSidebar(): void {
 }
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && sidebarLeft.classList.contains("mobile-open")) {
+  if (matchesShortcut(event, "escape") && sidebarLeft.classList.contains("mobile-open")) {
     closeMobileSidebar();
   }
 });
@@ -8920,13 +8920,12 @@ document.addEventListener("keydown", (event: KeyboardEvent) => {
   // El arrastre de ratón puede dejar una selección de texto nativa residual,
   // así que estas operaciones no dependen de hasTextSelection.
   if (selectedBulletIds.length > 1) {
-    const isTab = event.key === "Tab" || event.code === "Tab";
-    if (isTab && !event.shiftKey) {
+    if (matchesShortcut(event, "indent")) {
       event.preventDefault();
       indentSelectedBullets();
       return;
     }
-    if (isTab && event.shiftKey) {
+    if (matchesShortcut(event, "outdent")) {
       event.preventDefault();
       outdentSelectedBullets();
       return;
@@ -8941,20 +8940,20 @@ document.addEventListener("keydown", (event: KeyboardEvent) => {
       outdentSelectedBullets();
       return;
     }
-    if (event.key === "Delete" || event.key === "Backspace") {
+    if (matchesShortcut(event, "deleteBullets") || event.key === "Backspace") {
       event.preventDefault();
       void deleteSelectedBullets();
       return;
     }
   }
 
-  if (!hasTextSelection && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "c") {
+  if (!hasTextSelection && matchesShortcut(event, "copyBullets")) {
     event.preventDefault();
     void copySelectedBullets();
-  } else if (!hasTextSelection && (event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "x") {
+  } else if (!hasTextSelection && matchesShortcut(event, "cutBullets")) {
     event.preventDefault();
     void cutSelectedBullets();
-  } else if (!hasTextSelection && (event.key === "Delete" || event.key === "Backspace")) {
+  } else if (!hasTextSelection && (matchesShortcut(event, "deleteBullets") || event.key === "Backspace")) {
     event.preventDefault();
     void deleteSelectedBullets();
   }
@@ -9013,12 +9012,10 @@ function performRedo(): void {
 
 document.addEventListener("keydown", (event: KeyboardEvent) => {
   const mod = event.ctrlKey || event.metaKey;
-  if (!mod) return;
-
   const key = event.key.toLowerCase();
-  const isUndo = key === "z" && !event.shiftKey;
-  // Ctrl+Y es el atajo clásico de rehacer; Ctrl+Shift+Z es la alternativa estándar.
-  const isRedo = key === "y" || (key === "z" && event.shiftKey);
+  const isUndo = matchesShortcut(event, "undo");
+  // Ctrl+Shift+Z es la alternativa estándar de rehacer (no reasignable).
+  const isRedo = matchesShortcut(event, "redo") || (mod && key === "z" && event.shiftKey);
   if (!isUndo && !isRedo) return;
 
   const target = event.target;
@@ -9046,8 +9043,7 @@ function consumePendingPlainPaste(): boolean {
 document.addEventListener(
   "keydown",
   (event: KeyboardEvent) => {
-    const mod = event.ctrlKey || event.metaKey;
-    if (mod && event.shiftKey && event.key.toLowerCase() === "v") {
+    if (matchesShortcut(event, "pastePlain")) {
       pendingPlainPaste = true;
       return;
     }
@@ -9062,7 +9058,11 @@ document.addEventListener(
 document.addEventListener(
   "keyup",
   (event: KeyboardEvent) => {
-    if (event.key.toLowerCase() === "v" || !event.shiftKey) pendingPlainPaste = false;
+    const parts = getBinding("pastePlain").split("+");
+    const plainKey = parts[parts.length - 1] || "V";
+    if (event.key.toLowerCase() === plainKey.toLowerCase() || !event.shiftKey) {
+      pendingPlainPaste = false;
+    }
   },
   true
 );
@@ -9445,7 +9445,7 @@ function handleEditorKeyDown(e: KeyboardEvent, blockId: string, page: PageData =
     const options = Array.from(
       wikilinkAutocompleteMenu.querySelectorAll<HTMLButtonElement>(".wikilink-autocomplete-option")
     );
-    if (e.key === "Escape") {
+    if (matchesShortcut(e, "escape")) {
       e.preventDefault();
       hideWikilinkAutocomplete();
       return;
@@ -9483,13 +9483,12 @@ function handleEditorKeyDown(e: KeyboardEvent, blockId: string, page: PageData =
   // funcionan aunque haya una selección de texto nativa residual (creada,
   // p. ej., por un arrastre real de ratón sobre los bullets).
   if (selectedBulletIds.length > 1) {
-    const isTab = e.key === "Tab" || e.code === "Tab";
-    if (isTab && !e.shiftKey) {
+    if (matchesShortcut(e, "indent")) {
       e.preventDefault();
       indentSelectedBullets(page);
       return;
     }
-    if (isTab && e.shiftKey) {
+    if (matchesShortcut(e, "outdent")) {
       e.preventDefault();
       outdentSelectedBullets(page);
       return;
@@ -9504,26 +9503,26 @@ function handleEditorKeyDown(e: KeyboardEvent, blockId: string, page: PageData =
       outdentSelectedBullets(page);
       return;
     }
-    if (e.key === "Delete" || e.key === "Backspace") {
+    if (matchesShortcut(e, "deleteBullets") || e.key === "Backspace") {
       e.preventDefault();
       void deleteSelectedBullets(page);
       return;
     }
   }
 
-  if (hasBulletSelection && !hasTextSelection && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "c") {
+  if (hasBulletSelection && !hasTextSelection && matchesShortcut(e, "copyBullets")) {
     e.preventDefault();
     void copySelectedBullets(page);
     return;
   }
 
-  if (hasBulletSelection && !hasTextSelection && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "x") {
+  if (hasBulletSelection && !hasTextSelection && matchesShortcut(e, "cutBullets")) {
     e.preventDefault();
     void cutSelectedBullets(page);
     return;
   }
 
-  if (hasBulletSelection && !hasTextSelection && (e.key === "Delete" || e.key === "Backspace")) {
+  if (hasBulletSelection && !hasTextSelection && (matchesShortcut(e, "deleteBullets") || e.key === "Backspace")) {
     e.preventDefault();
     void deleteSelectedBullets(page);
     return;
@@ -9555,14 +9554,15 @@ function handleEditorKeyDown(e: KeyboardEvent, blockId: string, page: PageData =
     return;
   }
 
+  const selectUp = matchesShortcut(e, "selectAdjacentUp");
+  const selectDown = matchesShortcut(e, "selectAdjacentDown");
   if (
-    e.shiftKey &&
-    (e.key === "ArrowUp" || e.key === "ArrowDown") &&
-    ((e.key === "ArrowUp" && offset === 0) || (e.key === "ArrowDown" && offset >= textLen))
+    (selectUp && offset === 0) ||
+    (selectDown && offset >= textLen)
   ) {
     const visible = getFlatVisibleBlocks(page.blocks);
     const currentIndex = visible.findIndex((block) => block.id === blockId);
-    const nextIndex = currentIndex + (e.key === "ArrowUp" ? -1 : 1);
+    const nextIndex = currentIndex + (selectUp ? -1 : 1);
     const target = visible[nextIndex];
     if (target) {
       e.preventDefault();
@@ -9574,14 +9574,14 @@ function handleEditorKeyDown(e: KeyboardEvent, blockId: string, page: PageData =
         targetEditor.focus();
         setCaretOffset(
           targetEditor,
-          e.key === "ArrowUp" ? serializeEditorContent(targetEditor).length : 0
+          selectUp ? serializeEditorContent(targetEditor).length : 0
         );
       }
     }
     return;
   }
 
-  if (e.key === "Enter" && !e.shiftKey) {
+  if (matchesShortcut(e, "newBullet")) {
     e.preventDefault();
     if (offset >= textLen) {
       // Enter en un bullet vacío: primero lo desindenta un nivel y, en el
@@ -9628,7 +9628,7 @@ function handleEditorKeyDown(e: KeyboardEvent, blockId: string, page: PageData =
   }
 
  // 2. Mover a la derecha con TAB simple (evalúa key o code)
-if ((e.key === "Tab" || e.code === "Tab") && !e.shiftKey) {
+if (matchesShortcut(e, "indent")) {
   e.preventDefault();
   const newTree = indentBlock(page.blocks, blockId);
   if (newTree) {
@@ -9641,7 +9641,7 @@ if ((e.key === "Tab" || e.code === "Tab") && !e.shiftKey) {
 }
 
 // 3. Mover a la izquierda con Shift + TAB (evalúa key o code)
-if ((e.key === "Tab" || e.code === "Tab") && e.shiftKey) {
+if (matchesShortcut(e, "outdent")) {
   e.preventDefault();
   const newTree = outdentBlock(page.blocks, blockId);
   if (newTree) {
@@ -9653,7 +9653,7 @@ if ((e.key === "Tab" || e.code === "Tab") && e.shiftKey) {
   return;
 }
 
-  if (e.key === "Backspace" && offset === 0) {
+  if (matchesShortcut(e, "mergePrevious") && offset === 0) {
     const res = deleteOrMergeBlock(page.blocks, blockId);
     if (res) {
       e.preventDefault();
@@ -14992,7 +14992,7 @@ graphPreviewOpenButton.addEventListener("click", () => {
   loadPage(title);
 });
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && graphPreviewEl.classList.contains("is-open")) {
+  if (matchesShortcut(event, "escape") && graphPreviewEl.classList.contains("is-open")) {
     closeGraphPreview();
   }
 });
@@ -17055,7 +17055,7 @@ noteFindInput?.addEventListener("keydown", (event: KeyboardEvent) => {
     event.preventDefault();
     event.stopPropagation();
     moveNoteFind(-1);
-  } else if (event.key === "Escape") {
+  } else if (matchesShortcut(event, "escape")) {
     event.preventDefault();
     event.stopPropagation();
     closeNoteFind();
@@ -17645,7 +17645,7 @@ sidebarSearchInput.addEventListener("keydown", (e: KeyboardEvent) => {
         loadPage(newPage.title);
       }
     }
-  } else if (e.key === "Escape") {
+  } else if (matchesShortcut(e, "escape")) {
     closeSearchResults();
   }
 });
@@ -17673,7 +17673,7 @@ window.addEventListener("keydown", (e: KeyboardEvent) => {
     }
   }
 
-  if (e.key === "Escape" && noteFindBar && !noteFindBar.hidden) {
+  if (matchesShortcut(e, "escape") && noteFindBar && !noteFindBar.hidden) {
     e.preventDefault();
     closeNoteFind();
     return;
@@ -17687,10 +17687,10 @@ window.addEventListener("keydown", (e: KeyboardEvent) => {
     return;
   }
 
-  if (e.key === "Escape" && wikilinkAutocompleteMenu && !wikilinkAutocompleteMenu.hidden) {
+  if (matchesShortcut(e, "escape") && wikilinkAutocompleteMenu && !wikilinkAutocompleteMenu.hidden) {
     hideWikilinkAutocomplete();
   }
-  if (e.key === "Escape" && slashMenu && !slashMenu.hidden) {
+  if (matchesShortcut(e, "escape") && slashMenu && !slashMenu.hidden) {
     hideSlashMenu();
   }
   if (matchesShortcut(e, "sidebar")) {
@@ -17710,7 +17710,7 @@ window.addEventListener("keydown", (e: KeyboardEvent) => {
     return;
   }
 
-  if (e.key === "Escape") {
+  if (matchesShortcut(e, "escape")) {
     closeAllModalOverlays();
     hideAllContextMenus();
     closeSearchResults();
@@ -17725,7 +17725,7 @@ window.addEventListener("keydown", (e: KeyboardEvent) => {
       flashcardKeyboardTarget.isContentEditable);
 
   if (currentView === "flashcards" && !flashcardExplorerActive && !isTypingInField) {
-    if (e.key === " " && !flashcardsManager.isRevealed()) {
+    if (matchesShortcut(e, "revealAnswer") && !flashcardsManager.isRevealed()) {
       e.preventDefault();
       handleRevealAnswer();
       return;
