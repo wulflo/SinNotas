@@ -938,26 +938,10 @@ input[type="checkbox"] {
 /* Tinte suave del acento sobre la superficie del calendario. Se replica la
    especificidad de los bloques de tema (0,3,0) y se declara después para ganar
    por orden de aparición; el token de superficie cambia según el tema. */
-:root[data-theme="light"] .journal-calendar {
-  border-color: color-mix(in srgb, var(--md-primary) 22%, var(--ma-glass-border));
-  background:
-    var(--ma-sheen),
-    linear-gradient(
-      160deg,
-      color-mix(in srgb, var(--md-primary) 16%, var(--ma-glass-strong)) 0%,
-      color-mix(in srgb, var(--md-primary) 8%, var(--ma-glass-strong)) 100%
-    );
-}
-
+:root[data-theme="light"] .journal-calendar,
 :root:not([data-theme="light"]) .journal-calendar {
-  border-color: color-mix(in srgb, var(--md-primary) 30%, var(--ma-glass-border));
-  background:
-    var(--ma-sheen),
-    linear-gradient(
-      160deg,
-      color-mix(in srgb, var(--md-primary) 18%, var(--ma-glass)) 0%,
-      color-mix(in srgb, var(--md-primary) 9%, var(--ma-glass)) 100%
-    );
+  border-color: var(--md-outline-variant);
+  background: var(--md-surface-container-low);
 }
 
 .journals-layout-wrapper {

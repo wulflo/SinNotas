@@ -8745,13 +8745,10 @@ body.mobile-full-editor .flashcard-review-tools {
   max-width: 280px;
   margin: 20px 0 20px 20px;
   padding: 16px;
-  background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--ls-accent) 10%, transparent) 0%,
-      transparent 48%
-    ),
-    var(--ls-card-bg);
-  border: 1px solid color-mix(in srgb, var(--ls-accent) 26%, var(--ls-card-border));
+  /* Superficie del tema (Aero/Simple/Drácula la redefinen), sin degradados
+     de acento: el calendario debe leerse como un panel sobrio. */
+  background: var(--md-surface-container-low);
+  border: 1px solid var(--md-outline-variant);
   border-radius: 12px;
   box-shadow: none;
   flex-shrink: 0;
@@ -8876,8 +8873,12 @@ body.mobile-full-editor .flashcard-review-tools {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 18px;
-  color: var(--ls-text-title);
+  margin-bottom: 14px;
+  color: var(--md-on-surface);
+}
+
+.journal-calendar-navigation .btn-icon {
+  border-radius: 8px;
 }
 
 .journal-calendar-header h2 {
@@ -8899,9 +8900,10 @@ body.mobile-full-editor .flashcard-review-tools {
 
 .journal-calendar-weekday {
   padding: 5px 0;
-  color: var(--ls-text-muted);
+  color: var(--md-on-surface-variant);
   font-size: calc(10px * var(--ls-font-scale, 1));
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.04em;
   text-align: center;
 }
 
@@ -8914,37 +8916,38 @@ body.mobile-full-editor .flashcard-review-tools {
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--ls-text-primary);
+  color: var(--md-on-surface);
   font: inherit;
   font-size: calc(11.5px * var(--ls-font-scale, 1));
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
 .journal-calendar-day:hover:not(:disabled) {
-  background: var(--ls-bg-hover);
+  background: var(--md-state-hover);
 }
 
 .journal-calendar-day:disabled {
-  color: var(--ls-text-muted);
-  opacity: 0.4;
+  color: var(--md-on-surface-variant);
+  opacity: 0.45;
   cursor: default;
 }
 
 .journal-calendar-day.is-today {
-  outline: 1px solid var(--ls-accent);
+  outline: 1px solid var(--md-primary);
   outline-offset: -2px;
 }
 
 .journal-calendar-day.has-journal {
-  background: var(--ls-accent-subtle);
-  color: var(--ls-accent);
+  background: var(--md-primary-container);
+  color: var(--md-on-primary-container);
   font-weight: 700;
 }
 
 .journal-calendar-day.is-today.has-journal {
-  background: var(--ls-accent);
-  color: var(--ls-accent-foreground);
+  background: var(--md-primary);
+  color: var(--md-on-primary);
 }
 
 .journal-calendar-marker {
