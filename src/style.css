@@ -4283,6 +4283,44 @@ body.is-bullet-selecting {
   accent-color: var(--ls-accent);
 }
 
+.kanban-clean-completed-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--ls-text-muted);
+  font-size: calc(12px * var(--ls-font-scale, 1));
+}
+
+.kanban-clean-button {
+  min-width: 38px;
+  padding: 5px 8px;
+  border: 1px solid var(--ls-border-color);
+  border-radius: 8px;
+  background: var(--ls-bg-secondary);
+  color: var(--ls-text-primary);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.kanban-clean-button:hover:not(:disabled) {
+  border-color: var(--ls-accent);
+  background: var(--ls-accent-subtle);
+  color: var(--ls-accent);
+}
+
+.kanban-clean-button:focus-visible {
+  outline: 2px solid var(--ls-accent);
+  outline-offset: 1px;
+}
+
+.kanban-clean-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .kanban-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

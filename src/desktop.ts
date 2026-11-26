@@ -139,6 +139,7 @@ import {
   type CardMiniEditorRow,
 } from "./views/card-mini-editor";
 import { KanbanManager } from "./views/kanban-view";
+import { completedTasksToRemove, groupTasksByPage } from "./views/kanban-cleanup";
 import { PdfReaderView } from "./views/pdf-view";
 import { BibliographyView, type BibliographyHost } from "./views/bibliography-view";
 import {
@@ -1083,11 +1084,19 @@ const pdfView = new PdfReaderView(viewPdf, {
 const bibliographyView = new BibliographyView(viewBibliography, createBibliographyHost());
 const btnPdfToggleEditor = document.getElementById("pdf-toggle-editor") as HTMLButtonElement | null;
 const kanbanHideCompleted = document.getElementById("kanban-hide-completed") as HTMLInputElement;
+const kanbanCleanButtons = document.querySelectorAll<HTMLButtonElement>("[data-clean-days]");
+let kanbanCleanInFlight = false;
 let draggedKanbanTask: KanbanTask | null = null;
 kanbanHideCompleted.checked = localStorage.getItem("sinnotas-kanban-hide-completed") === "true";
 kanbanHideCompleted.addEventListener("change", () => {
   localStorage.setItem("sinnotas-kanban-hide-completed", String(kanbanHideCompleted.checked));
   renderKanbanBoard();
+});
+kanbanCleanButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const days = Number(button.dataset.cleanDays) === 30 ? 30 : 7;
+    void cleanCompletedKanbanTasks(days);
+  });
 });
 document.querySelectorAll<HTMLElement>(".kanban-column[data-kanban-status]").forEach((column) => {
   column.addEventListener("dragover", (event) => {
@@ -10864,6 +10873,74 @@ function renderKanbanBoard() {
   // rescan incremental procesa solo las notas recién hidratadas (epoch
   // centinela), así que re-renderizar es barato.
   void ensureKanbanContentLoaded();
+}
+
+/**
+ * Borra las tareas DONE completadas dentro del periodo elegido. Se agrupa por
+ * nota, se guarda una vez por página y se revierte el árbol en memoria si
+ * falla la escritura. Las tareas sin `done-at::` no se tocan.
+ */
+async function cleanCompletedKanbanTasks(days: 7 | 30): Promise<void> {
+  if (kanbanCleanInFlight) return;
+  const candidates = completedTasksToRemove(
+    kanbanManager.getTasksByStatus("done"),
+    days,
+    Date.now()
+  );
+  if (candidates.length === 0) {
+    showToast(translate("No hay tareas completadas en ese periodo"));
+    return;
+  }
+  const confirmed = await confirmAction(
+    translate("¿Borrar las tareas completadas del periodo elegido? Solo se quitan las tareas DONE con fecha en ese rango. El deshacer es por nota."),
+    translate("Confirmar acción")
+  );
+  if (!confirmed) return;
+
+  kanbanCleanInFlight = true;
+  kanbanCleanButtons.forEach((button) => { button.disabled = true; });
+  let removed = 0;
+  try {
+    for (const [pageId, tasks] of groupTasksByPage(
+      candidates,
+      vault.getPages().map((candidate) => candidate.id)
+    )) {
+      const page = vault.getPages().find((candidate) => candidate.id === pageId);
+      if (!page) continue;
+      await vault.ensurePageLoaded(page, { pin: true });
+      if (page.blocksLoaded === false) continue;
+
+      // El task puede estar desactualizado: comprobar el bloque real antes de borrar.
+      const ids = tasks
+        .filter((task) => {
+          const location = findNodeLocation(page.blocks, task.blockId);
+          return Boolean(location && /^DONE\s/i.test(location.parentList[location.index].content));
+        })
+        .map((task) => task.blockId);
+      if (ids.length === 0) continue;
+
+      const previous = page.blocks;
+      page.blocks = removeBlocks(page.blocks, new Set(ids));
+      try {
+        await vault.savePage(page, true);
+        removed += ids.length;
+      } catch (error) {
+        page.blocks = previous;
+        throw error;
+      }
+      // Ceder el hilo entre notas mantiene la UI fluida con bóvedas grandes.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    }
+    renderKanbanBoard();
+    showToast(`${translate("Tareas eliminadas")}: ${removed}`);
+  } catch (error) {
+    console.error("No se pudieron borrar las tareas completadas:", error);
+    showToast(translate("No se pudo borrar todas las tareas"));
+    renderKanbanBoard();
+  } finally {
+    kanbanCleanInFlight = false;
+    kanbanCleanButtons.forEach((button) => { button.disabled = false; });
+  }
 }
 
 /** Stream de hidratación de notas para el tablero Kanban (boot de metadatos). */
