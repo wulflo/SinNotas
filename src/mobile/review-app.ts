@@ -42,6 +42,12 @@ import {
   type FlashcardDeckFile,
 } from "../store/flashcard-decks";
 import { FlashcardDeckRepository } from "../store/flashcard-deck-storage";
+import {
+  applyCardMiniEditor,
+  cardMiniEditorRows,
+  changeCardMiniEditorIndent,
+  type CardMiniEditorRow,
+} from "../views/card-mini-editor";
 import type { BlockNode, Flashcard, FlashcardType, ImageOcclusionRegion, PageData } from "../types";
 import { FlashcardsManager, type FlashcardPageStats } from "../views/flashcards-manager";
 import {
@@ -310,6 +316,8 @@ class MobileReviewApp {
 
   private pages: PageData[] = [];
   private editing: EditingContext | null = null;
+  private cardEditBlock: BlockNode | null = null;
+  private cardEditRows: CardMiniEditorRow[] = [];
   private occlusionEditing: OcclusionEditingContext | null = null;
   private occlusionDrag: OcclusionDragState | null = null;
   private accent: AccentColor = DEFAULT_ACCENT;
@@ -397,6 +405,8 @@ class MobileReviewApp {
     questionField: HTMLElement;
     answerField: HTMLElement;
     textField: HTMLElement;
+    childrenField: HTMLElement;
+    cardEditorRows: HTMLElement;
     questionInput: HTMLTextAreaElement;
     answerInput: HTMLTextAreaElement;
     textInput: HTMLTextAreaElement;
@@ -522,6 +532,10 @@ class MobileReviewApp {
             <span>Texto de la tarjeta</span>
             <textarea data-edit-text rows="6" spellcheck="false"></textarea>
           </label>
+          <div class="mobile-editor-field" data-children-field hidden>
+            <span>Bullets hijos</span>
+            <div class="mobile-card-editor-rows" data-card-edit-rows></div>
+          </div>
           <p class="mobile-editor-hint">Solo se modifica este bloque. Se conservan las propiedades FSRS, la etiqueta #card y el resto de la nota.</p>
           <footer class="mobile-editor-actions">
             <button class="mobile-secondary" type="button" data-action="close-editor">Cancelar</button>
@@ -853,6 +867,8 @@ class MobileReviewApp {
       questionField: requireElement(this.root, "[data-question-field]"),
       answerField: requireElement(this.root, "[data-answer-field]"),
       textField: requireElement(this.root, "[data-text-field]"),
+      childrenField: requireElement(this.root, "[data-children-field]"),
+      cardEditorRows: requireElement(this.root, "[data-card-edit-rows]"),
       questionInput: requireElement(this.root, "[data-edit-question]"),
       answerInput: requireElement(this.root, "[data-edit-answer]"),
       textInput: requireElement(this.root, "[data-edit-text]"),
@@ -2172,6 +2188,73 @@ class MobileReviewApp {
     }
   }
 
+  private cardEditorFields(): { question: string; answer: string; text: string } {
+    return {
+      question: this.refs.questionInput.value,
+      answer: this.refs.answerInput.value,
+      text: this.refs.textInput.value,
+    };
+  }
+
+  /** Vuelca campos y filas en la copia de trabajo antes de guardar o indentar. */
+  private commitCardEditRows(): void {
+    if (!this.cardEditBlock || !this.editing) return;
+    this.cardEditBlock = applyCardMiniEditor(
+      this.cardEditBlock,
+      this.editing.cardType,
+      this.cardEditorFields(),
+      this.cardEditRows
+    );
+  }
+
+  private renderCardEditRows(includeRoot: boolean): void {
+    if (!this.cardEditBlock) return;
+    this.cardEditRows = cardMiniEditorRows(this.cardEditBlock, includeRoot);
+    this.refs.childrenField.hidden = this.cardEditRows.length === 0;
+    this.refs.cardEditorRows.replaceChildren();
+    this.cardEditRows.forEach((row) => {
+      const line = document.createElement("div");
+      line.className = "mobile-card-editor-row";
+      line.style.setProperty("--card-edit-depth", String(row.depth));
+
+      const textarea = document.createElement("textarea");
+      textarea.rows = 2;
+      textarea.value = row.text;
+      textarea.readOnly = row.isImage;
+      textarea.setAttribute("aria-label", `${translate("Bullet")} ${row.depth + 1}`);
+      textarea.addEventListener("input", () => {
+        row.text = textarea.value;
+      });
+
+      const actions = document.createElement("div");
+      actions.className = "mobile-card-editor-row-actions";
+      if (!row.isImage && row.depth > 0) {
+        (["in", "out"] as const).forEach((direction) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "mobile-icon-button";
+          button.textContent = direction === "in" ? "↳" : "↰";
+          button.title = translate(direction === "in" ? "Indentar" : "Desindentar");
+          button.setAttribute("aria-label", button.title);
+          button.addEventListener("click", () => {
+            this.commitCardEditRows();
+            if (!this.cardEditBlock) return;
+            this.cardEditBlock = changeCardMiniEditorIndent(
+              this.cardEditBlock,
+              row.id,
+              direction
+            );
+            this.renderCardEditRows(includeRoot);
+          });
+          actions.appendChild(button);
+        });
+      }
+
+      line.append(textarea, actions);
+      this.refs.cardEditorRows.appendChild(line);
+    });
+  }
+
   private openEditor(): void {
     if (this.busy || this.historyActionInFlight) return;
     const card = this.manager.getCurrentCard();
@@ -2188,10 +2271,13 @@ class MobileReviewApp {
     const isBasic = card.cardType === "basic";
     this.refs.questionField.hidden = !isBasic;
     this.refs.answerField.hidden = !isBasic;
-    this.refs.textField.hidden = isBasic;
+    // En cloze el bullet de la card se edita en el minieditor, junto a sus hijos.
+    this.refs.textField.hidden = true;
     this.refs.questionInput.value = fields.question;
     this.refs.answerInput.value = fields.answer;
     this.refs.textInput.value = fields.text;
+    this.cardEditBlock = block;
+    this.renderCardEditRows(!isBasic);
 
     this.editing = {
       cardId: card.id,
@@ -2210,6 +2296,9 @@ class MobileReviewApp {
 
   private closeEditor(): void {
     this.editing = null;
+    this.cardEditBlock = null;
+    this.cardEditRows = [];
+    this.refs.cardEditorRows.replaceChildren();
     this.refs.editor.hidden = true;
     this.syncOverlayState();
   }
@@ -2230,16 +2319,16 @@ class MobileReviewApp {
   private async saveEditor(): Promise<void> {
     if (!this.editing) return;
     const { cardId, pageId, blockId, cardType } = this.editing;
-    const fields = {
-      question: this.refs.questionInput.value,
-      answer: this.refs.answerInput.value,
-      text: this.refs.textInput.value,
-    };
+    const fields = this.cardEditorFields();
+    this.commitCardEditRows();
+    const editedBlock = this.cardEditBlock;
+    if (!editedBlock) return;
 
-    const isBasic = cardType === "basic";
-    const required = isBasic ? fields.question.trim() : fields.text.trim();
+    const required = cardType === "basic"
+      ? fields.question.trim()
+      : FlashcardsManager.readEditableFields(editedBlock.content, "cloze").text.trim();
     if (!required) {
-      this.showToast(isBasic ? "La pregunta no puede estar vacía." : "El texto no puede estar vacío.");
+      this.showToast(cardType === "basic" ? "La pregunta no puede estar vacía." : "El texto no puede estar vacío.");
       return;
     }
 
@@ -2256,7 +2345,9 @@ class MobileReviewApp {
 
     const block = location.parentList[location.index];
     const previousContent = block.content;
-    block.content = FlashcardsManager.applyCardEdit(block.content, cardType, fields);
+    const previousChildren = block.children;
+    block.content = editedBlock.content;
+    block.children = editedBlock.children;
 
     this.refs.saveEditor.disabled = true;
     this.setBusy(true);
@@ -2270,6 +2361,7 @@ class MobileReviewApp {
       this.showToast("Tarjeta guardada. Propiedades y nota intactas.");
     } catch (error) {
       block.content = previousContent;
+      block.children = previousChildren;
       console.error("No se pudo guardar la edición de la tarjeta:", error);
       this.showToast("No se pudo guardar la tarjeta. Revisa los permisos de la bóveda.");
     } finally {

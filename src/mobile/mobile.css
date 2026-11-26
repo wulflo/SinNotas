@@ -1169,6 +1169,47 @@ body.mobile-review-body {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--mobile-accent) 22%, transparent);
 }
 
+/* Minieditor del bullet de la tarjeta y sus hijos (mismo comportamiento que
+ * la review de escritorio): la sangría se respeta visualmente y se puede
+ * cambiar con ↳ / ↰ sin perder las propiedades del bloque. */
+.mobile-card-editor-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobile-card-editor-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding-left: calc(var(--card-edit-depth, 0) * 16px);
+}
+
+.mobile-card-editor-row textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 10px;
+}
+
+.mobile-card-editor-row textarea[readonly] {
+  opacity: 0.7;
+  resize: none;
+}
+
+.mobile-card-editor-row-actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobile-card-editor-row-actions .mobile-icon-button {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 4px;
+}
+
 .mobile-editor-hint {
   margin: 4px 0 16px;
   color: var(--mobile-muted);
