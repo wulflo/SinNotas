@@ -8956,8 +8956,8 @@ body.mobile-full-editor .flashcard-review-tools {
 .journal-calendar-marker {
   position: absolute;
   bottom: 6%;
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
   background: currentColor;
 }
