@@ -269,6 +269,26 @@ const SAVE_DEBOUNCE_MS = 300;
  * campo, el usuario (o soporte) vuelve al arranque completo sin actualizar
  * la app.
  */
+/**
+ * La bóveda SAF no tiene ruta de filesystem: el backend guarda el `DirPath`
+ * serializado (`{"topTreeUri":"content://…","relativeTerms":[…]}`) como raíz
+ * activa. Detectarla evita construir rutas `join(root, rel)` imposibles y
+ * permite leer imágenes por IPC (`read_image_data`) directamente.
+ */
+export function isSafVaultRoot(rootPath: string | null | undefined): boolean {
+  if (!rootPath) return false;
+  const trimmed = rootPath.trim();
+  if (!trimmed.startsWith("{")) return false;
+  try {
+    const parsed: unknown = JSON.parse(trimmed);
+    if (!parsed || typeof parsed !== "object") return false;
+    const uri = (parsed as { topTreeUri?: unknown }).topTreeUri;
+    return typeof uri === "string" && uri.startsWith("content://");
+  } catch {
+    return false;
+  }
+}
+
 export function isMetadataOnlyBoot(): boolean {
   try {
     const stored = window.localStorage.getItem(METADATA_BOOT_STORAGE_KEY);

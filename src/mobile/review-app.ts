@@ -24,7 +24,7 @@ import { isRemoteImageSource, resolveAllowedRemoteImageUrl } from "../editor/url
 import { DocumentHistory, type DocumentHistoryEntry } from "../editor/history";
 import { sanitizeHtml } from "../editor/markdown";
 import { findNodeLocation, getAllBlocksFlat } from "../editor/tree-engine";
-import { initialVaultPages, VaultStore } from "../store/vault";
+import { initialVaultPages, isSafVaultRoot, VaultStore } from "../store/vault";
 import { ReviewProgressStore, type ReviewProgressEvent } from "../store/review-progress";
 import {
   addFlashcardDeck,
@@ -3543,8 +3543,25 @@ class MobileReviewApp {
 
     if (!isTauri()) return decoded;
 
-    const requestId = ++this.imageRequest;
     const root = this.vault.getActiveRootPath();
+    if (isSafVaultRoot(root)) {
+      // SAF no tiene rutas de filesystem: el backend resuelve el document URI.
+      const relative = decoded.replace(/^\.\//, "").replace(/\\/g, "/");
+      try {
+        const bytes = await invoke<number[]>("read_image_data", { source: relative });
+        const extension = decoded.split(/[?#]/, 1)[0].split(".").pop()?.toLowerCase() || "png";
+        const url = URL.createObjectURL(new Blob([Uint8Array.from(bytes)], {
+          type: IMAGE_MIME_TYPES[extension] || "application/octet-stream",
+        }));
+        this.imageFallbackUrls.set(source, url);
+        return url;
+      } catch (error) {
+        console.error("No se pudo leer la imagen SAF de la tarjeta:", error);
+        return null;
+      }
+    }
+
+    const requestId = ++this.imageRequest;
     const absolute = /^(?:\/|[a-z]:[\\/])/i.test(decoded)
       ? decoded
       : root

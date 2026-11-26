@@ -4067,11 +4067,10 @@ fn resolve_image_path(
 }
 
 #[tauri::command]
-fn read_image_data(
+async fn read_image_data(
     source: String,
     state: tauri::State<'_, ActiveVault>,
 ) -> Result<Vec<u8>, String> {
-    let root = active_root(&state)?;
     let extension = Path::new(&source)
         .extension()
         .and_then(|value| value.to_str())
@@ -4083,6 +4082,15 @@ fn read_image_data(
     ) {
         return Err("La ruta no corresponde a una imagen compatible.".to_string());
     }
+
+    // En SAF no hay filesystem: `active_root()` está vacío y las imágenes se
+    // leen por document URI a través del plugin android-fs.
+    let storage = active_storage(&state)?;
+    if storage.storage_id() == "saf" {
+        return storage.read_image(&source).await;
+    }
+
+    let root = active_root(&state)?;
     let canonical_path =
         fs::canonicalize(resolve_vault_path(&root, &source)?).map_err(|err| err.to_string())?;
     if !canonical_path.starts_with(&root) {
