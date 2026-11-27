@@ -12960,10 +12960,10 @@ function updateFlashcardProgressTree(force = false): void {
   if (pointsChanged) {
     renderedFlashcardPoints = points;
     if (flashcardTreeProgress) {
-      const pointsText = `${points} ${points === 1 ? "punto" : "puntos"}`;
+      const pointsText = `${points} ${translate(points === 1 ? "punto" : "puntos")}`;
       flashcardTreeProgress.textContent =
         stage.kind === "proton"
-          ? `${pointsText} · Protón`
+          ? `${pointsText} · ${translate("Protón")}`
           : stage.kind === "element"
             ? `${pointsText} · ${stage.element.name} (Z=${stage.element.z})`
             : `${pointsText} · ${stage.molecule.formula} · ${stage.molecule.name}`;
@@ -12988,9 +12988,9 @@ function updateFlashcardProgressTree(force = false): void {
 }
 
 function updateFlashcardProgressPanel(): void {
-  flashcardHeatmapFocus.textContent = `${Math.floor(flashcardProgressStats.focusSeconds / 60)} min de enfoque hoy`;
+  flashcardHeatmapFocus.textContent = translate("min de enfoque hoy").replace("{n}", String(Math.floor(flashcardProgressStats.focusSeconds / 60)));
   const points = Math.max(0, Math.floor(flashcardProgressStats.points));
-  const pointsLabel = `${points} ${points === 1 ? "pt" : "pts"}`;
+  const pointsLabel = `${points} ${translate(points === 1 ? "pt" : "pts")}`;
   if (flashcardPointsBadge.textContent !== pointsLabel) flashcardPointsBadge.textContent = pointsLabel;
   updateFlashcardProgressTree();
 }
@@ -13029,7 +13029,7 @@ function renderFlashcardHeatmap(): void {
       if (day.date) {
         totalReviews += day.count;
         cell.dataset.level = String(day.level);
-        cell.title = `${day.date}: ${day.count} ${day.count === 1 ? "repaso" : "repasos"}`;
+        cell.title = `${day.date}: ${day.count} ${translate(day.count === 1 ? "repaso" : "repasos")}`;
       } else {
         cell.classList.add("is-empty");
         cell.setAttribute("aria-hidden", "true");
@@ -13037,10 +13037,10 @@ function renderFlashcardHeatmap(): void {
       flashcardHeatmapGrid.appendChild(cell);
     });
   });
-  flashcardHeatmapTotal.textContent = `${totalReviews} ${totalReviews === 1 ? "repaso" : "repasos"}`;
+  flashcardHeatmapTotal.textContent = `${totalReviews} ${translate(totalReviews === 1 ? "repaso" : "repasos")}`;
   flashcardHeatmapGrid.setAttribute(
     "aria-label",
-    `${totalReviews} repasos entre ${flashcardHeatmapStartDate} y ${today}`
+    `${totalReviews} ${translate("repasos")} ${translate("entre")} ${flashcardHeatmapStartDate} ${translate("y")} ${today}`
   );
 }
 
@@ -13125,9 +13125,9 @@ function renderPomodoro(): void {
     ? `Tiempo transcurrido de ${Math.round(totalSeconds / 60)} min`
     : `Tiempo restante de ${Math.round(totalSeconds / 60)} min`;
   pomodoroModeLabel.textContent = pomodoroMode === "focus"
-    ? "Enfoque"
-    : pomodoroIsLongBreak ? "Descanso largo" : "Descanso corto";
-  pomodoroToggle.textContent = pomodoroInterval === null ? "Iniciar" : "Pausar";
+    ? translate("Enfoque")
+    : translate(pomodoroIsLongBreak ? "Descanso largo" : "Descanso corto");
+  pomodoroToggle.textContent = translate(pomodoroInterval === null ? "Iniciar" : "Pausar");
 
   const isShortBreak = pomodoroMode === "break" && !pomodoroIsLongBreak;
   const isLongBreak = pomodoroMode === "break" && pomodoroIsLongBreak;
