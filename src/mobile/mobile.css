@@ -575,6 +575,12 @@ body.mobile-review-body {
   display: none !important;
 }
 
+/* La respuesta de una oclusión es la propia imagen: sin texto no debe quedar
+   el borde superior suelto. */
+.mobile-answer:empty {
+  display: none !important;
+}
+
 .mobile-question p,
 .mobile-answer p {
   margin: 0 0 0.65em;
@@ -746,7 +752,7 @@ body.mobile-review-body {
   width: auto;
   height: auto;
   max-width: 100%;
-  max-height: min(54vh, 560px);
+  max-height: min(72vh, 760px);
   border-radius: inherit;
   object-fit: contain;
 }
