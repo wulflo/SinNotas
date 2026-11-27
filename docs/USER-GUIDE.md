@@ -112,9 +112,9 @@ adapts to the status bar and the system navigation bar.
 
 Each view keeps its state when you switch between them.
 
-### Focus mode
+### Focus
 
-The **Focus mode** button in the Flashcards view hides the header and the rest of
+The **Focus** button in the Flashcards view hides the header and the rest of
 the distractions so you can review full screen. Press it again to exit. On
 Android the full editor keeps the same behavior.
 
@@ -287,7 +287,9 @@ During a session you can press **Edit card** (**Edit occlusion** for an image
 card). Basic cards expose their question and answer; cloze cards open a mini
 editor with the card's bullet and its child bullets, preserving indentation;
 occlusion cards open the image editor. Saving keeps FSRS properties and leaves
-the card in its place in the queue.
+the card in its place in the queue. Occlusion images fit the available card width
+without stretching small images, and revealing the answer leaves no empty
+separator.
 
 ### Review shortcuts
 

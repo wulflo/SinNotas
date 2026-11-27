@@ -176,7 +176,7 @@ El frontend llama al backend con `invoke("nombre", args)` desde `@tauri-apps/api
 | `load_vault` | `lib.rs:3755` | Bóveda | `store/vault.ts`, `desktop.ts`, `mobile/review-app.ts` |
 | `vault_sync_state` | `lib.rs:1103` | Bóveda / watcher | `desktop.ts` |
 | `read_pages_cached` | `lib.rs:1139` | Bóveda / caché | `store/vault.ts` |
-| `search_content` | `lib.rs:1156` | Búsqueda | `desktop.ts` → `store/content-search.ts` |
+| `search_content` | `content_search.rs` | Búsqueda | `desktop.ts` → `store/content-search.ts` |
 | `graph_links` | `lib.rs:1173` | Grafo | `desktop.ts` |
 | `find_backlinks` | `lib.rs:5261` | Backlinks | `desktop.ts` |
 | `bibliography_lookup` | `bibliography_lookup.rs:156` | Bibliografía | `views/bibliography-lookup.ts` |
@@ -198,16 +198,16 @@ El frontend llama al backend con `invoke("nombre", args)` desde `@tauri-apps/api
 | `write_flashcard_decks` | `lib.rs:4508` | Mazos | `store/flashcard-deck-storage.ts` |
 | `read_page_revisions` | `lib.rs:4523` | Historial | `store/vault.ts` |
 | `write_page_revisions` | `lib.rs:4535` | Historial | `store/vault.ts` |
-| `get_snapshot_state` | `lib.rs:4549` | Snapshots | `desktop.ts` |
-| `activate_snapshots` | `lib.rs:4561` | Snapshots | `desktop.ts` |
-| `disable_snapshots` | `lib.rs:4580` | Snapshots | `desktop.ts` |
-| `list_active_snapshot_notes` | `lib.rs:4596` | Snapshots | `desktop.ts` |
-| `delete_note_snapshots` | `lib.rs:4605` | Snapshots | `desktop.ts` |
-| `delete_all_snapshots` | `lib.rs:4621` | Snapshots | `desktop.ts` |
-| `tick_snapshots` | `lib.rs:4636` | Snapshots | `desktop.ts` |
-| `read_note_snapshots` | `lib.rs:4650` | Snapshots | `desktop.ts` |
-| `restore_snapshot` | `lib.rs:4661` | Snapshots | `desktop.ts` |
-| `migrate_legacy_snapshots` | `lib.rs:4684` | Snapshots | `desktop.ts` |
+| `get_snapshot_state` | `snapshots.rs` | Snapshots | `desktop.ts` |
+| `activate_snapshots` | `snapshots.rs` | Snapshots | `desktop.ts` |
+| `disable_snapshots` | `snapshots.rs` | Snapshots | `desktop.ts` |
+| `list_active_snapshot_notes` | `snapshots.rs` | Snapshots | `desktop.ts` |
+| `delete_note_snapshots` | `snapshots.rs` | Snapshots | `desktop.ts` |
+| `delete_all_snapshots` | `snapshots.rs` | Snapshots | `desktop.ts` |
+| `tick_snapshots` | `snapshots.rs` | Snapshots | `desktop.ts` |
+| `read_note_snapshots` | `snapshots.rs` | Snapshots | `desktop.ts` |
+| `restore_snapshot` | `snapshots.rs` | Snapshots | `desktop.ts` |
+| `migrate_legacy_snapshots` | `snapshots.rs` | Snapshots | `desktop.ts` |
 | `pdf_list` | `lib.rs:4964` | PDF | `views/pdf-view.ts` |
 | `pdf_open` | `lib.rs:4972` | PDF | `views/pdf-view.ts` |
 | `pdf_render_page` | `lib.rs:4982` | PDF | `views/pdf-view.ts` |
@@ -264,7 +264,14 @@ Tecla 1/2/3/4 o botón → src/desktop.ts:13508 applyFSRSRating()
 | `app-mode.ts` | 141 | Detección y preferencia de modo (desktop / repaso / editor completo móvil). |
 | `splash.ts` | 25 | Ocultar splash con duración mínima. |
 | `types.ts` | 233 | **Todos** los tipos compartidos del dominio. |
-| `desktop.ts` | 17.139 | App de escritorio: editor, 8 vistas, ajustes, repaso, vault, snapshots, i18n, gamepad. |
+| `desktop.ts` | 16.873 | App de escritorio: editor, 8 vistas, ajustes, repaso, vault, snapshots, i18n, gamepad. |
+| `views/journals-view.ts` | 383 | Diarios: calendario, lista, paginación y estado. |
+| `views/all-pages-view.ts` | 511 | «Todas las páginas»: orden, anchos de columna y paginación. |
+| `views/graph-settings-ui.ts` | 341 | Panel de ajustes del grafo (solo UI; la lógica sigue en `views/graph-settings.ts`). |
+| `ui/toast.ts` | 18 | Notificaciones flotantes. |
+| `ui/navigation-history.ts` | 126 | Historial atrás/adelante y última vista/página. |
+| `settings/shortcuts-ui.ts` | 107 | UI de atajos editables (registro puro en `shortcuts.ts`). |
+| `review/card-editor.ts` | 263 | Editor de tarjeta del repaso con dependencias inyectadas. |
 | `i18n.ts` | 2.339 | Diccionarios español→inglés y español→chino + `translate()`. |
 | `gamepad.ts` | 248 | Mapeo y sondeo del gamepad. |
 | `periodic-elements.ts` | 543 | Tabla periódica para el "árbol de progreso" de repaso. |
@@ -364,7 +371,9 @@ Tecla 1/2/3/4 o botón → src/desktop.ts:13508 applyFSRSRating()
 
 | Archivo | Líneas | Rol |
 | :--- | ---: | :--- |
-| `src/lib.rs` | 7.891 | Comandos Tauri, watcher, SAF, storage, snapshots, imágenes, sistema. |
+| `src/lib.rs` | 6.574 | Comandos Tauri, watcher, SAF, storage, imágenes, sistema. |
+| `src/snapshots.rs` | 1.156 | Helpers de snapshots y sus 10 comandos Tauri. |
+| `src/content_search.rs` | 243 | Plegado/búsqueda por contenido y comando `search_content`. |
 | `src/main.rs` | 6 | `fn main()` → `sin_notas_lib::run()`. |
 | `src/metadata_cache.rs` | 1.545 | Caché binaria persistente de metadatos + deltas incrementales. |
 | `src/bibliography_lookup.rs` | 1.456 | Consulta de metadatos bibliográficos remotos. |
@@ -455,7 +464,7 @@ Los tipos FSRS (`FSRSItem`, `FSRSParameters`, `FSRSRating`, `CardState`) viven e
 | `sinnotas-graph-node-colors` | `desktop.ts` | Colores personalizados de nodos. |
 | `sinnotas-last-view` / `sinnotas-last-page-id` | `desktop.ts:4547-4548` | Última vista y nota abierta. |
 | `sinnotas-recent-pages` | `desktop.ts:15107` (prefijo por bóveda) | Notas recientes. |
-| `sinnotas-all-pages-sort` / `-widths` | `desktop.ts:14694+` | Orden y ancho (proporcional) de columnas de "Todas las páginas"; `applyAllPagesColumnWidths` ajusta siempre al ancho visible para evitar recortes a la derecha. |
+| `sinnotas-all-pages-sort` / `-widths` | `views/all-pages-view.ts` | Orden y ancho (proporcional) de columnas de "Todas las páginas"; `applyAllPagesColumnWidths` ajusta siempre al ancho visible para evitar recortes a la derecha. |
 | `sinnotas-split-view`, `sinnotas-split-reference-page(s)`, `sinnotas-split-open` | `desktop.ts:16070-16073` | Vista dividida y notas de referencia. |
 | `sinnotas-pdf-editor-split` / `-ratio` | `desktop.ts:4756`, `4770` | Panel PDF+editor y proporción del separador. |
 | `sinnotas-pdf-retention` | `views/pdf-view.ts:15` | Conservación por defecto de enlaces PDF. |
@@ -476,7 +485,7 @@ Los tipos FSRS (`FSRSItem`, `FSRSParameters`, `FSRSRating`, `CardState`) viven e
 | Ruta | Quién la escribe | Contenido |
 | :--- | :--- | :--- |
 | `*.md` | `lib.rs:4329 save_page` | Notas con frontmatter `clave:: valor` y bullets. |
-| `.sinnotas/chronos/` | `lib.rs:4549+` | Snapshots automáticos de notas activas (máx. 30 días). |
+| `.sinnotas/chronos/` | `snapshots.rs` | Snapshots automáticos de notas activas (máx. 30 días). |
 | `.sinnotas/progress/reviews.json` | `lib.rs:4475` | Diario de repasos (≤4.000 entradas, 5 MB, 365 días). |
 | `.sinnotas/documents/links.json` | `pdf/storage.rs` | Registro de PDFs enlazados y su caducidad. |
 | `.sinnotas_cache.bin` | `metadata_cache.rs` | Caché binaria de metadatos para arranque rápido. |
@@ -855,8 +864,8 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | Fecha de vencimiento y urgencia | `desktop.ts:9933 taskDueUrgency`, `:9974 promptTaskDueDate` |
 | Lista virtual de tareas | `views/virtual-list.ts`, `desktop.ts:10022 getKanbanVirtualLists` |
 | Recompensa por completar | `desktop.ts:12008 applyTaskCompletionReward`, propiedad `completion-rewarded::` |
-| Diarios | `store/vault.ts:1274 createJournal`, `desktop.ts:14872 renderJournalCalendar`, `:14987 renderJournalsView` (ruta `journals/AAAA_MM_DD.md`) |
-| Todas las páginas | `views/all-pages.ts`, `desktop.ts:14685 renderAllPagesView`, `index.html:1352` |
+| Diarios | `store/vault.ts:1274 createJournal`, `views/journals-view.ts renderJournalCalendar`, `renderJournalsView` (ruta `journals/AAAA_MM_DD.md`) |
+| Todas las páginas | `views/all-pages.ts`, `views/all-pages-view.ts renderAllPagesView`, `index.html:1352` |
 | Pomodoro | `desktop.ts:12460-12633`, claves `sinnotas-pomodoro-*` |
 | Panel de productividad | `desktop.ts:12643 setFlashcardProductivityVisible`, `style.css:6671` |
 | Atajos globales | `index.html:1638-1675`, `desktop.ts` sección GLOBAL KEYBOARD SHORTCUTS (L16525) |
@@ -949,10 +958,10 @@ Registro exacto: `lib.rs:6040-6092` (`generate_handler!`). El único evento Rust
 | Dominio | Comandos (línea de la función en `lib.rs` salvo indicación) |
 | :--- | :--- |
 | Bóveda / notas | `load_vault` (3755), `pick_vault_root` (3655), `vault_sync_state` (1103), `read_pages_cached` (1139), `read_page` (4101), `read_note_created_times` (4153), `save_page` (4329), `delete_page` (5328), `rename_page` (5417), `find_backlinks` (5261), `open_note_with_default_app` (5395 / stub móvil 5412), `export_page_text` (4692) |
-| Búsqueda / grafo | `search_content` (1156), `graph_links` (1173) |
+| Búsqueda / grafo | `search_content` (`content_search.rs`), `graph_links` (`lib.rs`) |
 | Bibliografía | `bibliography_lookup` (`bibliography_lookup.rs:156`) |
-| Progreso / mazos / revisiones | `read_review_progress` (4466), `write_review_progress` (4475), `clear_review_progress` (4454), `read_flashcard_decks` (4496), `write_flashcard_decks` (4508), `read_page_revisions` (4523), `write_page_revisions` (4535), `migrate_legacy_snapshots` (4684) |
-| Snapshots / Chronos | `get_snapshot_state` (4549), `activate_snapshots` (4561), `disable_snapshots` (4580), `list_active_snapshot_notes` (4596), `delete_note_snapshots` (4605), `delete_all_snapshots` (4621), `tick_snapshots` (4636), `read_note_snapshots` (4650), `restore_snapshot` (4661) |
+| Progreso / mazos / revisiones | `read_review_progress` (4466), `write_review_progress` (`lib.rs`), `clear_review_progress` (4454), `read_flashcard_decks` (4496), `write_flashcard_decks` (4508), `read_page_revisions` (4523), `write_page_revisions` (4535), `migrate_legacy_snapshots` (`snapshots.rs`) |
+| Snapshots / Chronos | `get_snapshot_state`, `activate_snapshots`, `disable_snapshots`, `list_active_snapshot_notes`, `delete_note_snapshots`, `delete_all_snapshots`, `tick_snapshots`, `read_note_snapshots`, `restore_snapshot` (`snapshots.rs`) |
 | Imágenes | `resolve_image_path` (4035), `read_image_data` (4070), `save_image` (5073), `save_dropped_image` (5082), `delete_unused_attachments` (5253) |
 | PDF | `pdf_list` (4964), `pdf_open` (4972), `pdf_render_page` (4982), `pdf_import` (4995), `pdf_unlink` (5064), `pdf_page_text` (5024), `pdf_set_expiry` (5035), `pdf_delete` (5045), `pdf_save_capture` (5054) |
 | Sistema | `list_system_fonts` (5496), `save_android_apk` (5597), `desktop_install_kind` (5657), `set_native_scrollbar_style` (5729 Linux / 5801 otros), `software_rendering_active` (5991) |
@@ -960,10 +969,10 @@ Registro exacto: `lib.rs:6040-6092` (`generate_handler!`). El único evento Rust
 ### 13.3 Subsistemas
 
 - **Caché de metadatos** (`metadata_cache.rs`, 1.545): `.sinnotas_cache.bin` (magic `SNC1`, v3, ≤256 MiB) y `.sinnotas_cache_delta.log` (magic `SND1`, v1). `load_or_scan_vault_with_mode()` (944) reutiliza entradas por `modified_ns`/`size`; `metadata_only=true` sirve `blocksLoaded=false` con `block_count`. `append_cache_delta()` (370) escribe solo lo cambiado con fsync; `apply_cache_delta()` (487) usa reglas convergentes (gana `modified_ns` mayor). `vault_fingerprint()` (543) permite el chequeo O(n) sin IPC. `find_cached_backlinks()` (1117). `extract_links()` (740) separa wikilinks de tags desde v3.
-- **Búsqueda en Rust** (FASE 4-B): `fold_text()` (809), `visible_block_text()` (831), `refresh_content_index()` (2097, solo rutas sucias), `run_content_search()` (936, AND por bloque, mejor bloque por nota, índices en UTF-16 para coincidir con `locateMatch` del front).
+- **Búsqueda en Rust** (FASE 4-B): `fold_text()`, `visible_block_text()` y `run_content_search()` en `content_search.rs`; `refresh_content_index()` (solo rutas sucias) en `lib.rs`. Mantiene AND por bloque, mejor bloque por nota e índices UTF-16 para coincidir con `locateMatch` del front.
 - **Bibliografía** (`bibliography_lookup.rs`, 1.456): único HTTP saliente. Crossref (DOI/búsqueda) y Open Library (ISBN/palabras), `tokio::join!` con resultados parciales, `enforce_rate_limit()` 750 ms, caché 10 min/32 entradas, `https_only`, sin redirects, timeout 12 s, ≤2 MiB, allowlist de hosts y de portadas. 10 códigos de error estables.
 - **PDF** (`pdf/engine.rs` 437 + `pdf/storage.rs` 1.067): `Pdfium` en `Mutex<Option<…>>` con carga perezosa; `links.json` con `link:<uuid>`, caducidad, `missing`, capturas en `assets/pdf-captures/`. El front recibe solo PNG y metadatos, nunca RGBA ni el PDF.
-- **Snapshots**: constantes en `lib.rs:1186-1200` (máx. 30 días, 16 MiB, 2.000 archivos por nota, tolerancia de reloj 5 min); `tick_snapshots_in_root()` (3327) decide creación/borrado/anomalías; `restore_snapshot_from_root()` (3437) crea snapshot de seguridad antes de restaurar.
+- **Snapshots**: constantes en `lib.rs` (máx. 30 días, 16 MiB, 2.000 archivos por nota, tolerancia de reloj 5 min); `tick_snapshots_in_root()` y `restore_snapshot_from_root()` en `snapshots.rs` deciden creación/borrado/anomalías y crean snapshot de seguridad antes de restaurar.
 - **Permisos** (`capabilities/*.json`): `default.json` mínimo (opener solo a GitHub, portapapeles, `$APPCACHE/SinNotas-update.apk`); `desktop.json` updater+process; `android.json` `http:default` solo a GitHub Releases. CSP estricta en `tauri.conf.json:27-28`.
 - **Build**: `Cargo.toml:67-73` features `updater` (default) y `microsoft-store`; release `opt-level="s"`, LTO, `panic="abort"`, strip.
 
@@ -988,7 +997,7 @@ Registro exacto: `lib.rs:6040-6092` (`generate_handler!`). El único evento Rust
 | Área | Métodos (línea) |
 | :--- | :--- |
 | Ciclo de vida y bóveda | `constructor` 430, `mount` 887, `bootstrapVault` 928, `showVaultGate` 948, `loadAndApply` 1213, `syncFromDiskIfIdle` 1258, `loadVault` 1319, `applySnapshot` 1350, `readStoredPageFilter` 1387, `reconcilePageFilter` 1409, `pickVault` 2040 |
-| Eventos y navegación | `bindEvents` 958 (delegado `click` sobre `[data-action]` con ~40 acciones, atajos en 1145–1199), `openDrawer` 2640, `openSettings` 2658, `syncOverlayState` 2189, `setBusy` 3554, `showToast` 3634 |
+| Eventos y navegación | `bindEvents` 958 (delegado `click` sobre `[data-action]` con ~40 acciones, atajos en 1145–1199), `openDrawer` 2640, `openSettings` 2658, `syncOverlayState` 2189, `setBusy` 3554, `showToast` (`ui/toast.ts`) |
 | Repaso | `reveal` 2060, `rate` 2068, `render` 3198, `showEmpty` 3309, `getRatingPreviews` (vía manager) |
 | Editor de tarjeta y undo | `openEditor` 2143, `closeEditor` 2183, `saveEditor` 2202, `seedHistoryFor` 2253, `locateReviewBlock` 2292, `applyReviewSnapshot` 2329, `undo` 2364, `redo` 2381, `undoLastReview` 2398, `redoLastReview` 2425, `applyHistoryEntry` 2452 |
 | Mazos | `activeDeck` 1450, `loadDecksForVault` 1462, `applyActiveDeckFilter` 1511, `activateDeck` 1524, `openDecks` 1538, `renderDecksList` 1641, `openDeckEditor` 1679, `renderNotesList` 1893, `appendDeckRow` 1958, `saveDeckFromEditor` 1751, `deleteDeck` 1831, `updateDeckIndicators` 2022 |
@@ -1123,7 +1132,7 @@ Todas las acciones de terceros están pineadas a SHA; `npm ci --ignore-scripts`;
 | Insertar imágenes (pegar/soltar/archivo) | `[D] desktop.ts insertImageBlock` (si el bullet destino está vacío se sustituye, sin dejar bullet en blanco) + `[E] image-bytes.ts` |
 | URLs de imágenes anti-SSRF | `[E] editor/url-safety.ts` |
 | Oclusión de imagen (dibujar/mover/rotar/alinear) | `[E] editor/image-occlusion.ts` + `[D] desktop.ts:11172-11447` |
-| Historial de versiones (snapshots) | `[D] desktop.ts:9414-9894` + `[R] lib.rs:4549-4684` |
+| Historial de versiones (snapshots) | `[D] desktop.ts` + `[R] snapshots.rs` |
 | Exportar nota a `.txt` | `[S] store/export.ts:59` + `[R] lib.rs:4692` |
 | Grafo de wikilinks salientes en el editor | `[D] desktop.ts:9059 paintOutgoingLinks` + `[S] store/wikilinks.ts` |
 | Autocompletado de `[[wikilink]]` | `[D] desktop.ts:5646-5818` |
@@ -1140,9 +1149,9 @@ Todas las acciones de terceros están pineadas a SHA; `npm ci --ignore-scripts`;
 | Renombrar y reescribir wikilinks | `[S] vault.ts:1011,1086` + `[R] lib.rs:5417` |
 | Bóvedas múltiples | `[D] desktop.ts:15237-15498` + `sinnotas-vault-registry-v1` |
 | Omnibar (buscar/crear nota) | `[D] desktop.ts:15499-15791` + `[S] content-search.ts` |
-| Búsqueda de contenido en Rust | `[R] lib.rs:1156 search_content`, `936 run_content_search` |
-| Diarios por fecha | `[S] vault.ts:1274` + `[D] desktop.ts:14872` |
-| Todas las páginas (orden/filtro columnas) | `[V] all-pages.ts` + `[D] desktop.ts:14685` |
+| Búsqueda de contenido en Rust | `[R] content_search.rs search_content`, `run_content_search` |
+| Diarios por fecha | `[S] vault.ts:1274` + `[D] views/journals-view.ts` |
+| Todas las páginas (orden/filtro columnas) | `[V] all-pages.ts` + `[D] views/all-pages-view.ts` |
 | Backlinks | `[R] lib.rs:5261` + `[D] desktop.ts:9059` |
 
 ### 18.3 Repaso

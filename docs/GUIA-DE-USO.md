@@ -115,9 +115,9 @@ navegación del sistema.
 
 Cada vista conserva su estado al cambiar entre ellas.
 
-### Modo focus
+### Focus
 
-El botón **Modo focus** de la vista Flashcards oculta la cabecera y el resto de
+El botón **Focus** de la vista Flashcards oculta la cabecera y el resto de
 distracciones para repasar a pantalla completa. Vuelve a pulsarlo para salir.
 En Android el editor completo mantiene el mismo comportamiento.
 
@@ -291,6 +291,9 @@ tarjeta de imagen). En una básica se editan pregunta y respuesta; en una cloze 
 abre un minieditor con el bullet de la tarjeta y sus bullets hijos, respetando la
 indentación; en una oclusión se abre el editor de imagen. Al guardar se
 conservan las propiedades FSRS y la tarjeta sigue en su posición de la cola.
+En las oclusiones la imagen se adapta al ancho disponible de la tarjeta sin
+estirar las imágenes pequeñas, y al revelar la respuesta no queda ningún
+separador vacío.
 
 ### Atajos de repaso
 

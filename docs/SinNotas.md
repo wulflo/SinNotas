@@ -1,10 +1,28 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.5.7 · **Fecha:** 2026-11-26
+**Versión:** 0.5.8 · **Fecha:** 2026-11-26
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
 escritorio completa y una APK Android centrada en el repaso de flashcards.
+
+## Cambios en 0.5.8
+
+- Refactorización Fase 14: `desktop.ts` y `lib.rs` se dividen en módulos
+  (`views/`, `ui/`, `settings/`, `review/` y `src-tauri/src/snapshots.rs` y
+  `content_search.rs`) sin cambiar el comportamiento. Los comandos Tauri
+  conservan sus nombres y las 51 rutas del `generate_handler!`.
+- Pruebas de regresión de las referencias entre módulos y corrección del flag
+  de sincronización del panel de ajustes del grafo.
+- Diarios: paginación con el padding compacto que ya tenía la de Tareas.
+- Oclusión de imagen: la imagen grande aprovecha el ancho de la tarjeta tanto
+  en Flashcards como en la vista Review; las imágenes pequeñas conservan su
+  tamaño. Ya no aparece una línea de acento vacía al revelar la respuesta.
+- Botón de repaso renombrado a «Focus» y traducido al inglés y al chino.
+- Traducciones: 139 textos del panel de repaso, mazos y ajustes añadidos a los
+  diccionarios inglés y chino, con una prueba que impide nuevos textos sin
+  traducir.
+- README: se elimina el badge de release duplicado y se conserva el de versión.
 
 ## Cambios en 0.5.7
 
@@ -670,7 +688,7 @@ declara `runFullTrust`.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Última release publicada: `0.5.7` (`versionCode 5007`)
+- Última release publicada: `0.5.8` (`versionCode 5008`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):
