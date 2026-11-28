@@ -7382,13 +7382,16 @@ body.mobile-full-editor .flashcard-review-tools {
   border-radius: inherit;
   /* Dos capas: pista del color del modo y arco verde que crece desde el
    * inicio. No se interpolaron rojo y verde: esa mezcla daba un marrón feo. */
+  --pomodoro-arc: calc(var(--pomodoro-progress) * 1%);
   background:
     conic-gradient(
       from -90deg,
-      var(--pomodoro-green-color) 0%,
-      var(--pomodoro-green-color) max(0%, calc(var(--pomodoro-progress) * 1% - 2%)),
-      color-mix(in srgb, var(--pomodoro-green-color) 60%, transparent) max(0%, calc(var(--pomodoro-progress) * 1% - 0.5%)),
-      transparent calc(var(--pomodoro-progress) * 1%),
+      transparent 0%,
+      color-mix(in srgb, var(--pomodoro-green-color) 70%, transparent) min(3%, calc(var(--pomodoro-arc) * 0.5)),
+      var(--pomodoro-green-color) min(6%, var(--pomodoro-arc)),
+      var(--pomodoro-green-color) max(0%, calc(var(--pomodoro-arc) - 8%)),
+      color-mix(in srgb, var(--pomodoro-green-color) 55%, transparent) max(0%, calc(var(--pomodoro-arc) - 3%)),
+      transparent var(--pomodoro-arc),
       transparent 100%
     ),
     color-mix(in srgb, var(--pomodoro-color) 32%, transparent);
