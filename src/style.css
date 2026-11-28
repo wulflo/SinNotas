@@ -7558,10 +7558,20 @@ body.mobile-full-editor .flashcard-review-tools {
   height: auto;
 }
 
-.heatmap-snake-line {
+.heatmap-quipu-spine {
   fill: none;
-  stroke: color-mix(in srgb, var(--heatmap-ink) 14%, transparent);
+  stroke: color-mix(in srgb, var(--heatmap-ink) 18%, transparent);
   stroke-width: 1.5;
+}
+
+.heatmap-quipu-cord {
+  fill: none;
+  stroke: color-mix(in srgb, var(--heatmap-ink) 16%, transparent);
+  stroke-width: 1.2;
+}
+
+.heatmap-quipu-knot {
+  fill: color-mix(in srgb, var(--heatmap-ink) 34%, transparent);
 }
 
 .heatmap-snake-cell[data-level="0"] {
@@ -7587,12 +7597,6 @@ body.mobile-full-editor .flashcard-review-tools {
 .heatmap-snake-cell[data-leap="true"] {
   stroke: var(--heatmap-ink);
   stroke-width: 1.5;
-}
-
-.heatmap-snake-label {
-  fill: var(--ls-text-muted);
-  font-size: 7px;
-  font-weight: 700;
 }
 
 /* Leyenda muda: cinco muestras de intensidad, sin texto nuevo que traducir. */

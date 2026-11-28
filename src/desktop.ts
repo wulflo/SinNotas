@@ -13088,12 +13088,27 @@ function renderFlashcardHeatmap(): void {
   svg.classList.add("heatmap-snake");
 
   flashcardHeatmapGrid.replaceChildren();
-  snake.connectors.forEach((d) => {
-    const line = document.createElementNS(svgNS, "path");
-    line.setAttribute("d", d);
-    line.classList.add("heatmap-snake-line");
-    svg.appendChild(line);
+
+  // Quipu: un cordel vertical y doce cuerdas colgantes (una por mes), sin
+  // nombres de meses. Las cuentas son los días, teñidos por los repasos.
+  const spine = document.createElementNS(svgNS, "path");
+  spine.setAttribute("d", "M 14 8 L 14 170");
+  spine.classList.add("heatmap-quipu-spine");
+  svg.appendChild(spine);
+  snake.labels.forEach((label) => {
+    const cord = document.createElementNS(svgNS, "path");
+    cord.setAttribute("d", `M 14 ${label.y} Q 26 ${label.y} 38 ${label.y}`);
+    cord.classList.add("heatmap-quipu-cord");
+    svg.appendChild(cord);
+
+    const knot = document.createElementNS(svgNS, "circle");
+    knot.setAttribute("cx", "14");
+    knot.setAttribute("cy", String(label.y));
+    knot.setAttribute("r", "1.6");
+    knot.classList.add("heatmap-quipu-knot");
+    svg.appendChild(knot);
   });
+
   let totalReviews = 0;
   snake.cells.forEach((cell) => {
     if (cell.date && cell.date > today) return;
@@ -13113,15 +13128,6 @@ function renderFlashcardHeatmap(): void {
       rect.appendChild(title);
     }
     svg.appendChild(rect);
-  });
-  snake.labels.forEach((label) => {
-    const text = document.createElementNS(svgNS, "text");
-    text.setAttribute("x", String(label.x));
-    text.setAttribute("y", String(label.y));
-    text.setAttribute("dominant-baseline", "middle");
-    text.classList.add("heatmap-snake-label");
-    text.textContent = label.text;
-    svg.appendChild(text);
   });
   flashcardHeatmapGrid.appendChild(svg);
   flashcardHeatmapTotal.textContent = `${totalReviews} ${translate(totalReviews === 1 ? "repaso" : "repasos")}`;
