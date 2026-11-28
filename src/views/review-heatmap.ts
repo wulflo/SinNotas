@@ -151,93 +151,77 @@ export function buildReviewHeatmapYear(
   return months;
 }
 
-/** Celda de la serpiente: un día, colocado en su columna y fila mensual. */
-export interface HeatmapSnakeCell {
+/** Nudo de un quipu: una semana, teñido según los días que se estudió. */
+export interface HeatmapQuipuKnot {
   x: number;
   y: number;
-  date: string | null;
-  count: number;
-  level: ReviewHeatmapDay["level"];
-  isLeapDay: boolean;
-  monthIndex: number;
+  weekStart: string;
+  daysStudied: number;
+  /** 0–1: proporción de días de la semana con repasos. */
+  intensity: number;
 }
 
-export interface HeatmapSnakeLabel {
-  text: string;
-  x: number;
+export interface HeatmapQuipuBranch {
   y: number;
+  knots: HeatmapQuipuKnot[];
 }
 
-export interface HeatmapSnakeResult {
-  cells: HeatmapSnakeCell[];
-  connectors: string[];
-  labels: HeatmapSnakeLabel[];
+export interface HeatmapQuipuResult {
+  branches: HeatmapQuipuBranch[];
 }
 
-const SNAKE_X = 38;
-const SNAKE_Y = 8;
-const SNAKE_COLS = 31;
-const SNAKE_STEP_X = 6.8;
-const SNAKE_STEP_Y = 13;
-const SNAKE_CELL = 5;
+const QUIPU_TOP = 16;
+const QUIPU_STEP_Y = 13;
+const QUIPU_KNOT_START_X = 34;
+const QUIPU_KNOT_END_X = 244;
 
-function leapDayInYear(year: number): string | null {
-  return new Date(year, 1, 29).getDate() === 29
-    ? `${year}-02-29`
-    : null;
+function mondayKey(date: Date): string {
+  const offset = (date.getDay() + 6) % 7;
+  return dateKey(addDays(date, -offset));
 }
 
 /**
- * Serpiente anual: 12 filas (una por mes) recorridas en direcciones alternas,
- * unidas por curvas en los extremos. Un cuadrito por día y el 29 de febrero
- * señalado en años bisiestos.
+ * Quipu vertical: doce cuerdas (una por mes) colgadas de un cordel central y
+ * un nudo por cada semana del mes. Todos los nudos son opacos; su color vira
+ * al acento según cuántos días de esa semana tuvieron repasos.
  */
-export function buildReviewHeatmapSnake(
+export function buildReviewHeatmapQuipu(
   months: readonly ReviewHeatmapMonth[],
-  year: number
-): HeatmapSnakeResult {
-  const cells: HeatmapSnakeCell[] = [];
-  const connectors: string[] = [];
-  const labels: HeatmapSnakeLabel[] = [];
-  const leapDay = leapDayInYear(year);
+  entries: readonly Pick<ReviewProgressEvent, "date" | "state">[]
+): HeatmapQuipuResult {
+  const studied = new Set<string>();
+  for (const entry of entries) {
+    if (entry.state === "applied") studied.add(entry.date);
+  }
 
-  months.forEach((month, monthIndex) => {
-    const rowY = SNAKE_Y + monthIndex * SNAKE_STEP_Y;
-    const columnFor = (dayIndex: number): number =>
-      monthIndex % 2 === 0 ? dayIndex : SNAKE_COLS - 1 - dayIndex;
-    month.days.forEach((day, dayIndex) => {
-      if (!day.date) return;
-      cells.push({
-        x: Number((SNAKE_X + columnFor(dayIndex) * SNAKE_STEP_X).toFixed(2)),
-        y: Number(rowY.toFixed(2)),
-        date: day.date,
-        count: day.count,
-        level: day.level,
-        isLeapDay: day.date === leapDay,
-        monthIndex,
-      });
-    });
-    labels.push({
-      text: month.label.replace(".", "").slice(0, 3).toUpperCase(),
-      x: 4,
-      y: Number((rowY + SNAKE_CELL / 2).toFixed(2)),
-    });
+  const branches: HeatmapQuipuBranch[] = months.map((month, monthIndex) => {
+    const weeks = new Map<string, number>();
+    for (const day of month.days) {
+      if (!day.date) continue;
+      const parsed = parseLocalDate(day.date);
+      if (!parsed) continue;
+      const key = mondayKey(parsed);
+      weeks.set(key, (weeks.get(key) || 0) + (studied.has(day.date) ? 1 : 0));
+    }
 
-    const next = months[monthIndex + 1];
-    if (!next) return;
-    const lastCol = columnFor(month.days.length - 1);
-    const firstNextCol = (monthIndex + 1) % 2 === 0 ? 0 : SNAKE_COLS - 1;
-    const x1 = SNAKE_X + lastCol * SNAKE_STEP_X + SNAKE_CELL / 2;
-    const x2 = SNAKE_X + firstNextCol * SNAKE_STEP_X + SNAKE_CELL / 2;
-    const y1 = rowY + SNAKE_CELL / 2;
-    const y2 = rowY + SNAKE_STEP_Y + SNAKE_CELL / 2;
-    const bend = monthIndex % 2 === 0 ? 8 : -8;
-    connectors.push(
-      `M ${x1.toFixed(2)} ${y1.toFixed(2)} Q ${(x1 + bend).toFixed(2)} ${((y1 + y2) / 2).toFixed(2)} ${x2.toFixed(2)} ${y2.toFixed(2)}`
-    );
+    const ordered = [...weeks.entries()];
+    const step = ordered.length > 1
+      ? (QUIPU_KNOT_END_X - QUIPU_KNOT_START_X) / (ordered.length - 1)
+      : 0;
+    const y = QUIPU_TOP + monthIndex * QUIPU_STEP_Y;
+    return {
+      y,
+      knots: ordered.map(([weekStart, daysStudied], index) => ({
+        x: Number((QUIPU_KNOT_START_X + index * step).toFixed(2)),
+        y,
+        weekStart,
+        daysStudied,
+        intensity: Math.min(1, daysStudied / 7),
+      })),
+    };
   });
 
-  return { cells, connectors, labels };
+  return { branches };
 }
 
 export function defaultHeatmapStart(endDate: string, days = 90): string {

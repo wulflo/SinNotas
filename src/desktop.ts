@@ -186,7 +186,7 @@ import { VirtualList } from "./views/virtual-list";
 import { ConceptMapView } from "./views/concept-map-view";
 import { migrateSelect, syncCustomSelect } from "./views/custom-select";
 import {
-  buildReviewHeatmapSnake,
+  buildReviewHeatmapQuipu,
   buildReviewHeatmapYear,
   defaultHeatmapStart,
 } from "./views/review-heatmap";
@@ -13077,57 +13077,51 @@ function renderFlashcardHeatmap(): void {
   syncCustomSelect(flashcardHeatmapStyleSelect);
   flashcardHeatmapGrid.dataset.style = flashcardHeatmapStyle;
 
-  // Se muestran los 12 meses del año aunque los días futuros aún no tengan
-  // datos: la rueda es estable y no «crece» mes a mes.
+  // Quipu semanal: doce cuerdas mensuales colgadas del cordel central y un
+  // nudo por semana, teñido con el acento según los días estudiados.
   const displayEnd = `${today.slice(0, 4)}-12-31`;
-  const months = buildReviewHeatmapYear(reviewProgress.getEntries(), flashcardHeatmapStartDate, displayEnd);
-  const snake = buildReviewHeatmapSnake(months, Number(today.slice(0, 4)));
+  const entries = reviewProgress.getEntries();
+  const months = buildReviewHeatmapYear(entries, flashcardHeatmapStartDate, displayEnd);
+  const quipu = buildReviewHeatmapQuipu(months, entries);
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
   svg.setAttribute("viewBox", "0 0 260 180");
-  svg.classList.add("heatmap-snake");
+  svg.classList.add("heatmap-quipu");
 
   flashcardHeatmapGrid.replaceChildren();
 
-  // Quipu: un cordel vertical y doce cuerdas colgantes (una por mes), sin
-  // nombres de meses. Las cuentas son los días, teñidos por los repasos.
   const spine = document.createElementNS(svgNS, "path");
-  spine.setAttribute("d", "M 14 8 L 14 170");
+  spine.setAttribute("d", "M 16 10 L 16 170");
   spine.classList.add("heatmap-quipu-spine");
   svg.appendChild(spine);
-  snake.labels.forEach((label) => {
+
+  let totalReviews = 0;
+  quipu.branches.forEach((branch) => {
     const cord = document.createElementNS(svgNS, "path");
-    cord.setAttribute("d", `M 14 ${label.y} Q 26 ${label.y} 38 ${label.y}`);
+    cord.setAttribute("d", `M 16 ${branch.y} L 244 ${branch.y}`);
     cord.classList.add("heatmap-quipu-cord");
     svg.appendChild(cord);
 
-    const knot = document.createElementNS(svgNS, "circle");
-    knot.setAttribute("cx", "14");
-    knot.setAttribute("cy", String(label.y));
-    knot.setAttribute("r", "1.6");
-    knot.classList.add("heatmap-quipu-knot");
-    svg.appendChild(knot);
-  });
+    const anchor = document.createElementNS(svgNS, "circle");
+    anchor.setAttribute("cx", "16");
+    anchor.setAttribute("cy", String(branch.y));
+    anchor.setAttribute("r", "1.6");
+    anchor.classList.add("heatmap-quipu-anchor");
+    svg.appendChild(anchor);
 
-  let totalReviews = 0;
-  snake.cells.forEach((cell) => {
-    if (cell.date && cell.date > today) return;
-    const rect = document.createElementNS(svgNS, "rect");
-    rect.setAttribute("x", String(cell.x));
-    rect.setAttribute("y", String(cell.y));
-    rect.setAttribute("width", "6");
-    rect.setAttribute("height", "5");
-    rect.setAttribute("rx", "1.5");
-    rect.classList.add("heatmap-snake-cell");
-    rect.dataset.level = String(cell.level);
-    if (cell.isLeapDay) rect.dataset.leap = "true";
-    if (cell.date) {
-      totalReviews += cell.count;
+    branch.knots.forEach((knot) => {
+      totalReviews += knot.daysStudied;
+      const circle = document.createElementNS(svgNS, "circle");
+      circle.setAttribute("cx", String(knot.x));
+      circle.setAttribute("cy", String(knot.y));
+      circle.setAttribute("r", "2.8");
+      circle.classList.add("heatmap-quipu-knot");
+      circle.style.setProperty("--knot-fill", `${Math.round(knot.intensity * 100)}%`);
       const title = document.createElementNS(svgNS, "title");
-      title.textContent = `${cell.date}: ${cell.count} ${translate(cell.count === 1 ? "repaso" : "repasos")}${cell.isLeapDay ? ` · ${translate("año bisiesto")}` : ""}`;
-      rect.appendChild(title);
-    }
-    svg.appendChild(rect);
+      title.textContent = `${knot.weekStart}: ${knot.daysStudied}/7 ${translate("días con repasos")}`;
+      circle.appendChild(title);
+      svg.appendChild(circle);
+    });
   });
   flashcardHeatmapGrid.appendChild(svg);
   flashcardHeatmapTotal.textContent = `${totalReviews} ${translate(totalReviews === 1 ? "repaso" : "repasos")}`;

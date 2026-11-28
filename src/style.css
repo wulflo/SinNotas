@@ -7549,54 +7549,33 @@ body.mobile-full-editor .flashcard-review-tools {
   justify-content: center;
 }
 
-.heatmap-snake {
+.heatmap-quipu {
   display: block;
   width: 100%;
-  /* Antes estaba topado en 260 px y no crecía con el panel en pantallas
-   * anchas. Ahora escala con el contenedor hasta un límite cómodo. */
   max-width: 420px;
   height: auto;
 }
 
 .heatmap-quipu-spine {
   fill: none;
-  stroke: color-mix(in srgb, var(--heatmap-ink) 18%, transparent);
+  stroke: color-mix(in srgb, var(--heatmap-ink) 22%, transparent);
   stroke-width: 1.5;
 }
 
 .heatmap-quipu-cord {
   fill: none;
-  stroke: color-mix(in srgb, var(--heatmap-ink) 16%, transparent);
+  stroke: color-mix(in srgb, var(--heatmap-ink) 14%, transparent);
   stroke-width: 1.2;
 }
 
+.heatmap-quipu-anchor {
+  fill: color-mix(in srgb, var(--heatmap-ink) 32%, transparent);
+}
+
+/* Todos los nudos son opacos: solo cambia cuánto acento reciben según los
+ * días con repasos de esa semana (`--knot-fill`, 0–100 %). */
 .heatmap-quipu-knot {
-  fill: color-mix(in srgb, var(--heatmap-ink) 34%, transparent);
-}
-
-.heatmap-snake-cell[data-level="0"] {
-  fill: color-mix(in srgb, var(--heatmap-ink) 7%, transparent);
-}
-
-.heatmap-snake-cell[data-level="1"] {
-  fill: color-mix(in srgb, var(--heatmap-ink) 27%, transparent);
-}
-
-.heatmap-snake-cell[data-level="2"] {
-  fill: color-mix(in srgb, var(--heatmap-ink) 47%, transparent);
-}
-
-.heatmap-snake-cell[data-level="3"] {
-  fill: color-mix(in srgb, var(--heatmap-ink) 70%, transparent);
-}
-
-.heatmap-snake-cell[data-level="4"] {
-  fill: color-mix(in srgb, var(--heatmap-ink) 92%, transparent);
-}
-
-.heatmap-snake-cell[data-leap="true"] {
-  stroke: var(--heatmap-ink);
-  stroke-width: 1.5;
+  fill: color-mix(in srgb, var(--ls-accent) var(--knot-fill, 0%), var(--heatmap-ink));
 }
 
 /* Leyenda muda: cinco muestras de intensidad, sin texto nuevo que traducir. */
