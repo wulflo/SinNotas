@@ -13077,7 +13077,7 @@ function renderFlashcardHeatmap(): void {
   syncCustomSelect(flashcardHeatmapStyleSelect);
   flashcardHeatmapGrid.dataset.style = flashcardHeatmapStyle;
 
-  // Quipu semanal: doce cuerdas mensuales colgadas del cordel central y un
+  // Quipu colgante: cordel horizontal arriba y doce hilos verticales con un
   // nudo por semana, teñido con el acento según los días estudiados.
   const displayEnd = `${today.slice(0, 4)}-12-31`;
   const entries = reviewProgress.getEntries();
@@ -13091,25 +13091,26 @@ function renderFlashcardHeatmap(): void {
   flashcardHeatmapGrid.replaceChildren();
 
   const spine = document.createElementNS(svgNS, "path");
-  spine.setAttribute("d", "M 16 10 L 16 170");
+  spine.setAttribute("d", "M 12 20 L 248 20");
   spine.classList.add("heatmap-quipu-spine");
   svg.appendChild(spine);
 
   let totalReviews = 0;
-  quipu.branches.forEach((branch) => {
+  quipu.threads.forEach((thread) => {
+    const lastKnot = thread.knots[thread.knots.length - 1];
     const cord = document.createElementNS(svgNS, "path");
-    cord.setAttribute("d", `M 16 ${branch.y} L 244 ${branch.y}`);
+    cord.setAttribute("d", `M ${thread.x} 20 L ${thread.x} ${lastKnot ? lastKnot.y : 164}`);
     cord.classList.add("heatmap-quipu-cord");
     svg.appendChild(cord);
 
     const anchor = document.createElementNS(svgNS, "circle");
-    anchor.setAttribute("cx", "16");
-    anchor.setAttribute("cy", String(branch.y));
+    anchor.setAttribute("cx", String(thread.x));
+    anchor.setAttribute("cy", "20");
     anchor.setAttribute("r", "1.6");
     anchor.classList.add("heatmap-quipu-anchor");
     svg.appendChild(anchor);
 
-    branch.knots.forEach((knot) => {
+    thread.knots.forEach((knot) => {
       totalReviews += knot.daysStudied;
       const circle = document.createElementNS(svgNS, "circle");
       circle.setAttribute("cx", String(knot.x));

@@ -116,15 +116,15 @@ describe("review heatmap — cinta anual", () => {
 describe("review heatmap — quipu semanal", () => {
   const months = buildReviewHeatmapYear([], "2026-01-01", "2026-12-31");
 
-  it("tiene doce cuerdas, una por mes", () => {
+  it("tiene doce hilos colgantes, uno por mes", () => {
     const quipu = buildReviewHeatmapQuipu(months, []);
-    expect(quipu.branches).toHaveLength(12);
-    expect(new Set(quipu.branches.map((branch) => branch.y)).size).toBe(12);
+    expect(quipu.threads).toHaveLength(12);
+    expect(new Set(quipu.threads.map((thread) => thread.x)).size).toBe(12);
   });
 
   it("incluye todas las semanas del año", () => {
     const quipu = buildReviewHeatmapQuipu(months, []);
-    const total = quipu.branches.reduce((sum, branch) => sum + branch.knots.length, 0);
+    const total = quipu.threads.reduce((sum, thread) => sum + thread.knots.length, 0);
     expect(total).toBeGreaterThanOrEqual(52);
   });
 
@@ -135,7 +135,7 @@ describe("review heatmap — quipu semanal", () => {
       entry("2026-06-16"),
       entry("2026-06-20", "undone"),
     ]);
-    const june = quipu.branches[5].knots;
+    const june = quipu.threads[5].knots;
     const target = june.find((knot) => knot.weekStart === "2026-06-15");
     expect(target).toMatchObject({ daysStudied: 2 });
     expect(target?.intensity).toBeCloseTo(2 / 7);
@@ -143,6 +143,6 @@ describe("review heatmap — quipu semanal", () => {
 
   it("deja intensidad cero en semanas sin estudio", () => {
     const quipu = buildReviewHeatmapQuipu(months, []);
-    expect(quipu.branches.every((branch) => branch.knots.every((knot) => knot.intensity === 0))).toBe(true);
+    expect(quipu.threads.every((thread) => thread.knots.every((knot) => knot.intensity === 0))).toBe(true);
   });
 });

@@ -161,19 +161,19 @@ export interface HeatmapQuipuKnot {
   intensity: number;
 }
 
-export interface HeatmapQuipuBranch {
-  y: number;
+export interface HeatmapQuipuThread {
+  x: number;
   knots: HeatmapQuipuKnot[];
 }
 
 export interface HeatmapQuipuResult {
-  branches: HeatmapQuipuBranch[];
+  threads: HeatmapQuipuThread[];
 }
 
-const QUIPU_TOP = 16;
-const QUIPU_STEP_Y = 13;
-const QUIPU_KNOT_START_X = 34;
-const QUIPU_KNOT_END_X = 244;
+const QUIPU_THREAD_START_X = 24;
+const QUIPU_STEP_X = 18;
+const QUIPU_KNOT_START_Y = 32;
+const QUIPU_KNOT_END_Y = 164;
 
 function mondayKey(date: Date): string {
   const offset = (date.getDay() + 6) % 7;
@@ -181,9 +181,9 @@ function mondayKey(date: Date): string {
 }
 
 /**
- * Quipu vertical: doce cuerdas (una por mes) colgadas de un cordel central y
- * un nudo por cada semana del mes. Todos los nudos son opacos; su color vira
- * al acento según cuántos días de esa semana tuvieron repasos.
+ * Quipu colgante: cordel horizontal arriba y doce hilos verticales (uno por
+ * mes) cayendo hacia abajo, con un nudo por semana. Todos los nudos son
+ * opacos; su color vira al acento según los días estudiados esa semana.
  */
 export function buildReviewHeatmapQuipu(
   months: readonly ReviewHeatmapMonth[],
@@ -194,7 +194,7 @@ export function buildReviewHeatmapQuipu(
     if (entry.state === "applied") studied.add(entry.date);
   }
 
-  const branches: HeatmapQuipuBranch[] = months.map((month, monthIndex) => {
+  const threads: HeatmapQuipuThread[] = months.map((month, monthIndex) => {
     const weeks = new Map<string, number>();
     for (const day of month.days) {
       if (!day.date) continue;
@@ -206,14 +206,14 @@ export function buildReviewHeatmapQuipu(
 
     const ordered = [...weeks.entries()];
     const step = ordered.length > 1
-      ? (QUIPU_KNOT_END_X - QUIPU_KNOT_START_X) / (ordered.length - 1)
+      ? (QUIPU_KNOT_END_Y - QUIPU_KNOT_START_Y) / (ordered.length - 1)
       : 0;
-    const y = QUIPU_TOP + monthIndex * QUIPU_STEP_Y;
+    const x = QUIPU_THREAD_START_X + monthIndex * QUIPU_STEP_X;
     return {
-      y,
+      x: Number(x.toFixed(2)),
       knots: ordered.map(([weekStart, daysStudied], index) => ({
-        x: Number((QUIPU_KNOT_START_X + index * step).toFixed(2)),
-        y,
+        x: Number(x.toFixed(2)),
+        y: Number((QUIPU_KNOT_START_Y + index * step).toFixed(2)),
         weekStart,
         daysStudied,
         intensity: Math.min(1, daysStudied / 7),
@@ -221,7 +221,7 @@ export function buildReviewHeatmapQuipu(
     };
   });
 
-  return { branches };
+  return { threads };
 }
 
 export function defaultHeatmapStart(endDate: string, days = 90): string {
