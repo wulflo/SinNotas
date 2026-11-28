@@ -3,7 +3,7 @@
 > **Índice técnico extremadamente detallado de Sin Notas.**
 >
 > Versión del código indexada: **0.5.9** (`package.json`), 2026-11-27.
-> Fecha del índice: **2026-11-27**, actualizado **2026-11-28** (de `f230f45` a la fase 10, cierre de la auditoría de seguridad W1–W4). Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
+> Fecha del índice: **2026-11-27**, actualizado **2026-11-28** (de `f230f45` a la fase 12, centrado del grafo). Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
 >
 > Este documento **no modifica ni describe cambios en el código**: es solo un mapa de referencia.
 > Responde a la pregunta _«¿dónde está la pieza que hace que funcione cada cosa?»_.
@@ -784,9 +784,9 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 
 | Módulo | Líneas | Símbolos clave | Qué hace |
 | :--- | ---: | :--- | :--- |
-| `graph-physics.ts` | 539 | `DEFAULT_PHYSICS_CONFIG` (36), `physicsStep()` (286), `applyCollisionForce()` (210), `applyBarnesHutForce()` (158), `shouldStopSimulation()` (431), `computeRevealOrder()` (440), `computeInitialPosition()` (502) | Motor de fuerzas: repulsión (Barnes-Hut `O(n log n)` con theta 0,8 por encima de 200 nodos; `O(n²)` por debajo), colisión por **rejilla espacial** (3×3 celdas, evitó 4–10 FPS con 1.500 nodos), resortes de Hooke, atracción al centro, integración con amortiguación y `alpha` decreciente (`~170 pasos`). `shouldStopSimulation` ya no exige energía residual baja. |
+| `graph-physics.ts` | 539 | `DEFAULT_PHYSICS_CONFIG` (36), `physicsStep()` (286), `applyCollisionForce()` (210), `applyBarnesHutForce()` (158), `shouldStopSimulation()` (431), `computeRevealOrder()` (440), `computeInitialPosition()` (502), `centerNodesInCanvas()` | Motor de fuerzas: repulsión (Barnes-Hut `O(n log n)` con theta 0,8 por encima de 200 nodos; `O(n²)` por debajo), colisión por **rejilla espacial** (3×3 celdas, evitó 4–10 FPS con 1.500 nodos), resortes de Hooke, atracción al centro, integración con amortiguación y `alpha` decreciente (`~170 pasos`). `shouldStopSimulation` ya no exige energía residual baja. `centerNodesInCanvas()` traslada la caja envolvente al centro del canvas porque `centerStrength = 0.006` no basta para corregir grupos pequeños antes de que la física se detenga. |
 | `graph-settings.ts` | 326 | `GRAPH_SETTINGS_STORAGE_KEY` (4), `loadGraphSettings()` (249), `saveGraphSettings()` (264), `colorForPage()` (290), `toPhysicsConfig()` (313), `migratePerConnectionRadiusV2()` (228) | Persistencia en `sinnotas-graph-settings`, validación, migración v2 del radio por conexión (1.2→0), reglas de color por nombre con coincidencia insensible a acentos. |
-| `graph-view.ts` | 1.117 | `GraphView` (55), `updateData()` (242), `frame()` (461), `recomputeColors()` (729), `render()` (820), `setupEvents()` (954), `wakeSimulation()` (436) | Canvas del grafo. Revelado progresivo en lotes de 30 nodos, física a 30 Hz con render bajo demanda, zoom ×1.12, pan con botón medio/derecho, marquee, selección alterna, doble clic para reset. Los colores manuales se propagan por BFS a 4 niveles `[1, 0.5, 0.25, 0.125]`; las reglas por nombre pintan sin teñir. Un solo `beginPath/stroke` para todos los enlaces. Parar física al ocultarse (`IntersectionObserver`) y respetar `prefers-reduced-motion`. |
+| `graph-view.ts` | — | `GraphView`, `updateData()`, `frame()`, `recomputeColors()`, `render()`, `setupEvents()`, `wakeSimulation()`, `centerGraphInView()` | Canvas del grafo. Revelado progresivo en lotes de 30 nodos, física a 30 Hz con render bajo demanda, zoom ×1.12, pan con botón medio/derecho, marquee, selección alterna, doble clic para reset. `centerGraphInView()` recoloca el grupo al terminar el revelado, en reduced-motion y al cambiar el tamaño del canvas si `userAdjustedView` es falso (zoom/pan del usuario se respeta). Los colores manuales se propagan por BFS a 4 niveles `[1, 0.5, 0.25, 0.125]`; las reglas por nombre pintan sin teñir. Un solo `beginPath/stroke` para todos los enlaces. Parar física al ocultarse (`IntersectionObserver`) y respetar `prefers-reduced-motion`. |
 | `graph-labels.ts` | 19 | `labelAlphaForZoom()` (10) | Fundido de etiquetas: 0 por debajo de `0.75×umbral`, lineal hasta 1 en el umbral. Evita `fillText` por nodo cuando son invisibles. |
 | `graph-neighborhood.ts` | 66 | `connectedPageTitles()` (12) | BFS bidireccional hasta profundidad N; usa la adyacencia servida por Rust `graph_links` si llega, o extrae de los bloques; descarta destinos inexistentes. |
 | `concept-map-view.ts` | 716 | `ConceptMapView` (87), `setPage()` (173), `buildTree()` (244), `appendNextChildren()` (275), `measure()` (389), `layout()` (448), `render()` (532), `setupEvents()` (629) | Mapa conceptual en canvas del árbol de bullets. Lotes de 80 hijos, máximo 800 nodos y nodo pseudo `isMore`, wrapping de texto, layout por columnas con resolución de solapes, Bézier para enlaces, pan/zoom/doble-clic para centrar, hover con tolerancia de 4 px. Colores leídos de variables CSS `--ls-*`. |
@@ -849,7 +849,8 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | Extraer wikilinks salientes | `store/wikilinks.ts:28 collectOutgoingLinks` |
 | Adyacencia servida por Rust (FASE 4-C) | `lib.rs:1173 graph_links` → `lib.rs:904 graph_links_from_cache` |
 | Backlinks | `lib.rs:5261 find_backlinks` → `metadata_cache.rs:1117 find_cached_backlinks` |
-| Física | `views/graph-physics.ts:286 physicsStep` |
+| Física | `views/graph-physics.ts physicsStep` |
+| Centrado del grafo | `views/graph-physics.ts centerNodesInCanvas` + `views/graph-view.ts centerGraphInView` (al revelar, reduced-motion y resize sin interacción del usuario) |
 | Configuración y colores | `views/graph-settings.ts` (`sinnotas-graph-settings`) |
 | Render y gestos | `views/graph-view.ts:820 render`, `:954 setupEvents` |
 | Vecindad de un nodo (T5) | `views/graph-neighborhood.ts:12`, `desktop.ts:14058 openGraphNeighborhood` |
@@ -1056,7 +1057,7 @@ Registro exacto: `lib.rs:6040-6092` (`generate_handler!`). El único evento Rust
 
 | Comando | Qué ejecuta |
 | :--- | :--- |
-| `npm test` | `vitest run` — 646 pruebas en 70 archivos (verificación 2026-11-28, fase 10). Entorno `happy-dom` donde hace falta DOM. |
+| `npm test` | `vitest run` — 648 pruebas en 70 archivos (verificación 2026-11-28, fase 12). Entorno `happy-dom` donde hace falta DOM. |
 | `npx tsc --noEmit` | Gate de tipos estricto (`noUnusedLocals`/`noUnusedParameters`). |
 | `npm run build` | `tsc && vite build` → `dist/`. |
 | `cargo test --manifest-path src-tauri/Cargo.toml --lib --locked` | 110 tests Rust (109 pasan, 1 smoke de red ignorado; verificación 2026-11-28, fase 10). |

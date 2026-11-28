@@ -60,6 +60,7 @@ return { errors: errors.messages, page: page.content };
 | F17 — Quipu | Web: Flashcards → cinta anual; medir un nudo y el cordel | `<rect>` de 15 × 9,6 con `rx=2`, 12 hilos de x 20 a 240, trazo suave y cordel que no atraviesa los nudos |
 | F18 — Píldora Pomodoro | Web o Tauri: panel de productividad, iniciar/pausar | `.pomodoro-clock` con fondo transparente; solo se ve el aro de bolitas y la cifra sigue legible |
 | F19 — Copiar texto del PDF | Web o Tauri: seleccionar texto en el lector y pulsar «Copiar selección» | Se copia por `writeClipboardText` (en Tauri, plugin nativo); el aviso no dice «No se pudo copiar». En Android, además, «Buscar actualizaciones» debe seguir el redirect de GitHub sin salir del scope |
+| F20 — Grafo centrado | Web o Tauri: abrir Grafo (también como vista de arranque) con bóveda pequeña | Los nodos se pintan en el centro del canvas (bbox y≈315–536 px de 803 con DPR 1,25), no pegados al borde inferior; al hacer rueda y redimensionar no se recoloca la vista del usuario |
 
 **Matriz de temas (6 combinaciones):** para verificar aero/lino/dracula × claro/oscuro, fija `localStorage["sinnotas-theme"]` (`dark` / `light`) y `localStorage["sinnotas-visual"]` (`aero` / `lino` / `dracula`), **recarga** y toma captura. Cambiar solo `data-theme`/`data-visual` en caliente dio resultados engañosos. Restaura las preferencias originales al terminar; la evidencia de la matriz está en `~/Descargas/evidencia-refactor-contratos/06-matriz-temas.md`.
 

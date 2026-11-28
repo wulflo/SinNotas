@@ -46,6 +46,7 @@ Propósito: pasar de «se ve raro» a una crítica concreta y a un diff pequeño
 | Árbol de progreso | Fondo de humo en lugar de átomos difusos; el átomo se escala a 1.0 para no recortarse y las tres variantes (protón, elemento, molécula) comparten ancho máximo con las otras visualizaciones. |
 | Ajustes iterativos de un SVG | Encadena medidas concretas del DOM (`getAttribute`, `getComputedStyle`) con una captura por iteración: en el quipu se pasó de círculo a `<rect>`, se ajustaron radio/trazo, ancho y separación de hilos antes de darlo por bueno. El usuario puede pedir varios retoques sobre la misma figura; no des por cerrada una fase visual sin captura. |
 | Verificación de temas | Para probar las 6 combinaciones (aero/lino/dracula × claro/oscuro) cambia `localStorage["sinnotas-theme"]` y `["sinnotas-visual"]` **y recarga**; tocar solo `data-theme`/`data-visual` en caliente dio resultados engañosos. Restaura las preferencias al terminar. |
+| Grafo con pocos nodos | No confíes en que la física centra el grupo: con 4 notas y `centerStrength = 0.006` los nodos quedaron en y≈542–697 de un canvas de 643 px y la simulación se detuvo. Mide el bbox de píxeles pintados y centra la **caja envolvente** (`centerNodesInCanvas`), no el offset: mover el offset deja que la física vuelva a desplazarlos. No recentrar si el usuario hizo zoom/pan (`userAdjustedView`). |
 
 ## 4. Errores frecuentes a evitar
 
