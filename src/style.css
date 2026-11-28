@@ -7334,15 +7334,15 @@ body.mobile-full-editor .flashcard-review-tools {
 }
 
 :root[data-visual="dracula"] {
-  --focus-shadow-1: 0 1px 2px color-mix(in srgb, var(--md-shadow) 22%, transparent);
-  --focus-shadow-2: 0 4px 12px -6px color-mix(in srgb, var(--md-shadow) 28%, transparent);
-  --focus-shadow-3: 0 8px 20px -10px color-mix(in srgb, var(--md-shadow) 34%, transparent);
-}
-
-:root[data-visual="dracula"][data-theme="light"] {
   --focus-shadow-1: 0 1px 2px color-mix(in srgb, var(--md-shadow) 30%, transparent);
   --focus-shadow-2: 0 4px 12px -6px color-mix(in srgb, var(--md-shadow) 38%, transparent);
   --focus-shadow-3: 0 8px 20px -10px color-mix(in srgb, var(--md-shadow) 46%, transparent);
+}
+
+:root[data-visual="dracula"][data-theme="light"] {
+  --focus-shadow-1: 0 1px 2px color-mix(in srgb, var(--md-shadow) 55%, transparent);
+  --focus-shadow-2: 0 4px 12px -6px color-mix(in srgb, var(--md-shadow) 65%, transparent);
+  --focus-shadow-3: 0 8px 20px -10px color-mix(in srgb, var(--md-shadow) 75%, transparent);
 }
 
 .focus-panel:nth-child(1) { box-shadow: var(--focus-shadow-1); }
@@ -7429,10 +7429,17 @@ body.mobile-full-editor .flashcard-review-tools {
       transparent 100%
     ),
     color-mix(in srgb, var(--pomodoro-color) 32%, transparent);
-  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-  mask-composite: exclude;
+  /* Aro punteado: el patrón repetido recorta el borde en pequeños tramos. */
+  -webkit-mask:
+    repeating-conic-gradient(from -90deg, #000 0deg 1.6deg, transparent 1.6deg 3.2deg),
+    linear-gradient(#000 0 0),
+    linear-gradient(#000 0 0) content-box;
+  -webkit-mask-composite: source-in, xor;
+  mask:
+    repeating-conic-gradient(from -90deg, #000 0deg 1.6deg, transparent 1.6deg 3.2deg),
+    linear-gradient(#000 0 0),
+    linear-gradient(#000 0 0) content-box;
+  mask-composite: intersect, subtract;
   pointer-events: none;
 }
 
@@ -7669,6 +7676,17 @@ body.mobile-full-editor .flashcard-review-tools {
   z-index: 0;
   pointer-events: none;
   opacity: 0.34;
+}
+
+/* Lino casi plano, Dracula contenido y Aero con el humo completo. */
+:root[data-visual="lino"] .focus-panel::before,
+:root[data-visual="lino"] .focus-panel::after {
+  opacity: 0.05;
+}
+
+:root[data-visual="dracula"] .focus-panel::before,
+:root[data-visual="dracula"] .focus-panel::after {
+  opacity: 0.16;
 }
 
 .focus-panel::before {
