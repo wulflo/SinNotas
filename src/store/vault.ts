@@ -1,4 +1,4 @@
-import { Backlink, PageData, PageRevision, BlockNode, RestoredSnapshot, VaultCacheDelta } from "../types";
+import { Backlink, PageData, PageRevision, RestoredSnapshot, VaultCacheDelta } from "../types";
 import { getAllBlocksFlat, findNodeLocation, cloneTree } from "../editor/tree-engine";
 import { isTauri } from "@tauri-apps/api/core";
 import {
@@ -17,24 +17,7 @@ import {
   sanitizeDeckTitle,
   splitDeckTitle,
 } from "../deck-title";
-import { applyPinnedFrontmatter } from "./pinned-frontmatter";
-
-function normalizeBlockTypes(blocks: BlockNode[]): void {
-  for (const block of blocks) {
-    const [firstLine, ...remainingLines] = block.content.split(/\r?\n/);
-    const match = firstLine.match(/^!\[([^\]\r\n]*)\]\(([^()\r\n]+)\)$/);
-    const source = match?.[2].trim() || firstLine.trim();
-    if (source && /\.(?:png|jpe?g|webp|svg|gif|bmp)$/i.test(source)) {
-      block.type = "image";
-      const fileName = source.split(/[\\/]/).pop()?.split(/[?#]/, 1)[0] || "imagen";
-      block.imageAlt = match?.[1] || fileName.replace(/\.[^.]+$/, "") || "imagen";
-      block.content = [source, ...remainingLines].join("\n");
-    } else if (block.type !== "image") {
-      block.type = "text";
-    }
-    normalizeBlockTypes(block.children || []);
-  }
-}
+import { normalizeBlockTypes, normalizeNotePath, normalizePage } from "./normalize-page";
 
 export const initialVaultPages: PageData[] = [
   {
@@ -486,11 +469,8 @@ export class VaultStore {
         this.pages = initialVaultPages;
       }
     }
-    this.pages.forEach((page) => normalizeBlockTypes(page.blocks));
-    // Normalizar rutas heredadas (absolutas/prefijadas) a rutas relativas.
-    this.pages.forEach((page) => {
-      page.path = this.toRelativeNotePath(page.path, this.activeRootPath);
-    });
+    // Modo web: payload legacy, normalizar tipos, rutas y fijadas en un paso.
+    this.pages.forEach((page) => normalizePage(page, this.activeRootPath, { blockTypes: true }));
 
     if (isTauri()) {
       // Ya migradas las revisiones, la copia completa del vault sobra en localStorage.
@@ -624,28 +604,7 @@ export class VaultStore {
 
   /** Convierte una ruta de nota a ruta relativa al vault activo. */
   private toRelativeNotePath(path: string, rootPath?: string | null): string {
-    let normalized = (path || "").replace(/\\/g, "/").trim();
-    if (!normalized) return normalized;
-
-    const normalizedRoot = rootPath?.replace(/\\/g, "/").replace(/\/+$/, "");
-    if (normalizedRoot && normalized.startsWith(`${normalizedRoot}/`)) {
-      normalized = normalized.slice(normalizedRoot.length + 1);
-    }
-
-    // Si la ruta sigue siendo absoluta o quedó prefijada por una raíz antigua
-    // (p. ej. un JSON de SAF), conservamos solo la parte relativa a partir de
-    // las carpetas de notas conocidas.
-    const pagesIndex = normalized.lastIndexOf("/pages/");
-    const journalsIndex = normalized.lastIndexOf("/journals/");
-    const knownIndex = Math.max(pagesIndex, journalsIndex);
-    if (knownIndex >= 0) {
-      normalized = normalized.slice(knownIndex + 1);
-    } else if (/^(?:\/|[a-z]:\/)/i.test(normalized)) {
-      // Último recurso: quedarse con el nombre de archivo.
-      normalized = normalized.split("/").pop() || normalized;
-    }
-
-    return normalized.replace(/^\/+/, "");
+    return normalizeNotePath(path, rootPath);
   }
 
   public getActiveRootPath(): string | null {
@@ -659,19 +618,9 @@ export class VaultStore {
     // canónicos ("text"/"image" + image_alt) — con SAF además los árboles
     // viajan completos, así que renormalizar aquí pagaba el vault entero en
     // cada arranque y cada sync.
-    if (!isTauri()) {
-      pages.forEach((page) => normalizeBlockTypes(page.blocks));
-    }
-    // Las rutas de las notas deben ser relativas al vault. En algunos vaults
-    // (especialmente SAF en Android) el frontend pudo haber guardado rutas
-    // absolutas o prefijadas con la raíz; las normalizamos aquí para que el
-    // backend resuelva siempre dentro del vault activo.
-    pages.forEach((page) => {
-      page.path = this.toRelativeNotePath(page.path, rootPath);
-      // En Tauri las fijadas viajan en el frontmatter del .md; en modo web
-      // las claves no existen y se conserva el estado de localStorage.
-      applyPinnedFrontmatter(page);
-    });
+    // Único normalizador de ingress: rutas relativas, fijadas desde
+    // frontmatter y, solo en modo web, tipos de bloque legacy.
+    pages.forEach((page) => normalizePage(page, rootPath, { blockTypes: !isTauri() }));
     // Descartar escrituras diferidas del vault anterior.
     this.pendingSaves.forEach((entry) => window.clearTimeout(entry.timer));
     this.pendingSaves.clear();
@@ -772,8 +721,7 @@ export class VaultStore {
         path: entry.relativePath,
         blocks: entry.page.blocks || [],
       };
-      applyPinnedFrontmatter(added);
-      normalizeBlockTypes(added.blocks);
+      normalizePage(added, undefined, { blockTypes: true });
       nextPages.push(added);
       result.added.push(added.path);
       this.bumpPageVersion(added);
@@ -857,8 +805,7 @@ export class VaultStore {
     );
     for (const fresh of loaded) {
       if (!Array.isArray(fresh.blocks)) continue;
-      normalizeBlockTypes(fresh.blocks);
-      if (activeRoot) fresh.path = this.toRelativeNotePath(fresh.path, activeRoot);
+      normalizePage(fresh, activeRoot, { blockTypes: true });
       const existing = pagesById.get(fresh.id)
         ?? pagesByPath.get(normalizePathForCompare(fresh.path));
       if (!existing) continue;
@@ -965,7 +912,7 @@ export class VaultStore {
 
   /** Refleja la página en el estado en memoria y avisa al historial de deshacer. */
   private rememberPage(updatedPage: PageData): void {
-    normalizeBlockTypes(updatedPage.blocks);
+    normalizePage(updatedPage, undefined, { blockTypes: true });
     const idx = this.pages.findIndex((p) => p.id === updatedPage.id);
     if (idx >= 0) {
       this.pages[idx] = updatedPage;
