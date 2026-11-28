@@ -342,7 +342,7 @@ note, sorting by next review, last review or creation date, and pagination.
 
 ### Statistics and progress
 
-- **Activity:** oval year wheel of reviews: one ring per month and one arc per day, using the same five intensity levels. The current month is highlighted in the accent color; hovering an arc shows its date and review count.
+- **Activity:** annual snake of reviews: one row per month, one square per day, with curves joining the ends of each row. It keeps the five intensity levels; February 29 in leap years gets an accent outline and its tooltip identifies it. Hover a square for its date and review count.
 - **Progress:** accumulated points and an atom visualization that advances
   through stages as you review.
 - **Pomodoro:** tracked focus time.

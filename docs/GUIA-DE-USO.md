@@ -347,7 +347,7 @@ creación, y paginación.
 
 ### Estadísticas y progreso
 
-- **Actividad:** rueda ovalada de los repasos del año: un anillo por mes y un arco por día, con los mismos cinco niveles de intensidad de siempre. El mes actual se resalta en color de acento; al pasar el ratón por un arco se ve su fecha y número de repasos.
+- **Actividad:** serpiente anual de los repasos: una fila por mes, un cuadrito por día y curvas que unen los extremos de cada fila. Mantiene los cinco niveles de intensidad; el 29 de febrero de los años bisiestos lleva un borde de acento y su aviso lo identifica. Al pasar el ratón por un cuadrito se ve su fecha y número de repasos.
 - **Progreso:** puntos acumulados y una visualización del átomo que avanza por
   etapas a medida que repasas.
 - **Pomodoro:** tiempo de enfoque registrado.

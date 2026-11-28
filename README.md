@@ -74,7 +74,7 @@
 - **Card types:** basic, Cloze and image-occlusion cards, scheduled with FSRS-7.
 - **FSRS-7 model:** the official 34-weight FSRS-7 scheduler from `ts-fsrs` 6.0.0, with a dual-trace memory state (stability plus fast stability) instead of an approximation. Desired retention, maximum interval, learning/relearning steps and weights are configurable **per deck**, and each deck schedules its notes with its own parameters.
 - **Learning phase:** new cards pass through short fixed steps (1 min, 10 min) before graduating to FSRS review, avoiding misleading initial interval jumps. The learning state persists across reloads.
-- **Review tools:** focus mode, Pomodoro timer, review statistics, an oval year wheel (one ring per month, one arc per day) and a progress visualization that grows with your practice.
+- **Review tools:** focus mode, Pomodoro timer, review statistics, an annual serpentine heatmap (one square per day, curved month rows, leap-day marker) and a progress visualization that grows with your practice.
 - **Batched recalculation:** *Settings → Recalculate properties* applies each note's deck parameters and yields between batches of 40 notes, saving page by page so large vaults stay responsive.
 - **Hierarchical decks:** use `→` in note titles (for example `Mental health → Anxiety → Topic 1`) to nest decks. Select a parent deck to include all child notes, filter reviews from settings and keep the draft selection while searching or paging.
 - **Image occlusion:** draw rectangles, ellipses and polygons, move, resize and rotate areas, add hints and store the transformations in the block's Markdown metadata.

@@ -3,7 +3,7 @@
 > **Índice técnico extremadamente detallado de Sin Notas.**
 >
 > Versión del código indexada: **0.5.9** (`package.json`), 2026-11-27.
-> Fecha del índice: **2026-11-27**, actualizado **2026-11-28** (commits `f230f45`, `536b980`, `6a5b08a`). Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
+> Fecha del índice: **2026-11-27**, actualizado **2026-11-28** (de `f230f45` a `337bf86`). Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
 >
 > Este documento **no modifica ni describe cambios en el código**: es solo un mapa de referencia.
 > Responde a la pregunta _«¿dónde está la pieza que hace que funcione cada cosa?»_.
@@ -761,7 +761,7 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | `flashcard-loader.ts` | 403 | `FlashcardLoader` (88), `load()` (193), `processChunk()` (284), `finish()` (344), `evaluateCache()` (106) | Escaneo **streaming** por lotes adaptativos (16→64, objetivo 14 ms, mitad si >28 ms) con caché incremental por `VaultVersionView`. Hidrata notas metadata-only antes de escanear. `setDetectedCards` se llama **una sola vez** al terminar para que `mixed` no se rebaraje a mitad. |
 | `flashcard-maintenance.ts` | 253 | `runFlashcardMaintenance()` (176), `groupCardsByBlock()` (100), `applyAction()` (144), `DEFAULT_BATCH_SIZE = 40` (65) | 4 acciones (`due-dates`, `reschedule`, `convert` FSRS-4.5→7, `reset`). Agrupa por `page.id\0block.id` para escribir una sola vez cada bloque aunque produzca varias tarjetas; comprueba `signal.aborted` antes y dentro de cada lote; cede el hilo con rAF. |
 | `flashcard-decks.ts` | 281 | `buildDeckTree()` (75), `searchDeckTree()` (203), `flattenDeckRows()` (262), `getDeckSelectionState()` (168), `collectDeckPageTitles()` (156), `sortDeckTree()` (144) | **Árbol de mazos jerárquico** derivado de los títulos (`Salud mental → Ansiedad → Tema 1`), con selección tri-state y paginación por raíces visibles. Ojo: es distinto de `store/flashcard-decks.ts` (el modelo `decks.json`). |
-| `review-heatmap.ts` | 98 | `buildReviewHeatmap()` (41), `defaultHeatmapStart()` (95), `levelFor()` (27) | Semanas × 7 días, niveles 0–4 (`0→0, 1→1, 2-3→2, 4-6→3, ≥7→4`), máximo 365 días, solo eventos `state === "applied"`. |
+| `review-heatmap.ts` | — | `buildReviewHeatmap()` (legado), `buildReviewHeatmapYear()`, `buildReviewHeatmapSnake()`, `defaultHeatmapStart()`, `levelFor()` | Niveles 0–4 (`0→0, 1→1, 2-3→2, 4-6→3, ≥7→4`), máximo 365 días, solo eventos `state === "applied"`. `buildReviewHeatmapYear()` agrupa por mes natural; `buildReviewHeatmapSnake()` coloca un cuadrito por día en filas alternas con curvas de unión y marca `isLeapDay` en el 29 de febrero de años bisiestos. Tests: `review-heatmap.test.ts`. |
 
 ### 6.2 Grafo y mapa conceptual
 

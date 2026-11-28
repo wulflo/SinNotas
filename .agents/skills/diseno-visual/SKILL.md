@@ -39,6 +39,7 @@ Propósito: pasar de «se ve raro» a una crítica concreta y a un diff pequeño
 | Toolbars agrupadas | una sola fila con `overflow-x:auto`, separadores por contexto y botones de 28–44 px (ver `createTableToolbar`). |
 | Desplegable que no trunca | `.search-results-dropdown` crece con el viewport (`max-height: min(70vh, 520px)`; en landscape ancho `width: clamp(320px, 30vw, 440px)` y superposición con sombra). El fragmento envuelve hasta 4 líneas con `--ls-search-snippet-max-height` y ofrece «Ver bloque completo»; **no** usar `white-space:nowrap` + ellipsis para texto de apoyo. |
 | Sidebar: fijadas y estado vacío | Las fijadas se distinguen por negrita + icono de acento, **no** por el color del texto: `.sidebar-pinned .vault-tree-page-label` hereda el color de `.nav-item` (antes tenía `color:var(--ls-accent)` y `opacity:0.6`). Sin fijadas ni recientes, `.sidebar-empty-hint` da una pista en vez de dejar un hueco mudo. |
+| Actividad anual | Si la cuadrícula tipo GitHub se considera demasiado convencional, una **serpiente de 12 filas mensuales** (`buildReviewHeatmapSnake`) mantiene un cuadrito por día pero añade curvas en los extremos; el 29 de febrero se marca con `data-leap`. Referencias consultadas: *Year in Pixels* (12×31) y *serpentine/snake timeline* (amCharts, Vega). |
 
 ## 4. Errores frecuentes a evitar
 

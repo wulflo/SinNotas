@@ -53,6 +53,8 @@ return { errors: errors.messages, page: page.content };
 | F10 — Atajos crear/quitar | Web: clic en un bullet (sin seleccionar) + `Alt+R`, luego `Alt+T` | `#card` se añade y se quita en el bullet con el cursor/foco; toast distingue «ya genera tarjeta» de «está vacío»; con selección se marca la raíz |
 | F11 — Atajos en el modal | Web: «Atajos de teclado», cambiar idioma a en/zh | «Crear tarjeta básica» y «Quitar flashcards» aparecen bajo Flashcards, no bajo Editor |
 | F12 — Fijadas persistentes | App Tauri: menú contextual de una nota → Fijar, cerrar y reabrir | La nota sigue en «Fijadas»; el `.md` contiene `pinned:: true` y `pinned-at::`. En web se comprueba que `localStorage.sinnotas-vault-v4` guarda esas líneas en `frontmatter` |
+| F13 — Serpiente anual | Web: Flashcards → panel Actividad; alternar tema claro/oscuro y estilo accent/classic | 12 filas de meses con curvas en los extremos, un cuadrito por día, 5 niveles; en año bisiesto el 29 de febrero lleva borde de acento y aviso «año bisiesto» |
+| F14 — Pomodoro topbar | Web o Tauri: iniciar/pausar el Pomodoro | La pastilla de la topbar ocupa todo su contenedor (82 × 36 px) y el radio coincide (10 px) |
 
 ## 4. Formato del informe
 
