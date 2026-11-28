@@ -347,7 +347,7 @@ creación, y paginación.
 
 ### Estadísticas y progreso
 
-- **Actividad:** mapa de calor de los repasos de hasta un año.
+- **Actividad:** rueda ovalada de los repasos del año: un anillo por mes y un arco por día, con los mismos cinco niveles de intensidad de siempre. El mes actual se resalta en color de acento; al pasar el ratón por un arco se ve su fecha y número de repasos.
 - **Progreso:** puntos acumulados y una visualización del átomo que avanza por
   etapas a medida que repasas.
 - **Pomodoro:** tiempo de enfoque registrado.

@@ -342,7 +342,7 @@ note, sorting by next review, last review or creation date, and pagination.
 
 ### Statistics and progress
 
-- **Activity:** heatmap of reviews going back up to a year.
+- **Activity:** oval year wheel of reviews: one ring per month and one arc per day, using the same five intensity levels. The current month is highlighted in the accent color; hovering an arc shows its date and review count.
 - **Progress:** accumulated points and an atom visualization that advances
   through stages as you review.
 - **Pomodoro:** tracked focus time.
