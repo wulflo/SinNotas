@@ -54,7 +54,7 @@ return { errors: errors.messages, page: page.content };
 | F11 — Atajos en el modal | Web: «Atajos de teclado», cambiar idioma a en/zh | «Crear tarjeta básica» y «Quitar flashcards» aparecen bajo Flashcards, no bajo Editor |
 | F12 — Fijadas persistentes | App Tauri: menú contextual de una nota → Fijar, cerrar y reabrir | La nota sigue en «Fijadas»; el `.md` contiene `pinned:: true` y `pinned-at::`. En web se comprueba que `localStorage.sinnotas-vault-v4` guarda esas líneas en `frontmatter` |
 | F13 — Serpiente anual | Web: Flashcards → panel Actividad; alternar tema claro/oscuro y estilo accent/classic | 12 filas de meses con curvas en los extremos, un cuadrito por día, 5 niveles; en año bisiesto el 29 de febrero lleva borde de acento y aviso «año bisiesto» |
-| F14 — Pomodoro topbar | Web o Tauri: iniciar/pausar el Pomodoro | La pastilla de la topbar ocupa todo su contenedor (82 × 36 px) y el radio coincide (10 px). En el panel, el centro es translúcido y el borde vira de rojo (regresivo) o azul (progresivo) a verde con degradado suave, sin salto a violeta |
+| F14 — Pomodoro topbar | Web o Tauri: iniciar/pausar el Pomodoro | La pastilla de la topbar ocupa todo su contenedor (82 × 36 px) y el radio coincide (10 px). En el panel, el centro es translúcido; el arco nace rojo (regresivo) o azul (progresivo) y se tiñe de verde en la punta que avanza, volviendo al color base al empezar cada vuelta, sin salto a violeta |
 | F15 — Árbol de progreso | Web: inyectar `sinnotas-flashcard-progress` con 0, 8, 60 y 150 puntos y recargar | Protón solitario, elemento ligero, elemento pesado y molécula; SVG de 210 px de alto, etiqueta legible y fondo de átomos difusos sin más acento |
 
 ## 4. Formato del informe
