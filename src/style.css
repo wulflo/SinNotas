@@ -2402,8 +2402,16 @@ input[type="checkbox"] {
 .visual-selector {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  padding: 4px 0 2px;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 0 6px;
+}
+
+.visual-selector .font-option-btn {
+  min-width: 92px;
+  min-height: 36px;
+  padding: 8px 16px;
+  font-size: calc(12px * var(--ls-font-scale, 1));
 }
 
 .accent-option {
