@@ -124,7 +124,7 @@ describe("review heatmap — quipu semanal", () => {
 
   it("nudos rectangulares más grandes y menos separados", () => {
     const quipu = buildReviewHeatmapQuipu(months, []);
-    expect(quipu.knotSize).toEqual({ width: 12.5, height: 9.6, radius: 2 });
+    expect(quipu.knotSize).toEqual({ width: 15, height: 9.6, radius: 2 });
     const xs = quipu.threads.map((thread) => thread.x).sort((a, b) => a - b);
     expect(xs[1] - xs[0]).toBe(16);
   });

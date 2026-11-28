@@ -13092,11 +13092,22 @@ function renderFlashcardHeatmap(): void {
 
   let daysStudied = 0;
   quipu.threads.forEach((thread) => {
-    const lastKnot = thread.knots[thread.knots.length - 1];
-    const cord = document.createElementNS(svgNS, "path");
-    cord.setAttribute("d", `M ${thread.x} 20 L ${thread.x} ${lastKnot ? lastKnot.y : 164}`);
-    cord.classList.add("heatmap-quipu-cord");
-    svg.appendChild(cord);
+    // El hilo se dibuja solo entre nudos: así no se ve atravesando su interior.
+    const halfHeight = quipu.knotSize.height / 2;
+    const gaps: Array<[number, number]> = [];
+    if (thread.knots.length > 0) {
+      gaps.push([20, thread.knots[0].y - halfHeight]);
+      for (let i = 1; i < thread.knots.length; i += 1) {
+        gaps.push([thread.knots[i - 1].y + halfHeight, thread.knots[i].y - halfHeight]);
+      }
+    }
+    gaps.forEach(([fromY, toY]) => {
+      if (toY <= fromY) return;
+      const segment = document.createElementNS(svgNS, "path");
+      segment.setAttribute("d", `M ${thread.x} ${fromY.toFixed(2)} L ${thread.x} ${toY.toFixed(2)}`);
+      segment.classList.add("heatmap-quipu-cord");
+      svg.appendChild(segment);
+    });
 
     const anchor = document.createElementNS(svgNS, "circle");
     anchor.setAttribute("cx", String(thread.x));
