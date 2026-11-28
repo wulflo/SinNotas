@@ -13113,7 +13113,7 @@ function renderFlashcardHeatmap(): void {
       const ring = document.createElementNS(svgNS, "circle");
       ring.setAttribute("cx", String(knot.x));
       ring.setAttribute("cy", String(knot.y));
-      ring.setAttribute("r", "4.5");
+      ring.setAttribute("r", "4");
       ring.classList.add("heatmap-quipu-knot-ring");
       const title = document.createElementNS(svgNS, "title");
       title.textContent = `${knot.weekStart}: ${knot.daysStudied}/7 ${translate("días con repasos")}`;
@@ -13124,7 +13124,7 @@ function renderFlashcardHeatmap(): void {
       const fill = document.createElementNS(svgNS, "circle");
       fill.setAttribute("cx", String(knot.x));
       fill.setAttribute("cy", String(knot.y));
-      fill.setAttribute("r", (4.5 * knot.intensity).toFixed(2));
+      fill.setAttribute("r", (4 * knot.intensity).toFixed(2));
       fill.classList.add("heatmap-quipu-knot-fill");
       group.appendChild(fill);
 

@@ -7719,8 +7719,8 @@ body.mobile-full-editor .flashcard-review-tools {
  * según los días con repasos de esa semana. */
 .heatmap-quipu-knot-ring {
   fill: none;
-  stroke: color-mix(in srgb, var(--heatmap-ink) 78%, transparent);
-  stroke-width: 1.2;
+  stroke: color-mix(in srgb, var(--heatmap-ink) 55%, transparent);
+  stroke-width: 0.9;
 }
 
 .heatmap-quipu-knot-fill {
