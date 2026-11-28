@@ -190,6 +190,7 @@ import {
   removeFlashcardMarkers,
   splitBlockProperties,
 } from "./editor/flashcard-markers";
+import { resolveCardTargetIds } from "./editor/flashcard-target";
 import { FSRS7_WEIGHT_COUNT, defaultFSRSParams, FSRSRating, type FSRSParameters } from "./editor/fsrs";
 import {
   formatLearningSteps,
@@ -7671,10 +7672,30 @@ function selectAllBullets(page: PageData = currentPage): void {
   refreshBulletSelection();
 }
 
+/**
+ * Objetivo de los atajos de tarjetas: selección de bullets, cursor guardado o
+ * bullet enfocado (en ese orden). Antes solo se miraban los dos primeros, así
+ * que pulsar el atajo con el cursor en un bullet no hacía nada sin avisar.
+ */
+function cardTargetIds(page: PageData): Set<string> {
+  const active = document.activeElement;
+  const focusedId = active instanceof HTMLElement
+    ? active.closest<HTMLElement>(".block-editor[data-id]")?.dataset.id ?? null
+    : null;
+  return resolveCardTargetIds(page, {
+    selectedIds: selectedBulletIds,
+    cursorId: cursorState?.blockId ?? null,
+    focusedId,
+  });
+}
+
 /** Elimina las flashcards de los bullets seleccionados sin borrar su contenido. */
 function deleteFlashcardsInSelection(page: PageData = getSelectionPage()): boolean {
-  const ids = new Set(selectedBulletIds);
-  if (ids.size === 0) return false;
+  const ids = cardTargetIds(page);
+  if (ids.size === 0) {
+    showToast(translate("Selecciona un bullet o coloca el cursor en él para quitar flashcards."));
+    return false;
+  }
   let changed = false;
   getAllBlocksFlat(page.blocks).forEach((block) => {
     if (!ids.has(block.id) || !isFlashcardBlockContent(block.content)) return;
@@ -7684,34 +7705,39 @@ function deleteFlashcardsInSelection(page: PageData = getSelectionPage()): boole
     changed = true;
   });
   if (!changed) {
-    showToast("La selección no contiene flashcards que eliminar.");
+    showToast(translate("La selección no contiene flashcards que eliminar."));
     return false;
   }
   void vault.savePage(page);
   renderBlocksTree();
   refreshBulletSelection();
-  showToast("Flashcards eliminadas; el contenido se conservó.");
+  showToast(translate("Flashcards eliminadas; el contenido se conservó."));
   return true;
 }
 
 /** Incrusta #card en el bloque de mayor jerarquía de la selección. */
 function createBasicCardFromSelection(page: PageData = getSelectionPage()): boolean {
-  const ids = selectedBulletIds.length > 0
-    ? new Set(selectedBulletIds)
-    : cursorState
-      ? new Set([cursorState.blockId])
-      : new Set<string>();
-  if (ids.size === 0) return false;
+  const ids = cardTargetIds(page);
+  if (ids.size === 0) {
+    showToast(translate("Selecciona un bullet o coloca el cursor en él para crear una tarjeta."));
+    return false;
+  }
   // Solo el bloque superior: marcar todos los seleccionados convertía también
   // cada descendant en tarjeta y rompía la jerarquía esperada del outliner.
   const target = getHighestSelectedRoot(page.blocks, ids);
   if (!target || target.type === "image") {
-    showToast("El bloque principal no puede convertirse en tarjeta.");
+    showToast(translate("El bloque principal no puede convertirse en tarjeta."));
     return false;
   }
   const visible = getVisibleBlockContent(target.content);
-  if (!visible.trim() || isFlashcardBlockContent(target.content)) {
-    showToast("El bloque principal ya es una tarjeta o está vacío.");
+  if (!visible.trim()) {
+    showToast(translate("El bullet está vacío; escribe algo antes de crear la tarjeta."));
+    return false;
+  }
+  // `#card`, `::`, cloze y oclusiones ya generan tarjeta: añadir `#card`
+  // cambiaría la pregunta y la huella del diario (ver skill fsrs7-audit).
+  if (isFlashcardBlockContent(target.content)) {
+    showToast(translate("Este bullet ya genera una tarjeta (#card, ::, ==…==, {{…}} o una oclusión)."));
     return false;
   }
   setVisibleBlockContent(target, `${visible.trim()} #card`);
@@ -7719,7 +7745,7 @@ function createBasicCardFromSelection(page: PageData = getSelectionPage()): bool
   void vault.savePage(page);
   renderBlocksTree();
   refreshBulletSelection();
-  showToast("Tarjeta básica creada en el bloque principal.");
+  showToast(translate("Tarjeta básica creada en el bloque principal."));
   return true;
 }
 
