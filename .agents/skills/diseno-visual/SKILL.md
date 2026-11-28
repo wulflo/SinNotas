@@ -42,6 +42,7 @@ Propósito: pasar de «se ve raro» a una crítica concreta y a un diff pequeño
 | Actividad anual | Si la cuadrícula tipo GitHub se considera demasiado convencional, una **serpiente de 12 filas mensuales** (`buildReviewHeatmapSnake`) mantiene un cuadrito por día pero añade curvas en los extremos; el 29 de febrero se marca con `data-leap`. Referencias consultadas: *Year in Pixels* (12×31) y *serpentine/snake timeline* (amCharts, Vega). |
 | Panel de productividad | Tres tarjetas separadas con helpers uniformes; humo de acento con opacidad por estilo (Lino ~0,05, Dracula ~0,16, Aero ~0,34) y sombras por tema/subsección (`--focus-shadow-*`). El aro del Pomodoro usa bolitas grandes espaciadas conservando el degradado rojo/azul → verde. |
 | Sidebar de Ajustes | Los puntos de colores fijos y el borde interior de Aero se eliminan: navegación neutra con pestaña activa en acento, misma jerarquía en los 6 estilos/temas. |
+| Hue del acento | Para evitar monotonía se derivan `--ls-accent-hue-1/2` con `oklch(from var(--ls-accent) l c calc(h ± N))` (N = 26 Aero, 12 Lino, 38 Dracula); el giro se aplica a los tres helpers y a los botones de estilo, sin colores hexadecimales nuevos. |
 | Árbol de progreso | Fondo de humo en lugar de átomos difusos; el átomo se escala a 1.0 para no recortarse y las tres variantes (protón, elemento, molécula) comparten ancho máximo con las otras visualizaciones. |
 
 ## 4. Errores frecuentes a evitar
