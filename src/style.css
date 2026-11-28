@@ -7446,8 +7446,8 @@ body.mobile-full-editor .flashcard-review-tools {
   align-items: center;
   justify-content: center;
   margin: 10px 0 14px;
-  /* La pista tenue conserva la silueta de la píldora bajo las bolitas. */
-  border: 1px solid color-mix(in srgb, var(--pomodoro-color) 22%, var(--ls-border-subtle));
+  /* El aro de bolitas define la píldora: sin borde exterior añadido. */
+  border: 0;
   border-radius: var(--ma-radius-xl, 14px);
   background: color-mix(in srgb, var(--ls-bg-secondary) 55%, transparent);
   font-variant-numeric: tabular-nums;
