@@ -6691,7 +6691,9 @@ body.is-bullet-selecting {
 }
 
 /* ==================== FLASHCARDS (FSRS-7 & CLOZE) ==================== */
-#view-flashcards {
+/* Aero mantiene el halo de acento; Lino es plano y Dracula usa su propio
+ * tono de superficie en vez del color de interfaz elegido. */
+:root[data-visual="aero"] #view-flashcards {
   background: radial-gradient(
       1200px 800px at 50% 0%,
       color-mix(in srgb, var(--ls-accent) 12%, transparent),
@@ -6700,10 +6702,23 @@ body.is-bullet-selecting {
     transparent;
 }
 
-[data-theme="light"] #view-flashcards {
+[data-theme="light"][data-visual="aero"] #view-flashcards {
   background: radial-gradient(
       1200px 800px at 50% 0%,
       color-mix(in srgb, var(--ls-accent) 14%, transparent),
+      transparent 72%
+    ),
+    transparent;
+}
+
+:root[data-visual="lino"] #view-flashcards {
+  background: transparent;
+}
+
+:root[data-visual="dracula"] #view-flashcards {
+  background: radial-gradient(
+      1200px 800px at 50% 0%,
+      color-mix(in srgb, var(--md-tertiary) 8%, transparent),
       transparent 72%
     ),
     transparent;
@@ -6852,6 +6867,40 @@ body.is-bullet-selecting {
   border-color: var(--ls-accent);
   background: var(--ls-accent-subtle);
   color: var(--ls-accent);
+}
+
+/* Controles de Flashcards: en claro se aclaran para separarlos del fondo;
+ * en oscuro se refactorizan con superficie de tema y borde de acento tenue. */
+[data-theme="light"] .flashcards-container .font-option-btn,
+[data-theme="light"] .flashcards-container .flashcard-tab {
+  background: color-mix(in srgb, var(--ls-bg-primary) 94%, transparent);
+  border-color: color-mix(in srgb, var(--ls-border-color) 55%, transparent);
+  color: var(--ls-text-primary);
+}
+
+[data-theme="dark"] .flashcards-container .font-option-btn,
+[data-theme="dark"] .flashcards-container .flashcard-tab {
+  background: color-mix(in srgb, var(--md-surface-container-high, var(--ls-bg-secondary)) 82%, transparent);
+  border-color: color-mix(in srgb, var(--ls-accent) 28%, var(--ls-border-color));
+  color: var(--ls-text-title);
+}
+
+[data-theme="light"] .flashcards-container .font-option-btn:hover,
+[data-theme="light"] .flashcards-container .flashcard-tab:hover,
+[data-theme="light"] .flashcards-container .font-option-btn.active,
+[data-theme="light"] .flashcards-container .flashcard-tab.active {
+  background: var(--ls-accent-subtle);
+  border-color: var(--ls-accent);
+  color: var(--ls-accent);
+}
+
+[data-theme="dark"] .flashcards-container .font-option-btn:hover,
+[data-theme="dark"] .flashcards-container .flashcard-tab:hover,
+[data-theme="dark"] .flashcards-container .font-option-btn.active,
+[data-theme="dark"] .flashcards-container .flashcard-tab.active {
+  background: color-mix(in srgb, var(--ls-accent) 20%, var(--md-surface-container-high, var(--ls-bg-secondary)));
+  border-color: var(--ls-accent);
+  color: var(--ls-text-title);
 }
 
 .flashcard-card-header {
@@ -7433,12 +7482,12 @@ body.mobile-full-editor .flashcard-review-tools {
    * 10 px, recortados al grosor del borde. El degradado de color y el virado
    * al verde se mantienen intactos debajo de la máscara. */
   -webkit-mask:
-    radial-gradient(circle at 5px 5px, #000 4px, transparent 4.5px) 0 0 / 10px 10px,
+    radial-gradient(circle at 7px 7px, #000 4px, transparent 4.5px) 0 0 / 14px 14px,
     linear-gradient(#000 0 0),
     linear-gradient(#000 0 0) content-box;
   -webkit-mask-composite: source-in, xor;
   mask:
-    radial-gradient(circle at 5px 5px, #000 4px, transparent 4.5px) 0 0 / 10px 10px,
+    radial-gradient(circle at 7px 7px, #000 4px, transparent 4.5px) 0 0 / 14px 14px,
     linear-gradient(#000 0 0),
     linear-gradient(#000 0 0) content-box;
   mask-composite: intersect, subtract;
