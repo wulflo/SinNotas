@@ -178,7 +178,8 @@ impl VaultStorage for FsStorage {
 
     async fn read_note(&self, relative_path: &str) -> Result<String, String> {
         let path = self.resolve(relative_path)?;
-        fs::read_to_string(&path).map_err(|e: std::io::Error| e.to_string())
+        let file = fs::File::open(&path).map_err(|e: std::io::Error| e.to_string())?;
+        read_text_bounded(file, NOTE_MAX_BYTES as usize)
     }
 
     async fn write_note(&self, relative_path: &str, content: &str) -> Result<(), String> {
@@ -462,9 +463,12 @@ impl VaultStorage for SafStorage {
 
     async fn read_note(&self, relative_path: &str) -> Result<String, String> {
         let file_path = self.require_file_path(relative_path)?;
-        self.android_fs()
-            .read_to_string(&file_path)
-            .map_err(|e: tauri_plugin_android_fs::Error| e.to_string())
+        let bytes = self
+            .android_fs()
+            .read(&file_path)
+            .map_err(|e: tauri_plugin_android_fs::Error| e.to_string())?;
+        check_byte_limit(bytes.len(), NOTE_MAX_BYTES as usize, "La nota")?;
+        String::from_utf8(bytes).map_err(|_| "La nota no es UTF-8 válido.".to_string())
     }
 
     async fn write_note(&self, relative_path: &str, content: &str) -> Result<(), String> {
@@ -545,9 +549,12 @@ impl VaultStorage for SafStorage {
 
     async fn read_image(&self, relative_path: &str) -> Result<Vec<u8>, String> {
         let file_path = self.require_file_path(relative_path)?;
-        self.android_fs()
+        let bytes = self
+            .android_fs()
             .read(&file_path)
-            .map_err(|e: tauri_plugin_android_fs::Error| e.to_string())
+            .map_err(|e: tauri_plugin_android_fs::Error| e.to_string())?;
+        check_byte_limit(bytes.len(), MAX_IMAGE_FILE_BYTES, "La imagen")?;
+        Ok(bytes)
     }
 
     async fn read_progress_file(&self, relative_path: &str) -> Result<Option<String>, String> {
@@ -2894,7 +2901,7 @@ async fn read_image_data(
     {
         return Err("La ruta de imagen no es un archivo.".to_string());
     }
-    fs::read(canonical_path).map_err(|err| err.to_string())
+    read_image_bytes_bounded(&canonical_path)
 }
 
 #[tauri::command(async)]
@@ -3064,6 +3071,30 @@ fn read_text_bounded<R: Read>(reader: R, max_bytes: usize) -> Result<String, Str
         return Err("El archivo interno supera el límite permitido.".to_string());
     }
     String::from_utf8(buffer).map_err(|_| "El archivo interno no es UTF-8 válido.".to_string())
+}
+
+/// Comprueba un tamaño ya leído contra el límite indicado.
+fn check_byte_limit(len: usize, max: usize, label: &str) -> Result<(), String> {
+    if len > max {
+        return Err(format!("{} supera el tamaño máximo permitido.", label));
+    }
+    Ok(())
+}
+
+/// Lee una imagen del filesystem sin fiarse solo de `metadata.len()`: el
+/// `take` garantiza que nunca se asigne más que el límite aunque el archivo
+/// crezca entre la comprobación y la lectura.
+fn read_image_bytes_bounded(path: &Path) -> Result<Vec<u8>, String> {
+    let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
+    check_byte_limit(metadata.len() as usize, MAX_IMAGE_FILE_BYTES, "La imagen")?;
+    let mut bytes = Vec::with_capacity(metadata.len() as usize);
+    fs::File::open(path)
+        .map_err(|e| e.to_string())?
+        .take(MAX_IMAGE_FILE_BYTES as u64 + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| e.to_string())?;
+    check_byte_limit(bytes.len(), MAX_IMAGE_FILE_BYTES, "La imagen")?;
+    Ok(bytes)
 }
 
 /// Crea un archivo nuevo sin seguir symlinks: `create_new` falla si el nombre
@@ -4812,6 +4843,38 @@ mod tests {
         write_new_file(&fresh, "contenido").unwrap();
         assert_eq!(fs::read_to_string(&fresh).unwrap(), "contenido");
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn check_byte_limit_rejects_only_above_the_max() {
+        assert!(check_byte_limit(10, 10, "La nota").is_ok());
+        assert!(check_byte_limit(11, 10, "La nota").is_err());
+    }
+
+    #[test]
+    fn read_image_bytes_bounded_rejects_oversized_file() {
+        let dir = std::env::temp_dir().join(format!(
+            "sinnotas-image-limit-test-{}-{}",
+            process::id(),
+            Uuid::new_v4()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let small = dir.join("small.png");
+        fs::write(&small, b"png").unwrap();
+        assert_eq!(read_image_bytes_bounded(&small).unwrap(), b"png");
+
+        let big = dir.join("big.png");
+        fs::write(&big, vec![0u8; MAX_IMAGE_FILE_BYTES + 1]).unwrap();
+        assert!(read_image_bytes_bounded(&big).is_err());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_text_bounded_rejects_oversized_notes() {
+        let bytes = vec![b'a'; NOTE_MAX_BYTES as usize + 1];
+        assert!(
+            read_text_bounded(std::io::Cursor::new(bytes), NOTE_MAX_BYTES as usize).is_err()
+        );
     }
 
     #[test]
