@@ -7313,26 +7313,41 @@ body.mobile-full-editor .flashcard-review-tools {
   background: var(--ls-card-bg);
 }
 
-/* Sombras por estilo, modo y subsección. Se usan los tokens de elevación de
- * cada tema: Lino es plano (sin sombras) y Dracula no comparte los tonos de
- * Aero, así que las seis combinaciones son realmente distintas. */
-:root[data-visual="lino"] .focus-panel {
-  box-shadow: none;
+/* Sombras por estilo, modo y subsección. Lino es plano; Aero usa el tinte de
+ * su acento y Dracula un velo violeta mucho más suave que su elevación base. */
+:root[data-visual="lino"] {
+  --focus-shadow-1: none;
+  --focus-shadow-2: none;
+  --focus-shadow-3: none;
 }
 
-:root[data-visual="aero"][data-theme="light"] .focus-panel:nth-child(1) { box-shadow: var(--md-elevation-1); }
-:root[data-visual="aero"][data-theme="light"] .focus-panel:nth-child(2) { box-shadow: var(--md-elevation-2); }
-:root[data-visual="aero"][data-theme="light"] .focus-panel:nth-child(3) { box-shadow: var(--md-elevation-3); }
-:root[data-visual="aero"][data-theme="dark"] .focus-panel:nth-child(1) { box-shadow: var(--md-elevation-1); }
-:root[data-visual="aero"][data-theme="dark"] .focus-panel:nth-child(2) { box-shadow: var(--md-elevation-2); }
-:root[data-visual="aero"][data-theme="dark"] .focus-panel:nth-child(3) { box-shadow: var(--md-elevation-3); }
+:root[data-visual="aero"] {
+  --focus-shadow-1: 0 1px 2px color-mix(in srgb, var(--md-primary) 10%, transparent);
+  --focus-shadow-2: 0 4px 12px -6px color-mix(in srgb, var(--md-primary) 20%, transparent);
+  --focus-shadow-3: 0 8px 20px -10px color-mix(in srgb, var(--md-primary) 28%, transparent);
+}
 
-:root[data-visual="dracula"][data-theme="light"] .focus-panel:nth-child(1) { box-shadow: var(--md-elevation-1); }
-:root[data-visual="dracula"][data-theme="light"] .focus-panel:nth-child(2) { box-shadow: var(--md-elevation-2); }
-:root[data-visual="dracula"][data-theme="light"] .focus-panel:nth-child(3) { box-shadow: var(--md-elevation-3); }
-:root[data-visual="dracula"][data-theme="dark"] .focus-panel:nth-child(1) { box-shadow: var(--md-elevation-1); }
-:root[data-visual="dracula"][data-theme="dark"] .focus-panel:nth-child(2) { box-shadow: var(--md-elevation-2); }
-:root[data-visual="dracula"][data-theme="dark"] .focus-panel:nth-child(3) { box-shadow: var(--md-elevation-3); }
+:root[data-visual="aero"][data-theme="dark"] {
+  --focus-shadow-1: 0 1px 2px color-mix(in srgb, var(--md-primary) 12%, transparent);
+  --focus-shadow-2: 0 4px 14px -6px color-mix(in srgb, var(--md-primary) 20%, transparent);
+  --focus-shadow-3: 0 8px 22px -10px color-mix(in srgb, var(--md-primary) 30%, transparent);
+}
+
+:root[data-visual="dracula"] {
+  --focus-shadow-1: 0 1px 2px color-mix(in srgb, var(--md-shadow) 22%, transparent);
+  --focus-shadow-2: 0 4px 12px -6px color-mix(in srgb, var(--md-shadow) 28%, transparent);
+  --focus-shadow-3: 0 8px 20px -10px color-mix(in srgb, var(--md-shadow) 34%, transparent);
+}
+
+:root[data-visual="dracula"][data-theme="light"] {
+  --focus-shadow-1: 0 1px 2px color-mix(in srgb, var(--md-shadow) 30%, transparent);
+  --focus-shadow-2: 0 4px 12px -6px color-mix(in srgb, var(--md-shadow) 38%, transparent);
+  --focus-shadow-3: 0 8px 20px -10px color-mix(in srgb, var(--md-shadow) 46%, transparent);
+}
+
+.focus-panel:nth-child(1) { box-shadow: var(--focus-shadow-1); }
+.focus-panel:nth-child(2) { box-shadow: var(--focus-shadow-2); }
+.focus-panel:nth-child(3) { box-shadow: var(--focus-shadow-3); }
 
 .focus-panel h3,
 .focus-panel label {
