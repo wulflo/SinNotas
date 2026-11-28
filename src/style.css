@@ -7475,20 +7475,20 @@ body.mobile-full-editor .flashcard-review-tools {
       var(--pomodoro-green-color) min(6%, var(--pomodoro-arc)),
       var(--pomodoro-green-color) max(0%, calc(var(--pomodoro-arc) - 8%)),
       color-mix(in srgb, var(--pomodoro-green-color) 55%, transparent) max(0%, calc(var(--pomodoro-arc) - 3%)),
-      transparent var(--pomodoro-arc),
-      transparent 100%
+      color-mix(in srgb, var(--pomodoro-green-color) 30%, transparent) var(--pomodoro-arc),
+      color-mix(in srgb, var(--pomodoro-green-color) 30%, transparent) 100%
     ),
     color-mix(in srgb, var(--pomodoro-color) 32%, transparent);
   /* Aro de bolitas grandes: el patrón radial deja círculos de 8 px separados
    * 10 px, recortados al grosor del borde. El degradado de color y el virado
    * al verde se mantienen intactos debajo de la máscara. */
   -webkit-mask:
-    radial-gradient(circle at 7px 7px, #000 4px, transparent 4.5px) 0 0 / 14px 14px,
+    radial-gradient(circle at 7px 7px, #000 4px, transparent 4.5px) center / 14px 14px,
     linear-gradient(#000 0 0),
     linear-gradient(#000 0 0) content-box;
   -webkit-mask-composite: source-in, xor;
   mask:
-    radial-gradient(circle at 7px 7px, #000 4px, transparent 4.5px) 0 0 / 14px 14px,
+    radial-gradient(circle at 7px 7px, #000 4px, transparent 4.5px) center / 14px 14px,
     linear-gradient(#000 0 0),
     linear-gradient(#000 0 0) content-box;
   mask-composite: intersect, subtract;
