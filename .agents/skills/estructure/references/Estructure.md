@@ -3,7 +3,7 @@
 > **Índice técnico extremadamente detallado de Sin Notas.**
 >
 > Versión del código indexada: **0.5.9** (`package.json`), 2026-11-27.
-> Fecha del índice: **2026-11-27**, actualizado **2026-11-28** (de `f230f45` a `337bf86`). Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
+> Fecha del índice: **2026-11-27**, actualizado **2026-11-28** (de `f230f45` a `a4acd70`). Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
 >
 > Este documento **no modifica ni describe cambios en el código**: es solo un mapa de referencia.
 > Responde a la pregunta _«¿dónde está la pieza que hace que funcione cada cosa?»_.
@@ -320,6 +320,8 @@ Tecla 1/2/3/4 o botón → src/desktop.ts:13508 applyFSRSRating()
 | `flashcard-deck-storage.ts` | 225 | Persistencia de mazos (Rust / localStorage). |
 | `review-progress.ts` | 524 | Diario de repasos, estadísticas, eventos. |
 | `sidebar-selection.ts` | 40 | Selección de nota en la barra lateral. |
+| `normalize-page.ts` | — | `normalizePage()` normaliza en un solo paso tipos de bloque, ruta relativa y fijadas desde frontmatter. Todos los ingress de `PageData` lo usan. |
+| `epoch-guard.ts` | — | `isStaleMutation(captured, current)` descarta resultados de `await` cuando la bóveda cambió mientras esperaba. |
 | `wikilinks.ts` | 53 | Resolución de `[[enlaces]]`. |
 | `vault-replace.test.ts` | 80 | Test de reemplazo de bóveda. |
 | `saf-root.test.ts` | 21 | `isSafVaultRoot`: detecta la raíz SAF serializada. |
@@ -353,7 +355,9 @@ Tecla 1/2/3/4 o botón → src/desktop.ts:13508 applyFSRSRating()
 | `pdf-view.ts` | 965 | Lector PDF: lista, render, texto, capturas. |
 | `reference-slot-state.ts` | 33 | Estado y botón de «ver referencia sin truncar». |
 | `snippet-highlight.ts` | ~110 | `highlightSnippetMatch(root, needle)`: envuelve en `<mark>` la coincidencia **después** de renderizar el Markdown. `createRenderedSnippet(text, query)`: renderiza el bloque completo, recorta con un `Range` sobre nodos de texto (16 chars antes / 80 después) y resalta; evita `**` sin cerrar y que el match quede fuera de las 4 líneas visibles. Test: `snippet-highlight.test.ts` (5 casos). |
-| `review-heatmap.ts` | 98 | Mapa de calor de repasos. |
+| `review-heatmap.ts` | — | Mapa de actividad de repasos (quipu anual). |
+| `boot-invariants.ts` | — | Decisiones puras de arranque (`shouldRenderEditorOnBoot`, `needsEditorHydration`) que evitan el editor vacío con `blocksLoaded:false`. |
+| `tauri/commands.ts` | — | Adaptador tipado de `invoke`: construye argumentos y normaliza formas de datos (p. ej. `Backlink` snake_case ↔ camelCase). |
 | `review-target.ts` | 108 | Resolución compartida de nota/bloque de una tarjeta y del diario. |
 | `virtual-list.ts` | 362 | Lista virtual reutilizable (offsets correctos tras medir filas). |
 | `*.test.ts` (24 archivos) | 3.000+ | Ver §6 y §15. |
@@ -761,7 +765,7 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | `flashcard-loader.ts` | 403 | `FlashcardLoader` (88), `load()` (193), `processChunk()` (284), `finish()` (344), `evaluateCache()` (106) | Escaneo **streaming** por lotes adaptativos (16→64, objetivo 14 ms, mitad si >28 ms) con caché incremental por `VaultVersionView`. Hidrata notas metadata-only antes de escanear. `setDetectedCards` se llama **una sola vez** al terminar para que `mixed` no se rebaraje a mitad. |
 | `flashcard-maintenance.ts` | 253 | `runFlashcardMaintenance()` (176), `groupCardsByBlock()` (100), `applyAction()` (144), `DEFAULT_BATCH_SIZE = 40` (65) | 4 acciones (`due-dates`, `reschedule`, `convert` FSRS-4.5→7, `reset`). Agrupa por `page.id\0block.id` para escribir una sola vez cada bloque aunque produzca varias tarjetas; comprueba `signal.aborted` antes y dentro de cada lote; cede el hilo con rAF. |
 | `flashcard-decks.ts` | 281 | `buildDeckTree()` (75), `searchDeckTree()` (203), `flattenDeckRows()` (262), `getDeckSelectionState()` (168), `collectDeckPageTitles()` (156), `sortDeckTree()` (144) | **Árbol de mazos jerárquico** derivado de los títulos (`Salud mental → Ansiedad → Tema 1`), con selección tri-state y paginación por raíces visibles. Ojo: es distinto de `store/flashcard-decks.ts` (el modelo `decks.json`). |
-| `review-heatmap.ts` | — | `buildReviewHeatmap()` (legado), `buildReviewHeatmapYear()`, `buildReviewHeatmapQuipu()`, `defaultHeatmapStart()`, `levelFor()` | Niveles 0–4, máximo 365 días, solo eventos `state === "applied"`. `buildReviewHeatmapYear()` agrupa por mes natural; `buildReviewHeatmapQuipu()` genera 12 hilos colgantes y un nudo por semana con `intensity = días con repasos / 7`. Tests: `review-heatmap.test.ts`. |
+| `review-heatmap.ts` | — | `buildReviewHeatmapYear()`, `buildReviewHeatmapQuipu()`, `defaultHeatmapStart()`, `levelFor()` | Máximo 365 días, solo eventos `state === "applied"`. El quipu genera 12 hilos colgantes y un nudo por semana con `intensity = días con repasos / 7` y `knotSize` (ancho/alto/radio). Tests: `review-heatmap.test.ts`. |
 
 ### 6.2 Grafo y mapa conceptual
 

@@ -13,7 +13,7 @@ Propósito: que cada cambio tenga una prueba que guarde una invariante real y qu
 
 ```bash
 npx tsc --noEmit
-npm test                 # 621 pruebas / 64 archivos en la última verificación (2026-11-28)
+npm test                 # 643 pruebas / 69 archivos en la última verificación (2026-11-28)
 npm run build
 cargo test --manifest-path src-tauri/Cargo.toml --lib
 git diff --check
@@ -60,6 +60,7 @@ Antes de escribir un test, responder «¿qué puede romperse?»:
 - Las convenciones del repo ganan sobre las mejores prácticas genéricas: estilo de `src/desktop.ts`, tokens `--ls-*`, patrón de `tree-engine.ts`.
 - Rust: decidir modo **defensivo** (añadir tipo/abstracción por seguridad) frente a **ofensivo** (borrar indirección que solo reenvía). No quitar capas de seguridad; no añadir abstracciones donde no aportan.
 - TS: exports con tipo explícito, evitar `await` dentro de bucles, `Promise.all` solo para operaciones independientes **y acotado** (ver skill `vault-performance-guard`).
+- Frontera Tauri: construir los argumentos de `invoke` en `src/tauri/commands.ts` con tipos compartidos; un test por wrapper comprueba la forma exacta. Los `await` que mutan estado usan `isStaleMutation()` para descartar resultados obsoletos.
 - Antes de terminar: `npx tsc --noEmit`, `npm test`, `git diff --check`. Si el refactor tocó Rust, también `cargo check`.
 
 ## Checklist antes de responder

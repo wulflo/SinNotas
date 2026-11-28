@@ -6,11 +6,6 @@ export interface ReviewHeatmapDay {
   level: 0 | 1 | 2 | 3 | 4;
 }
 
-export interface ReviewHeatmapWeek {
-  monthLabel: string;
-  days: ReviewHeatmapDay[];
-}
-
 /** Un mes de la cinta anual: una fila con un cuadrito por día del mes. */
 export interface ReviewHeatmapMonth {
   /** `YYYY-MM`, estable para claves y tests. */
@@ -44,60 +39,6 @@ function addDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
-}
-
-export function buildReviewHeatmap(
-  entries: readonly Pick<ReviewProgressEvent, "date" | "state">[],
-  requestedStart: string,
-  requestedEnd: string
-): ReviewHeatmapWeek[] {
-  const end = parseLocalDate(requestedEnd);
-  if (!end) return [];
-  const requested = parseLocalDate(requestedStart) ?? end;
-  const earliest = addDays(end, -364);
-  const start = requested < earliest ? earliest : requested > end ? end : requested;
-  const startKey = dateKey(start);
-  const endKey = dateKey(end);
-
-  const counts = new Map<string, number>();
-  for (const entry of entries) {
-    if (entry.state !== "applied" || entry.date < startKey || entry.date > endKey) continue;
-    counts.set(entry.date, (counts.get(entry.date) || 0) + 1);
-  }
-
-  const firstWeek = addDays(start, -start.getDay());
-  const weeks: ReviewHeatmapWeek[] = [];
-  let previousMonth = "";
-  for (let weekOffset = 0; weekOffset < 54; weekOffset += 1) {
-    const weekStart = addDays(firstWeek, weekOffset * 7);
-    if (dateKey(weekStart) > endKey) break;
-    const days: ReviewHeatmapDay[] = [];
-    let monthLabel = "";
-    for (let dayOffset = 0; dayOffset < 7; dayOffset += 1) {
-      const date = addDays(weekStart, dayOffset);
-      const key = dateKey(date);
-      if (key >= startKey && key <= endKey) {
-        const count = counts.get(key) || 0;
-        days.push({ date: key, count, level: levelFor(count) });
-        if ((date.getDate() === 1 || weeks.length === 0) && !monthLabel) {
-          monthLabel = new Intl.DateTimeFormat(undefined, { month: "short" }).format(date);
-        }
-      } else {
-        days.push({ date: null, count: 0, level: 0 });
-      }
-    }
-    if (!monthLabel && weeks.length === 0) {
-      const firstVisible = days.find((day) => day.date)?.date;
-      if (firstVisible) {
-        const date = parseLocalDate(firstVisible);
-        if (date) monthLabel = new Intl.DateTimeFormat(undefined, { month: "short" }).format(date);
-      }
-    }
-    if (monthLabel === previousMonth) monthLabel = "";
-    if (monthLabel) previousMonth = monthLabel;
-    weeks.push({ monthLabel, days });
-  }
-  return weeks;
 }
 
 /**
