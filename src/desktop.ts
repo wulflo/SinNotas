@@ -118,6 +118,7 @@ import {
 } from "./views/graph-settings-ui";
 import { closeCardEditor, configureCardEditor } from "./review/card-editor";
 import { showToast } from "./ui/toast";
+import { needsEditorHydration, shouldRenderEditorOnBoot } from "./boot-invariants";
 import {
   configureNavigationHistory,
   readLastNavigation,
@@ -16997,11 +16998,9 @@ async function initializeDesktopApp(): Promise<void> {
   // bloques. Rehidratarla antes del primer render evita que el editor quede
   // vacío (y que parezca que sus bullets están colapsados) hasta la primera
   // interacción. También la dejamos pinned como hace `showEditorPage`.
-  const willRenderEditor =
-    !restored ||
-    lastNavigation?.view === "editor" ||
-    (lastNavigation?.view === "pdf" && pdfEditorSplitPreferred());
-  if (willRenderEditor && currentPage.blocksLoaded === false && isTauri()) {
+  const pdfSplit = pdfEditorSplitPreferred();
+  const willRenderEditor = shouldRenderEditorOnBoot(restored, lastNavigation, pdfSplit);
+  if (needsEditorHydration(willRenderEditor, currentPage.blocksLoaded, isTauri())) {
     if (pinnedEditorPagePath) vault.unpinPage(pinnedEditorPagePath);
     pinnedEditorPagePath = currentPage.path;
     vault.pinPage(currentPage.path);
@@ -17014,7 +17013,7 @@ async function initializeDesktopApp(): Promise<void> {
     } else {
       // Si el PDF recuerda el modo de edición en paralelo, el editor debe
       // estar pintado antes de mostrar ambos paneles.
-      if (lastNavigation.view === "pdf" && pdfEditorSplitPreferred()) {
+      if (lastNavigation.view === "pdf" && pdfSplit) {
         renderEditor();
       }
       switchView(lastNavigation.view);
