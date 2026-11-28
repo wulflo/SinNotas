@@ -9025,10 +9025,13 @@ body.mobile-full-editor .flashcard-review-tools {
   justify-content: space-between;
   gap: 10px;
   margin: 12px 0 10px;
-  padding: 4px 6px;
-  border: 1px solid var(--md-journals-item-border);
-  border-radius: var(--ls-headbar-radius);
-  background: color-mix(in srgb, var(--md-journals-panel-bg) 70%, transparent);
+  /* El usuario pidió quitar solo el envoltorio: sin borde ni fondo, pero con
+   * el padding ajustado para que los controles sigan alineados con la tarjeta
+   * de diario de abajo (14 px de padding + 1 px de borde). */
+  padding: 4px 13px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .journals-size-group,
