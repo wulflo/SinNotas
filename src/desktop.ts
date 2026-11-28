@@ -13075,6 +13075,7 @@ function renderFlashcardHeatmap(): void {
   months.forEach((month) => {
     const row = document.createElement("div");
     row.className = "heatmap-month-row";
+    if (month.key === today.slice(0, 7)) row.classList.add("is-current");
     const label = document.createElement("span");
     label.className = "heatmap-month-label";
     label.textContent = month.label;

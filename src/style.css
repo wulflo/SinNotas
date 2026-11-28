@@ -7541,15 +7541,16 @@ body.mobile-full-editor .flashcard-review-tools {
 
 .heatmap-month-strip {
   display: grid;
-  grid-template-columns: repeat(16, 8px);
-  justify-content: center;
+  grid-template-columns: repeat(16, minmax(6px, 10px));
+  justify-content: space-between;
   gap: 2px;
   min-width: 0;
 }
 
 .heatmap-cell {
-  width: 8px;
-  height: 8px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
   box-sizing: border-box;
   border: 1px solid color-mix(in srgb, var(--heatmap-color) 16%, var(--ls-border-subtle));
   border-radius: 2px;
@@ -7576,6 +7577,24 @@ body.mobile-full-editor .flashcard-review-tools {
   visibility: hidden;
   border-color: transparent;
   background: transparent;
+}
+
+.heatmap-month-row.is-current .heatmap-month-label {
+  color: var(--ls-accent);
+}
+
+/* Leyenda muda: cinco muestras de intensidad, sin texto nuevo que traducir. */
+.heatmap-legend {
+  display: flex;
+  justify-content: flex-end;
+  gap: 3px;
+  margin-top: 8px;
+}
+
+.heatmap-legend .heatmap-cell {
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
 }
 
 .flashcard-heatmap-summary {
