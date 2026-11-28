@@ -7270,24 +7270,15 @@ body.is-bullet-selecting {
   min-width: 0;
 }
 
-/* Pomodoro, actividad y progreso comparten una sola tarjeta horizontal debajo
- * de la flashcard. */
+/* Pomodoro, actividad y progreso son tres tarjetas separadas debajo de la
+ * flashcard; el espacio entre ellas deja respirar el humo de cada una. */
 .flashcard-review-tools {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   align-items: stretch;
-  gap: 0;
+  gap: 10px;
   padding: 0;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--ls-accent) 10%, var(--ls-card-border));
-  border-radius: 16px;
-  background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--ls-accent) 4%, transparent) 0%,
-      color-mix(in srgb, var(--ls-accent) 1%, transparent) 100%
-    ),
-    var(--ls-card-bg);
-  box-shadow: 0 8px 28px color-mix(in srgb, var(--ls-accent) 5%, transparent);
+  background: transparent;
 }
 
 .flashcard-review-tools[hidden] {
@@ -7306,15 +7297,10 @@ body.mobile-full-editor .flashcard-review-tools {
   min-width: 0;
   padding: 16px;
   overflow: hidden;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-/* Los tres paneles forman una sola tarjeta continua, separados por una línea
-   fina vertical en lugar de tres cajas con bordes y radios independientes. */
-.focus-panel + .focus-panel {
-  border-left: 1px solid color-mix(in srgb, var(--ls-card-border) 80%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ls-accent) 10%, var(--ls-card-border));
+  border-radius: 14px;
+  background: var(--ls-card-bg);
+  box-shadow: 0 6px 20px color-mix(in srgb, var(--ls-accent) 4%, transparent);
 }
 
 .focus-panel h3,
@@ -9447,19 +9433,12 @@ body.mobile-full-editor .flashcard-review-tools {
 
   .flashcard-review-tools .focus-tree-panel {
     grid-column: 1 / -1;
-    border-left: 0;
-    border-top: 1px solid color-mix(in srgb, var(--ls-card-border) 80%, transparent);
   }
 }
 
 @media (max-width: 640px) {
   .flashcard-review-tools {
     grid-template-columns: minmax(0, 1fr);
-  }
-
-  .flashcard-review-tools .focus-panel + .focus-panel {
-    border-left: 0;
-    border-top: 1px solid color-mix(in srgb, var(--ls-card-border) 80%, transparent);
   }
 
   .flashcard-review-tools .focus-tree-panel {
