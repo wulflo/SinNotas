@@ -905,7 +905,6 @@ const flashcardHeatmapStyleSelect = document.getElementById("flashcard-heatmap-s
 const flashcardHeatmapGrid = document.getElementById("flashcard-heatmap-grid") as HTMLDivElement;
 const flashcardHeatmapTotal = document.getElementById("flashcard-heatmap-total") as HTMLElement;
 const flashcardGrowthTree = document.querySelector<SVGSVGElement>("#flashcard-growth-tree")!;
-const flashcardTreeProgress = document.getElementById("flashcard-tree-progress") as HTMLSpanElement;
 const flashcardPointsBadge = document.getElementById("flashcard-points-badge") as HTMLSpanElement;
 const pageExportToggle = document.getElementById("btn-open-page-export") as HTMLButtonElement;
 const pageExportDropdown = document.getElementById("page-export-dropdown") as HTMLDivElement;
@@ -12718,7 +12717,6 @@ function loadFlashcardProgressStats(): void {
   updateFlashcardProgressPanel();
 }
 
-let renderedFlashcardPoints: number | null = null;
 let renderedFlashcardStageKey: string | null = null;
 
 const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
@@ -13009,20 +13007,6 @@ function updateFlashcardProgressTree(force = false): void {
         ? `element:${stage.element.z}`
         : `molecule:${stage.molecule.id}`;
 
-  const pointsChanged = renderedFlashcardPoints !== points;
-  if (pointsChanged) {
-    renderedFlashcardPoints = points;
-    if (flashcardTreeProgress) {
-      const pointsText = `${points} ${translate(points === 1 ? "punto" : "puntos")}`;
-      flashcardTreeProgress.textContent =
-        stage.kind === "proton"
-          ? `${pointsText} · ${translate("Protón")}`
-          : stage.kind === "element"
-            ? `${pointsText} · ${stage.element.name} (Z=${stage.element.z})`
-            : `${pointsText} · ${stage.molecule.formula} · ${stage.molecule.name}`;
-    }
-  }
-
   // The visual only changes when the stage changes. This also keeps the
   // electron animation running while the Pomodoro timer updates the panel.
   if (!force && renderedFlashcardStageKey === stageKey) return;
@@ -13047,10 +13031,17 @@ function updateFlashcardProgressTree(force = false): void {
   if (label) tree.setAttribute("aria-label", label);
 }
 
+/** Etiqueta corta de la etapa actual para el helper de la sección. */
+function progressStageLabel(stage: ReturnType<typeof progressStageFromPoints>): string {
+  if (stage.kind === "proton") return translate("Protón");
+  if (stage.kind === "element") return `${stage.element.name} (Z=${stage.element.z})`;
+  return `${stage.molecule.formula} · ${stage.molecule.name}`;
+}
+
 function updateFlashcardProgressPanel(): void {
   const points = Math.max(0, Math.floor(flashcardProgressStats.points));
-  const pointsLabel = `${points} ${translate(points === 1 ? "pt" : "pts")}`;
-  if (flashcardPointsBadge.textContent !== pointsLabel) flashcardPointsBadge.textContent = pointsLabel;
+  const stageLabel = progressStageLabel(progressStageFromPoints(points));
+  if (flashcardPointsBadge.textContent !== stageLabel) flashcardPointsBadge.textContent = stageLabel;
   updateFlashcardProgressTree();
 }
 

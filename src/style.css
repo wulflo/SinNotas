@@ -7825,14 +7825,6 @@ body.mobile-full-editor .flashcard-review-tools {
   fill: #1f2937;
 }
 
-.focus-tree-panel > span {
-  color: var(--ls-text-primary);
-  font-size: calc(12px * var(--ls-font-scale, 1));
-  font-weight: 600;
-  line-height: 1.4;
-  text-align: center;
-}
-
 #app.flashcard-focus-mode .sidebar-left,
 #app.flashcard-focus-mode > .main-container > .headbar {
   display: none;
