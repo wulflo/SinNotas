@@ -177,8 +177,8 @@ export interface HeatmapQuipuResult {
   knotSize: HeatmapQuipuKnotSize;
 }
 
-const QUIPU_THREAD_START_X = 32;
-const QUIPU_STEP_X = 16;
+const QUIPU_THREAD_START_X = 20;
+const QUIPU_STEP_X = 20;
 const QUIPU_KNOT_START_Y = 34;
 const QUIPU_KNOT_END_Y = 158;
 const QUIPU_KNOT_WIDTH = 15;
