@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildReviewHeatmap,
   buildReviewHeatmapYear,
+  buildReviewHeatmapWheel,
   defaultHeatmapStart,
 } from "./review-heatmap";
 
@@ -109,5 +110,28 @@ describe("review heatmap — cinta anual", () => {
 
   it("devuelve nada si la fecha final no es válida", () => {
     expect(buildReviewHeatmapYear([], "2026-01-01", "no-es-fecha")).toEqual([]);
+  });
+});
+
+describe("review heatmap — rueda anual", () => {
+  const months = buildReviewHeatmapYear([], "2026-01-01", "2026-12-31");
+
+  it("convierte cada día en un arco y cada mes en una etiqueta", () => {
+    const wheel = buildReviewHeatmapWheel(months, "2026-11");
+    expect(wheel.labels).toHaveLength(12);
+    expect(wheel.segments).toHaveLength(365);
+    expect(wheel.segments.every((segment) => segment.d.startsWith("M ") && segment.d.includes(" A "))).toBe(true);
+  });
+
+  it("resalta el mes actual y mantiene las etiquetas dentro del viewBox", () => {
+    const wheel = buildReviewHeatmapWheel(months, "2026-03");
+    expect(wheel.labels.filter((label) => label.isCurrent).map((label) => label.text)).toEqual(["MAR"]);
+    expect(wheel.labels.every((label) => label.x > 0 && label.x < 220 && label.y > 0 && label.y < 220)).toBe(true);
+  });
+
+  it("respeta el nivel de cada día en el arco", () => {
+    const active = buildReviewHeatmapYear([entry("2026-06-15"), entry("2026-06-15")], "2026-01-01", "2026-12-31");
+    const wheel = buildReviewHeatmapWheel(active);
+    expect(wheel.segments.find((segment) => segment.date === "2026-06-15")).toMatchObject({ level: 2, count: 2, monthIndex: 5 });
   });
 });
