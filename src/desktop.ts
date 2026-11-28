@@ -13100,7 +13100,7 @@ function renderFlashcardHeatmap(): void {
     const rect = document.createElementNS(svgNS, "rect");
     rect.setAttribute("x", String(cell.x));
     rect.setAttribute("y", String(cell.y));
-    rect.setAttribute("width", "5");
+    rect.setAttribute("width", "6");
     rect.setAttribute("height", "5");
     rect.setAttribute("rx", "1.5");
     rect.classList.add("heatmap-snake-cell");

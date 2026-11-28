@@ -7541,15 +7541,12 @@ body.mobile-full-editor .flashcard-review-tools {
 }
 
 /* Serpiente anual: 12 filas mensuales recorridas en serpentina y unidas por
- * curvas. Mismo esquema de cinco niveles, sin scroll y sin vistas nuevas. */
+ * curvas. Monocroma: tinta negra en tema claro y blanca en oscuro; la
+ * opacidad de cada tramo encodea el número de repasos. */
 .flashcard-heatmap-year {
-  --heatmap-color: var(--ls-accent);
+  --heatmap-ink: var(--ls-text-title);
   display: flex;
   justify-content: center;
-}
-
-.flashcard-heatmap-year[data-style="classic"] {
-  --heatmap-color: #2da44e;
 }
 
 .heatmap-snake {
@@ -7563,32 +7560,32 @@ body.mobile-full-editor .flashcard-review-tools {
 
 .heatmap-snake-line {
   fill: none;
-  stroke: color-mix(in srgb, var(--heatmap-color) 22%, transparent);
+  stroke: color-mix(in srgb, var(--heatmap-ink) 14%, transparent);
   stroke-width: 1.5;
 }
 
 .heatmap-snake-cell[data-level="0"] {
-  fill: color-mix(in srgb, var(--heatmap-color) 8%, var(--ls-bg-tertiary));
+  fill: color-mix(in srgb, var(--heatmap-ink) 7%, transparent);
 }
 
 .heatmap-snake-cell[data-level="1"] {
-  fill: color-mix(in srgb, var(--heatmap-color) 28%, var(--ls-bg-tertiary));
+  fill: color-mix(in srgb, var(--heatmap-ink) 27%, transparent);
 }
 
 .heatmap-snake-cell[data-level="2"] {
-  fill: color-mix(in srgb, var(--heatmap-color) 48%, var(--ls-bg-tertiary));
+  fill: color-mix(in srgb, var(--heatmap-ink) 47%, transparent);
 }
 
 .heatmap-snake-cell[data-level="3"] {
-  fill: color-mix(in srgb, var(--heatmap-color) 70%, var(--ls-bg-tertiary));
+  fill: color-mix(in srgb, var(--heatmap-ink) 70%, transparent);
 }
 
 .heatmap-snake-cell[data-level="4"] {
-  fill: color-mix(in srgb, var(--heatmap-color) 92%, var(--ls-bg-tertiary));
+  fill: color-mix(in srgb, var(--heatmap-ink) 92%, transparent);
 }
 
 .heatmap-snake-cell[data-leap="true"] {
-  stroke: var(--ls-accent);
+  stroke: var(--heatmap-ink);
   stroke-width: 1.5;
 }
 
@@ -7612,23 +7609,23 @@ body.mobile-full-editor .flashcard-review-tools {
   height: 8px;
   box-sizing: border-box;
   border-radius: 2px;
-  background: color-mix(in srgb, var(--heatmap-color) 8%, var(--ls-bg-tertiary));
+  background: color-mix(in srgb, var(--heatmap-ink) 7%, transparent);
 }
 
 .heatmap-cell[data-level="1"] {
-  background: color-mix(in srgb, var(--heatmap-color) 28%, var(--ls-bg-tertiary));
+  background: color-mix(in srgb, var(--heatmap-ink) 27%, transparent);
 }
 
 .heatmap-cell[data-level="2"] {
-  background: color-mix(in srgb, var(--heatmap-color) 48%, var(--ls-bg-tertiary));
+  background: color-mix(in srgb, var(--heatmap-ink) 47%, transparent);
 }
 
 .heatmap-cell[data-level="3"] {
-  background: color-mix(in srgb, var(--heatmap-color) 70%, var(--ls-bg-tertiary));
+  background: color-mix(in srgb, var(--heatmap-ink) 70%, transparent);
 }
 
 .heatmap-cell[data-level="4"] {
-  background: color-mix(in srgb, var(--heatmap-color) 92%, var(--ls-bg-tertiary));
+  background: color-mix(in srgb, var(--heatmap-ink) 92%, transparent);
 }
 
 .flashcard-heatmap-summary {
