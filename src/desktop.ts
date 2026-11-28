@@ -12749,7 +12749,7 @@ function hexClusterPositions(count: number, spacing: number): { x: number; y: nu
 }
 
 function appendNucleonLabel(
-  tree: SVGSVGElement,
+  tree: SVGElement,
   x: number,
   y: number,
   radius: number,
@@ -12766,7 +12766,7 @@ function appendNucleonLabel(
 }
 
 /** Estado inicial: un único protón, sin neutrones ni electrones. */
-function renderProtonStage(tree: SVGSVGElement): void {
+function renderProtonStage(tree: SVGElement): void {
   tree.setAttribute("aria-label", "Protón solitario: 1 protón, sin neutrones ni electrones");
   const cx = 80;
   const cy = 70;
@@ -12789,7 +12789,7 @@ function renderProtonStage(tree: SVGSVGElement): void {
 }
 
 function renderElementStage(
-  tree: SVGSVGElement,
+  tree: SVGElement,
   element: ChemicalElement,
   reducedMotion: boolean
 ): void {
@@ -12938,7 +12938,7 @@ function atomRadius(element: string, explicit?: number): number {
 }
 
 /** Dibuja un esquema ball-and-stick de la molécula indicada. */
-function renderMoleculeStage(tree: SVGSVGElement, molecule: MoleculeStage): void {
+function renderMoleculeStage(tree: SVGElement, molecule: MoleculeStage): void {
   tree.setAttribute("aria-label", `Molécula: ${molecule.name} (${molecule.formula})`);
 
   const halo = createSvgElement("circle");
@@ -13030,15 +13030,21 @@ function updateFlashcardProgressTree(force = false): void {
   renderedFlashcardStageKey = stageKey;
 
   const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  tree.replaceChildren();
+  // Un grupo escalado agranda las tres variantes (protón, elemento y
+  // molécula) sin rehacer sus coordenadas internas.
+  const content = createSvgElement("g");
+  content.setAttribute("transform", "translate(80 70) scale(1.18) translate(-80 -70)");
+  tree.replaceChildren(content);
 
   if (stage.kind === "proton") {
-    renderProtonStage(tree);
+    renderProtonStage(content);
   } else if (stage.kind === "element") {
-    renderElementStage(tree, stage.element, reducedMotion);
+    renderElementStage(content, stage.element, reducedMotion);
   } else {
-    renderMoleculeStage(tree, stage.molecule);
+    renderMoleculeStage(content, stage.molecule);
   }
+  const label = content.getAttribute("aria-label");
+  if (label) tree.setAttribute("aria-label", label);
 }
 
 function updateFlashcardProgressPanel(): void {

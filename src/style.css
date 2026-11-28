@@ -7644,7 +7644,7 @@ body.mobile-full-editor .flashcard-review-tools {
 
 .focus-tree {
   width: 100%;
-  height: 130px;
+  height: 210px;
 }
 
 .focus-tree .atom-nucleus-glow {
@@ -7759,8 +7759,9 @@ body.mobile-full-editor .flashcard-review-tools {
 }
 
 .focus-tree-panel > span {
-  color: var(--ls-text-muted);
-  font-size: calc(11px * var(--ls-font-scale, 1));
+  color: var(--ls-text-primary);
+  font-size: calc(12px * var(--ls-font-scale, 1));
+  font-weight: 600;
   line-height: 1.4;
   text-align: center;
 }
