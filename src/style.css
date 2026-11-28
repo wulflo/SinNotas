@@ -7863,6 +7863,55 @@ body.mobile-full-editor .flashcard-review-tools {
   white-space: nowrap;
 }
 
+/* Variantes del acento por giro de tono (no solo brillo/saturación). Cada
+ * estilo visual ajusta el giro para dar personalidad sin salir de la paleta. */
+:root {
+  --ls-accent-hue-1: oklch(from var(--ls-accent) l c calc(h + 26));
+  --ls-accent-hue-2: oklch(from var(--ls-accent) l c calc(h - 26));
+}
+
+:root[data-visual="lino"] {
+  --ls-accent-hue-1: oklch(from var(--ls-accent) l c calc(h + 12));
+  --ls-accent-hue-2: oklch(from var(--ls-accent) l c calc(h - 12));
+}
+
+:root[data-visual="dracula"] {
+  --ls-accent-hue-1: oklch(from var(--ls-accent) l c calc(h + 38));
+  --ls-accent-hue-2: oklch(from var(--ls-accent) l c calc(h - 38));
+}
+
+/* Cada helper usa un giro distinto: Pomodoro, Actividad y Progreso dejan de
+ * competir por el mismo tono exacto. */
+.focus-panel:nth-child(1) .focus-panel-heading > span,
+.focus-panel:nth-child(1) .focus-panel-heading > strong {
+  color: var(--ls-accent-hue-1);
+  background: color-mix(in srgb, var(--ls-accent-hue-1) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ls-accent-hue-1) 42%, var(--ls-border-color));
+}
+
+.focus-panel:nth-child(3) .focus-panel-heading > span,
+.focus-panel:nth-child(3) .focus-panel-heading > strong,
+.focus-panel:nth-child(3) .focus-panel-heading > #flashcard-points-badge {
+  color: var(--ls-accent-hue-2);
+  background: color-mix(in srgb, var(--ls-accent-hue-2) 14%, transparent);
+  border-color: color-mix(in srgb, var(--ls-accent-hue-2) 42%, var(--ls-border-color));
+}
+
+/* Los botones de estilo anticipan el giro de cada tema visual. */
+.visual-selector [data-visual-option="aero"] { --visual-tone: var(--ls-accent-hue-1); }
+.visual-selector [data-visual-option="lino"] { --visual-tone: var(--ls-accent); }
+.visual-selector [data-visual-option="dracula"] { --visual-tone: var(--ls-accent-hue-2); }
+
+.visual-selector .font-option-btn.active {
+  background: color-mix(in srgb, var(--visual-tone, var(--ls-accent)) 18%, transparent);
+  border-color: color-mix(in srgb, var(--visual-tone, var(--ls-accent)) 55%, var(--ls-border-color));
+  color: var(--visual-tone, var(--ls-accent));
+}
+
+.visual-selector .font-option-btn:hover {
+  border-color: var(--visual-tone, var(--ls-accent));
+}
+
 /* Las tres visualizaciones comparten ancho máximo y centrado para que pesen
  * igual dentro de sus tarjetas. */
 .focus-tree {
