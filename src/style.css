@@ -7690,14 +7690,23 @@ body.mobile-full-editor .flashcard-review-tools {
   margin: 0;
 }
 
-.focus-tree-panel .focus-panel-heading > span {
-  padding: 2px 7px;
+/* Helper común de las tres secciones: pílula fit-content con letras de
+ * acento. El ID gana a la capa Aero, que redondeaba solo el badge de puntos. */
+.focus-panel-heading > span,
+.focus-panel-heading > strong,
+.focus-panel-heading > #flashcard-points-badge,
+.focus-panel-heading > #flashcard-heatmap-total {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
   border-radius: 999px;
   background: var(--ls-accent-subtle);
   color: var(--ls-accent);
   font-size: calc(10px * var(--ls-font-scale, 1));
   font-variant-numeric: tabular-nums;
   font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .focus-tree {
