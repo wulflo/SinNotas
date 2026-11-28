@@ -3896,7 +3896,7 @@ btnClearFlashcardStats.addEventListener("click", async () => {
   };
   saveFlashcardProgressStats();
   updateFlashcardProgressPanel();
-  showToast("Estadísticas de repaso borradas.");
+  showToast(translate("Estadísticas de repaso borradas."));
 });
 
 btnClearReviewLog.addEventListener("click", async () => {
@@ -9890,7 +9890,7 @@ async function deleteCurrentPage() {
     currentPage = vault.createPage("Bienvenido");
   }
 
-  showToast("Página eliminada con éxito");
+  showToast(translate("Página eliminada con éxito"));
   loadPage(currentPage.title);
 }
 
@@ -10274,7 +10274,7 @@ btnRestoreVersion.addEventListener("click", async () => {
     documentHistory.seed(currentPage.id, currentPage.blocks, currentPage.title);
     renderBlocksTree();
     closeHistoryModal();
-    showToast("¡Nota restaurada con éxito a la versión seleccionada!");
+    showToast(translate("¡Nota restaurada con éxito a la versión seleccionada!"));
   } catch (error) {
     console.error("No se pudo restaurar el snapshot:", error);
     showToast(translate("No se pudo restaurar el snapshot."));
@@ -11567,7 +11567,7 @@ document.getElementById("ctx-flashcard")?.addEventListener("click", () => {
     // Misma regla que el atajo: `::`, cloze y oclusiones ya son tarjetas y
     // añadir `#card` cambiaría la pregunta y la huella del diario.
     if (isFlashcardBlockContent(node.content)) {
-      showToast("El bloque principal ya es una tarjeta o está vacío.");
+      showToast(translate("El bloque principal ya es una tarjeta o está vacío."));
     } else {
       const text = getVisibleBlockContent(node.content);
       setVisibleBlockContent(node, `${text} #card`);
@@ -11604,7 +11604,7 @@ document.getElementById("ctx-remove-flashcard")?.addEventListener("click", () =>
       node.content = next;
       void vault.savePage(page);
       renderBlocksTree();
-      showToast("Flashcard eliminada; el contenido se conservó.");
+      showToast(translate("Flashcard eliminada; el contenido se conservó."));
     }
   }
   hideAllContextMenus();
@@ -13777,12 +13777,12 @@ function flashcardExplorerSortTime(card: Flashcard): number {
 async function deleteFlashcardFromExplorer(card: Flashcard): Promise<void> {
   const page = vault.getPages().find((candidate) => candidate.title === card.pageTitle);
   if (!page) {
-    showToast("No se encontró la nota de la tarjeta.");
+    showToast(translate("No se encontró la nota de la tarjeta."));
     return;
   }
   const location = findNodeLocation(page.blocks, card.blockId);
   if (!location) {
-    showToast("No se encontró el bullet de la tarjeta.");
+    showToast(translate("No se encontró el bullet de la tarjeta."));
     return;
   }
   const node = location.parentList[location.index];
@@ -13800,7 +13800,7 @@ async function deleteFlashcardFromExplorer(card: Flashcard): Promise<void> {
     await vault.savePage(page, true);
     flashcardLoader.invalidate();
     renderFlashcardExplorer();
-    showToast("Tarjeta eliminada; el contenido se conservó.");
+    showToast(translate("Tarjeta eliminada; el contenido se conservó."));
   } catch (error) {
     console.error("No se pudo eliminar la tarjeta:", error);
     showToast("No se pudo guardar el cambio en el vault.");

@@ -156,7 +156,7 @@ function renderJournalCalendar(container: HTMLElement, journalPages: PageData[])
   ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].forEach((name) => {
     const weekday = document.createElement("span");
     weekday.className = "journal-calendar-weekday";
-    weekday.textContent = name;
+    weekday.textContent = translate(name);
     grid.appendChild(weekday);
   });
 

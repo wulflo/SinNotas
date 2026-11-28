@@ -67,4 +67,19 @@ describe("cobertura de traducciones", () => {
       expect(chinese.has(text), `falta en chino: ${text}`).toBe(true);
     }
   });
+
+  it("los avisos de flashcards y restauración están en los tres idiomas", () => {
+    const toasts = [
+      "El bloque principal ya es una tarjeta o está vacío.",
+      "Flashcard eliminada; el contenido se conservó.",
+      "Tarjeta eliminada; el contenido se conservó.",
+      "No se encontró la nota de la tarjeta.",
+      "No se encontró el bullet de la tarjeta.",
+      "Abrir Repaso",
+    ];
+    for (const text of toasts) {
+      expect(english.has(text), `falta en inglés: ${text}`).toBe(true);
+      expect(chinese.has(text), `falta en chino: ${text}`).toBe(true);
+    }
+  });
 });

@@ -448,7 +448,7 @@ export function renderAllPagesView() {
     kindBadge.className = "badge-kind";
     const kindDot = document.createElement("span");
     kindDot.className = "badge-dot";
-    kindBadge.append(kindDot, document.createTextNode(p.isJournal ? "Diario" : "Página"));
+    kindBadge.append(kindDot, document.createTextNode(translate(p.isJournal ? "Diario" : "Página")));
     kindCell.appendChild(kindBadge);
 
     const createdCell = document.createElement("td");
@@ -470,7 +470,7 @@ export function renderAllPagesView() {
     const deleteButton = document.createElement("button");
     deleteButton.className = "btn-table-delete";
     deleteButton.dataset.id = p.id;
-    deleteButton.title = "Eliminar página";
+    deleteButton.title = translate("Eliminar página");
     deleteButton.textContent = "🗑️";
     actionsCell.appendChild(deleteButton);
 
