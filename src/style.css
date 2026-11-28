@@ -2092,6 +2092,47 @@ select {
   box-shadow: 0 4px 14px -5px color-mix(in srgb, var(--ls-accent) 60%, transparent);
 }
 
+/* La barra lateral de Aero usaba puntos de colores fijos, borde interior y
+ * poco contraste. Se normaliza con tokens para los 3 estilos × 2 modos. */
+.settings-dropdown-menu .settings-tabs {
+  background: color-mix(in srgb, var(--ls-bg-secondary) 62%, transparent);
+  border: 1px solid var(--ls-border-subtle);
+  border-radius: 12px;
+  padding: 6px;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.settings-dropdown-menu .settings-tab {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ls-text-muted);
+  text-align: left;
+  box-shadow: none;
+}
+
+.settings-dropdown-menu .settings-tab::before {
+  display: none;
+}
+
+.settings-dropdown-menu .settings-tab:hover {
+  background: var(--ls-bg-hover);
+  border-color: var(--ls-border-subtle);
+  color: var(--ls-text-title);
+  box-shadow: none;
+}
+
+.settings-dropdown-menu .settings-tab.active {
+  background: var(--ls-accent-subtle);
+  border-color: color-mix(in srgb, var(--ls-accent) 48%, var(--ls-border-color));
+  color: var(--ls-accent);
+  font-weight: 650;
+  box-shadow: none;
+}
+
 .settings-tab-panel {
   display: flex;
   flex-direction: column;
