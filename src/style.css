@@ -4056,11 +4056,30 @@ body.is-bullet-selecting {
 }
 
 .backlink-snippet {
+  position: relative;
   font-size: calc(14px * var(--ls-font-scale, 1));
   color: var(--ls-text-primary);
   line-height: 1.5;
-  padding-left: 12px;
-  border-left: 2px solid var(--ls-accent);
+  /* 2 px de barra + 12 px de separación respecto al texto (antes era
+   * border-left: 2px + padding-left: 12px: misma posición de las glifos). */
+  padding-left: 14px;
+}
+
+/*
+ * La barra se dibuja aparte para alinearla con el texto visible. Un
+ * `border-left` cubre toda la caja de línea, incluido el half-leading de
+ * `line-height: 1.5`, y sobresale ≈0,25em por encima y por debajo de las
+ * glifos; con `::before` se recorta exactamente ese margen.
+ */
+.backlink-snippet::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.25em;
+  bottom: 0.25em;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--ls-accent);
 }
 
 .backlink-snippet mark {
