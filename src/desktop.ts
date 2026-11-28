@@ -13219,7 +13219,13 @@ function renderPomodoro(): void {
   pomodoroModeLabel.textContent = pomodoroMode === "focus"
     ? translate("Enfoque")
     : translate(pomodoroIsLongBreak ? "Descanso largo" : "Descanso corto");
-  pomodoroToggle.textContent = translate(pomodoroInterval === null ? "Iniciar" : "Pausar");
+  pomodoroToggle.textContent = translate(
+    pomodoroInterval !== null
+      ? "Pausar"
+      : pomodoroPaused
+        ? "Continuar"
+        : "Iniciar"
+  );
 
   const isShortBreak = pomodoroMode === "break" && !pomodoroIsLongBreak;
   const isLongBreak = pomodoroMode === "break" && pomodoroIsLongBreak;

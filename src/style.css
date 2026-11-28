@@ -7477,7 +7477,7 @@ body.mobile-full-editor .flashcard-review-tools {
 .pomodoro-actions .font-option-btn,
 .pomodoro-mode-actions .font-option-btn {
   background: color-mix(in srgb, var(--ls-bg-secondary) 58%, transparent);
-  border-color: color-mix(in srgb, var(--ls-border-color) 72%, transparent);
+  border-color: var(--ls-accent);
 }
 
 .focus-heatmap-panel {
