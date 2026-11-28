@@ -50,5 +50,6 @@ Propósito: evitar que aparezcan controles con el estilo del sistema operativo o
 | Tokens y temas | `src/style.css` (`--ls-*`), `src/material-aero.css`, `src/theme-lino.css`, `src/theme-dracula.css` |
 | Reglas de controles | `src/style.css` (SETTINGS DROPDOWN, CustomSelect, settings inputs) |
 | Flashcards | Los botones de `.flashcards-container` aclaran su fondo en tema claro y usan superficie de tema/borde de acento tenue en oscuro; el fondo de `#view-flashcards` depende de `data-visual` (Aero halo de acento, Lino transparente, Dracula `--md-tertiary`). |
+| Sidebar de Ajustes | La barra vertical de Aero se normaliza con tokens: sin puntos de colores fijos ni `box-shadow: inset` tipo borde izquierdo; pestaña activa con `--ls-accent-subtle` y texto `--ls-accent`, contraste correcto en claro/oscuro y en los tres estilos visuales. |
 | Ejemplo de toolbar agrupado | `desktop.ts` → `createTableToolbar` |
 | Mapa de estilos | skill `estructure` → `references/Estructure.md` §11.3 |

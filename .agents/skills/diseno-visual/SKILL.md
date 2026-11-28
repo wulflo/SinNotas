@@ -41,6 +41,7 @@ Propósito: pasar de «se ve raro» a una crítica concreta y a un diff pequeño
 | Sidebar: fijadas y estado vacío | Las fijadas se distinguen por negrita + icono de acento, **no** por el color del texto: `.sidebar-pinned .vault-tree-page-label` hereda el color de `.nav-item` (antes tenía `color:var(--ls-accent)` y `opacity:0.6`). Sin fijadas ni recientes, `.sidebar-empty-hint` da una pista en vez de dejar un hueco mudo. |
 | Actividad anual | Si la cuadrícula tipo GitHub se considera demasiado convencional, una **serpiente de 12 filas mensuales** (`buildReviewHeatmapSnake`) mantiene un cuadrito por día pero añade curvas en los extremos; el 29 de febrero se marca con `data-leap`. Referencias consultadas: *Year in Pixels* (12×31) y *serpentine/snake timeline* (amCharts, Vega). |
 | Panel de productividad | Tres tarjetas separadas con helpers uniformes; humo de acento con opacidad por estilo (Lino ~0,05, Dracula ~0,16, Aero ~0,34) y sombras por tema/subsección (`--focus-shadow-*`). El aro del Pomodoro usa bolitas grandes espaciadas conservando el degradado rojo/azul → verde. |
+| Sidebar de Ajustes | Los puntos de colores fijos y el borde interior de Aero se eliminan: navegación neutra con pestaña activa en acento, misma jerarquía en los 6 estilos/temas. |
 | Árbol de progreso | Fondo de humo en lugar de átomos difusos; el átomo se escala a 1.0 para no recortarse y las tres variantes (protón, elemento, molécula) comparten ancho máximo con las otras visualizaciones. |
 
 ## 4. Errores frecuentes a evitar
