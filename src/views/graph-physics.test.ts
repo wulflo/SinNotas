@@ -4,6 +4,7 @@ import {
   shouldStopSimulation,
   computeRevealOrder,
   computeInitialPosition,
+  centerNodesInCanvas,
   applyCollisionForce,
   DEFAULT_PHYSICS_CONFIG,
   PhysicsState,
@@ -320,6 +321,31 @@ describe("graph-physics", () => {
       const dist = Math.sqrt((pos.x - 400) ** 2 + (pos.y - 300) ** 2);
       expect(dist).toBeGreaterThanOrEqual(50);
       expect(dist).toBeLessThanOrEqual(150);
+    });
+  });
+
+  describe("centerNodesInCanvas", () => {
+    it("centra la caja envolvente sin alterar la forma del grupo", () => {
+      const nodes = [
+        createTestNode("A", 300, 540),
+        createTestNode("B", 460, 690),
+      ];
+      centerNodesInCanvas(nodes, 800, 600);
+
+      const centerX = (nodes[0].x + nodes[1].x) / 2;
+      const centerY = (nodes[0].y + nodes[1].y) / 2;
+      expect(centerX).toBeCloseTo(400, 5);
+      expect(centerY).toBeCloseTo(300, 5);
+      expect(nodes[1].x - nodes[0].x).toBe(160);
+      expect(nodes[1].y - nodes[0].y).toBe(150);
+    });
+
+    it("no hace nada con un canvas sin tamaño o sin nodos", () => {
+      const node = createTestNode("A", 10, 10);
+      centerNodesInCanvas([], 800, 600);
+      centerNodesInCanvas([node], 0, 0);
+      expect(node.x).toBe(10);
+      expect(node.y).toBe(10);
     });
   });
 });

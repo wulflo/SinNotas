@@ -3,6 +3,7 @@ import {
   physicsStep,
   shouldStopSimulation,
   computeRevealOrder,
+  centerNodesInCanvas,
   PhysicsConfig,
 } from "./graph-physics";
 import {
@@ -78,6 +79,10 @@ export class GraphView {
   private scale = 1;
   private offsetX = 0;
   private offsetY = 0;
+  /** Evita recolocar el grafo cuando el usuario ya ha hecho zoom/pan. */
+  private userAdjustedView = false;
+  private lastCanvasWidth = 0;
+  private lastCanvasHeight = 0;
   private marquee: { x1: number; y1: number; x2: number; y2: number } | null = null;
   private pointerStart: { x: number; y: number } | null = null;
   /** Puntos táctiles activos (dedos) y línea base de la pinza, solo para pointerType === "touch". */
@@ -188,12 +193,35 @@ export class GraphView {
     if (parent) {
       const width = parent.clientWidth;
       const height = parent.clientHeight;
+      const sizeChanged =
+        Math.abs(width - this.lastCanvasWidth) > 20 ||
+        Math.abs(height - this.lastCanvasHeight) > 20;
       this.canvas.width = width * this.dpr;
       this.canvas.height = height * this.dpr;
       this.canvas.style.width = `${width}px`;
       this.canvas.style.height = `${height}px`;
       this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      this.lastCanvasWidth = width;
+      this.lastCanvasHeight = height;
+      // El arranque con el grafo activo podía medir 0 px y dejar los nodos
+      // fuera de pantalla. Recolocar solo si el usuario no ha movido la vista.
+      if (sizeChanged && this.nodes.length > 0 && !this.userAdjustedView && !this.followTitle) {
+        this.centerGraphInView();
+      }
     }
+    this.requestRender();
+  }
+
+  /**
+   * Centra el grupo de nodos en el canvas actual. No toca zoom/pan: traslada
+   * las coordenadas del grafo para que la física siga atrayéndolo al centro.
+   */
+  private centerGraphInView(): void {
+    centerNodesInCanvas(
+      this.nodes,
+      this.canvas.width / this.dpr,
+      this.canvas.height / this.dpr
+    );
     this.requestRender();
   }
 
@@ -209,9 +237,11 @@ export class GraphView {
 
   public resetView(): void {
     this.followTitle = null;
+    this.userAdjustedView = false;
     this.scale = 1;
     this.offsetX = 0;
     this.offsetY = 0;
+    this.centerGraphInView();
     this.requestRender();
   }
 
@@ -280,6 +310,7 @@ export class GraphView {
   public updateData(pages: PageData[], links?: Map<string, string[]>) {
     const width = (this.canvas.width || 800) / this.dpr;
     const height = (this.canvas.height || 600) / this.dpr;
+    this.userAdjustedView = false;
 
     this.links = [];
     this.allLinks = [];
@@ -374,6 +405,7 @@ export class GraphView {
     if (this.prefersReducedMotion) {
       this.stopSimulation();
       this.settleImmediately();
+      this.centerGraphInView();
     } else {
       this.alpha = 1.0;
       this.simulationSteps = 0;
@@ -467,6 +499,7 @@ export class GraphView {
     this.scheduleNextRevealBatch();
 
     if (this.currentBatchIndex >= this.revealBatches.length) {
+      this.centerGraphInView();
       this.recomputeColors();
     }
   }
@@ -636,6 +669,7 @@ export class GraphView {
   }
 
   private zoomAt(screenX: number, screenY: number, factor: number): void {
+    this.userAdjustedView = true;
     const next = Math.max(0.25, Math.min(8, this.scale * factor));
     const world = this.screenToWorld(screenX, screenY);
     this.scale = next;
@@ -1120,6 +1154,7 @@ export class GraphView {
           const rect = this.canvas.getBoundingClientRect();
           const dx = e.clientX - (rect.left + this.pointerStart.x);
           const dy = e.clientY - (rect.top + this.pointerStart.y);
+          this.userAdjustedView = true;
           this.offsetX += dx;
           this.offsetY += dy;
           this.pointerStart.x = e.clientX - rect.left;
@@ -1231,6 +1266,7 @@ export class GraphView {
         const dx = point.x - previous.x;
         const dy = point.y - previous.y;
         if (dx !== 0 || dy !== 0) {
+          this.userAdjustedView = true;
           this.offsetX += dx;
           this.offsetY += dy;
           if (Math.hypot(dx, dy) > 2) this.suppressClick = true;

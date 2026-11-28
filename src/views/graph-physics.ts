@@ -499,6 +499,39 @@ export function computeRevealOrder(allNodes: GraphNode[], allLinks: GraphLink[])
   return result;
 }
 
+/**
+ * Traslada el grupo de nodos para que su caja envolvente quede centrada en el
+ * canvas. La atracción al centro de `physicsStep` es demasiado débil para
+ * corregir grupos pequeños que nacen desplazados (bóvedas con pocas notas), y
+ * la simulación se detiene antes de que lleguen al centro.
+ */
+export function centerNodesInCanvas(
+  nodes: GraphNode[],
+  width: number,
+  height: number
+): void {
+  if (nodes.length === 0 || width <= 0 || height <= 0) return;
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const node of nodes) {
+    if (node.x < minX) minX = node.x;
+    if (node.x > maxX) maxX = node.x;
+    if (node.y < minY) minY = node.y;
+    if (node.y > maxY) maxY = node.y;
+  }
+
+  const dx = width / 2 - (minX + maxX) / 2;
+  const dy = height / 2 - (minY + maxY) / 2;
+  if (dx === 0 && dy === 0) return;
+  for (const node of nodes) {
+    node.x += dx;
+    node.y += dy;
+  }
+}
+
 export function computeInitialPosition(
   node: GraphNode,
   loadedNodes: GraphNode[],
