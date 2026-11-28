@@ -7532,7 +7532,9 @@ body.mobile-full-editor .flashcard-review-tools {
 .heatmap-snake {
   display: block;
   width: 100%;
-  max-width: 260px;
+  /* Antes estaba topado en 260 px y no crecía con el panel en pantallas
+   * anchas. Ahora escala con el contenedor hasta un límite cómodo. */
+  max-width: 420px;
   height: auto;
 }
 
