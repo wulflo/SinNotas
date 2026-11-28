@@ -98,7 +98,7 @@ import { collectOutgoingLinks } from "./store/wikilinks";
 import { connectedPageTitles, referenceGraphPages } from "./views/graph-neighborhood";
 import { renderBacklinkSnippetHtml, wireBacklinkWikilinks } from "./views/backlink-render";
 import { createRenderedSnippet } from "./views/snippet-highlight";
-import { createPageIcon } from "./views/page-icon";
+import { createOutgoingLinkIcon, createPageIcon } from "./views/page-icon";
 import {
   configureJournalsView,
   localDateKey,
@@ -9591,7 +9591,7 @@ function paintOutgoingLinks(outgoing: ReturnType<typeof collectOutgoingLinks>): 
 
     const target = document.createElement("div");
     target.className = "backlink-source";
-    target.append(`→ ${ref.targetTitle}`);
+    target.append(createOutgoingLinkIcon(), document.createTextNode(` ${ref.targetTitle}`));
     if (!exists) {
       const broken = document.createElement("span");
       broken.className = "outgoing-broken-badge";

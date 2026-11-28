@@ -4055,14 +4055,20 @@ body.is-bullet-selecting {
   color: inherit;
 }
 
+/* La flecha de texto «→» se veía demasiado fina frente al icono de página de
+ * los retroenlaces. Ahora es un SVG con trazo más grueso y el mismo color. */
+.backlink-source .outgoing-link-icon svg {
+  stroke-width: 2.2;
+}
+
 .backlink-snippet {
   position: relative;
   font-size: calc(14px * var(--ls-font-scale, 1));
   color: var(--ls-text-primary);
   line-height: 1.5;
-  /* 2 px de barra + 12 px de separación respecto al texto (antes era
-   * border-left: 2px + padding-left: 12px: misma posición de las glifos). */
-  padding-left: 14px;
+  /* La columna de texto arranca donde termina el icono del título:
+   * 16 px de icono + 6 px de gap = 22 px desde el borde de la tarjeta. */
+  padding-left: 22px;
 }
 
 /*
@@ -4074,7 +4080,9 @@ body.is-bullet-selecting {
 .backlink-snippet::before {
   content: "";
   position: absolute;
-  left: 0;
+  /* Alineado con el centro del icono de 16 px del título, no con el borde
+   * de la tarjeta: así la barra queda debajo del icono en ambos tipos. */
+  left: 8px;
   top: 0.25em;
   bottom: 0.25em;
   width: 2px;
