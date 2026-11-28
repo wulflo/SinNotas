@@ -7281,6 +7281,17 @@ body.is-bullet-selecting {
   background: transparent;
 }
 
+/* La capa Aero vuelve a poner borde, fondo y sombra en este contenedor; el
+   ID gana especificidad para dejar las tres tarjetas realmente separadas. */
+#flashcard-review-tools {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
 .flashcard-review-tools[hidden] {
   display: none;
 }
