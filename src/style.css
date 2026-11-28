@@ -9023,7 +9023,7 @@ body.mobile-full-editor .flashcard-review-tools {
   justify-content: space-between;
   gap: 10px;
   margin: 12px 0 10px;
-  padding: 6px 8px;
+  padding: 4px 6px;
   border: 1px solid var(--md-journals-item-border);
   border-radius: var(--ls-headbar-radius);
   background: color-mix(in srgb, var(--md-journals-panel-bg) 70%, transparent);
@@ -9043,9 +9043,9 @@ body.mobile-full-editor .flashcard-review-tools {
 }
 
 .journals-size-chip {
-  min-width: 30px;
+  min-width: 26px;
   min-height: 28px;
-  padding: 3px 8px;
+  padding: 2px 6px;
   border: 1px solid var(--md-outline-variant);
   border-radius: 8px;
   background: transparent;
@@ -9060,6 +9060,13 @@ body.mobile-full-editor .flashcard-review-tools {
   border-color: var(--md-primary);
   background: var(--md-journals-item-hover-bg);
   color: var(--md-on-primary-container);
+}
+
+/* Botones de paginación de Diarios: mismo alto táctil (28 px), pero menos
+ * padding horizontal que la variante compartida con Tareas. */
+.journals-pagination .btn-pagination {
+  min-width: 30px;
+  padding: 4px 6px;
 }
 
 .journals-pagination .font-option-btn {
