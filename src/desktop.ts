@@ -13093,7 +13093,7 @@ function renderFlashcardHeatmap(): void {
   spine.classList.add("heatmap-quipu-spine");
   svg.appendChild(spine);
 
-  let totalReviews = 0;
+  let daysStudied = 0;
   quipu.threads.forEach((thread) => {
     const lastKnot = thread.knots[thread.knots.length - 1];
     const cord = document.createElementNS(svgNS, "path");
@@ -13109,7 +13109,7 @@ function renderFlashcardHeatmap(): void {
     svg.appendChild(anchor);
 
     thread.knots.forEach((knot) => {
-      totalReviews += knot.daysStudied;
+      daysStudied += knot.daysStudied;
       const group = document.createElementNS(svgNS, "g");
       group.classList.add("heatmap-quipu-knot");
 
@@ -13135,10 +13135,12 @@ function renderFlashcardHeatmap(): void {
     });
   });
   flashcardHeatmapGrid.appendChild(svg);
-  flashcardHeatmapTotal.textContent = `${totalReviews} ${translate(totalReviews === 1 ? "repaso" : "repasos")}`;
+  // El badge cuenta días con actividad, no repasos: miles de repasos pueden
+  // concentrarse en pocos días y el número dejaría de ser informativo.
+  flashcardHeatmapTotal.textContent = `${daysStudied} ${translate("días")}`;
   flashcardHeatmapGrid.setAttribute(
     "aria-label",
-    `${totalReviews} ${translate("repasos")} ${translate("entre")} ${flashcardHeatmapStartDate} ${translate("y")} ${today}`
+    `${daysStudied} ${translate("días")} ${translate("entre")} ${flashcardHeatmapStartDate} ${translate("y")} ${today}`
   );
 }
 
