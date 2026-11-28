@@ -13,6 +13,7 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 import type { BlockNode, PageData } from "../types";
 import { VaultStore } from "./vault";
+import { writePinnedToFrontmatter } from "./pinned-frontmatter";
 
 function pageWithBlocks(id: string, blocks: BlockNode[]): PageData {
   return {
@@ -76,5 +77,17 @@ describe("VaultStore.replaceVault — normalización por runtime (FASE 6.2)", ()
     expect(b1.type).toBe("image");
     expect(b1.content).toBe("archivos/corazon.png");
     expect(b2.type).toBe("text");
+  });
+
+  it("recupera las notas fijadas desde el frontmatter que devuelve Rust", () => {
+    runtime.tauri = true;
+    const vault = new VaultStore();
+    const page = rustPayloadPage();
+    page.frontmatter = writePinnedToFrontmatter([], true, "2026-11-28T10:00:00.000Z");
+
+    vault.replaceVault([page], "/vault", "Tauri");
+
+    expect(vault.getPages()[0].pinned).toBe(true);
+    expect(vault.getPages()[0].pinnedAt).toBe("2026-11-28T10:00:00.000Z");
   });
 });

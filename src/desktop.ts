@@ -54,6 +54,7 @@ import {
 } from "./editor/tree-engine";
 import { DocumentHistory } from "./editor/history";
 import { VaultStore, isMetadataOnlyBoot } from "./store/vault";
+import { applyPinnedFrontmatter, writePinnedToFrontmatter } from "./store/pinned-frontmatter";
 import {
   DECK_SEPARATOR,
   hasInvalidDeckTitleCharacters,
@@ -3739,8 +3740,11 @@ btnClearBulletProperties.addEventListener("click", async () => {
   let removedProperties = 0;
   pages.forEach((page) => {
     removedProperties += clearBlockProperties(page.blocks);
-    removedProperties += page.frontmatter?.length || 0;
-    page.frontmatter = [];
+    // El estado de fijadas no es una propiedad del usuario: se conserva aunque
+    // se borre el resto del frontmatter para no perderlo al reiniciar.
+    const pinnedFrontmatter = writePinnedToFrontmatter([], page.pinned, page.pinnedAt);
+    removedProperties += (page.frontmatter?.length || 0) - pinnedFrontmatter.length;
+    page.frontmatter = pinnedFrontmatter;
   });
 
   try {
@@ -10259,6 +10263,7 @@ btnRestoreVersion.addEventListener("click", async () => {
     }
     currentPage.blocks = restored.blocks;
     currentPage.frontmatter = restored.frontmatter;
+    applyPinnedFrontmatter(currentPage);
     documentHistory.seed(currentPage.id, currentPage.blocks, currentPage.title);
     renderBlocksTree();
     closeHistoryModal();
@@ -12488,10 +12493,16 @@ document.getElementById("sctx-pin")?.addEventListener("click", async () => {
   const pageId = sidebarContextPageId;
   const pageTitle = sidebarContextPageTitle;
   hideAllContextMenus();
-  const page = vault.getPages().find((item) => item.id === pageId);
-  if (!page) return;
+  const found = vault.getPages().find((item) => item.id === pageId);
+  if (!found) return;
+  // Una nota nunca abierta puede llegar metadata-only; savePage ignora esas
+  // notas, así que hay que hidratarla antes de escribir el frontmatter.
+  const page = await vault.ensurePageLoaded(found, { pin: true });
   page.pinned = !page.pinned;
   page.pinnedAt = page.pinned ? new Date().toISOString() : undefined;
+  // El backend solo persiste frontmatter y bloques: sin estas líneas la
+  // fijada se perdía al cerrar y reabrir la app en Tauri.
+  page.frontmatter = writePinnedToFrontmatter(page.frontmatter, page.pinned, page.pinnedAt);
   await vault.savePage(page);
   renderSidebar();
   if (currentView === "all-pages") renderAllPagesView();

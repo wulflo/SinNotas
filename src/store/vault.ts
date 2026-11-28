@@ -7,6 +7,7 @@ import {
   sanitizeDeckTitle,
   splitDeckTitle,
 } from "../deck-title";
+import { applyPinnedFrontmatter } from "./pinned-frontmatter";
 
 function normalizeBlockTypes(blocks: BlockNode[]): void {
   for (const block of blocks) {
@@ -657,6 +658,9 @@ export class VaultStore {
     // backend resuelva siempre dentro del vault activo.
     pages.forEach((page) => {
       page.path = this.toRelativeNotePath(page.path, rootPath);
+      // En Tauri las fijadas viajan en el frontmatter del .md; en modo web
+      // las claves no existen y se conserva el estado de localStorage.
+      applyPinnedFrontmatter(page);
     });
     // Descartar escrituras diferidas del vault anterior.
     this.pendingSaves.forEach((entry) => window.clearTimeout(entry.timer));
@@ -758,6 +762,7 @@ export class VaultStore {
         path: entry.relativePath,
         blocks: entry.page.blocks || [],
       };
+      applyPinnedFrontmatter(added);
       normalizeBlockTypes(added.blocks);
       nextPages.push(added);
       result.added.push(added.path);
