@@ -185,7 +185,11 @@ import "./bibliography.css";
 import { VirtualList } from "./views/virtual-list";
 import { ConceptMapView } from "./views/concept-map-view";
 import { migrateSelect, syncCustomSelect } from "./views/custom-select";
-import { buildReviewHeatmapYear, defaultHeatmapStart } from "./views/review-heatmap";
+import {
+  buildReviewHeatmapWheel,
+  buildReviewHeatmapYear,
+  defaultHeatmapStart,
+} from "./views/review-heatmap";
 import {
   isFlashcardBlockContent,
   removeFlashcardMarkers,
@@ -13066,42 +13070,49 @@ function renderFlashcardHeatmap(): void {
   syncCustomSelect(flashcardHeatmapStyleSelect);
   flashcardHeatmapGrid.dataset.style = flashcardHeatmapStyle;
 
-  // Se muestran los 12 meses del año aunque las semanas futuras aún no tengan
-  // datos: así la cinta es estable y no «crece» mes a mes.
+  // Se muestran los 12 meses del año aunque los días futuros aún no tengan
+  // datos: la rueda es estable y no «crece» mes a mes.
   const displayEnd = `${today.slice(0, 4)}-12-31`;
   const months = buildReviewHeatmapYear(reviewProgress.getEntries(), flashcardHeatmapStartDate, displayEnd);
+  const currentMonthKey = `${today.slice(0, 4)}-${today.slice(5, 7)}`;
+  const wheel = buildReviewHeatmapWheel(months, currentMonthKey);
+  const svgNS = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(svgNS, "svg");
+  svg.setAttribute("viewBox", "0 0 220 220");
+  svg.classList.add("heatmap-wheel");
+
   flashcardHeatmapGrid.replaceChildren();
   let totalReviews = 0;
-  months.forEach((month) => {
-    const row = document.createElement("div");
-    row.className = "heatmap-month-row";
-    if (month.key === today.slice(0, 7)) row.classList.add("is-current");
-    const label = document.createElement("span");
-    label.className = "heatmap-month-label";
-    label.textContent = month.label;
-    row.appendChild(label);
-    // Dos franjas de hasta 16 días por mes: celdas de ~8 px en vez de los
-    // 3 px que dejaría una sola fila de 31 dentro del panel estrecho.
-    for (let offset = 0; offset < month.days.length; offset += 16) {
-      const strip = document.createElement("div");
-      strip.className = "heatmap-month-strip";
-      month.days.slice(offset, offset + 16).forEach((day) => {
-        const cell = document.createElement("span");
-        cell.className = "heatmap-cell";
-        if (day.date && day.date <= today) {
-          totalReviews += day.count;
-          cell.dataset.level = String(day.level);
-          cell.title = `${day.date}: ${day.count} ${translate(day.count === 1 ? "repaso" : "repasos")}`;
-        } else {
-          cell.classList.add("is-empty");
-          cell.setAttribute("aria-hidden", "true");
-        }
-        strip.appendChild(cell);
-      });
-      row.appendChild(strip);
+  wheel.segments.forEach((segment) => {
+    if (segment.date && segment.date > today) return;
+    const arc = document.createElementNS(svgNS, "path");
+    arc.setAttribute("d", segment.d);
+    arc.dataset.level = String(segment.level);
+    if (segment.date) {
+      totalReviews += segment.count;
+      const title = document.createElementNS(svgNS, "title");
+      title.textContent = `${segment.date}: ${segment.count} ${translate(segment.count === 1 ? "repaso" : "repasos")}`;
+      arc.appendChild(title);
     }
-    flashcardHeatmapGrid.appendChild(row);
+    svg.appendChild(arc);
   });
+  wheel.labels.forEach((label) => {
+    const text = document.createElementNS(svgNS, "text");
+    text.setAttribute("x", String(label.x));
+    text.setAttribute("y", String(label.y));
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("dominant-baseline", "middle");
+    text.textContent = label.text;
+    if (label.isCurrent) text.classList.add("is-current");
+    svg.appendChild(text);
+  });
+  const center = document.createElementNS(svgNS, "circle");
+  center.setAttribute("cx", "110");
+  center.setAttribute("cy", "110");
+  center.setAttribute("r", "3");
+  center.classList.add("heatmap-wheel-center");
+  svg.appendChild(center);
+  flashcardHeatmapGrid.appendChild(svg);
   flashcardHeatmapTotal.textContent = `${totalReviews} ${translate(totalReviews === 1 ? "repaso" : "repasos")}`;
   flashcardHeatmapGrid.setAttribute(
     "aria-label",

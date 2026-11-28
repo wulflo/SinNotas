@@ -7510,49 +7510,79 @@ body.mobile-full-editor .flashcard-review-tools {
   width: 100%;
 }
 
+/* Rueda anual: un anillo por mes y un arco por día. Mismo esquema de niveles
+ * que la cuadrícula, pero sin cuadritos y sin scroll. */
 .flashcard-heatmap-year {
   --heatmap-color: var(--ls-accent);
-  display: grid;
-  gap: 3px;
+  display: flex;
+  justify-content: center;
 }
 
 .flashcard-heatmap-year[data-style="classic"] {
   --heatmap-color: #2da44e;
 }
 
-.heatmap-month-row {
-  display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
-  align-items: center;
-  gap: 2px 4px;
+.heatmap-wheel {
+  display: block;
+  width: 100%;
+  max-width: 240px;
+  height: auto;
 }
 
-.heatmap-month-label {
-  grid-row: 1 / span 2;
-  overflow: hidden;
-  color: var(--ls-text-muted);
-  font-size: calc(8px * var(--ls-font-scale, 1));
+.heatmap-wheel path {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+.heatmap-wheel path[data-level="0"] {
+  stroke: color-mix(in srgb, var(--heatmap-color) 10%, var(--ls-border-subtle));
+}
+
+.heatmap-wheel path[data-level="1"] {
+  stroke: color-mix(in srgb, var(--heatmap-color) 28%, var(--ls-bg-tertiary));
+}
+
+.heatmap-wheel path[data-level="2"] {
+  stroke: color-mix(in srgb, var(--heatmap-color) 48%, var(--ls-bg-tertiary));
+}
+
+.heatmap-wheel path[data-level="3"] {
+  stroke: color-mix(in srgb, var(--heatmap-color) 70%, var(--ls-bg-tertiary));
+}
+
+.heatmap-wheel path[data-level="4"] {
+  stroke: color-mix(in srgb, var(--heatmap-color) 92%, var(--ls-bg-tertiary));
+}
+
+.heatmap-wheel text {
+  fill: var(--ls-text-muted);
+  font-size: 7px;
   font-weight: 700;
-  line-height: 1;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
 }
 
-.heatmap-month-strip {
-  display: grid;
-  grid-template-columns: repeat(16, minmax(6px, 10px));
-  justify-content: space-between;
-  gap: 2px;
-  min-width: 0;
+.heatmap-wheel text.is-current {
+  fill: var(--ls-accent);
+}
+
+.heatmap-wheel-center {
+  fill: var(--ls-accent);
+  opacity: 0.8;
+}
+
+/* Leyenda muda: cinco muestras de intensidad, sin texto nuevo que traducir. */
+.heatmap-legend {
+  display: flex;
+  justify-content: flex-end;
+  gap: 3px;
+  margin-top: 8px;
 }
 
 .heatmap-cell {
-  width: 100%;
-  height: auto;
-  aspect-ratio: 1;
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
   box-sizing: border-box;
-  border: 1px solid color-mix(in srgb, var(--heatmap-color) 16%, var(--ls-border-subtle));
   border-radius: 2px;
   background: color-mix(in srgb, var(--heatmap-color) 8%, var(--ls-bg-tertiary));
 }
@@ -7571,30 +7601,6 @@ body.mobile-full-editor .flashcard-review-tools {
 
 .heatmap-cell[data-level="4"] {
   background: color-mix(in srgb, var(--heatmap-color) 92%, var(--ls-bg-tertiary));
-}
-
-.heatmap-cell.is-empty {
-  visibility: hidden;
-  border-color: transparent;
-  background: transparent;
-}
-
-.heatmap-month-row.is-current .heatmap-month-label {
-  color: var(--ls-accent);
-}
-
-/* Leyenda muda: cinco muestras de intensidad, sin texto nuevo que traducir. */
-.heatmap-legend {
-  display: flex;
-  justify-content: flex-end;
-  gap: 3px;
-  margin-top: 8px;
-}
-
-.heatmap-legend .heatmap-cell {
-  flex: 0 0 8px;
-  width: 8px;
-  height: 8px;
 }
 
 .flashcard-heatmap-summary {

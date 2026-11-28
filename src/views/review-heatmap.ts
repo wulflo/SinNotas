@@ -170,7 +170,7 @@ export interface HeatmapWheelLabel {
 const WHEEL_CENTER = 110;
 const WHEEL_MIN_RADIUS = 30;
 const WHEEL_MAX_RADIUS = 88;
-const WHEEL_LABEL_RADIUS = 101;
+const WHEEL_LABEL_RADIUS = 98;
 
 function wheelPoint(radius: number, angle: number): [number, number] {
   return [
@@ -212,7 +212,8 @@ export function buildReviewHeatmapWheel(
       });
     });
 
-    const [lx, ly] = wheelPoint(WHEEL_LABEL_RADIUS, angleStart);
+    const labelAngle = angleStart + (monthIndex * 2 * Math.PI) / months.length;
+    const [lx, ly] = wheelPoint(WHEEL_LABEL_RADIUS, labelAngle);
     labels.push({
       text: month.label.replace(".", "").slice(0, 3).toUpperCase(),
       x: Number(lx.toFixed(2)),
