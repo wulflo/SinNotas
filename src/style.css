@@ -7446,7 +7446,8 @@ body.mobile-full-editor .flashcard-review-tools {
   align-items: center;
   justify-content: center;
   margin: 10px 0 14px;
-  border: 0;
+  /* La pista tenue conserva la silueta de la píldora bajo las bolitas. */
+  border: 1px solid color-mix(in srgb, var(--pomodoro-color) 22%, var(--ls-border-subtle));
   border-radius: var(--ma-radius-xl, 14px);
   background: color-mix(in srgb, var(--ls-bg-secondary) 55%, transparent);
   font-variant-numeric: tabular-nums;
