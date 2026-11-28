@@ -186,7 +186,7 @@ import { VirtualList } from "./views/virtual-list";
 import { ConceptMapView } from "./views/concept-map-view";
 import { migrateSelect, syncCustomSelect } from "./views/custom-select";
 import {
-  buildReviewHeatmapWheel,
+  buildReviewHeatmapSnake,
   buildReviewHeatmapYear,
   defaultHeatmapStart,
 } from "./views/review-heatmap";
@@ -13074,44 +13074,48 @@ function renderFlashcardHeatmap(): void {
   // datos: la rueda es estable y no «crece» mes a mes.
   const displayEnd = `${today.slice(0, 4)}-12-31`;
   const months = buildReviewHeatmapYear(reviewProgress.getEntries(), flashcardHeatmapStartDate, displayEnd);
-  const currentMonthKey = `${today.slice(0, 4)}-${today.slice(5, 7)}`;
-  const wheel = buildReviewHeatmapWheel(months, currentMonthKey);
+  const snake = buildReviewHeatmapSnake(months, Number(today.slice(0, 4)));
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
   svg.setAttribute("viewBox", "0 0 260 180");
-  svg.classList.add("heatmap-wheel");
+  svg.classList.add("heatmap-snake");
 
   flashcardHeatmapGrid.replaceChildren();
-  let totalReviews = 0;
-  wheel.segments.forEach((segment) => {
-    if (segment.date && segment.date > today) return;
-    const arc = document.createElementNS(svgNS, "path");
-    arc.setAttribute("d", segment.d);
-    arc.dataset.level = String(segment.level);
-    if (segment.date) {
-      totalReviews += segment.count;
-      const title = document.createElementNS(svgNS, "title");
-      title.textContent = `${segment.date}: ${segment.count} ${translate(segment.count === 1 ? "repaso" : "repasos")}`;
-      arc.appendChild(title);
-    }
-    svg.appendChild(arc);
+  snake.connectors.forEach((d) => {
+    const line = document.createElementNS(svgNS, "path");
+    line.setAttribute("d", d);
+    line.classList.add("heatmap-snake-line");
+    svg.appendChild(line);
   });
-  wheel.labels.forEach((label) => {
+  let totalReviews = 0;
+  snake.cells.forEach((cell) => {
+    if (cell.date && cell.date > today) return;
+    const rect = document.createElementNS(svgNS, "rect");
+    rect.setAttribute("x", String(cell.x));
+    rect.setAttribute("y", String(cell.y));
+    rect.setAttribute("width", "5");
+    rect.setAttribute("height", "5");
+    rect.setAttribute("rx", "1.5");
+    rect.classList.add("heatmap-snake-cell");
+    rect.dataset.level = String(cell.level);
+    if (cell.isLeapDay) rect.dataset.leap = "true";
+    if (cell.date) {
+      totalReviews += cell.count;
+      const title = document.createElementNS(svgNS, "title");
+      title.textContent = `${cell.date}: ${cell.count} ${translate(cell.count === 1 ? "repaso" : "repasos")}${cell.isLeapDay ? ` · ${translate("año bisiesto")}` : ""}`;
+      rect.appendChild(title);
+    }
+    svg.appendChild(rect);
+  });
+  snake.labels.forEach((label) => {
     const text = document.createElementNS(svgNS, "text");
     text.setAttribute("x", String(label.x));
     text.setAttribute("y", String(label.y));
-    text.setAttribute("text-anchor", "middle");
     text.setAttribute("dominant-baseline", "middle");
+    text.classList.add("heatmap-snake-label");
     text.textContent = label.text;
-    if (label.isCurrent) text.classList.add("is-current");
     svg.appendChild(text);
   });
-  const center = document.createElementNS(svgNS, "circle");
-  center.setAttribute("cx", "130");
-  center.setAttribute("cy", "90");
-  center.setAttribute("r", "3");
-  center.classList.add("heatmap-wheel-center");
-  svg.appendChild(center);
   flashcardHeatmapGrid.appendChild(svg);
   flashcardHeatmapTotal.textContent = `${totalReviews} ${translate(totalReviews === 1 ? "repaso" : "repasos")}`;
   flashcardHeatmapGrid.setAttribute(

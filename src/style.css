@@ -7517,8 +7517,8 @@ body.mobile-full-editor .flashcard-review-tools {
   width: 100%;
 }
 
-/* Rueda anual: un anillo por mes y un arco por día. Mismo esquema de niveles
- * que la cuadrícula, pero sin cuadritos y sin scroll. */
+/* Serpiente anual: 12 filas mensuales recorridas en serpentina y unidas por
+ * curvas. Mismo esquema de cinco niveles, sin scroll y sin vistas nuevas. */
 .flashcard-heatmap-year {
   --heatmap-color: var(--ls-accent);
   display: flex;
@@ -7529,52 +7529,48 @@ body.mobile-full-editor .flashcard-review-tools {
   --heatmap-color: #2da44e;
 }
 
-.heatmap-wheel {
+.heatmap-snake {
   display: block;
   width: 100%;
   max-width: 260px;
   height: auto;
 }
 
-.heatmap-wheel path {
+.heatmap-snake-line {
   fill: none;
-  stroke-width: 4;
-  stroke-linecap: round;
+  stroke: color-mix(in srgb, var(--heatmap-color) 22%, transparent);
+  stroke-width: 1.5;
 }
 
-.heatmap-wheel path[data-level="0"] {
-  stroke: color-mix(in srgb, var(--heatmap-color) 10%, var(--ls-border-subtle));
+.heatmap-snake-cell[data-level="0"] {
+  fill: color-mix(in srgb, var(--heatmap-color) 8%, var(--ls-bg-tertiary));
 }
 
-.heatmap-wheel path[data-level="1"] {
-  stroke: color-mix(in srgb, var(--heatmap-color) 28%, var(--ls-bg-tertiary));
+.heatmap-snake-cell[data-level="1"] {
+  fill: color-mix(in srgb, var(--heatmap-color) 28%, var(--ls-bg-tertiary));
 }
 
-.heatmap-wheel path[data-level="2"] {
-  stroke: color-mix(in srgb, var(--heatmap-color) 48%, var(--ls-bg-tertiary));
+.heatmap-snake-cell[data-level="2"] {
+  fill: color-mix(in srgb, var(--heatmap-color) 48%, var(--ls-bg-tertiary));
 }
 
-.heatmap-wheel path[data-level="3"] {
-  stroke: color-mix(in srgb, var(--heatmap-color) 70%, var(--ls-bg-tertiary));
+.heatmap-snake-cell[data-level="3"] {
+  fill: color-mix(in srgb, var(--heatmap-color) 70%, var(--ls-bg-tertiary));
 }
 
-.heatmap-wheel path[data-level="4"] {
-  stroke: color-mix(in srgb, var(--heatmap-color) 92%, var(--ls-bg-tertiary));
+.heatmap-snake-cell[data-level="4"] {
+  fill: color-mix(in srgb, var(--heatmap-color) 92%, var(--ls-bg-tertiary));
 }
 
-.heatmap-wheel text {
+.heatmap-snake-cell[data-leap="true"] {
+  stroke: var(--ls-accent);
+  stroke-width: 1.5;
+}
+
+.heatmap-snake-label {
   fill: var(--ls-text-muted);
   font-size: 7px;
   font-weight: 700;
-}
-
-.heatmap-wheel text.is-current {
-  fill: var(--ls-accent);
-}
-
-.heatmap-wheel-center {
-  fill: var(--ls-accent);
-  opacity: 0.8;
 }
 
 /* Leyenda muda: cinco muestras de intensidad, sin texto nuevo que traducir. */
