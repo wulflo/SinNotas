@@ -7380,14 +7380,18 @@ body.mobile-full-editor .flashcard-review-tools {
   inset: 0;
   padding: 5px;
   border-radius: inherit;
-  background: conic-gradient(
-    from -90deg,
-    var(--pomodoro-color) 0%,
-    color-mix(in oklch, var(--pomodoro-color) 55%, var(--pomodoro-green-color)) calc(var(--pomodoro-progress) * 0.5%),
-    var(--pomodoro-green-color) calc(var(--pomodoro-progress) * 1%),
-    color-mix(in oklch, var(--pomodoro-green-color) 32%, transparent) calc(var(--pomodoro-progress) * 1%),
-    color-mix(in oklch, var(--pomodoro-color) 20%, transparent) 100%
-  );
+  /* Dos capas: pista del color del modo y arco verde que crece desde el
+   * inicio. No se interpolaron rojo y verde: esa mezcla daba un marrón feo. */
+  background:
+    conic-gradient(
+      from -90deg,
+      var(--pomodoro-green-color) 0%,
+      var(--pomodoro-green-color) max(0%, calc(var(--pomodoro-progress) * 1% - 2%)),
+      color-mix(in srgb, var(--pomodoro-green-color) 60%, transparent) max(0%, calc(var(--pomodoro-progress) * 1% - 0.5%)),
+      transparent calc(var(--pomodoro-progress) * 1%),
+      transparent 100%
+    ),
+    color-mix(in srgb, var(--pomodoro-color) 32%, transparent);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
