@@ -13254,6 +13254,9 @@ function renderPomodoro(): void {
   const timeString = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   pomodoroClockValue.textContent = timeString;
   pomodoroClock.style.setProperty("--pomodoro-progress", String(fillProgress * 100));
+  // El tono vira con el tiempo transcurrido en ambos modos: rojo→verde al
+  // contar atrás y azul→verde al contar hacia delante.
+  pomodoroClock.style.setProperty("--pomodoro-elapsed", String(progress * 100));
   pomodoroClock.classList.toggle("is-break", pomodoroMode === "break");
   pomodoroClock.classList.toggle("is-count-up", pomodoroCountUp);
   pomodoroClock.title = pomodoroCountUp

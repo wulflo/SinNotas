@@ -7353,8 +7353,15 @@ body.mobile-full-editor .flashcard-review-tools {
   --pomodoro-focus-color: #a96870;
   --pomodoro-countup-color: #668d74;
   --pomodoro-break-color: #6685a5;
+  --pomodoro-green-color: #668d74;
   --pomodoro-color: var(--pomodoro-focus-color);
-  --pomodoro-track: color-mix(in srgb, var(--ls-border-subtle) 60%, transparent);
+  /* El borde vira desde el color del modo hacia verde a medida que pasa el
+   * tiempo; `--pomodoro-elapsed` lo escribe el render (0–100 en ambos modos). */
+  --pomodoro-hue: color-mix(
+    in oklch,
+    var(--pomodoro-color) calc(100% - var(--pomodoro-elapsed, 0) * 1%),
+    var(--pomodoro-green-color) calc(var(--pomodoro-elapsed, 0) * 1%)
+  );
   position: relative;
   display: flex;
   width: 100%;
@@ -7381,11 +7388,13 @@ body.mobile-full-editor .flashcard-review-tools {
   border-radius: inherit;
   background: conic-gradient(
     from -90deg,
-    color-mix(in srgb, var(--pomodoro-color) 55%, var(--ls-accent)) 0%,
-    var(--pomodoro-color) calc(var(--pomodoro-progress) * 0.5%),
-    color-mix(in srgb, var(--pomodoro-color) 70%, var(--ls-bg-primary)) calc(var(--pomodoro-progress) * 1%),
-    var(--pomodoro-track) calc(var(--pomodoro-progress) * 1%),
-    var(--pomodoro-track) 100%
+    /* Mismo hue en todo el arco: solo se aclara hacia el verde de forma
+       gradual. Sin mezcla con el acento para evitar el salto a violeta. */
+    color-mix(in oklch, var(--pomodoro-hue) 88%, var(--pomodoro-green-color)) 0%,
+    var(--pomodoro-hue) calc(var(--pomodoro-progress) * 0.5%),
+    color-mix(in oklch, var(--pomodoro-hue) 82%, var(--pomodoro-green-color)) calc(var(--pomodoro-progress) * 1%),
+    color-mix(in oklch, var(--pomodoro-hue) 38%, transparent) calc(var(--pomodoro-progress) * 1%),
+    color-mix(in oklch, var(--pomodoro-hue) 24%, transparent) 100%
   );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
@@ -7396,9 +7405,9 @@ body.mobile-full-editor .flashcard-review-tools {
 
 [data-theme="light"] .pomodoro-clock {
   --pomodoro-focus-color: #c25b66;
-  --pomodoro-countup-color: #4f8c63;
+  --pomodoro-countup-color: #4f7fb0;
   --pomodoro-break-color: #4f7fb0;
-  --pomodoro-track: color-mix(in srgb, var(--ls-border-subtle) 55%, transparent);
+  --pomodoro-green-color: #4f8c63;
 }
 
 .pomodoro-clock-value {
@@ -7423,6 +7432,8 @@ body.mobile-full-editor .flashcard-review-tools {
   --pomodoro-color: var(--pomodoro-break-color);
 }
 
+/* El modo progresivo arranca azul y vira a verde; el regresivo arranca rojo
+ * y vira a verde (misma mezcla, distinto color base). */
 .pomodoro-clock.is-count-up:not(.is-break) {
   --pomodoro-color: var(--pomodoro-countup-color);
 }
