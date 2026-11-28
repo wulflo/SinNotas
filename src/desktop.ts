@@ -4831,7 +4831,12 @@ btnMobileBackToReview?.addEventListener("click", () => {
   window.location.reload();
 });
 
-btnEnterReviewMode?.addEventListener("click", () => {
+btnEnterReviewMode?.addEventListener("click", async () => {
+  const confirmed = await confirmAction(
+    translate("Vas a abrir el modo Repaso. La aplicación se recargará; podrás volver al editor desde el modo repaso."),
+    translate("Abrir Repaso")
+  );
+  if (!confirmed) return;
   requestReviewMode();
   window.location.reload();
 });
