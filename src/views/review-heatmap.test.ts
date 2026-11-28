@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildReviewHeatmap, defaultHeatmapStart } from "./review-heatmap";
+import {
+  buildReviewHeatmap,
+  buildReviewHeatmapYear,
+  defaultHeatmapStart,
+} from "./review-heatmap";
 
 function entry(date: string, state: "applied" | "undone" = "applied") {
   return { date, state } as const;
@@ -55,5 +59,55 @@ describe("review heatmap", () => {
 
   it("defaults to a 90-day inclusive range", () => {
     expect(defaultHeatmapStart("2026-11-04")).toBe("2026-08-07");
+  });
+});
+
+describe("review heatmap — cinta anual", () => {
+  it("devuelve los 12 meses del año con un cuadrito por día", () => {
+    const months = buildReviewHeatmapYear([], "2026-01-01", "2026-12-31");
+    expect(months).toHaveLength(12);
+    expect(months.map((month) => month.key)).toEqual([
+      "2026-01", "2026-02", "2026-03", "2026-04",
+      "2026-05", "2026-06", "2026-07", "2026-08",
+      "2026-09", "2026-10", "2026-11", "2026-12",
+    ]);
+    expect(months.map((month) => month.days.length)).toEqual([
+      31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31,
+    ]);
+  });
+
+  it("cuenta solo repasos applied y aplica los cinco niveles", () => {
+    const months = buildReviewHeatmapYear(
+      [
+        entry("2026-01-01"),
+        entry("2026-01-02"), entry("2026-01-02"),
+        entry("2026-01-03"), entry("2026-01-03"), entry("2026-01-03"), entry("2026-01-03"),
+        entry("2026-01-04", "undone"),
+      ],
+      "2026-01-01",
+      "2026-01-31"
+    );
+    const january = months[0].days;
+    expect(january.slice(0, 4).map((day) => day.level)).toEqual([1, 2, 3, 0]);
+    expect(january.find((day) => day.date === "2026-01-04")?.count).toBe(0);
+  });
+
+  it("deja huecos en los días fuera del rango (meses parciales)", () => {
+    const months = buildReviewHeatmapYear([], "2026-11-20", "2026-12-10");
+    expect(months).toHaveLength(2);
+    expect(months[0].days.slice(0, 19).every((day) => day.date === null)).toBe(true);
+    expect(months[0].days[19].date).toBe("2026-11-20");
+    expect(months[1].days.slice(10).every((day) => day.date === null)).toBe(true);
+  });
+
+  it("limita la ventana a 365 días aunque pidan más", () => {
+    const months = buildReviewHeatmapYear([], "2024-01-01", "2026-11-04");
+    const days = months.flatMap((month) => month.days).filter((day) => day.date);
+    expect(days).toHaveLength(365);
+    expect(months.length).toBeLessThanOrEqual(13);
+  });
+
+  it("devuelve nada si la fecha final no es válida", () => {
+    expect(buildReviewHeatmapYear([], "2026-01-01", "no-es-fecha")).toEqual([]);
   });
 });

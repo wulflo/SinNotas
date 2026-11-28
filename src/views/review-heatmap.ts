@@ -11,6 +11,14 @@ export interface ReviewHeatmapWeek {
   days: ReviewHeatmapDay[];
 }
 
+/** Un mes de la cinta anual: una fila con un cuadrito por día del mes. */
+export interface ReviewHeatmapMonth {
+  /** `YYYY-MM`, estable para claves y tests. */
+  key: string;
+  label: string;
+  days: ReviewHeatmapDay[];
+}
+
 function dateKey(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
     date.getDate()
@@ -90,6 +98,57 @@ export function buildReviewHeatmap(
     weeks.push({ monthLabel, days });
   }
   return weeks;
+}
+
+/**
+ * Cinta anual: agrupa los repasos por mes natural en lugar de por semanas.
+ * Mantiene el detalle diario pero cabe entero en el panel de productividad
+ * (12 filas cortas) y no necesita scroll ni otra vista.
+ */
+export function buildReviewHeatmapYear(
+  entries: readonly Pick<ReviewProgressEvent, "date" | "state">[],
+  requestedStart: string,
+  requestedEnd: string
+): ReviewHeatmapMonth[] {
+  const end = parseLocalDate(requestedEnd);
+  if (!end) return [];
+  const requested = parseLocalDate(requestedStart) ?? end;
+  const earliest = addDays(end, -364);
+  const start = requested < earliest ? earliest : requested > end ? end : requested;
+  const startKey = dateKey(start);
+  const endKey = dateKey(end);
+
+  const counts = new Map<string, number>();
+  for (const entry of entries) {
+    if (entry.state !== "applied" || entry.date < startKey || entry.date > endKey) continue;
+    counts.set(entry.date, (counts.get(entry.date) || 0) + 1);
+  }
+
+  const months: ReviewHeatmapMonth[] = [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1, 12);
+  while (cursor <= end) {
+    const year = cursor.getFullYear();
+    const month = cursor.getMonth();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const days: ReviewHeatmapDay[] = [];
+    for (let day = 1; day <= daysInMonth; day += 1) {
+      const date = new Date(year, month, day, 12);
+      const key = dateKey(date);
+      if (key < startKey || key > endKey) {
+        days.push({ date: null, count: 0, level: 0 });
+        continue;
+      }
+      const count = counts.get(key) || 0;
+      days.push({ date: key, count, level: levelFor(count) });
+    }
+    months.push({
+      key: `${year}-${String(month + 1).padStart(2, "0")}`,
+      label: new Intl.DateTimeFormat(undefined, { month: "short" }).format(cursor),
+      days,
+    });
+    cursor.setMonth(month + 1);
+  }
+  return months;
 }
 
 export function defaultHeatmapStart(endDate: string, days = 90): string {
