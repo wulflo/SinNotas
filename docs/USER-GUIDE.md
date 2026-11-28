@@ -103,7 +103,9 @@ edit it by hand.
   shows a hint to open a page. For the full list, use the **All pages** icon in
   the navigation grid.
 - A page's context menu is text-only: open, rename, copy `[[...]]` link,
-  pin/unpin and delete.
+  pin/unpin and delete. Pinned pages stay at the top and remain pinned after
+  closing and reopening the app: they are stored as `pinned:: true` and
+  `pinned-at::` in the `.md` file's frontmatter.
 - **Ctrl/Cmd + B** collapses or expands it.
 - On desktop you can drag its edge to change the width.
 - The context menu of a note offers rename, delete, open history and other
@@ -264,6 +266,14 @@ A card is born from a bullet. There are three main ways:
    hidden and asked. Add `#card` so the bullet becomes a card.
 4. **Image occlusion:** insert an image and draw rectangular, elliptical or
    polygonal areas to hide parts of it. Each area can have a hint.
+
+You can also use the shortcuts **Alt + R** (create basic card) and
+**Alt + T** (remove markers) with the cursor in a bullet or with
+several bullets selected; when there is a selection, the highest-level bullet is
+marked. Both shortcuts appear in the **Flashcards** group of the shortcuts
+dialog. `#card` is not added to a bullet that already creates a card with `::`,
+`==…==`, `{{…}}` or an occlusion: the notice distinguishes that case from an
+empty bullet.
 
 You can also select several bullets and use **Create basic card** or **Convert to
 flashcard** from the context menu. To remove the markers without deleting the

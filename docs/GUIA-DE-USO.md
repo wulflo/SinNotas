@@ -106,7 +106,9 @@ pero no necesitas editarla a mano.
   una pista para abrir una nota. Para ver el listado completo de páginas, usa el
   icono **Todas las páginas** del mosaico de navegación.
 - El menú contextual de una nota ofrece solo texto: abrir, renombrar, copiar
-  enlace `[[...]]`, fijar/desfijar y eliminar.
+  enlace `[[...]]`, fijar/desfijar y eliminar. Las notas fijadas aparecen arriba
+  y siguen fijadas al cerrar y reabrir la app: se guardan como `pinned:: true` y
+  `pinned-at::` en el frontmatter del archivo `.md`.
 - **Ctrl/Cmd + B** la colapsa o la expande.
 - En escritorio puedes arrastrar su borde para cambiar el ancho.
 - El menú contextual de una nota ofrece renombrar, eliminar, abrir historial y
@@ -267,6 +269,13 @@ Una tarjeta nace de un bullet. Hay tres formas principales:
    oculta y se pregunta. Añade `#card` para que el bullet sea una tarjeta.
 4. **Oclusión de imagen:** inserta una imagen y dibuja zonas rectangulares,
    elípticas o poligonales para ocultar partes. Cada zona puede tener una pista.
+
+También puedes usar los atajos **Alt + R** (crear tarjeta básica) y
+**Alt + T** (quitar marcadores) con el cursor en un bullet o con
+varios bullets seleccionados; si hay selección, se marca el bullet de mayor
+jerarquía. Ambos atajos aparecen en el grupo **Flashcards** del diálogo de
+atajos. No se añade `#card` a un bullet que ya genera tarjeta con `::`, `==…==`,
+`{{…}}` o una oclusión: el aviso distingue ese caso de un bullet vacío.
 
 También puedes seleccionar varios bullets y usar **Crear tarjeta básica** o
 **Convertir en flashcard** desde el menú contextual. Para quitar los marcadores

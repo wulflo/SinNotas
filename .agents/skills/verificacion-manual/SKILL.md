@@ -50,6 +50,9 @@ return { errors: errors.messages, page: page.content };
 | F6 — Revisando | Web: Bibliografía en es/en/zh | Estado visible «Revisando» / «Reviewing» / «审阅中»; los recursos antiguos conservan su estado |
 | F7 — Menú Todas las páginas | App Tauri: clic derecho sobre una fila | El menú permanece abierto y «Fijar nota» se aplica |
 | F9 — Íconos del menú | Web o Tauri: clic derecho sobre contenido de un bullet | «Limpiar formato» e hijas de Flashcards sin íconos |
+| F10 — Atajos crear/quitar | Web: clic en un bullet (sin seleccionar) + `Alt+R`, luego `Alt+T` | `#card` se añade y se quita en el bullet con el cursor/foco; toast distingue «ya genera tarjeta» de «está vacío»; con selección se marca la raíz |
+| F11 — Atajos en el modal | Web: «Atajos de teclado», cambiar idioma a en/zh | «Crear tarjeta básica» y «Quitar flashcards» aparecen bajo Flashcards, no bajo Editor |
+| F12 — Fijadas persistentes | App Tauri: menú contextual de una nota → Fijar, cerrar y reabrir | La nota sigue en «Fijadas»; el `.md` contiene `pinned:: true` y `pinned-at::`. En web se comprueba que `localStorage.sinnotas-vault-v4` guarda esas líneas en `frontmatter` |
 
 ## 4. Formato del informe
 

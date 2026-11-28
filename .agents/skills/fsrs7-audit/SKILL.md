@@ -16,6 +16,7 @@ Propósito: verificar que el algoritmo y su persistencia sigan siendo correctos.
 | `src/views/flashcards-manager.ts` — `parseBlockFSRS`, `readScheduleSnapshot`, `updateBlockFSRS`, `applyScheduleSnapshot`, `rate`, `readProperty`, `stripScheduledProperties` | Lectura/escritura de programación en Markdown |
 | `src/store/review-progress.ts` — `record`, `commitUndo`, `commitRedo` | Diario y deshacer/rehacer |
 | `src/desktop.ts` — `applyFSRSRating`, `findReviewCardBlock`; `src/mobile/review-app.ts` — `rate` | Flujo de calificación en escritorio y APK |
+| `src/editor/flashcard-target.ts` — `resolveCardTargetIds`; `src/desktop.ts` — `cardTargetIds`, `createBasicCardFromSelection`, `deleteFlashcardsInSelection` | Atajos `Alt+R`/`Alt+T`: resuelven el bullet objetivo (selección → cursor → foco) y evitan duplicar `#card` en bullets que ya generan tarjeta |
 
 ## 2. Invariantes que deben cumplirse
 
@@ -29,6 +30,7 @@ Propósito: verificar que el algoritmo y su persistencia sigan siendo correctos.
 8. **Rollback**: si falla `savePage` o `record`, se revierten contenido **en disco**, estadísticas y celebración; si falla `persist` en undo/redo, se restauran el evento y las pilas.
 9. **Teclas de calificación**: cuatro teclas no vacías, únicas y comparables (`normalizeRatingKeys`).
 10. **Identidad**: `card.id = fc-<tipo>-<page.id>-<b-N>`; la huella ignora propiedades FSRS y espacios. No cambiarla sin migrar `.sinnotas/progress/reviews.json`.
+11. **Atajos de creación/borrado**: sin selección de bullets, el objetivo es el bullet con el cursor o el enfocado; con selección gana la raíz de mayor jerarquía. No añadir `#card` si `isFlashcardBlockContent()` ya es `true` (`::`, cloze, oclusión): cambiaría la pregunta y la huella. Quitar marcadores conserva el contenido y la indentación. Los avisos están traducidos a en/zh.
 
 ## 3. Verificación automática
 
@@ -36,7 +38,8 @@ Propósito: verificar que el algoritmo y su persistencia sigan siendo correctos.
 npx tsc --noEmit
 npm test -- src/editor/fsrs.test.ts src/editor/fsrs-settings.test.ts \
   src/views/flashcards-manager.test.ts src/store/review-progress.test.ts \
-  src/editor/rating-keys.test.ts
+  src/editor/rating-keys.test.ts src/editor/flashcard-target.test.ts \
+  src/editor/flashcard-markers.test.ts
 npm test
 git diff --check
 ```

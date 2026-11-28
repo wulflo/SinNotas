@@ -3,7 +3,7 @@
 > **Índice técnico extremadamente detallado de Sin Notas.**
 >
 > Versión del código indexada: **0.5.9** (`package.json`), 2026-11-27.
-> Fecha del índice: **2026-11-27**. Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
+> Fecha del índice: **2026-11-27**, actualizado **2026-11-28** (commits `f230f45`, `536b980`, `6a5b08a`). Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
 >
 > Este documento **no modifica ni describe cambios en el código**: es solo un mapa de referencia.
 > Responde a la pregunta _«¿dónde está la pieza que hace que funcione cada cosa?»_.
@@ -485,7 +485,7 @@ Los tipos FSRS (`FSRSItem`, `FSRSParameters`, `FSRSRating`, `CardState`) viven e
 
 | Ruta | Quién la escribe | Contenido |
 | :--- | :--- | :--- |
-| `*.md` | `lib.rs:4329 save_page` | Notas con frontmatter `clave:: valor` y bullets. |
+| `*.md` | `lib.rs:4329 save_page` | Notas con frontmatter `clave:: valor` y bullets. Las fijadas guardan `pinned:: true` y `pinned-at:: <ISO>` en el frontmatter (`store/pinned-frontmatter.ts`); sin esas claves se conserva el estado previo en memoria/localStorage. |
 | `.sinnotas/chronos/` | `snapshots.rs` | Snapshots automáticos de notas activas (máx. 30 días). |
 | `.sinnotas/progress/reviews.json` | `lib.rs:4475` | Diario de repasos (≤4.000 entradas, 5 MB, 365 días). |
 | `.sinnotas/documents/links.json` | `pdf/storage.rs` | Registro de PDFs enlazados y su caducidad. |
@@ -619,6 +619,7 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | `image-occlusion.ts` (287) | `normalizeImageOcclusionRegion()` (17), `parseImageOcclusions()` (66), `clampImageOcclusionRegion()` (100), `updateImageOcclusionInContent()` (129), `occlusionRegionsMatch()` (177), `appendOcclusionMasks()` (205) | Lee regiones **solo** de `image-occlusions::`; colores `#rrggbb`; `hint` ≤200 chars; SVG generado con `createElementNS` + `setAttribute` desde números validados; `fill=true` añade `width/height=100%` para que siga a la imagen al hacer zoom. Test: `image-occlusion.test.ts` (93). |
 | `image-bytes.ts` (49) | `detectRasterImageMime()` (15), `normalizeRasterImageFile()` (36) | Magic bytes PNG/JPEG/GIF/WebP/BMP; **rechaza SVG** (no hay saneador en modo web). Test: `image-bytes.test.ts` (47). |
 | `flashcard-markers.ts` (70) | `splitBlockProperties()` (10), `isFlashcardBlockContent()` (24), `removeFlashcardMarkers()` (36) | Primilla pura compartida por todas las rutas de borrado de flashcards: quita `#card`, cloze, `==…==`, `::` y propiedades FSRS **conservando la indentación de cada línea** (el `trim()` global anterior desplazaba los bullets anidados). Test: `flashcard-markers.test.ts`. |
+| `flashcard-target.ts` | `resolveCardTargetIds()` | Objetivo de los atajos crear/quitar tarjetas: prioridad **selección de bullets → `cursorState` → `.block-editor` enfocado**; descarta ids obsoletos tras un render. Lo usa `desktop.ts cardTargetIds()`. Test: `flashcard-target.test.ts`. |
 | `html.ts` (13) | `escapeHtml()` (2) | `& < > " '` → entidades. Sin test directo. |
 | `math.ts` (46) | `renderMathToHtml()` (35) | KaTeX con caché de 300 entradas, `trust:false`, `maxSize:500`, `maxExpand:1000`; fallback `<code class="math-error">`. |
 | `note-search.ts` (71) | `findFoldedRanges()` (20), `findMatchesInBlocks()` (53) | Plegado de mayúsculas/acentos vía `fold()` de `content-search`; mapeo carácter→offset original; incluye bloques colapsados; tope 5.000 coincidencias. Test: `note-search.test.ts` (49). |
@@ -661,7 +662,7 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | `getPages()` | 565 | Referencia directa al array. |
 | `onBeforeSave(listener)` | 570 | Hook invocado antes de persistir (historial de desktop.ts:306). |
 | `getPageByTitle()` | 574 | Case-insensitive; también compara con `normalizeDeckTitle` (`::` ≡ `→`). |
-| `replaceVault(pages, root, name)` | 620 | Tras `load_vault`: cancela escrituras, cambia páginas/raíz, sube versión, limpia LRU y caché, persiste. |
+| `replaceVault(pages, root, name)` | 620 | Tras `load_vault`: cancela escrituras, cambia páginas/raíz, sube versión, limpia LRU y caché, persiste. Deriva `pinned`/`pinnedAt` del frontmatter de cada nota (`pinned-frontmatter.ts`). |
 | `applyExternalDelta(delta, {skipPaths})` | 661 | Aplica cambios del watcher solo si coincide `rootPath`; conserva edición local; fusiona `id`, `pinned`, `revisions`. |
 | `setActiveVault()` | 748 | Actualiza raíz/nombre en memoria y localStorage. |
 | `pinPage()` / `unpinPage()` | 759 / 764 | Excluyen la nota del sweep LRU. |
@@ -720,6 +721,7 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | :--- | :--- | :--- |
 | `export.ts` (258) | `serializePageAsPlainText()` (L59), `exportVaultAsMarkdownZip()` (L162), `exportVaultAsMarkdown()` (L176), `exportVaultAsJson()` (L189), `exportVaultAsCsv()` (L202), `printVaultAsPdf()` (L234) | ZIP implementado a mano: CRC32 (L87), local headers, central directory y end record (L106–160). Solo `serializePageAsPlainText` tiene consumidor real (`desktop.ts:114,4354`); el resto es API latente. |
 | `sidebar-selection.ts` (40) | `selectSidebarPages()` (L12) | `pinned` ordenados por `pinnedAt` ascendente; `recent` por `recentPaths`, sin fijadas, sin duplicados, sin huérfanas. |
+| `pinned-frontmatter.ts` | `readPinnedFromFrontmatter()`, `writePinnedToFrontmatter()`, `applyPinnedFrontmatter()` | Persistencia de fijadas en el `.md`: escribe/lee `pinned:: true` y `pinned-at:: <ISO>` en el frontmatter (el backend solo serializa frontmatter + bloques). Lo usan `replaceVault()`, el alta de `applyExternalDelta()`, `sctx-pin`, restaurar snapshot y borrar propiedades. Tests: `pinned-frontmatter.test.ts`. |
 | `wikilinks.ts` (53) | `WikiLinkRef` (L5), `collectOutgoingLinks()` (L28) | Extrae `[[Destino\|Alias]]`; dedupe por destino, omite auto-enlaces, ignora código, conserva destinos rotos. La reescritura en renombres **no** usa este módulo (vault.ts hace su propia regex en L1055). |
 
 ### 5.6 Mapa rápido del store
@@ -742,7 +744,7 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | Fusión de mazos entre dispositivos | `store/flashcard-decks.ts:521` |
 | Mazo activo por bóveda | `store/flashcard-deck-storage.ts:21,155-176` |
 | Diario de repasos / undo por dispositivo | `store/review-progress.ts:18,43,360,422-475` |
-| Fijadas y recientes | `[S] store/sidebar-selection.ts selectSidebarPages` + `[D] desktop.ts renderSidebar / buildSidebarItem / touchRecentPage` (`RECENT_PAGES_LIMIT = 20`). Sin botón «Ver todas las notas»: la vista se abre desde `[D] #nav-all-pages`. Estado vacío: `Recientes` + `.sidebar-empty-hint`. |
+| Fijadas y recientes | `[S] store/sidebar-selection.ts selectSidebarPages` + `[D] desktop.ts renderSidebar / buildSidebarItem / touchRecentPage` (`RECENT_PAGES_LIMIT = 20`). Persistencia: `[S] pinned-frontmatter.ts` (`pinned::` / `pinned-at::` en el frontmatter del `.md`); el handler `[D] sctx-pin` hidrata la nota antes de guardar. Sin botón «Ver todas las notas»: la vista se abre desde `[D] #nav-all-pages`. Estado vacío: `Recientes` + `.sidebar-empty-hint`. |
 | Wikilinks salientes | `store/wikilinks.ts:28` |
 
 ---
@@ -1172,6 +1174,7 @@ Todas las acciones de terceros están pineadas a SHA; `npm ci --ignore-scripts`;
 | Árbol jerárquico de mazos | `[V] flashcard-decks.ts:75` |
 | Recálculo masivo (40 por lote) | `[V] flashcard-maintenance.ts:176` |
 | Borrado selectivo de propiedades FSRS y de marcadores | `[D] desktop.ts createFlashcardScopePicker` (selector paginado compartido, `#fsrs-clear-*` y `#flashcard-clear-*` en Avanzado) → `[E] flashcard-markers.ts removeFlashcardMarkers` |
+| Atajos crear/quitar tarjetas (`Alt+R` / `Alt+T`, definidos en `shortcuts.ts`) | `[D] desktop.ts cardTargetIds → createBasicCardFromSelection / deleteFlashcardsInSelection` + `[E] flashcard-target.ts resolveCardTargetIds`; visibles en el grupo «Flashcards» de `index.html #shortcuts-modal-overlay` |
 | Explorador y filtros | `[D] desktop.ts:13167` + `[V] virtual-list.ts` |
 | Modo Aprendizaje (sin persistir FSRS) | `[D] desktop.ts`, `[M] review-app.ts:2590` |
 | Undo/redo de repasos | `[S] review-progress.ts:422-475` + `[D] desktop.ts:13777` |

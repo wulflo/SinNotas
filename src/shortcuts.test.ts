@@ -50,12 +50,13 @@ describe("asignación de atajos", () => {
   beforeEach(() => localStorage.clear());
 
   it("devuelve los valores por defecto sin personalizaciones", () => {
-    expect(getBinding("createCard")).toBe("Mod+Shift+C");
+    expect(getBinding("createCard")).toBe("Alt+R");
+    expect(getBinding("removeCards")).toBe("Alt+T");
     expect(loadCustomBindings()).toEqual({});
   });
 
   it("detecta un atajo ya usado por otra acción", () => {
-    const result = validateShortcut("removeCards", "Mod+Shift+C");
+    const result = validateShortcut("removeCards", "Alt+R");
     expect(result).toEqual({
       ok: false,
       reason: "duplicate",
@@ -74,15 +75,15 @@ describe("asignación de atajos", () => {
   });
 
   it("guarda, aplica y restablece una combinación válida", () => {
-    expect(assignBinding("createCard", "Mod+Shift+K")).toEqual({ ok: true });
-    expect(getBinding("createCard")).toBe("Mod+Shift+K");
-    expect(matchesShortcut(key({ key: "k", code: "KeyK", ctrlKey: true, shiftKey: true }), "createCard"))
+    expect(assignBinding("createCard", "Alt+K")).toEqual({ ok: true });
+    expect(getBinding("createCard")).toBe("Alt+K");
+    expect(matchesShortcut(key({ key: "k", code: "KeyK", altKey: true }), "createCard"))
       .toBe(true);
-    expect(matchesShortcut(key({ key: "c", code: "KeyC", ctrlKey: true, shiftKey: true }), "createCard"))
+    expect(matchesShortcut(key({ key: "r", code: "KeyR", altKey: true }), "createCard"))
       .toBe(false);
 
     resetBinding("createCard");
-    expect(getBinding("createCard")).toBe("Mod+Shift+C");
+    expect(getBinding("createCard")).toBe("Alt+R");
     expect(loadCustomBindings()).toEqual({});
   });
 

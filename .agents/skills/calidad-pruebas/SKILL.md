@@ -13,7 +13,7 @@ Propósito: que cada cambio tenga una prueba que guarde una invariante real y qu
 
 ```bash
 npx tsc --noEmit
-npm test                 # 598 pruebas / 62 archivos en la última verificación (2026-11-27)
+npm test                 # 612 pruebas / 64 archivos en la última verificación (2026-11-28)
 npm run build
 cargo test --manifest-path src-tauri/Cargo.toml --lib
 git diff --check

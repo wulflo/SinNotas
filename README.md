@@ -64,6 +64,7 @@
 
 - **Journals:** create daily notes by date and browse them from the calendar.
 - **All pages:** browse every note in the vault and open its version history.
+- **Pinned notes:** pin from a note's context menu; pinned notes stay at the top of the sidebar and survive restarts (stored as `pinned::` / `pinned-at::` frontmatter in the `.md` file).
 - **External vaults:** open any Markdown folder through the directory picker and navigate its pages and subfolders.
 - **Fast startup:** local vaults keep a persistent binary metadata cache (`.sinnotas_cache.bin`) so only new or modified notes are parsed on launch. A native filesystem watcher applies external edits incrementally.
 - **Sync your way:** use any file-sync service you trust to keep notes up to date across devices. SinNotas does not impose a cloud provider.
@@ -200,6 +201,8 @@ PDFium is not committed to the repository. The release workflows fetch the match
 | **Ctrl/Cmd + C** / **X** | Copy or cut the selected bullets when no text is selected. |
 | **Ctrl/Cmd + V** | Paste through the sanitizer. Only safe Markdown formatting survives. |
 | **Ctrl + Shift + V** | Paste as plain text. |
+| **Alt + R** | Add `#card` to the focused or selected bullet (grouped under **Flashcards** in the shortcuts dialog). |
+| **Alt + T** | Remove flashcard markers from the focused or selected bullets, keeping their text. |
 | **Ctrl/Cmd + Z** | Undo. **Ctrl/Cmd + Y** or **Ctrl/Cmd + Shift + Z** redoes. |
 | **Ctrl/Cmd + B** | Collapse or expand the sidebar. |
 | **Ctrl/Cmd + K** | Quick search and quick page creation (omnibar). |
