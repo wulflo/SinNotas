@@ -3,7 +3,7 @@
 > **Índice técnico extremadamente detallado de Sin Notas.**
 >
 > Versión del código indexada: **0.5.9** (`package.json`), 2026-11-27.
-> Fecha del índice: **2026-11-27**, actualizado **2026-11-28** (de `f230f45` a `6d974b2`). Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
+> Fecha del índice: **2026-11-27**, actualizado **2026-11-28** (de `f230f45` a la fase 10, cierre de la auditoría de seguridad W1–W4). Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
 >
 > Este documento **no modifica ni describe cambios en el código**: es solo un mapa de referencia.
 > Responde a la pregunta _«¿dónde está la pieza que hace que funcione cada cosa?»_.
@@ -977,7 +977,8 @@ El crate `sin-notas` v0.5.6 (`lib` = `sin_notas_lib`) tiene en `lib.rs`:
 - **Runtime de caché** `VaultCacheRuntime` (1839): caché en disco + watcher `notify` + índice plegado + deltas al frontend.
 - **Parser Markdown** `parse_markdown_with_frontmatter()` (1376, ids `b-N`, profundidad máx. 64) y `serialize_page_to_markdown()` (1533).
 - **Validación de rutas**: `resolve_note_path()` (1601, rechaza NUL, 7 esquemas URI, `..`, componentes reservadas/temporales, exige `.md`, anti-symlink) y `resolve_vault_path()` (1691, variante para assets, `symlink_metadata`).
-- **Escritura atómica** `write_file_atomically()` (4274, temp + rename, UUID, 32 intentos).
+- **Escritura atómica** `write_file_atomically()` (temp + rename, UUID, 32 intentos): el temporal se crea con `write_new_file()` (`OpenOptions::create_new(true)` + `write_all`) para no seguir symlinks.
+- **Lecturas acotadas**: `read_image_bytes_bounded()` (metadata + `Read::take`) en `read_image_data`, `check_byte_limit()` para SAF, y `read_text_bounded()` en `FsStorage::read_note`; topes `MAX_IMAGE_FILE_BYTES` (5 MiB) y `NOTE_MAX_BYTES` (20 MiB). Tests en `lib.rs tests::*bounded*`.
 
 ### 13.2 Los 51 comandos registrados
 
@@ -1055,10 +1056,10 @@ Registro exacto: `lib.rs:6040-6092` (`generate_handler!`). El único evento Rust
 
 | Comando | Qué ejecuta |
 | :--- | :--- |
-| `npm test` | `vitest run` — 643 pruebas en 69 archivos (verificación 2026-11-28, commit `6d974b2`). Entorno `happy-dom` donde hace falta DOM. |
+| `npm test` | `vitest run` — 646 pruebas en 70 archivos (verificación 2026-11-28, fase 10). Entorno `happy-dom` donde hace falta DOM. |
 | `npx tsc --noEmit` | Gate de tipos estricto (`noUnusedLocals`/`noUnusedParameters`). |
 | `npm run build` | `tsc && vite build` → `dist/`. |
-| `cargo test --manifest-path src-tauri/Cargo.toml --lib --locked` | 106 tests Rust (105 pasan, 1 smoke de red ignorado; verificación 2026-11-28). |
+| `cargo test --manifest-path src-tauri/Cargo.toml --lib --locked` | 110 tests Rust (109 pasan, 1 smoke de red ignorado; verificación 2026-11-28, fase 10). |
 | `cargo clippy --locked -- -D warnings` | Lint Rust. |
 | `cargo audit` | Auditoría de dependencias (con `glib 0.18.5` tolerada, ver checklist §A3). |
 | `npm run dev` → `localhost:1420/graph-harness.html` | Harness del grafo, debe terminar en `HARNESS PASS`. |
@@ -1217,7 +1218,7 @@ Todas las acciones de terceros están pineadas a SHA; `npm ci --ignore-scripts`;
 | Grafo apilado sobre referencias en la sidebar derecha | `[D] desktop.ts showReferenceGraph / renderReferenceGraph` (`#reference-pane-graph`, `reference-graph-canvas`), reutiliza `[V] graph-view.ts GraphView` (con `centerOn()` que sigue al nodo mientras avanza la física) y `connectedPageTitles` |
 | Buscador de notas de referencia | `[D] desktop.ts createReferenceNotePicker` + `REFERENCE_RESULTS_CHUNK = 20` (resultados por tandas con «Mostrar más» y debounce de 120 ms, sin montar todas las notas) |
 | Mapa conceptual | `[V] concept-map-view.ts` + `index.html:1601` |
-| Lector PDF | `[V] pdf-view.ts` + `[R] pdf/engine.rs` + `[R] pdf/storage.rs` |
+| Lector PDF | `[V] pdf-view.ts` (`PdfReaderHost.copyText` → `[D] desktop.ts writeClipboardText`; test `pdf-view.test.ts`) + `[R] pdf/engine.rs` + `[R] pdf/storage.rs` |
 | Enlazar PDF sin copiar | `[R] pdf/storage.rs:460 link_pdf` |
 | Texto seleccionable del PDF | `[R] pdf/engine.rs:281` → `[V] pdf-view.ts:513` |
 | Capturas y oclusiones desde PDF | `[D] desktop.ts:6491` + `[R] lib.rs:5054` |
@@ -1225,7 +1226,7 @@ Todas las acciones de terceros están pineadas a SHA; `npm ci --ignore-scripts`;
 | Bibliografía (frontmatter `bib-*`) | `[V] bibliography.ts` + `[V] bibliography-view.ts` (todos sus `<select>` migrados a `[V] custom-select.ts CustomSelect`) |
 | Kanban | `[V] kanban-view.ts` + `[D] desktop.ts:9895-10250` |
 | Fuentes del sistema | `[R] lib.rs:5496 list_system_fonts` |
-| Actualizaciones | `[SVC] services/updater.ts` + `[R] lib.rs:5657/5597` |
+| Actualizaciones | `[SVC] services/updater.ts` (`androidFetchInit`, `maxRedirections: 5`) + `[SVC] services/update-utils.ts isAllowedUpdateUrl` + `[R] lib.rs:5657/5597`; scope HTTP con `scopeRedirects` en `tauri.conf.json` y allowlist en `capabilities/android.json` |
 | Detección de tienda / render software | `[R] lib.rs:5657`, `:5991` |
 
 ### 18.5 Plataforma y build

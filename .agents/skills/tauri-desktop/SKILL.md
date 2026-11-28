@@ -26,13 +26,13 @@ Propósito: que un cambio en la capa Tauri respete el modelo de permisos, el vau
 - Comandos `#[tauri::command]` en `src-tauri/src/lib.rs`, registrados en `invoke_handler`; tipos compartidos en `src/types.ts`; llamadas desde `src/desktop.ts` y vistas.
 - Si se añade/quita un comando, revisar los tres sitios (definición, registro, llamada). Los tipos del payload deben coincidir con la interfaz TS.
 - Los comandos que transportan datos de dominio se llaman desde `src/tauri/commands.ts`: ahí se construyen los argumentos (`assertRequired` solo en dev) y se normalizan las formas del payload. Caso real: Rust serializa `Backlink` como `source_page`/`source_path`/`line_number`, pero `vault.ts` leía `sourcePage` y reventaba al renombrar; `findBacklinksCmd()` acepta ambas formas y devuelve la canónica. Al añadir un wrapper, añadir un test en `src/tauri/commands.test.ts` con la forma exacta de los argumentos y del payload. Los `await` que mutan estado capturan un epoch y usan `isStaleMutation()` antes de aplicar el resultado.
-- **La validación de contención vive en Rust**: `resolve_note_path`, `resolve_vault_path`, `write_file_atomically`, `validate_image_file`. Una validación solo en frontend no cierra un hallazgo de seguridad.
+- **La validación de contención vive en Rust**: `resolve_note_path`, `resolve_vault_path`, `write_file_atomically` (con `write_new_file`/`create_new`), `validate_image_file`. Una validación solo en frontend no cierra un hallazgo de seguridad. Las lecturas IPC están acotadas (`read_image_bytes_bounded`, `read_text_bounded`, `check_byte_limit`).
 
 ## 4. Portapapeles (caso real del repo)
 
 - `readImage`/`readText` del plugin no piden permiso al WebView; `navigator.clipboard.read()` sí lo pide en Windows/WebView2.
 - Toda lectura debe estar ligada a una acción del usuario. El menú contextual de Pegar debe usar el mismo camino que Ctrl+V (`pasteNativeClipboardImage`), no una API distinta.
-- Para **escribir** texto, usar `writeClipboardText()` de `desktop.ts`: en Tauri llama a `writeText` del plugin (declarado en `capabilities/default.json` como `clipboard-manager:allow-write-text`), luego Clipboard API y por último textarea + `execCommand`. No llamar a `navigator.clipboard.writeText` directamente en handlers: en WebView puede rechazarse sin promesa manejada y el botón parece no hacer nada (caso real del menú «Copiar enlace [[...]»).
+- Para **escribir** texto, usar `writeClipboardText()` de `desktop.ts` (también lo usa la vista PDF vía `PdfReaderHost.copyText()`): en Tauri llama a `writeText` del plugin (declarado en `capabilities/default.json` como `clipboard-manager:allow-write-text`), luego Clipboard API y por último textarea + `execCommand`. No llamar a `navigator.clipboard.writeText` directamente en handlers: en WebView puede rechazarse sin promesa manejada y el botón parece no hacer nada (caso real del menú «Copiar enlace [[...]»).
 
 ## 5. Sistema de archivos
 
@@ -43,7 +43,7 @@ Propósito: que un cambio en la capa Tauri respete el modelo de permisos, el vau
 ## 6. Diálogos, opener y HTTP
 
 - Confirmaciones y selectores de archivo pasan por el plugin `dialog`; en modo web hay alternativas. Comprobar cancelación y mensajes de error.
-- Enlaces externos: allowlist de protocolos y hosts, sin `javascript:`/`file:` arbitrarios.
+- Enlaces externos: allowlist de protocolos y hosts, sin `javascript:`/`file:` arbitrarios. El actualizador Android depende de `plugins.http.scopeRedirects: true` y de `maxRedirections` acotado en `androidFetchInit()`: sin eso, un redirect podía eludir la capability.
 - Búsqueda de metadatos (`src-tauri/src/bibliography_lookup.rs`): hosts constantes, HTTPS, sin redirecciones, `rustls`, timeouts, límite de respuesta, rate limit y caché. El frontend nunca construye la URL.
 
 ## 7. Updater, build y release
@@ -62,16 +62,16 @@ Propósito: que un cambio en la capa Tauri respete el modelo de permisos, el vau
 - Barra de título personalizada en `index.html`; `src/splash.ts` controla el splash. La biblioteca de diálogos propios usa `hasMountedModal` para evitar abrir unos sobre otros.
 - Los atajos globales de la app se registran en `src/desktop.ts`; no duplicarlos con `global-shortcut` del plugin salvo decisión explícita.
 
-## 10. Hallazgos abiertos (auditoría 2026-11-28)
+## 10. Hallazgos de la auditoría 2026-11-28 (cerrados en fase 10)
 
-Informe completo: `~/Descargas/evidencia-refactor-contratos/09-seguridad.md`. Revisar si el cambio toca alguna de estas zonas; **no darlos por cerrados sin parche y test**:
+Informe original: `~/Descargas/evidencia-refactor-contratos/09-seguridad.md`; cierre: `10-seguridad-cerrada.md`. No reintroducir estas regresiones:
 
-1. **W1 — redirects del updater Android.** `capabilities/android.json` solo permite `github.com/wulflo/SinNotas/releases/*`, pero `services/updater.ts` usa `redirect: "follow"` y `plugins.http.scopeRedirects` no está activo: un 3xx puede salir del scope. Corrección: activar `scopeRedirects`, ampliar `allow` a los hosts de assets de GitHub y bajar `maxRedirections`.
-2. **W2 — `write_file_atomically`.** `lib.rs` usa `fs::write` para el archivo temporal en vez de `OpenOptions::create_new(true)`. Corrección: `create_new` + `write_all`, conservando `remove_file` y `rename`.
-3. **W3 — lecturas IPC sin cota.** `read_image_data` y `FsStorage::read_note` (`fs::read` / `fs::read_to_string`) no limitan bytes, aunque la escritura y el escaneo sí (`MAX_IMAGE_FILE_BYTES`, `NOTE_MAX_BYTES`, `read_text_bounded`). Corrección: `metadata.len()` + `Read::take(limit + 1)`.
-4. **W4 — portapapeles en la vista PDF.** `views/pdf-view.ts copySelectedText()` llama a `navigator.clipboard.writeText` directamente; debe delegar en `desktop.ts writeClipboardText()` vía `PdfReaderHost.copyText()`.
+1. **W1 — redirects del updater Android.** `tauri.conf.json` activa `plugins.http.scopeRedirects`, `capabilities/android.json` incluye los hosts de assets de GitHub y `services/updater.ts androidFetchInit()` fija `maxRedirections: 5`. Sin `scopeRedirects`, un 3xx podía salir del allowlist.
+2. **W2 — `write_file_atomically`.** Usa `write_new_file()` (`OpenOptions::create_new(true)` + `write_all`) para el temporal; conserva `remove_file` y `rename`. Test con symlink existente.
+3. **W3 — lecturas IPC sin cota.** `read_image_bytes_bounded()` (metadata + `take`) y `check_byte_limit()` acotan imágenes a `MAX_IMAGE_FILE_BYTES` y notas a `NOTE_MAX_BYTES`, también en SAF. Tests de límite exacto y sobredimensión.
+4. **W4 — portapapeles en la vista PDF.** `PdfReaderHost.copyText()` delega en `desktop.ts writeClipboardText()`; `pdf-view.test.ts` verifica que no se usa `navigator.clipboard.writeText` directamente.
 
-Notas de riesgo aceptado: CSP con la única excepción de `covers.openlibrary.org`; D4 restringe rutas absolutas a PDFs; `gen/schemas/` es generado y CI valida el manifiesto Android.
+Notas de riesgo aceptado (sin cambios): CSP con la única excepción de `covers.openlibrary.org`; D4 restringe rutas absolutas a PDFs; `gen/schemas/` es generado y CI valida el manifiesto Android.
 
 ## Checklist antes de responder
 

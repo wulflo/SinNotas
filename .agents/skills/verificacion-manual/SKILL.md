@@ -59,6 +59,7 @@ return { errors: errors.messages, page: page.content };
 | F16 — Entrar en Repaso | Web o Tauri: `#btn-enter-review-mode` → cancelar y luego confirmar | Al cancelar no se activa `sinnotas-review-mode`; al confirmar se recarga en repaso. «Volver al repaso» móvil no pide confirmación |
 | F17 — Quipu | Web: Flashcards → cinta anual; medir un nudo y el cordel | `<rect>` de 15 × 9,6 con `rx=2`, 12 hilos de x 20 a 240, trazo suave y cordel que no atraviesa los nudos |
 | F18 — Píldora Pomodoro | Web o Tauri: panel de productividad, iniciar/pausar | `.pomodoro-clock` con fondo transparente; solo se ve el aro de bolitas y la cifra sigue legible |
+| F19 — Copiar texto del PDF | Web o Tauri: seleccionar texto en el lector y pulsar «Copiar selección» | Se copia por `writeClipboardText` (en Tauri, plugin nativo); el aviso no dice «No se pudo copiar». En Android, además, «Buscar actualizaciones» debe seguir el redirect de GitHub sin salir del scope |
 
 **Matriz de temas (6 combinaciones):** para verificar aero/lino/dracula × claro/oscuro, fija `localStorage["sinnotas-theme"]` (`dark` / `light`) y `localStorage["sinnotas-visual"]` (`aero` / `lino` / `dracula`), **recarga** y toma captura. Cambiar solo `data-theme`/`data-visual` en caliente dio resultados engañosos. Restaura las preferencias originales al terminar; la evidencia de la matriz está en `~/Descargas/evidencia-refactor-contratos/06-matriz-temas.md`.
 
