@@ -7429,14 +7429,16 @@ body.mobile-full-editor .flashcard-review-tools {
       transparent 100%
     ),
     color-mix(in srgb, var(--pomodoro-color) 32%, transparent);
-  /* Aro punteado: el patrón repetido recorta el borde en pequeños tramos. */
+  /* Aro de bolitas grandes: el patrón radial deja círculos de 8 px separados
+   * 10 px, recortados al grosor del borde. El degradado de color y el virado
+   * al verde se mantienen intactos debajo de la máscara. */
   -webkit-mask:
-    repeating-conic-gradient(from -90deg, #000 0deg 1.6deg, transparent 1.6deg 3.2deg),
+    radial-gradient(circle at 5px 5px, #000 4px, transparent 4.5px) 0 0 / 10px 10px,
     linear-gradient(#000 0 0),
     linear-gradient(#000 0 0) content-box;
   -webkit-mask-composite: source-in, xor;
   mask:
-    repeating-conic-gradient(from -90deg, #000 0deg 1.6deg, transparent 1.6deg 3.2deg),
+    radial-gradient(circle at 5px 5px, #000 4px, transparent 4.5px) 0 0 / 10px 10px,
     linear-gradient(#000 0 0),
     linear-gradient(#000 0 0) content-box;
   mask-composite: intersect, subtract;
