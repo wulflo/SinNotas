@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildReviewHeatmap,
   buildReviewHeatmapYear,
+  buildReviewHeatmapSnake,
   buildReviewHeatmapWheel,
   defaultHeatmapStart,
 } from "./review-heatmap";
@@ -134,5 +135,39 @@ describe("review heatmap — rueda anual", () => {
     const active = buildReviewHeatmapYear([entry("2026-06-15"), entry("2026-06-15")], "2026-01-01", "2026-12-31");
     const wheel = buildReviewHeatmapWheel(active);
     expect(wheel.segments.find((segment) => segment.date === "2026-06-15")).toMatchObject({ level: 2, count: 2, monthIndex: 5 });
+  });
+});
+
+describe("review heatmap — serpiente anual", () => {
+  it("marca el 29 de febrero en un año bisiesto (la ventana queda en 365 días)", () => {
+    const months = buildReviewHeatmapYear([], "2024-01-01", "2024-12-31");
+    const snake = buildReviewHeatmapSnake(months, 2024);
+    expect(snake.cells).toHaveLength(365);
+    expect(snake.cells.filter((cell) => cell.isLeapDay).map((cell) => cell.date)).toEqual(["2024-02-29"]);
+  });
+
+  it("usa 365 celdas y ningún día bisiesto en un año normal", () => {
+    const months = buildReviewHeatmapYear([], "2026-01-01", "2026-12-31");
+    const snake = buildReviewHeatmapSnake(months, 2026);
+    expect(snake.cells).toHaveLength(365);
+    expect(snake.cells.some((cell) => cell.isLeapDay)).toBe(false);
+  });
+
+  it("alterna la dirección de las filas y une los extremos con curvas", () => {
+    const months = buildReviewHeatmapYear([], "2026-01-01", "2026-12-31");
+    const snake = buildReviewHeatmapSnake(months, 2026);
+    const january = snake.cells.filter((cell) => cell.monthIndex === 0);
+    const february = snake.cells.filter((cell) => cell.monthIndex === 1);
+    expect(january[0].x).toBeLessThan(january[january.length - 1].x);
+    expect(february[0].x).toBeGreaterThan(february[february.length - 1].x);
+    expect(snake.connectors).toHaveLength(11);
+    expect(snake.connectors.every((connector) => connector.includes(" Q "))).toBe(true);
+  });
+
+  it("genera una etiqueta de mes por fila", () => {
+    const months = buildReviewHeatmapYear([], "2026-01-01", "2026-12-31");
+    const snake = buildReviewHeatmapSnake(months, 2026);
+    expect(snake.labels).toHaveLength(12);
+    expect(new Set(snake.labels.map((label) => label.y)).size).toBe(12);
   });
 });
