@@ -1084,6 +1084,7 @@ const pdfView = new PdfReaderView(viewPdf, {
       translate("Abrir PDF")
     ),
   confirmDelete: confirmPdfDeletion,
+  copyText: writeClipboardText,
 });
 const bibliographyView = new BibliographyView(viewBibliography, createBibliographyHost());
 const btnPdfToggleEditor = document.getElementById("pdf-toggle-editor") as HTMLButtonElement | null;

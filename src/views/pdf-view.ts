@@ -25,6 +25,8 @@ export interface PdfReaderHost {
   confirmOpenLinked(item: PdfListItem): Promise<boolean>;
   /** Pide confirmación antes de borrar un documento de la biblioteca. */
   confirmDelete(item: PdfListItem): Promise<boolean>;
+  /** Copia texto al portapapeles por el camino nativo de la app. */
+  copyText(text: string): Promise<void>;
 }
 
 interface PendingCapture {
@@ -654,7 +656,7 @@ export class PdfReaderView {
   private async copySelectedText(): Promise<void> {
     if (!this.selectedText) return;
     try {
-      await navigator.clipboard.writeText(this.selectedText);
+      await this.host.copyText(this.selectedText);
       this.setStatus("Texto copiado al portapapeles.");
     } catch {
       this.setStatus("No se pudo copiar el texto.");
