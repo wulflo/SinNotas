@@ -7572,10 +7572,16 @@ body.mobile-full-editor .flashcard-review-tools {
   fill: color-mix(in srgb, var(--heatmap-ink) 32%, transparent);
 }
 
-/* Todos los nudos son opacos: solo cambia cuánto acento reciben según los
- * días con repasos de esa semana (`--knot-fill`, 0–100 %). */
-.heatmap-quipu-knot {
-  fill: color-mix(in srgb, var(--ls-accent) var(--knot-fill, 0%), var(--heatmap-ink));
+/* Nudos vacíos: anillo siempre visible y relleno que crece desde el centro
+ * según los días con repasos de esa semana. */
+.heatmap-quipu-knot-ring {
+  fill: none;
+  stroke: color-mix(in srgb, var(--heatmap-ink) 78%, transparent);
+  stroke-width: 1.2;
+}
+
+.heatmap-quipu-knot-fill {
+  fill: var(--ls-accent);
 }
 
 /* Leyenda muda: cinco muestras de intensidad, sin texto nuevo que traducir. */
@@ -7609,15 +7615,6 @@ body.mobile-full-editor .flashcard-review-tools {
 
 .heatmap-cell[data-level="4"] {
   background: color-mix(in srgb, var(--heatmap-ink) 92%, transparent);
-}
-
-.flashcard-heatmap-summary {
-  display: flex;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  color: var(--ls-text-muted);
-  font-size: calc(9px * var(--ls-font-scale, 1));
 }
 
 .focus-tree-panel {

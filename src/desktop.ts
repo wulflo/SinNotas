@@ -904,7 +904,6 @@ const flashcardHeatmapStartInput = document.getElementById("flashcard-heatmap-st
 const flashcardHeatmapStyleSelect = document.getElementById("flashcard-heatmap-style-setting") as HTMLSelectElement;
 const flashcardHeatmapGrid = document.getElementById("flashcard-heatmap-grid") as HTMLDivElement;
 const flashcardHeatmapTotal = document.getElementById("flashcard-heatmap-total") as HTMLElement;
-const flashcardHeatmapFocus = document.getElementById("flashcard-heatmap-focus") as HTMLElement;
 const flashcardGrowthTree = document.querySelector<SVGSVGElement>("#flashcard-growth-tree")!;
 const flashcardTreeProgress = document.getElementById("flashcard-tree-progress") as HTMLSpanElement;
 const flashcardPointsBadge = document.getElementById("flashcard-points-badge") as HTMLSpanElement;
@@ -13049,7 +13048,6 @@ function updateFlashcardProgressTree(force = false): void {
 }
 
 function updateFlashcardProgressPanel(): void {
-  flashcardHeatmapFocus.textContent = translate("min de enfoque hoy").replace("{n}", String(Math.floor(flashcardProgressStats.focusSeconds / 60)));
   const points = Math.max(0, Math.floor(flashcardProgressStats.points));
   const pointsLabel = `${points} ${translate(points === 1 ? "pt" : "pts")}`;
   if (flashcardPointsBadge.textContent !== pointsLabel) flashcardPointsBadge.textContent = pointsLabel;
@@ -13112,16 +13110,28 @@ function renderFlashcardHeatmap(): void {
 
     thread.knots.forEach((knot) => {
       totalReviews += knot.daysStudied;
-      const circle = document.createElementNS(svgNS, "circle");
-      circle.setAttribute("cx", String(knot.x));
-      circle.setAttribute("cy", String(knot.y));
-      circle.setAttribute("r", "2.8");
-      circle.classList.add("heatmap-quipu-knot");
-      circle.style.setProperty("--knot-fill", `${Math.round(knot.intensity * 100)}%`);
+      const group = document.createElementNS(svgNS, "g");
+      group.classList.add("heatmap-quipu-knot");
+
+      const ring = document.createElementNS(svgNS, "circle");
+      ring.setAttribute("cx", String(knot.x));
+      ring.setAttribute("cy", String(knot.y));
+      ring.setAttribute("r", "4.5");
+      ring.classList.add("heatmap-quipu-knot-ring");
       const title = document.createElementNS(svgNS, "title");
       title.textContent = `${knot.weekStart}: ${knot.daysStudied}/7 ${translate("días con repasos")}`;
-      circle.appendChild(title);
-      svg.appendChild(circle);
+      ring.appendChild(title);
+      group.appendChild(ring);
+
+      // El nudo nace vacío y se llena desde el centro con el acento.
+      const fill = document.createElementNS(svgNS, "circle");
+      fill.setAttribute("cx", String(knot.x));
+      fill.setAttribute("cy", String(knot.y));
+      fill.setAttribute("r", (4.5 * knot.intensity).toFixed(2));
+      fill.classList.add("heatmap-quipu-knot-fill");
+      group.appendChild(fill);
+
+      svg.appendChild(group);
     });
   });
   flashcardHeatmapGrid.appendChild(svg);
