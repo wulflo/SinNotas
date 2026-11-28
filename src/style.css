@@ -7351,17 +7351,10 @@ body.mobile-full-editor .flashcard-review-tools {
 
 .pomodoro-clock {
   --pomodoro-focus-color: #a96870;
-  --pomodoro-countup-color: #668d74;
+  --pomodoro-countup-color: #6685a5;
   --pomodoro-break-color: #6685a5;
   --pomodoro-green-color: #668d74;
   --pomodoro-color: var(--pomodoro-focus-color);
-  /* El borde vira desde el color del modo hacia verde a medida que pasa el
-   * tiempo; `--pomodoro-elapsed` lo escribe el render (0–100 en ambos modos). */
-  --pomodoro-hue: color-mix(
-    in oklch,
-    var(--pomodoro-color) calc(100% - var(--pomodoro-elapsed, 0) * 1%),
-    var(--pomodoro-green-color) calc(var(--pomodoro-elapsed, 0) * 1%)
-  );
   position: relative;
   display: flex;
   width: 100%;
@@ -7378,8 +7371,9 @@ body.mobile-full-editor .flashcard-review-tools {
   text-align: center;
 }
 
-/* El progreso corre por el borde: franja gruesa con degradado y variación de
- * tono sobre una pista neutra. El centro queda transparente, no teñido. */
+/* El progreso corre por el borde: el arco nace en el color del modo y se
+ * tiñe de verde en la punta que avanza. Al empezar cada vuelta vuelve al
+ * color base. El centro queda transparente, no teñido. */
 .pomodoro-clock::before {
   content: "";
   position: absolute;
@@ -7388,13 +7382,11 @@ body.mobile-full-editor .flashcard-review-tools {
   border-radius: inherit;
   background: conic-gradient(
     from -90deg,
-    /* Mismo hue en todo el arco: solo se aclara hacia el verde de forma
-       gradual. Sin mezcla con el acento para evitar el salto a violeta. */
-    color-mix(in oklch, var(--pomodoro-hue) 88%, var(--pomodoro-green-color)) 0%,
-    var(--pomodoro-hue) calc(var(--pomodoro-progress) * 0.5%),
-    color-mix(in oklch, var(--pomodoro-hue) 82%, var(--pomodoro-green-color)) calc(var(--pomodoro-progress) * 1%),
-    color-mix(in oklch, var(--pomodoro-hue) 38%, transparent) calc(var(--pomodoro-progress) * 1%),
-    color-mix(in oklch, var(--pomodoro-hue) 24%, transparent) 100%
+    var(--pomodoro-color) 0%,
+    color-mix(in oklch, var(--pomodoro-color) 55%, var(--pomodoro-green-color)) calc(var(--pomodoro-progress) * 0.5%),
+    var(--pomodoro-green-color) calc(var(--pomodoro-progress) * 1%),
+    color-mix(in oklch, var(--pomodoro-green-color) 32%, transparent) calc(var(--pomodoro-progress) * 1%),
+    color-mix(in oklch, var(--pomodoro-color) 20%, transparent) 100%
   );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
