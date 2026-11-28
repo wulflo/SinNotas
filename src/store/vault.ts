@@ -18,6 +18,7 @@ import {
   splitDeckTitle,
 } from "../deck-title";
 import { normalizeBlockTypes, normalizeNotePath, normalizePage } from "./normalize-page";
+import { isStaleMutation } from "./epoch-guard";
 
 export const initialVaultPages: PageData[] = [
   {
@@ -789,6 +790,7 @@ export class VaultStore {
     const targets = pages.filter((page) => page.blocksLoaded === false);
     if (targets.length === 0) return;
     const paths = [...new Set(targets.map((page) => page.path))];
+    const epoch = this.mutationVersion;
     let loaded: PageData[];
     try {
       loaded = await readPagesCachedCmd(paths);
@@ -796,6 +798,7 @@ export class VaultStore {
       console.error("No se pudo rehidratar la nota desde la caché de Rust:", error);
       return;
     }
+    if (isStaleMutation(epoch, this.mutationVersion)) return;
     if (loaded.length === 0) return;
     this.loadedTick += 1;
     const activeRoot = this.activeRootPath;
@@ -1000,6 +1003,7 @@ export class VaultStore {
   public async renamePage(pageId: string, newTitle: string): Promise<boolean> {
     const page = this.pages.find((p) => p.id === pageId);
     if (!page) return false;
+    const epochBeforeHydration = this.mutationVersion;
 
     // Acepta `::`, `->`, `>` y otros alias, pero guarda siempre la flecha
     // canónica para que el nombre de archivo sea válido en todas las plataformas.
@@ -1021,6 +1025,7 @@ export class VaultStore {
     // conoce; si se hidratara después, el read fallaría como fichero inexistente).
     if (isMetadataOnlyBoot() && isTauri() && page.blocksLoaded === false) {
       await this.ensurePageLoaded(page);
+      if (isStaleMutation(epochBeforeHydration, this.mutationVersion)) return false;
     }
 
     const oldTitle = page.title;
@@ -1043,7 +1048,9 @@ export class VaultStore {
     // Update wikilinks across all pages, remembering which ones changed
     const oldPattern = new RegExp(`\\[\\[${oldTitle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\]\\]`, "g");
     const newLink = `[[${trimmed}]]`;
+    const epochBeforeLinkRewrite = this.mutationVersion;
     const changedPages = await this.rewriteRenameLinks(oldTitle, oldPattern, newLink, page);
+    if (isStaleMutation(epochBeforeLinkRewrite, this.mutationVersion)) return false;
 
     this.persist();
 
@@ -1140,8 +1147,10 @@ export class VaultStore {
   public async updateBlockContent(pageTitle: string, blockId: string, newContent: string): Promise<void> {
     let page = this.getPageByTitle(pageTitle);
     if (!page) return;
+    const epoch = this.mutationVersion;
     if (page.blocksLoaded === false && isTauri()) {
       await this.ensurePageLoaded(page, { pin: true });
+      if (isStaleMutation(epoch, this.mutationVersion)) return;
       page = this.getPageByTitle(pageTitle);
       if (!page || page.blocksLoaded === false) return;
     }
@@ -1161,8 +1170,10 @@ export class VaultStore {
   public async appendBlockToPage(pageTitle: string, content: string): Promise<boolean> {
     let page = this.getPageByTitle(pageTitle);
     if (!page) return false;
+    const epoch = this.mutationVersion;
     if (page.blocksLoaded === false && isTauri()) {
       await this.ensurePageLoaded(page, { pin: true });
+      if (isStaleMutation(epoch, this.mutationVersion)) return false;
       page = this.getPageByTitle(pageTitle);
       if (!page || page.blocksLoaded === false) return false;
     }
