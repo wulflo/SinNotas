@@ -166,14 +166,24 @@ export interface HeatmapQuipuThread {
   knots: HeatmapQuipuKnot[];
 }
 
-export interface HeatmapQuipuResult {
-  threads: HeatmapQuipuThread[];
+export interface HeatmapQuipuKnotSize {
+  width: number;
+  height: number;
+  radius: number;
 }
 
-const QUIPU_THREAD_START_X = 24;
-const QUIPU_STEP_X = 18;
-const QUIPU_KNOT_START_Y = 32;
-const QUIPU_KNOT_END_Y = 164;
+export interface HeatmapQuipuResult {
+  threads: HeatmapQuipuThread[];
+  knotSize: HeatmapQuipuKnotSize;
+}
+
+const QUIPU_THREAD_START_X = 32;
+const QUIPU_STEP_X = 16;
+const QUIPU_KNOT_START_Y = 34;
+const QUIPU_KNOT_END_Y = 158;
+const QUIPU_KNOT_WIDTH = 12.5;
+const QUIPU_KNOT_HEIGHT = 9.6;
+const QUIPU_KNOT_RADIUS = 2;
 
 function mondayKey(date: Date): string {
   const offset = (date.getDay() + 6) % 7;
@@ -221,7 +231,14 @@ export function buildReviewHeatmapQuipu(
     };
   });
 
-  return { threads };
+  return {
+    threads,
+    knotSize: {
+      width: QUIPU_KNOT_WIDTH,
+      height: QUIPU_KNOT_HEIGHT,
+      radius: QUIPU_KNOT_RADIUS,
+    },
+  };
 }
 
 export function defaultHeatmapStart(endDate: string, days = 90): string {

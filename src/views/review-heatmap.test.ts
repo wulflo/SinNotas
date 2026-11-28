@@ -122,6 +122,13 @@ describe("review heatmap — quipu semanal", () => {
     expect(new Set(quipu.threads.map((thread) => thread.x)).size).toBe(12);
   });
 
+  it("nudos rectangulares más grandes y menos separados", () => {
+    const quipu = buildReviewHeatmapQuipu(months, []);
+    expect(quipu.knotSize).toEqual({ width: 12.5, height: 9.6, radius: 2 });
+    const xs = quipu.threads.map((thread) => thread.x).sort((a, b) => a - b);
+    expect(xs[1] - xs[0]).toBe(16);
+  });
+
   it("incluye todas las semanas del año", () => {
     const quipu = buildReviewHeatmapQuipu(months, []);
     const total = quipu.threads.reduce((sum, thread) => sum + thread.knots.length, 0);

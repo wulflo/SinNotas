@@ -13110,10 +13110,13 @@ function renderFlashcardHeatmap(): void {
       const group = document.createElementNS(svgNS, "g");
       group.classList.add("heatmap-quipu-knot");
 
-      const ring = document.createElementNS(svgNS, "circle");
-      ring.setAttribute("cx", String(knot.x));
-      ring.setAttribute("cy", String(knot.y));
-      ring.setAttribute("r", "4");
+      const { width, height, radius } = quipu.knotSize;
+      const ring = document.createElementNS(svgNS, "rect");
+      ring.setAttribute("x", (knot.x - width / 2).toFixed(2));
+      ring.setAttribute("y", (knot.y - height / 2).toFixed(2));
+      ring.setAttribute("width", String(width));
+      ring.setAttribute("height", String(height));
+      ring.setAttribute("rx", String(radius));
       ring.classList.add("heatmap-quipu-knot-ring");
       const title = document.createElementNS(svgNS, "title");
       title.textContent = `${knot.weekStart}: ${knot.daysStudied}/7 ${translate("días con repasos")}`;
@@ -13121,10 +13124,12 @@ function renderFlashcardHeatmap(): void {
       group.appendChild(ring);
 
       // El nudo nace vacío y se llena desde el centro con el acento.
-      const fill = document.createElementNS(svgNS, "circle");
-      fill.setAttribute("cx", String(knot.x));
-      fill.setAttribute("cy", String(knot.y));
-      fill.setAttribute("r", (4 * knot.intensity).toFixed(2));
+      const fill = document.createElementNS(svgNS, "rect");
+      fill.setAttribute("x", (knot.x - (width * knot.intensity) / 2).toFixed(2));
+      fill.setAttribute("y", (knot.y - (height * knot.intensity) / 2).toFixed(2));
+      fill.setAttribute("width", (width * knot.intensity).toFixed(2));
+      fill.setAttribute("height", (height * knot.intensity).toFixed(2));
+      fill.setAttribute("rx", String(radius));
       fill.classList.add("heatmap-quipu-knot-fill");
       group.appendChild(fill);
 
