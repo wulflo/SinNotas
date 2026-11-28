@@ -13247,13 +13247,14 @@ function renderPomodoro(): void {
   const totalSeconds = Math.max(1, pomodoroActiveDurationSeconds());
   const elapsedSeconds = Math.max(0, Math.min(totalSeconds, totalSeconds - pomodoroRemainingSeconds));
   const progress = elapsedSeconds / totalSeconds;
-  const fillProgress = pomodoroCountUp ? progress : 1 - progress;
   const displayedSeconds = pomodoroCountUp ? elapsedSeconds : Math.max(0, pomodoroRemainingSeconds);
   const minutes = Math.floor(displayedSeconds / 60);
   const seconds = displayedSeconds % 60;
   const timeString = `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   pomodoroClockValue.textContent = timeString;
-  pomodoroClock.style.setProperty("--pomodoro-progress", String(fillProgress * 100));
+  // El verdiado del borde sigue siempre al tiempo transcurrido: en regresivo
+  // empieza rojo y se tiñe de verde, igual que en progresivo (azul → verde).
+  pomodoroClock.style.setProperty("--pomodoro-progress", String(progress * 100));
   pomodoroClock.classList.toggle("is-break", pomodoroMode === "break");
   pomodoroClock.classList.toggle("is-count-up", pomodoroCountUp);
   pomodoroClock.title = pomodoroCountUp
