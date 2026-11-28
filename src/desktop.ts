@@ -13032,7 +13032,7 @@ function updateFlashcardProgressTree(force = false): void {
   // Un grupo escalado agranda las tres variantes (protón, elemento y
   // molécula) sin rehacer sus coordenadas internas.
   const content = createSvgElement("g");
-  content.setAttribute("transform", "translate(80 70) scale(1.18) translate(-80 -70)");
+  content.setAttribute("transform", "translate(80 70) scale(1) translate(-80 -70)");
   tree.replaceChildren();
   tree.appendChild(content);
 
