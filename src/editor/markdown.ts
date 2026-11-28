@@ -393,6 +393,15 @@ function renderBlockContent(text: string, options: MarkdownRenderOptions): strin
 }
 
 /**
+ * Render de inline Markdown (negrita, cursiva, código, wikilinks…) listo para
+ * insertar en fragmentos de la UI. Pasa por DOMPurify igual que el contenido
+ * de las notas: el HTML de una nota nunca se inyecta sin saneado.
+ */
+export function renderInlineToSafeHtml(text: string): string {
+  return sanitizeHtml(renderInline(text, {}));
+}
+
+/**
  * Sanitiza cualquier HTML que vaya a inyectarse con `innerHTML`.
  *
  * `renderMarkdownToHtml` ya escapa el Markdown y aplica DOMPurify, pero esta

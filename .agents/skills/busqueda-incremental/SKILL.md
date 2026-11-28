@@ -9,9 +9,10 @@ Propósito: que un buscador con bóvedas grandes no congele la UI ni sature la m
 
 ## Reglas
 
-1. **Nunca montar un nodo por nota sin límite.** Si hay más resultados que la ventana, renderizar solo los primeros N y ofrecer «Mostrar más» o paginación.
+1. **Nunca montar un nodo por nota sin límite.** Si hay más resultados que la ventana, renderizar solo los primeros N y ofrecer «Mostrar más» o paginación. Aplica a **todas** las secciones del desplegable, no solo a la búsqueda de contenido.
    - Ejemplo: `REFERENCE_RESULTS_CHUNK = 20` en `desktop.ts` (`createReferenceNotePicker`).
    - Ejemplo: `FLASHCARD_PAGES_PER_PAGE = 20` para el árbol de mazos/notas.
+   - Omnibar: `TITLE_RESULTS_CHUNK = 10` (`appendTitleMatchChunk`) y `CONTENT_RESULTS_CHUNK = 10` (`appendContentHitChunk`), con botones propios «Mostrar más notas» / «Mostrar más resultados». El foco vuelve al input tras añadir la tanda.
 2. **Filtrar con límite y hacer debounce.** El `input` debe esperar ~100–150 ms antes de filtrar; pasar siempre un `limit` a la función de búsqueda.
    - Referencia: `ContentSearchIndex.search(query, limit = 25)` en `src/store/content-search.ts`.
 3. **Índice incremental, no reconstrucción por tecla.**
@@ -25,7 +26,7 @@ Propósito: que un buscador con bóvedas grandes no congele la UI ni sature la m
 
 ## Checklist de revisión
 
-- [ ] ¿El buscador tiene `limit` o ventana explícita?
+- [ ] ¿El buscador tiene `limit` o ventana explícita **en cada sección** (títulos y contenido)?
 - [ ] ¿Se evita `forEach` sobre todas las notas creando DOM?
 - [ ] ¿Hay debounce en el evento `input`?
 - [ ] ¿La lista usa `VirtualList` o paginación?
@@ -43,5 +44,6 @@ Propósito: que un buscador con bóvedas grandes no congele la UI ni sature la m
 | Lista virtual | `src/views/virtual-list.ts` |
 | Paginación por raíces de mazos | `src/views/flashcard-decks.ts`, `desktop.ts renderFlashcardPagesFilter` |
 | Buscador por tandas | `desktop.ts createReferenceNotePicker` |
+| Omnibar por tandas (títulos y contenido) | `desktop.ts appendTitleMatchChunk` / `appendContentHitChunk` (`TITLE_RESULTS_CHUNK`, `CONTENT_RESULTS_CHUNK`) |
 | Hidración por lotes | `src/store/vault.ts`, `src/views/flashcard-loader.ts` |
 | Mapa general | skill `estructure` → `references/Estructure.md` §5.2, §6.4, §7 |

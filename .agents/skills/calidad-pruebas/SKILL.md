@@ -13,7 +13,7 @@ Propósito: que cada cambio tenga una prueba que guarde una invariante real y qu
 
 ```bash
 npx tsc --noEmit
-npm test                 # 511 pruebas / 48 archivos en la última verificación
+npm test                 # 598 pruebas / 62 archivos en la última verificación (2026-11-27)
 npm run build
 cargo test --manifest-path src-tauri/Cargo.toml --lib
 git diff --check
@@ -27,6 +27,8 @@ git diff --check
 - **Aislamiento:** limpiar `localStorage` en `beforeEach`; restaurar preferencias (idioma, pestaña de ajustes) en `afterEach`; `vi.restoreAllMocks()` después de cada test con spies. Nada de estado mutable compartido entre tests.
 - Nombre descriptivo y patrón Arrange–Act–Assert; una aserción lógica por test; factories para datos complejos (`block()`, `page()`…).
 - Cubrir el caso normal **y** el límite: vacío, duplicado, nota con `::` sin espacios, selección con padre e hijo, orden de ramas disjuntas, error de guardado con rollback.
+- Invariantes de arranque: si el estado persistido puede estar vacío, probar el constructor con `localStorage.setItem(..., "[]")` además del dato corrupto (caso real: `VaultStore` + `currentPage.title` en `desktop.ts`). El test debe fallar antes del arreglo y verificar la invariante, no solo que no lance.
+- La misma invariante aplica **después** de cargar: `replaceVault([])` seguido de `ensureNonEmpty()` debe dejar una nota, y una bóveda no vacía no debe provocar escrituras. Probar ambos lados.
 - Si el cambio es en i18n, comprobar las tres claves (es/en/zh) con `translate()` tras `setLanguagePreference()`.
 
 ## 3. Rust (`src-tauri`)

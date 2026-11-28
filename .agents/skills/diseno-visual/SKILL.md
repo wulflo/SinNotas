@@ -37,6 +37,8 @@ Propósito: pasar de «se ve raro» a una crítica concreta y a un diff pequeño
 | Ocultar controles en móvil | `body.mobile-full-editor <selector> { display:none }` con ID para ganar especificidad sobre `material-aero.css`. |
 | Espaciado coherente de la sidebar | tokens `--ls-sidebar-*` en `:root` y `calc()` en las `@container`; la capa Aero reutiliza el token. |
 | Toolbars agrupadas | una sola fila con `overflow-x:auto`, separadores por contexto y botones de 28–44 px (ver `createTableToolbar`). |
+| Desplegable que no trunca | `.search-results-dropdown` crece con el viewport (`max-height: min(70vh, 520px)`; en landscape ancho `width: clamp(320px, 30vw, 440px)` y superposición con sombra). El fragmento envuelve hasta 4 líneas con `--ls-search-snippet-max-height` y ofrece «Ver bloque completo»; **no** usar `white-space:nowrap` + ellipsis para texto de apoyo. |
+| Sidebar: fijadas y estado vacío | Las fijadas se distinguen por negrita + icono de acento, **no** por el color del texto: `.sidebar-pinned .vault-tree-page-label` hereda el color de `.nav-item` (antes tenía `color:var(--ls-accent)` y `opacity:0.6`). Sin fijadas ni recientes, `.sidebar-empty-hint` da una pista en vez de dejar un hueco mudo. |
 
 ## 4. Errores frecuentes a evitar
 
@@ -45,6 +47,7 @@ Propósito: pasar de «se ve raro» a una crítica concreta y a un diff pequeño
 - Medir `offsetX/offsetY` en un contenedor transformado: usar `getBoundingClientRect()` de la imagen pintada.
 - Dejar un `<select>` nativo o un color hexadecimal nuevo en un control: ver `estilo-ui`.
 - Añadir texto nuevo sin `data-i18n` y sus entradas en es/en/zh: ver `traducciones-ui`.
+- Usar un selector descendiente que alcance HTML generado: `.search-dropdown-content strong` ponía en `display:block` las negritas del Markdown del snippet (una palabra por línea). El título se selecciona con `> strong` para no afectar al contenido.
 - Cambiar `touch-action:none` en un área de dibujo sin ofrecer otra forma de desplazarse.
 
 ## 5. Verificación final

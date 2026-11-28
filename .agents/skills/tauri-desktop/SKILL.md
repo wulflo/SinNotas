@@ -31,6 +31,7 @@ Propósito: que un cambio en la capa Tauri respete el modelo de permisos, el vau
 
 - `readImage`/`readText` del plugin no piden permiso al WebView; `navigator.clipboard.read()` sí lo pide en Windows/WebView2.
 - Toda lectura debe estar ligada a una acción del usuario. El menú contextual de Pegar debe usar el mismo camino que Ctrl+V (`pasteNativeClipboardImage`), no una API distinta.
+- Para **escribir** texto, usar `writeClipboardText()` de `desktop.ts`: en Tauri llama a `writeText` del plugin (declarado en `capabilities/default.json` como `clipboard-manager:allow-write-text`), luego Clipboard API y por último textarea + `execCommand`. No llamar a `navigator.clipboard.writeText` directamente en handlers: en WebView puede rechazarse sin promesa manejada y el botón parece no hacer nada (caso real del menú «Copiar enlace [[...]»).
 
 ## 5. Sistema de archivos
 

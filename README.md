@@ -5,7 +5,7 @@
   <p>A local-first, file-based outliner for notes, tasks, PDFs and spaced repetition.</p>
 
   <p>
-    <a href="https://github.com/wulflo/SinNotas/releases/tag/v0.5.8"><img src="https://img.shields.io/badge/version-0.5.8-4f7cff?style=flat-square" alt="Version 0.5.8"></a>
+    <a href="https://github.com/wulflo/SinNotas/releases/tag/v0.5.9"><img src="https://img.shields.io/badge/version-0.5.9-4f7cff?style=flat-square" alt="Version 0.5.9"></a>
     <a href="https://github.com/wulflo/SinNotas/actions/workflows/ci.yml"><img src="https://github.com/wulflo/SinNotas/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
     <img src="https://img.shields.io/badge/license-MIT-2ea44f?style=flat-square" alt="MIT license">
     <img src="https://img.shields.io/badge/platforms-Linux%20%7C%20Windows%20%7C%20macOS%20%7C%20Android-6b7280?style=flat-square" alt="Platforms">
@@ -21,7 +21,8 @@
     <a href="#-quick-start">Quick start</a> ·
     <a href="#-building-from-source">Build</a> ·
     <a href="CONTRIBUTING.md">Contributing</a> ·
-    <a href="docs/SinNotas.md">Documentation</a>
+    <a href="docs/SinNotas.md">Documentation</a> ·
+    <a href="README.es.md">Español</a>
   </p>
 </div>
 

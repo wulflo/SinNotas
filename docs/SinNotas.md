@@ -1,10 +1,28 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.5.8 · **Fecha:** 2026-11-26
+**Versión:** 0.5.9 · **Fecha:** 2026-11-27
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
 escritorio completa y una APK Android centrada en el repaso de flashcards.
+
+## Cambios en 0.5.9
+
+- Omnibar: el desplegable usa el ancho disponible en pantallas horizontales y
+  todo el ancho en verticales; los fragmentos se muestran en varias líneas con
+  Markdown saneado, resaltado dentro de la negrita y botón «Ver bloque completo».
+- Los resultados (títulos y contenido) se pintan en tandas de 10 con «Mostrar
+  más», sin montar un nodo por nota de golpe; se conserva el foco del teclado.
+- Sidebar: se quita el botón «Ver todas las notas» (la vista sigue en el mosaico
+  de navegación), el límite de recientes sube a 20, se elimina el encabezado
+  duplicado y el menú contextual de nota pasa a ser solo texto.
+- «Copiar enlace [[]]» usa el portapapeles nativo de Tauri con permiso acotado,
+  respaldo en web y aviso de éxito/error. Las notas fijadas mantienen el color
+  del texto de las recientes.
+- Arranque: la bóveda vacía (`[]` en web o carpeta vacía en Tauri) vuelve a
+  tener una nota activa (`VaultStore.ensureNonEmpty`), con pruebas de regresión.
+- README en inglés y español (`README.md` / `README.es.md`); skills e índice
+  técnico actualizados con los nuevos símbolos y patrones.
 
 ## Cambios en 0.5.8
 
@@ -599,22 +617,25 @@ la clave de release.
 ### Publicar una release sin errores
 
 El workflow de release se dispara **solo** con un tag que empiece por `v` y
-compara el número del tag con tres archivos. Para publicar la `0.2.9`:
+compara el número del tag con **cinco** archivos. El procedimiento completo está
+en [`docs/RELEASE.md`](./RELEASE.md). Para publicar la `0.5.9`:
 
 ```bash
-# 1. Las tres versiones deben ser idénticas
+# 1. Las cinco versiones deben ser idénticas
 node -p "require('./package.json').version"
 node -p "require('./src-tauri/tauri.conf.json').version"
 sed -n 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' src-tauri/Cargo.toml | head -n 1
+sed -n '/^name = "sin-notas"$/{n;s/^version = "\([^"]*\)".*/\1/p;}' src-tauri/Cargo.lock | head -n 1
+sed -n "s/^version: '\([^']*\)'.*/\1/p" snapcraft.yaml | head -n 1
 
 # 2. Commit y tag anotado sobre ese commit
 git add -A
-git commit -m "chore(release): preparar 0.2.9"
-git tag -a v0.2.9 -m "Sin Notas 0.2.9"     # el tag SIEMPRE lleva la v
+git commit -m "chore: release v0.5.9"
+git tag -a v0.5.9 -m "v0.5.9"              # el tag SIEMPRE lleva la v
 
 # 3. Empujar y comprobar que arrancó el workflow
 git push origin master
-git push origin v0.2.9
+git push origin v0.5.9
 gh run list --workflow=release.yml --limit 1
 ```
 
@@ -623,7 +644,7 @@ Puntos que causan el error de “número de release distinto” o `already_exist
 - **El tag no lleva `v`.** Un tag `0.2.8` no dispara `release.yml` (filtro
   `v*`), así que GitHub guarda una release sin artefactos y `latest.json`
   devuelve 404.
-- **El tag no coincide con las tres versiones.** El job `validate` falla antes
+- **El tag no coincide con las cinco versiones.** El job `validate` falla antes
   de compilar. El número de `latest.json` se genera sin la `v`; no se debe
   escribir a mano.
 - **La release se creó o guardó antes en la interfaz web.** Al pulsar
@@ -688,7 +709,7 @@ declara `runFullTrust`.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Última release publicada: `0.5.8` (`versionCode 5008`)
+- Última release publicada: `0.5.9` (`versionCode 5009`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):

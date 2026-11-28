@@ -2,8 +2,8 @@
 
 > **Índice técnico extremadamente detallado de Sin Notas.**
 >
-> Versión del código indexada: **0.5.6** (`package.json`, `src-tauri/tauri.conf.json`, `docs/SinNotas.md`).
-> Fecha del índice: **2026-11-26**.
+> Versión del código indexada: **0.5.9** (`package.json`), 2026-11-27.
+> Fecha del índice: **2026-11-27**. Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
 >
 > Este documento **no modifica ni describe cambios en el código**: es solo un mapa de referencia.
 > Responde a la pregunta _«¿dónde está la pieza que hace que funcione cada cosa?»_.
@@ -141,7 +141,7 @@
 
 | Líneas | Sección | Ids / selectores clave |
 | ---: | :--- | :--- |
-| 96–220 | Barra lateral izquierda | `.sidebar-left`, navegación, árbol de notas, búsqueda omnibar |
+| 96–220 | Barra lateral izquierda | `.sidebar-left`, navegación, `.pages-list` (cabeceras dinámicas `Fijadas` / `Recientes` + `.sidebar-empty-hint`; ya no hay encabezado estático ni `#sidebar-show-all-container`), búsqueda omnibar |
 | 221–317 | Headbar (barra superior) | título, navegación atrás/adelante, controles de ventana, Pomodoro compacto |
 | 318–392 | Ajustes → Apariencia | `data-settings-panel="appearance"` |
 | 393–676 | Ajustes → Flashcards | `data-settings-panel="flashcards"` (FSRS, mazos, atajos, orden de repaso) |
@@ -160,7 +160,7 @@
 | 1638–1675 | Modal de atajos | `#shortcuts-modal-overlay` |
 | 1676–1775 | Menú contextual de texto | `#custom-context-menu`, formatos, flashcards, headings, colores |
 | 1776–1817 | Menú contextual de bullet | `#bullet-context-menu` (tarea, fecha, mover, copiar, imagen, borrar) |
-| 1818–1841 | Menú contextual de nota (sidebar) | `#sidebar-context-menu` (abrir, renombrar, enlace, fijar, borrar) |
+| 1818–1841 | Menú contextual de nota (sidebar) | `#sidebar-context-menu` (abrir, renombrar, enlace, fijar, borrar). Sin `.menu-symbol`: solo texto. «Copiar enlace» usa `writeClipboardText()` → plugin `clipboard-manager.writeText` en Tauri (permiso `clipboard-manager:allow-write-text` en `capabilities/default.json`). |
 | 1874–1890 | Gestor de bóvedas | `#vault-manager-overlay`, `#vault-manager-list` |
 | 1891–1954 | Editor de oclusión de imagen | `#image-occlusion-overlay`, formas, alineación, distribución |
 | 1955–1961 | Toast y canvas de celebración | `#toast-notification`, `#celebration-canvas` |
@@ -352,6 +352,7 @@ Tecla 1/2/3/4 o botón → src/desktop.ts:13508 applyFSRSRating()
 | `page-icon.ts` | 20 | Icono SVG de nota/diario en color de acento. |
 | `pdf-view.ts` | 965 | Lector PDF: lista, render, texto, capturas. |
 | `reference-slot-state.ts` | 33 | Estado y botón de «ver referencia sin truncar». |
+| `snippet-highlight.ts` | ~110 | `highlightSnippetMatch(root, needle)`: envuelve en `<mark>` la coincidencia **después** de renderizar el Markdown. `createRenderedSnippet(text, query)`: renderiza el bloque completo, recorta con un `Range` sobre nodos de texto (16 chars antes / 80 después) y resalta; evita `**` sin cerrar y que el match quede fuera de las 4 líneas visibles. Test: `snippet-highlight.test.ts` (5 casos). |
 | `review-heatmap.ts` | 98 | Mapa de calor de repasos. |
 | `review-target.ts` | 108 | Resolución compartida de nota/bloque de una tarjeta y del diario. |
 | `virtual-list.ts` | 362 | Lista virtual reutilizable (offsets correctos tras medir filas). |
@@ -445,7 +446,7 @@ Los tipos FSRS (`FSRSItem`, `FSRSParameters`, `FSRSRating`, `CardState`) viven e
 | `sinnotas-revisions-migrated-v1` | `store/vault.ts:252` | Flag de migración de `chronos/`. |
 | `sinnotas-active-vault-root` / `-name` | `store/vault.ts:253-254` | Bóveda activa. |
 | `sinnotas-metadata-boot` | `store/vault.ts:256` | Arranque metadata-only. |
-| `sinnotas-recent-pages:<vaultPathKey>` | `desktop.ts:15107-15108` | Rutas recientes de la sidebar (consumidas por `sidebar-selection.ts`). |
+| `sinnotas-recent-pages:<vaultPathKey>` | `desktop.ts recentPagesStorageKey()` | Rutas de las **20** aperturas más recientes (`RECENT_PAGES_LIMIT = 20`, antes 10), consumidas por `sidebar-selection.ts`. |
 | `sinnotas-vault-registry-v1` | `desktop.ts:285` | Registro de bóvedas conocidas. |
 | `sinnotas-review-progress-v1` | `store/review-progress.ts:61` | Progreso de repaso en modo web. |
 | `sinnotas-review-device-id` | `store/review-progress.ts:62` | ID de dispositivo. |
@@ -463,7 +464,7 @@ Los tipos FSRS (`FSRSItem`, `FSRSParameters`, `FSRSRating`, `CardState`) viven e
 | `sinnotas-graph-settings` | `views/graph-settings.ts:4` | Física, tamaños, colores del grafo. |
 | `sinnotas-graph-node-colors` | `desktop.ts` | Colores personalizados de nodos. |
 | `sinnotas-last-view` / `sinnotas-last-page-id` | `desktop.ts:4547-4548` | Última vista y nota abierta. |
-| `sinnotas-recent-pages` | `desktop.ts:15107` (prefijo por bóveda) | Notas recientes. |
+| `sinnotas-recent-pages` | `desktop.ts recentPagesStorageKey()` (prefijo por bóveda) | Notas recientes (máx. 20). |
 | `sinnotas-all-pages-sort` / `-widths` | `views/all-pages-view.ts` | Orden y ancho (proporcional) de columnas de "Todas las páginas"; `applyAllPagesColumnWidths` ajusta siempre al ancho visible para evitar recortes a la derecha. |
 | `sinnotas-split-view`, `sinnotas-split-reference-page(s)`, `sinnotas-split-open` | `desktop.ts:16070-16073` | Vista dividida y notas de referencia. |
 | `sinnotas-pdf-editor-split` / `-ratio` | `desktop.ts:4756`, `4770` | Panel PDF+editor y proporción del separador. |
@@ -636,6 +637,11 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 
 **`initialVaultPages` (L28–248):** vault semilla de 4 notas (`p-welcome`, `p-journals`, `p-rust`, `p-flashcards`) con ejemplos de wikilinks, `#card`, `{{cloze }}`, `==resaltado==`, propiedades `::` y estados TODO/DONE/NOW/LATER.
 
+**Invariante «siempre hay una nota activa»:**
+- Modo **web**: el constructor trata `sinnotas-vault-v4 = "[]"` como bóveda no inicializada y usa `initialVaultPages`, igual que un JSON corrupto. Antes, un array vacío hacía que `desktop.ts` no arrancara (`lastValidPageTitle = currentPage.title` con `currentPage` undefined).
+- Modo **Tauri**: `replaceVault()` puede recibir `[]` (carpeta vacía, watcher que detecta borrado externo). `VaultStore.ensureNonEmpty()` crea `Nueva nota` **después** de fijar el root, para que el guardado vaya a la bóveda correcta. Lo llaman los tres puntos de carga de `desktop.ts`: cambio de bóveda, `synchronizeVaultFromDisk()` y arranque con `savedRootPath`. `mobile/review-app.ts` usa el patrón equivalente con las 4 notas semilla en el primer arranque de la APK.
+- Tests: `store/vault.test.ts` («constructor — bóveda web» y «ensureNonEmpty — vault vacío tras cargar»).
+
 **`isSafVaultRoot(rootPath)`:** detecta la raíz SAF serializada (`{"topTreeUri":"content://…"}`) para que las imágenes se lean por IPC (`read_image_data`) en vez de `join(root, rel)`. Test: `store/saf-root.test.ts`.
 
 **`isMetadataOnlyBoot()` (L272):** lee `sinnotas-metadata-boot`; `"off"` → false, cualquier otro valor o error → **true por defecto**. Es el interruptor del arranque rápido (FASE 4).
@@ -684,7 +690,8 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 - `search(query, limit=25)` (L221): tokeniza con AND (todos los tokens en el mismo bloque), suma apariciones (tope 20/token), guarda el mejor bloque por nota, ordena por `count` y limita.
 - `buildSnippet(text, index, matchLength)` (L295): `{before(40), match, after(80)}`, elipsis y colapso de espacios; se pinta con `textContent` + `<mark>`, nunca HTML.
 - `collectTextBlocks()` (L32) ignora imágenes pero recorre sus hijos; `visibleBlockText()` (L52) quita líneas `clave:: valor`.
-- Consumidores: `desktop.ts:98-106` (omnibar), `editor/note-search.ts:3`, `views/all-pages.ts:2`.
+- Consumidores: `desktop.ts` (omnibar), `editor/note-search.ts`, `views/all-pages.ts`.
+- **Omnibar (0.5.9):** `desktop.ts updateOmnibarDropdown` → `appendTitleMatchChunk` (`TITLE_RESULTS_CHUNK = 10`) y `renderContentResults` → `appendContentHitChunk` (`CONTENT_RESULTS_CHUNK = 10`), cada una con su botón «Mostrar más» (`search-dropdown-more-titles` / `-results`). El snippet se construye con `views/snippet-highlight.ts createRenderedSnippet` (renderiza el bloque completo con `editor/markdown.ts renderInlineToSafeHtml`, recorta por Range y resalta con `highlightSnippetMatch`). El bloque completo se abre con `renderMarkdownToHtml(visibleBlockText(...))`.
 
 ### 5.3 `flashcard-decks.ts` (578 líneas) + `flashcard-deck-storage.ts` (225)
 
@@ -735,7 +742,7 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | Fusión de mazos entre dispositivos | `store/flashcard-decks.ts:521` |
 | Mazo activo por bóveda | `store/flashcard-deck-storage.ts:21,155-176` |
 | Diario de repasos / undo por dispositivo | `store/review-progress.ts:18,43,360,422-475` |
-| Fijadas y recientes | `store/sidebar-selection.ts:12` |
+| Fijadas y recientes | `[S] store/sidebar-selection.ts selectSidebarPages` + `[D] desktop.ts renderSidebar / buildSidebarItem / touchRecentPage` (`RECENT_PAGES_LIMIT = 20`). Sin botón «Ver todas las notas»: la vista se abre desde `[D] #nav-all-pages`. Estado vacío: `Recientes` + `.sidebar-empty-hint`. |
 | Wikilinks salientes | `store/wikilinks.ts:28` |
 
 ---
@@ -897,6 +904,7 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | Archivo | Líneas | Banners / secciones (línea aprox.) |
 | :--- | ---: | :--- |
 | `style.css` | 9.787 | `:root` (1, tema oscuro y tokens `--ls-*`), `[data-theme=light]` (77), 12 acentos (128–261), TYPOGRAPHY MODES (263), COLLAPSIBLE SIDEBAR (319), Integrated Search & Omnibar (816), BÚSQUEDA DE CONTENIDO (923), MAIN WORKSPACE (1187), Top Headbar (1277), SETTINGS DROPDOWN (1661), CustomSelect (1702), selector de mazos (2395), mosaico de mazos (2415), árbol `--deck-depth` (2610), VIEWS CONTAINER (2773), CANVAS & OUTLINER (2786), OUTLINER BLOCKS (2951), MATH & CODE (3463), Tasks (3632), BACKLINKS (3757), CONTEXT MENUS (3837), KANBAN (4138), PAGE HISTORY (4538), Snapshots (4580/4637), CONCEPT MAP (4838), TOAST (4999), IMAGE OCCLUSION (5023), VAULT MANAGER (5076), SHORTCUTS (5856), oclusiones/zoom (6028), FLASHCARDS (6079), productividad (6671), APK editor completo (6695), GRAPH VIEW (7561), ajustes grafo (7589), ALL PAGES & JOURNALS (7881), GRAPH SETTINGS (8762), transiciones (8864), MÓVIL editor completo (8981), ACTUALIZACIONES (9058), sidebar en mosaico (9595). ~602 clases. |
+| Omnibar CSS (0.5.9) | `.search-results-dropdown` usa `max-height: min(70vh, 520px)` y, en `@media (min-width:900px) and (orientation:landscape)`, `width: clamp(320px, 30vw, 440px)` superpuesto al workspace. `.search-dropdown-snippet` envuelve a 4 líneas (`--ls-search-snippet-max-height: 5.8em`) sin ellipsis; `.is-expanded` lo abre. El título se selecciona con `.search-dropdown-content > strong` (nunca el descendiente, que convertiría en block las negritas del Markdown del snippet). Botones `.search-dropdown-expand`, `.search-dropdown-more`, `.search-dropdown-more-titles`. |
 | `material-aero.css` | 1.388 | Capa Material 3 sobre `style.css`: roles tonales (14), mapa `--md-*`→`--ls-*` (43), radio/desenfoco aero (87), BASE AERO (188), SUPERFICIES (245), NAVEGACIÓN M3 (395), BOTONES/CHIPS/INPUTS (548), FLOTANTES (667), TABLAS/DIARIOS (842), EDITOR (1010), FLASHCARDS/KANBAN/GRAFO (1068), MENÚS/MODALES (1122), MOVIMIENTO (1276), RESPONSIVE (1317), radios duros (1340), scrollbars (1382). |
 | `theme-lino.css` | 288 | Tema "Simple" (nombre interno `lino`): tapiz plano, `color-mix` desde `--ls-accent`, sin gradientes/glow. `:root[data-visual="lino"]` (26), neutralizar aero (142/156), tapiz (164), tablas (258), tarjetas (267). |
 | `theme-dracula.css` | 238 | `:root[data-visual="dracula"]` (14), paleta violeta/rosa/verde/cian/ámbar, variante diurna (85), neutralizar aero (143). |
@@ -1148,7 +1156,7 @@ Todas las acciones de terceros están pineadas a SHA; `npm ci --ignore-scripts`;
 | Guardado con debounce 300 ms | `[S] vault.ts:261,874,904` |
 | Renombrar y reescribir wikilinks | `[S] vault.ts:1011,1086` + `[R] lib.rs:5417` |
 | Bóvedas múltiples | `[D] desktop.ts:15237-15498` + `sinnotas-vault-registry-v1` |
-| Omnibar (buscar/crear nota) | `[D] desktop.ts:15499-15791` + `[S] content-search.ts` |
+| Omnibar (buscar/crear nota) | `[D] desktop.ts updateOmnibarDropdown / appendTitleMatchChunk / renderContentResults / appendContentHitChunk` + `[S] content-search.ts` + `[E] markdown.ts renderInlineToSafeHtml` + `[V] snippet-highlight.ts` |
 | Búsqueda de contenido en Rust | `[R] content_search.rs search_content`, `run_content_search` |
 | Diarios por fecha | `[S] vault.ts:1274` + `[D] views/journals-view.ts` |
 | Todas las páginas (orden/filtro columnas) | `[V] all-pages.ts` + `[D] views/all-pages-view.ts` |

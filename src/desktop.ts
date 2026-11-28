@@ -96,6 +96,7 @@ import { FlashcardDeckRepository } from "./store/flashcard-deck-storage";
 import { collectOutgoingLinks } from "./store/wikilinks";
 import { connectedPageTitles, referenceGraphPages } from "./views/graph-neighborhood";
 import { renderBacklinkSnippetHtml, wireBacklinkWikilinks } from "./views/backlink-render";
+import { createRenderedSnippet } from "./views/snippet-highlight";
 import { createPageIcon } from "./views/page-icon";
 import {
   configureJournalsView,
@@ -133,13 +134,12 @@ import {
 import { selectSidebarPages } from "./store/sidebar-selection";
 import {
   ContentSearchIndex,
-  buildSnippet,
   visibleBlockText,
   fold,
   locateMatch,
   type ContentHit,
 } from "./store/content-search";
-import { readImage as readClipboardImage, readText as readClipboardText } from "@tauri-apps/plugin-clipboard-manager";
+import { readImage as readClipboardImage, readText as readClipboardText, writeText as writeTauriClipboardText } from "@tauri-apps/plugin-clipboard-manager";
 import { convertFileSrc, invoke, isTauri } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { join } from "@tauri-apps/api/path";
@@ -770,7 +770,6 @@ const outgoingCountBadge = document.getElementById("outgoing-count") as HTMLSpan
 const sidebarLeft = document.getElementById("sidebar-left") as HTMLElement;
 const sidebarResizer = document.getElementById("sidebar-resizer") as HTMLElement;
 const sidebarPagesList = document.getElementById("sidebar-pages-list") as HTMLDivElement;
-const sidebarShowAllContainer = document.getElementById("sidebar-show-all-container") as HTMLDivElement | null;
 const sidebarSearchInput = document.getElementById("sidebar-search-input") as HTMLInputElement;
 const searchResultsDropdown = document.getElementById("search-results-dropdown") as HTMLDivElement;
 const pageTitleHeading = document.getElementById("page-title-heading") as HTMLHeadingElement;
@@ -7386,6 +7385,16 @@ function serializeBlockSubtree(block: BlockNode, depth = 0): string {
 }
 
 async function writeClipboardText(text: string): Promise<void> {
+  // En Tauri la Clipboard API del WebView puede rechazar la escritura; el
+  // plugin nativo es la ruta fiable (permiso `clipboard-manager:allow-write-text`).
+  if (isTauri()) {
+    try {
+      await writeTauriClipboardText(text);
+      return;
+    } catch (error) {
+      console.warn("El portapapeles nativo no está disponible; se intentará la API web:", error);
+    }
+  }
   try {
     if (navigator.clipboard?.writeText) {
       await navigator.clipboard.writeText(text);
@@ -12433,14 +12442,19 @@ document.getElementById("sctx-rename")?.addEventListener("click", async () => {
   }
 });
 
-document.getElementById("sctx-copy-link")?.addEventListener("click", () => {
+document.getElementById("sctx-copy-link")?.addEventListener("click", async () => {
   const pageTitle = sidebarContextPageTitle;
-  if (pageTitle) {
-    navigator.clipboard.writeText(`[[${pageTitle}]]`).then(() => {
-      showToast(`¡Enlace [[${pageTitle}]] copiado al portapapeles!`);
-    });
-  }
   hideAllContextMenus();
+  if (!pageTitle) return;
+  // navigator.clipboard no está disponible en todos los WebView: se usa el
+  // helper con respaldo (textarea + execCommand) y se avisa si falla.
+  try {
+    await writeClipboardText(`[[${pageTitle}]]`);
+    showToast(`${translate("Enlace copiado al portapapeles")}: [[${pageTitle}]]`);
+  } catch (error) {
+    console.warn("No se pudo copiar el enlace de la nota:", error);
+    showToast(translate("No se pudo copiar el enlace."));
+  }
 });
 
 document.getElementById("sctx-pin")?.addEventListener("click", async () => {
@@ -14694,8 +14708,8 @@ btnGraphShowAll?.addEventListener("click", clearGraphNeighborhood);
 const SIDEBAR_JOURNAL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M16 2v4M8 2v4M3 9h18"></path><path d="M8 13h3M8 17h6"></path></svg>';
 const SIDEBAR_PAGE_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6M8 13h8M8 17h8"></path></svg>';
 
-/** Máximo de notas en Recientes: las 10 aperturas más recientes. */
-const RECENT_PAGES_LIMIT = 10;
+/** Máximo de notas en Recientes: las 20 aperturas más recientes. */
+const RECENT_PAGES_LIMIT = 20;
 
 /**
  * Rutas de las últimas notas abiertas (la más reciente primero). Se guardar
@@ -14803,7 +14817,7 @@ function renderSidebar() {
     pinnedHeader.className = "sidebar-section-title";
     pinnedHeader.style.fontSize = scaledFontSize(11);
     pinnedHeader.style.opacity = "0.7";
-    pinnedHeader.textContent = translate("📌 Fijadas");
+    pinnedHeader.textContent = translate("Fijadas");
     sidebarPagesList.appendChild(pinnedHeader);
     pinned.forEach((page) => sidebarPagesList.appendChild(buildSidebarItem(page)));
   }
@@ -14816,23 +14830,20 @@ function renderSidebar() {
     recentHeader.textContent = translate("Recientes");
     sidebarPagesList.appendChild(recentHeader);
     recent.forEach((page) => sidebarPagesList.appendChild(buildSidebarItem(page)));
-  }
+  } else if (pinned.length === 0) {
+    // Bóveda sin fijadas ni recientes: se conserva la cabecera y una pista
+    // atenuada para que la zona no parezca un hueco sin explicación.
+    const recentHeader = document.createElement("div");
+    recentHeader.className = "sidebar-section-title";
+    recentHeader.style.fontSize = scaledFontSize(11);
+    recentHeader.style.opacity = "0.7";
+    recentHeader.textContent = translate("Recientes");
+    sidebarPagesList.appendChild(recentHeader);
 
-  // El botón vive en su propia fila, al final de la sección de páginas y
-  // justo encima del selector de bóveda, para que no se pierda al desplazar
-  // la lista larga de notas recientes.
-  if (sidebarShowAllContainer) sidebarShowAllContainer.replaceChildren();
-  const totalPages = vault.getPages().length;
-  if (totalPages > 0) {
-    const loadMore = document.createElement("button");
-    loadMore.className = "sidebar-load-more";
-    loadMore.type = "button";
-    loadMore.textContent = `${translate("Ver todas las notas")} (${totalPages})`;
-    loadMore.addEventListener("click", () => {
-      resetAllPagesPage();
-      switchView("all-pages");
-    });
-    (sidebarShowAllContainer ?? sidebarPagesList).appendChild(loadMore);
+    const emptyHint = document.createElement("div");
+    emptyHint.className = "sidebar-empty-hint";
+    emptyHint.textContent = translate("Abre una nota para verla aquí");
+    sidebarPagesList.appendChild(emptyHint);
   }
 }
 
@@ -15030,7 +15041,9 @@ async function openVaultAtPath(rootPath: string): Promise<void> {
     renderFlashcardHeatmap();
     await vault.migrateLegacyRevisions();
     await migrateLegacySnapshotFiles();
-    currentPage = snapshot.pages[0] || vault.createPage("Nueva nota");
+    // Un vault elegido puede estar vacío: se crea la nota activa dentro del
+    // vault ya sustituido para que no quede una referencia huérfana.
+    currentPage = vault.ensureNonEmpty() ?? snapshot.pages[0] ?? vault.getPages()[0];
     loadRecentPages();
     // Los mazos son por bóveda: recargar los del vault recién abierto.
     await refreshFlashcardDecksFromVault(true);
@@ -15100,6 +15113,10 @@ vaultManagerOverlay.addEventListener("click", (event) => {
 let selectedDropdownIndex = 0;
 let searchResultsCloseTimer: number | null = null;
 let searchResultsPendingClear = false;
+/** Títulos coincidentes: también se pintan por tandas (bóvedas grandes). */
+const TITLE_RESULTS_CHUNK = 10;
+let titleMatches: PageData[] = [];
+let titleMatchesShown = 0;
 
 function openSearchResults(): void {
   if (searchResultsCloseTimer !== null) {
@@ -15189,8 +15206,30 @@ function updateOmnibarDropdown() {
     searchResultsDropdown.appendChild(createItem);
   }
 
-  // 2. Matching existing pages
-  matches.forEach((m) => {
+  // 2. Matching existing pages (en tandas, como los resultados de contenido).
+  appendTitleMatchChunk(matches);
+
+  highlightDropdownItem(0);
+  // Resultados "En el contenido": con debonce para no competir con los
+  // resultados por título (que pintan al instante).
+  scheduleContentSearch(query);
+}
+
+/**
+ * Pinta la siguiente tanda de notas cuyo título coincide. Con `reset` se
+ * reemplaza la lista completa al cambiar la consulta; si no, solo se añaden
+ * nuevas filas. Nunca se crea un nodo por nota de golpe.
+ */
+function appendTitleMatchChunk(reset: PageData[] | null = null): void {
+  if (reset) {
+    titleMatches = reset;
+    titleMatchesShown = 0;
+  }
+  const contentHeader = searchResultsDropdown.querySelector(".search-dropdown-content-title");
+  const end = Math.min(titleMatchesShown + TITLE_RESULTS_CHUNK, titleMatches.length);
+
+  for (let i = titleMatchesShown; i < end; i++) {
+    const m = titleMatches[i];
     const item = document.createElement("div");
     item.className = "search-dropdown-item";
     const pageLabel = pageDisplayTitle(m);
@@ -15213,13 +15252,26 @@ function updateOmnibarDropdown() {
       closeSearchResults(true);
       loadPage(m.title);
     });
-    searchResultsDropdown.appendChild(item);
-  });
+    if (contentHeader) searchResultsDropdown.insertBefore(item, contentHeader);
+    else searchResultsDropdown.appendChild(item);
+  }
+  titleMatchesShown = end;
 
-  highlightDropdownItem(0);
-  // Resultados "En el contenido": con debonce para no competir con los
-  // resultados por título (que pintan al instante).
-  scheduleContentSearch(query);
+  searchResultsDropdown.querySelector(".search-dropdown-more-titles")?.remove();
+  if (titleMatchesShown < titleMatches.length) {
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "search-dropdown-item search-dropdown-more search-dropdown-more-titles";
+    more.textContent = `${translate("Mostrar más notas")} (${titleMatches.length - titleMatchesShown})`;
+    more.addEventListener("click", (event) => {
+      event.stopPropagation();
+      appendTitleMatchChunk();
+      sidebarSearchInput.focus();
+      highlightDropdownItem(selectedDropdownIndex);
+    });
+    if (contentHeader) searchResultsDropdown.insertBefore(more, contentHeader);
+    else searchResultsDropdown.appendChild(more);
+  }
 }
 
 /* ==================== BÚSQUEDA DE CONTENIDO (OMNIBAR) ==================== */
@@ -15229,6 +15281,11 @@ const contentSearchIndex = new ContentSearchIndex();
 let contentSearchTimer: number | null = null;
 /** Identifica la búsqueda en curso: solo la última respuesta del backend pinta. */
 let contentSearchRun = 0;
+/** Resultados de contenido: se pintan por tandas para no montarlos todos. */
+const CONTENT_RESULTS_CHUNK = 10;
+let contentHits: ContentHit[] = [];
+let contentHitsShown = 0;
+let contentHitsQuery = "";
 
 function cancelScheduledContentSearch(): void {
   if (contentSearchTimer !== null) {
@@ -15292,45 +15349,111 @@ function renderContentResults(query: string, hits: ContentHit[]): void {
   if (searchResultsCloseTimer !== null) return;
   if (!searchResultsDropdown.classList.contains("visible")) return;
 
+  contentHits = hits;
+  contentHitsShown = 0;
+  contentHitsQuery = query;
+
   const header = document.createElement("div");
   header.className = "sidebar-section-title search-dropdown-content-title";
   header.textContent = `${translate("En el contenido")} (${hits.length})`;
   searchResultsDropdown.appendChild(header);
 
-  hits.forEach((hit) => {
+  appendContentHitChunk();
+
+  // Reaplica la selección vigente para que flechas y Enter funcionen también
+  // sobre los resultados de contenido (y sobre «Mostrar más»).
+  highlightDropdownItem(selectedDropdownIndex);
+}
+
+/**
+ * Añade la siguiente tanda de resultados de contenido al desplegable. Quita el
+ * botón anterior y lo vuelve a poner si quedan hits, de modo que nunca se
+ * montan más de `CONTENT_RESULTS_CHUNK` nuevos nodos por interacción.
+ */
+function appendContentHitChunk(): void {
+  searchResultsDropdown.querySelector(".search-dropdown-more-results")?.remove();
+
+  const end = Math.min(contentHitsShown + CONTENT_RESULTS_CHUNK, contentHits.length);
+  for (let i = contentHitsShown; i < end; i++) {
+    const hit = contentHits[i];
     const item = document.createElement("div");
     item.className = "search-dropdown-item search-dropdown-content";
 
     const title = document.createElement("strong");
     title.textContent = hit.page.title.replace(/^(?:diario|journal)\s+/i, "");
 
-    // El índice del hit apunta al texto plegado: el fragmento solo se resalta
-    // si el plegado no cambió la longitud; si la cambió, se muestra el inicio
-    // del bloque sin resaltado.
-    const text = visibleBlockText(hit.block.content);
-    const snippet =
-      fold(text).length === text.length
-        ? buildSnippet(text, hit.index, hit.matchLength)
-        : buildSnippet(text, 0, 0);
+    // Se renderiza el bloque COMPLETO y se recorta ya en el DOM: recortar el
+    // Markdown antes de renderizar dejaba `**` sin cerrar y negritas cruzadas.
+    const excerpt = createRenderedSnippet(
+      visibleBlockText(hit.block.content),
+      contentHitsQuery
+    );
 
-    const excerpt = document.createElement("span");
-    excerpt.className = "search-dropdown-snippet";
-    excerpt.append(snippet.before);
-    if (snippet.match) {
-      const mark = document.createElement("mark");
-      mark.textContent = snippet.match;
-      excerpt.append(mark);
-    }
-    excerpt.append(snippet.after);
+    const expand = document.createElement("button");
+    expand.type = "button";
+    expand.className = "search-dropdown-expand";
+    expand.textContent = translate("Ver bloque completo");
+    expand.hidden = true;
+    expand.addEventListener("click", (event) => {
+      event.stopPropagation();
+      toggleFullContentBlock(item, hit, expand);
+    });
 
-    item.append(title, excerpt);
-    item.addEventListener("click", () => openContentHit(hit, query));
+    item.append(title, excerpt, expand);
+    item.addEventListener("click", () => openContentHit(hit, contentHitsQuery));
     searchResultsDropdown.appendChild(item);
-  });
+  }
+  contentHitsShown = end;
 
-  // Reaplica la selección vigente para que flechas y Enter funcionen también
-  // sobre los resultados de contenido.
-  highlightDropdownItem(selectedDropdownIndex);
+  if (contentHitsShown < contentHits.length) {
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "search-dropdown-item search-dropdown-more search-dropdown-more-results";
+    more.textContent = `${translate("Mostrar más resultados")} (${contentHits.length - contentHitsShown})`;
+    more.addEventListener("click", (event) => {
+      event.stopPropagation();
+      appendContentHitChunk();
+      // El foco vuelve al input: las flechas siguen recorriendo la lista.
+      sidebarSearchInput.focus();
+      highlightDropdownItem(selectedDropdownIndex);
+    });
+    searchResultsDropdown.appendChild(more);
+  }
+
+  // El botón «Ver bloque completo» solo aparece si el fragmento se recortó.
+  requestAnimationFrame(refineContentSnippets);
+}
+
+/** Muestra u oculta el bloque completo dentro del propio resultado. */
+function toggleFullContentBlock(
+  item: HTMLElement,
+  hit: ContentHit,
+  button: HTMLButtonElement
+): void {
+  const existing = item.querySelector<HTMLElement>(".search-dropdown-full-block");
+  if (existing) {
+    existing.remove();
+    item.classList.remove("is-expanded");
+    button.textContent = translate("Ver bloque completo");
+    return;
+  }
+  const full = document.createElement("div");
+  full.className = "search-dropdown-full-block";
+  full.innerHTML = renderMarkdownToHtml(visibleBlockText(hit.block.content));
+  item.appendChild(full);
+  item.classList.add("is-expanded");
+  button.textContent = translate("Ocultar bloque");
+  requestAnimationFrame(refineContentSnippets);
+}
+
+/** Ajusta la visibilidad de «Ver bloque completo» tras medir el fragmento. */
+function refineContentSnippets(): void {
+  searchResultsDropdown.querySelectorAll<HTMLElement>(".search-dropdown-content").forEach((item) => {
+    const snippet = item.querySelector<HTMLElement>(".search-dropdown-snippet");
+    const button = item.querySelector<HTMLButtonElement>(".search-dropdown-expand");
+    if (!snippet || !button) return;
+    button.hidden = !item.classList.contains("is-expanded") && snippet.scrollHeight <= snippet.clientHeight + 1;
+  });
 }
 
 /**
@@ -16461,6 +16584,9 @@ async function synchronizeVaultFromDisk(options: { notify?: boolean; force?: boo
     const activePagePath = currentPage.path;
     clearResolvedImages();
     vault.replaceVault(snapshot.pages, snapshot.rootPath, snapshot.vaultName);
+    // Si el watcher detectó que el disco se vació, se crea una nota en el vault
+    // nuevo; si no, ensureNonEmpty no escribe nada.
+    vault.ensureNonEmpty();
     flashcardLoader.invalidate();
     // El vault se recargó: releeer recientes para descartar rutas que dejaron
     // de existir en disco.
@@ -16619,8 +16745,11 @@ async function initializeNativeVault(): Promise<void> {
       vault.replaceVault(snapshot.pages, snapshot.rootPath, snapshot.vaultName);
       flashcardLoader.invalidate();
       // La migración de revisiones se hace después del primer pintado.
-      if (snapshot.pages.length === 0) currentPage = vault.createPage("Nueva nota");
-      else currentPage = vault.getPageByTitle(currentPage.title) || snapshot.pages[0];
+      currentPage =
+        vault.ensureNonEmpty() ??
+        vault.getPageByTitle(currentPage.title) ??
+        snapshot.pages[0] ??
+        vault.getPages()[0];
       registerKnownVault(snapshot.rootPath, snapshot.vaultName);
       if (snapshot.skipped && snapshot.skipped.length > 0) {
         showToast(`Se omitieron ${snapshot.skipped.length} notas (errores de lectura/permisos/tamaño).`);

@@ -67,6 +67,18 @@ se mueve, aparecerá una pantalla para volver a elegirla.
 - También puedes usar el botón **+** de la barra lateral o el menú contextual.
 - El título de la página es editable y también define el nombre del archivo.
 
+### Buscar y abrir notas
+
+- El buscador de la barra lateral muestra primero las notas cuyo título coincide
+  y, debajo, **En el contenido**, con fragmentos del texto de las notas.
+- En pantallas anchas el desplegable se abre sobre el editor para que el
+  fragmento no se corte; en pantallas estrechas ocupa todo el ancho disponible.
+- Los resultados aparecen en tandas de 10: **Mostrar más notas** y
+  **Mostrar más resultados** añaden los siguientes sin borrar los anteriores.
+- Si un fragmento supera cuatro líneas, **Ver bloque completo** lo despliega
+  dentro del propio desplegable. Las flechas y **Enter** siguen funcionando y
+  **Esc** lo cierra.
+
 Las notas nuevas se guardan automáticamente. Los cambios de texto se escriben
 en disco con una pequeña demora para no bloquear la escritura.
 
@@ -90,6 +102,11 @@ pero no necesitas editarla a mano.
 ### Barra lateral
 
 - Lista las páginas de la bóveda y permite crear, buscar, renombrar y eliminar.
+- Muestra hasta **20 páginas recientes**; si no hay fijadas ni recientes, aparece
+  una pista para abrir una nota. Para ver el listado completo de páginas, usa el
+  icono **Todas las páginas** del mosaico de navegación.
+- El menú contextual de una nota ofrece solo texto: abrir, renombrar, copiar
+  enlace `[[...]]`, fijar/desfijar y eliminar.
 - **Ctrl/Cmd + B** la colapsa o la expande.
 - En escritorio puedes arrastrar su borde para cambiar el ancho.
 - El menú contextual de una nota ofrece renombrar, eliminar, abrir historial y

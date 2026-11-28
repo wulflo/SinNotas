@@ -59,6 +59,9 @@
   --ls-sidebar-search-gap-top: 10px;
   --ls-sidebar-search-pad-top: 18px;
   --ls-sidebar-search-pad-bottom: 14px;
+  /* Omnibar: fragmentos multilínea y panel que crece con el viewport. */
+  --ls-search-snippet-max-height: 5.8em; /* 4 líneas × 1.45 */
+  --ls-search-snippet-line-height: 1.45;
   --ls-sidebar-nav-gap: 10px;
   /* Rediseño: radios y altura de los controles de la barra lateral. */
   --ls-sidebar-radius: 10px;
@@ -896,7 +899,10 @@ body.sidebar-resizing * {
   top: calc(100% + 6px);
   left: 0;
   width: 100%;
-  max-height: 260px;
+  /* Antes 260 px fijos: incluso con pocos resultados la lista ya scrolleaba. */
+  max-height: min(70vh, 520px);
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   background-color: var(--ls-menu-bg);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -956,31 +962,42 @@ body.sidebar-resizing * {
   color: var(--ls-text-muted);
 }
 
-/* Resultado de contenido: título y fragmento apilados en dos líneas. */
+/* Resultado de contenido: título y fragmento apilados; el texto se ajusta al
+   ancho del panel en lugar de recortarse con ellipsis de una sola línea. */
 .search-dropdown-content {
   display: block;
   white-space: normal;
+  padding: 8px 10px;
+  overflow-wrap: anywhere;
 }
 
-.search-dropdown-content strong {
+/* Solo el TÍTULO de la fila: las negritas del Markdown del fragmento deben
+   seguir siendo inline (si no, cada `**palabra**` salta a su propia línea). */
+.search-dropdown-content > strong {
   display: block;
   color: var(--ls-text-title);
   font-weight: 600;
   font-size: var(--ls-font-size-ui);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
 }
 
 .search-dropdown-snippet {
   display: block;
-  margin-top: 2px;
+  margin-top: 3px;
   color: var(--ls-text-secondary);
   font-size: calc(11px * var(--ls-font-scale, 1));
-  line-height: 1.35;
+  line-height: var(--ls-search-snippet-line-height);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  /* Tope de 4 líneas; el botón «Ver bloque completo» revela el resto. */
+  max-height: var(--ls-search-snippet-max-height);
+}
+
+.search-dropdown-item.is-expanded .search-dropdown-snippet {
+  max-height: none;
 }
 
 .search-dropdown-snippet mark,
@@ -989,6 +1006,83 @@ body.sidebar-resizing * {
   color: var(--ls-accent);
   border-radius: 3px;
   padding: 0 2px;
+}
+
+/* Acciones dentro del desplegable: abrir el bloque completo y pedir la
+   siguiente tanda de resultados (ambas con foco visible y targets cómodos). */
+.search-dropdown-expand {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: var(--ls-accent);
+  font: inherit;
+  font-size: calc(10.5px * var(--ls-font-scale, 1));
+  cursor: pointer;
+}
+
+.search-dropdown-expand[hidden] {
+  display: none;
+}
+
+.search-dropdown-expand:hover,
+.search-dropdown-expand:focus-visible {
+  text-decoration: underline;
+}
+
+.search-dropdown-full-block {
+  margin-top: 6px;
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--ls-accent-subtle);
+  color: var(--ls-text-secondary);
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  line-height: var(--ls-search-snippet-line-height);
+  max-height: 40vh;
+  overflow: auto;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.search-dropdown-more {
+  width: 100%;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 2px;
+  padding: 9px 10px;
+  border: 0;
+  border-top: 1px solid var(--ls-border-subtle);
+  border-radius: 0;
+  background: none;
+  color: var(--ls-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.search-dropdown-more:focus-visible {
+  outline: 2px solid var(--ls-accent);
+  outline-offset: -2px;
+}
+
+/* En pantalla horizontal ancha el panel se sale de la sidebar y se superpone
+   al workspace (sin empujarlo); en vertical estrecha conserva el ancho. */
+@media (min-width: 900px) and (orientation: landscape) {
+  .search-results-dropdown {
+    width: clamp(320px, 30vw, 440px);
+    max-height: min(78vh, 640px);
+  }
+}
+
+@media (max-width: 640px), (orientation: portrait) {
+  .search-dropdown-item {
+    min-height: 44px;
+  }
+
+  .search-dropdown-content {
+    padding: 10px;
+  }
 }
 
 .sidebar-nav {
@@ -9264,32 +9358,13 @@ body.mobile-full-editor .flashcard-review-tools {
   background: linear-gradient(135deg, #61afef 50%, #e5c07b 50%);
 }
 
-.sidebar-show-all-row {
-  flex: 0 0 auto;
-  padding: 8px 10px 10px;
-}
-
-.sidebar-load-more {
-  display: block;
-  width: 100%;
-  padding: 6px 10px;
-  margin: 0;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
+/* Pista cuando no hay fijadas ni recientes: misma jerarquía que una fila
+   desactivada, sin parecer un botón ni ocupar un objetivo táctil. */
+.sidebar-empty-hint {
+  padding: 6px 16px 10px;
   color: var(--ls-text-muted);
-  font-size: calc(12px * var(--ls-font-scale, 1));
-  cursor: pointer;
-  transition: color 0.15s;
-}
-.sidebar-load-more:hover {
-  color: var(--ls-accent);
-  text-decoration: underline;
-}
-.sidebar-load-more:focus-visible {
-  outline: 1px solid var(--ls-accent);
-  outline-offset: 2px;
+  font-size: calc(11px * var(--ls-font-scale, 1));
+  line-height: 1.4;
 }
 
 .table-pagination {
@@ -9328,18 +9403,13 @@ body.mobile-full-editor .flashcard-review-tools {
   text-align: center;
 }
 
+/* Las fijadas se distinguen por la negrita y por el icono de acento, no por
+   el color del texto: el nombre debe verse igual que el de las recientes. */
 .sidebar-pinned .vault-tree-page-label {
   font-weight: 700;
-  color: var(--ls-accent);
 }
 .sidebar-pinned .vault-tree-page-icon {
   color: var(--ls-accent);
-}
-.sidebar-pinned {
-  opacity: 0.6;
-}
-.sidebar-pinned .vault-tree-page-label {
-  font-weight: 700;
 }
 
 /*
@@ -10459,11 +10529,6 @@ body.editor-split-active #view-editor .canvas-wrapper {
     min-height: 44px;
   }
 
-  .sidebar-load-more {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
 }
 
 /* Modo riel: el botón de repaso pasa a icono para dejar más sitio al nombre y

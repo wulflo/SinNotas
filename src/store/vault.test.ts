@@ -33,6 +33,64 @@ function saveCalls(): Array<{ filePath: string; blocks: BlockNode[] }> {
     .map((call) => call[1] as { filePath: string; blocks: BlockNode[] });
 }
 
+describe("VaultStore constructor — bóveda web", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    invokeMock.mockReset();
+    runtime.tauri = false;
+  });
+
+  afterEach(() => {
+    runtime.tauri = false;
+    vi.clearAllMocks();
+  });
+
+  it("siembra las notas iniciales cuando el guardado es un array vacío", () => {
+    localStorage.setItem("sinnotas-vault-v4", "[]");
+    const vault = new VaultStore();
+    expect(vault.getPages().length).toBeGreaterThan(0);
+    expect(vault.getPageByTitle("Welcome to SinNotas")).toBeDefined();
+  });
+
+  it("conserva una bóveda guardada que sí tiene notas", () => {
+    localStorage.setItem("sinnotas-vault-v4", JSON.stringify([page("a")]));
+    const vault = new VaultStore();
+    expect(vault.getPages().map((p) => p.id)).toEqual(["a"]);
+  });
+});
+
+describe("VaultStore.ensureNonEmpty — vault vacío tras cargar", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    invokeMock.mockReset();
+    invokeMock.mockResolvedValue(undefined);
+    runtime.tauri = true;
+  });
+
+  afterEach(() => {
+    runtime.tauri = false;
+    vi.clearAllMocks();
+  });
+
+  it("crea una nota cuando replaceVault deja la bóveda vacía", () => {
+    const vault = new VaultStore();
+    vault.replaceVault([], "/vault", "Demo");
+
+    const created = vault.ensureNonEmpty();
+
+    expect(created?.title).toBe("Nueva nota");
+    expect(vault.getPages().map((p) => p.id)).toEqual([created?.id]);
+  });
+
+  it("no crea nada si la bóveda ya tiene notas", () => {
+    const vault = new VaultStore();
+    vault.replaceVault([page("a")], "/vault", "Demo");
+
+    expect(vault.ensureNonEmpty()).toBeNull();
+    expect(vault.getPages().map((p) => p.id)).toEqual(["a"]);
+  });
+});
+
 describe("VaultStore.scheduleSavePage — debounce por nota", () => {
   beforeEach(() => {
     localStorage.clear();

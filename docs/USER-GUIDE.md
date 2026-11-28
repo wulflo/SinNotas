@@ -65,6 +65,17 @@ screen appears so you can choose it again.
 - You can also use the **+** button in the sidebar or the context menu.
 - The page title is editable and also defines the file name.
 
+### Finding and opening notes
+
+- The sidebar search shows pages whose title matches first and, below them,
+  **In page content** with snippets of the notes' text.
+- On wide screens the dropdown opens over the editor so snippets are not cut
+  off; on narrow screens it uses the full available width.
+- Results appear in batches of 10: **Show more pages** and **Show more results**
+  append the next batch without clearing the previous ones.
+- If a snippet is longer than four lines, **View full block** expands it inside
+  the dropdown. Arrow keys and **Enter** still work, and **Esc** closes it.
+
 New notes are saved automatically. Text changes are written to disk with a short
 delay so typing is not blocked.
 
@@ -88,6 +99,11 @@ edit it by hand.
 ### Sidebar
 
 - Lists the vault pages and lets you create, search, rename and delete them.
+- Shows up to **20 recent pages**; when there are no pinned or recent pages it
+  shows a hint to open a page. For the full list, use the **All pages** icon in
+  the navigation grid.
+- A page's context menu is text-only: open, rename, copy `[[...]]` link,
+  pin/unpin and delete.
 - **Ctrl/Cmd + B** collapses or expands it.
 - On desktop you can drag its edge to change the width.
 - The context menu of a note offers rename, delete, open history and other

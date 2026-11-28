@@ -463,7 +463,11 @@ export class VaultStore {
       const saved = localStorage.getItem(VAULT_STORAGE_KEY);
       if (saved) {
         try {
-          this.pages = JSON.parse(saved);
+          const parsed: unknown = JSON.parse(saved);
+          // Un array vacío no es una bóveda válida: `desktop.ts` necesita una
+          // nota activa desde el arranque (currentPage.title). Se trata como
+          // dato no inicializado, igual que un JSON corrupto.
+          this.pages = Array.isArray(parsed) && parsed.length > 0 ? parsed : initialVaultPages;
         } catch {
           this.pages = initialVaultPages;
         }
@@ -1262,6 +1266,17 @@ export class VaultStore {
       blocks: cloneTree(restored.blocks),
       frontmatter: [...restored.frontmatter],
     };
+  }
+
+  /**
+   * Garantiza que la bóveda tenga al menos una nota después de una carga.
+   * Un vault vacío en disco (o un snapshot vacío) dejaría `currentPage` sin
+   * nota real en el escritorio. Devuelve la nota creada, o `null` si ya
+   * existía alguna y no hubo que escribir nada.
+   */
+  public ensureNonEmpty(title = "Nueva nota"): PageData | null {
+    if (this.pages.length > 0) return null;
+    return this.createPage(title);
   }
 
   public createPage(title: string): PageData {
