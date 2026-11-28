@@ -1,10 +1,30 @@
 # SinNotas — guía técnica y estado
 
-**Versión:** 0.5.9 · **Fecha:** 2026-11-27
+**Versión:** 0.5.10 · **Fecha:** 2026-11-28
 
 SinNotas es una aplicación local de notas tipo outliner jerárquico. Las páginas
 se guardan como Markdown dentro de una bóveda (vault). Tiene una aplicación de
 escritorio completa y una APK Android centrada en el repaso de flashcards.
+
+## Cambios en 0.5.10
+
+- **Contratos y normalización:** adaptador tipado para `invoke` en `src/tauri/commands.ts`
+  (bóveda, progreso y mazos), `normalizePage()` como único ingress de `PageData` y
+  guards de epoch para descartar mutaciones asíncronas obsoletas. Se corrigió un
+  contrato roto real: Rust serializa `Backlink` en `source_page` y `vault.ts`
+  leía `sourcePage`.
+- **Arranque y repaso:** decisiones puras extraídas a `boot-invariants.ts` para
+  evitar la nota vacía hasta pulsar «+»; confirmación antes de entrar en Repaso
+  desde escritorio.
+- **Interfaz:** matriz de 6 estilos/temas verificada, píldora del Pomodoro con
+  fondo transparente, quipu con nudos rectangulares centrados y cordel
+  segmentado; grafo centrado en el canvas con bóvedas pequeñas sin romper el
+  zoom/pan del usuario.
+- **Seguridad:** los redirects del actualizador Android se validan contra el
+  scope HTTP; escritura atómica con `create_new`; cotas de bytes en lecturas IPC
+  de imágenes y notas; copiado de texto del PDF por el portapapeles nativo.
+- **i18n:** textos visibles de diarios, todas las páginas y avisos de flashcards
+  envueltos en `translate()`, con test de cobertura es/en/zh.
 
 ## Cambios en 0.5.9
 
@@ -618,7 +638,7 @@ la clave de release.
 
 El workflow de release se dispara **solo** con un tag que empiece por `v` y
 compara el número del tag con **cinco** archivos. El procedimiento completo está
-en [`docs/RELEASE.md`](./RELEASE.md). Para publicar la `0.5.9`:
+en [`docs/RELEASE.md`](./RELEASE.md). Para publicar la `0.5.10`:
 
 ```bash
 # 1. Las cinco versiones deben ser idénticas
@@ -630,12 +650,12 @@ sed -n "s/^version: '\([^']*\)'.*/\1/p" snapcraft.yaml | head -n 1
 
 # 2. Commit y tag anotado sobre ese commit
 git add -A
-git commit -m "chore: release v0.5.9"
-git tag -a v0.5.9 -m "v0.5.9"              # el tag SIEMPRE lleva la v
+git commit -m "chore: release v0.5.10"
+git tag -a v0.5.10 -m "v0.5.10"            # el tag SIEMPRE lleva la v
 
 # 3. Empujar y comprobar que arrancó el workflow
 git push origin master
-git push origin v0.5.9
+git push origin v0.5.10
 gh run list --workflow=release.yml --limit 1
 ```
 
@@ -709,7 +729,7 @@ declara `runFullTrust`.
 ## Datos de la release Android
 
 - Paquete: `com.sinnotas.desktop`
-- Última release publicada: `0.5.9` (`versionCode 5009`)
+- Última release publicada: `0.5.10` (`versionCode 5010`)
 - `minSdk 33`, `targetSdk 37`
 - Arquitectura: `arm64-v8a`
 - Firma release esperada (SHA-256 del certificado):

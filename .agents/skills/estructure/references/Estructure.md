@@ -2,7 +2,7 @@
 
 > **Índice técnico extremadamente detallado de Sin Notas.**
 >
-> Versión del código indexada: **0.5.9** (`package.json`), 2026-11-27.
+> Versión del código indexada: **0.5.10** (`package.json`), 2026-11-28.
 > Fecha del índice: **2026-11-27**, actualizado **2026-11-28** (de `f230f45` a la fase 12, centrado del grafo). Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
 >
 > Este documento **no modifica ni describe cambios en el código**: es solo un mapa de referencia.
