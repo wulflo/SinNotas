@@ -21,7 +21,7 @@ Propósito: que un buscador con bóvedas grandes no congele la UI ni sature la m
 4. **Caché acotada y LRU.** Los resultados y las notas hidratadas deben tener techo (`MAX_LOADED_PAGES = 120` en `vault.ts`, caché de 32 páginas en `pdf-view.ts`). Nada de mapas que crezcan sin límite.
 5. **Virtualización para listas largas.** Usar `VirtualList<T>` (`src/views/virtual-list.ts`) con `overscan`, `keyFor` y altura estimada; el Kanban y el explorador ya lo hacen.
 6. **Plegado y búsqueda tolerante.** Usar `fold()` de `content-search.ts` para ignorar mayúsculas/acentos y `locateMatch()` para devolver índices sobre el texto original.
-7. **Hidratar bajo demanda.** Con arranque metadata-only (`blocksLoaded === false`), no descargar todos los bloques para buscar: usar `read_pages_cached` por lote y `ensurePageLoaded` solo para la nota que se va a mostrar.
+7. **Hidratar bajo demanda.** Con arranque metadata-only (`blocksLoaded === false`), no descargar todos los bloques para buscar: usar `read_pages_cached` por lote y `ensurePageLoaded` solo para la nota que se va a mostrar. Si la bóveda cambia durante la espera, `store/epoch-guard.ts isStaleMutation()` descarta el resultado antes de pintarlo.
 8. **Métricas simples.** Si el cambio puede afectar rendimiento, comprobar el número de nodos DOM creados y el tiempo de respuesta con `npm test` / benchmark antes y después.
 
 ## Checklist de revisión

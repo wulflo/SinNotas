@@ -11,7 +11,7 @@ Propósito: que un cambio en la capa Tauri respete el modelo de permisos, el vau
 
 ## 1. Configuración y CSP
 
-- `src-tauri/tauri.conf.json` es la fuente de verdad; los perfiles por plataforma van en sus secciones. No relajar la CSP para permitir portadas remotas: la decisión del repo es validar hosts en código y dejar que Tauri bloquee las remotas (§A1 del checklist consolidado).
+- `src-tauri/tauri.conf.json` es la fuente de verdad; los perfiles por plataforma van en sus secciones. No relajar la CSP para permitir portadas remotas: la decisión del repo es validar hosts en código y dejar que Tauri bloquee las remotas (§A1 del checklist consolidado). Única excepción documentada: `img-src https://covers.openlibrary.org` (validada en `bibliography_lookup.rs`), sin abrir `connect-src`.
 - `vite.config.ts` decide `desktop` vs `flashcards` con `VITE_APP_MODE` / `TAURI_ENV_PLATFORM`. Un cambio aquí afecta al APK de repaso.
 - Verificar siempre con `npm run build` y `cargo check --manifest-path src-tauri/Cargo.toml --lib`.
 
@@ -25,7 +25,8 @@ Propósito: que un cambio en la capa Tauri respete el modelo de permisos, el vau
 
 - Comandos `#[tauri::command]` en `src-tauri/src/lib.rs`, registrados en `invoke_handler`; tipos compartidos en `src/types.ts`; llamadas desde `src/desktop.ts` y vistas.
 - Si se añade/quita un comando, revisar los tres sitios (definición, registro, llamada). Los tipos del payload deben coincidir con la interfaz TS.
-- **La validación de contención vive en Rust**: `resolve_vault_path`, `write_file_atomically`, `validate_image_file`. Una validación solo en frontend no cierra un hallazgo de seguridad.
+- Los comandos que transportan datos de dominio se llaman desde `src/tauri/commands.ts`: ahí se construyen los argumentos (`assertRequired` solo en dev) y se normalizan las formas del payload. Caso real: Rust serializa `Backlink` como `source_page`/`source_path`/`line_number`, pero `vault.ts` leía `sourcePage` y reventaba al renombrar; `findBacklinksCmd()` acepta ambas formas y devuelve la canónica. Al añadir un wrapper, añadir un test en `src/tauri/commands.test.ts` con la forma exacta de los argumentos y del payload. Los `await` que mutan estado capturan un epoch y usan `isStaleMutation()` antes de aplicar el resultado.
+- **La validación de contención vive en Rust**: `resolve_note_path`, `resolve_vault_path`, `write_file_atomically`, `validate_image_file`. Una validación solo en frontend no cierra un hallazgo de seguridad.
 
 ## 4. Portapapeles (caso real del repo)
 
@@ -36,7 +37,7 @@ Propósito: que un cambio en la capa Tauri respete el modelo de permisos, el vau
 ## 5. Sistema de archivos
 
 - Toda ruta del vault pasa por `resolve_vault_path`; rechazar symlinks que salgan del vault y componentes `..`. Escritura atómica y `create_new` para no seguir symlinks de archivo.
-- El frontend solo recibe rutas relativas o identificadores `link:<id>`; nunca rutas absolutas (decisión D4).
+- La decisión D4 de «no exponer rutas absolutas» aplica a **PDFs**: el front recibe `relativePath` o `link:<id>`. Las imágenes sí usan rutas canónicas absolutas por IPC (`resolve_image_path`), siempre validadas después por `resolve_vault_path`/`resolve_note_path` en Rust.
 - Bóvedas de prueba solo en `/tmp/opencode`; no tocar una bóveda real para pruebas destructivas.
 
 ## 6. Diálogos, opener y HTTP
@@ -60,6 +61,17 @@ Propósito: que un cambio en la capa Tauri respete el modelo de permisos, el vau
 
 - Barra de título personalizada en `index.html`; `src/splash.ts` controla el splash. La biblioteca de diálogos propios usa `hasMountedModal` para evitar abrir unos sobre otros.
 - Los atajos globales de la app se registran en `src/desktop.ts`; no duplicarlos con `global-shortcut` del plugin salvo decisión explícita.
+
+## 10. Hallazgos abiertos (auditoría 2026-11-28)
+
+Informe completo: `~/Descargas/evidencia-refactor-contratos/09-seguridad.md`. Revisar si el cambio toca alguna de estas zonas; **no darlos por cerrados sin parche y test**:
+
+1. **W1 — redirects del updater Android.** `capabilities/android.json` solo permite `github.com/wulflo/SinNotas/releases/*`, pero `services/updater.ts` usa `redirect: "follow"` y `plugins.http.scopeRedirects` no está activo: un 3xx puede salir del scope. Corrección: activar `scopeRedirects`, ampliar `allow` a los hosts de assets de GitHub y bajar `maxRedirections`.
+2. **W2 — `write_file_atomically`.** `lib.rs` usa `fs::write` para el archivo temporal en vez de `OpenOptions::create_new(true)`. Corrección: `create_new` + `write_all`, conservando `remove_file` y `rename`.
+3. **W3 — lecturas IPC sin cota.** `read_image_data` y `FsStorage::read_note` (`fs::read` / `fs::read_to_string`) no limitan bytes, aunque la escritura y el escaneo sí (`MAX_IMAGE_FILE_BYTES`, `NOTE_MAX_BYTES`, `read_text_bounded`). Corrección: `metadata.len()` + `Read::take(limit + 1)`.
+4. **W4 — portapapeles en la vista PDF.** `views/pdf-view.ts copySelectedText()` llama a `navigator.clipboard.writeText` directamente; debe delegar en `desktop.ts writeClipboardText()` vía `PdfReaderHost.copyText()`.
+
+Notas de riesgo aceptado: CSP con la única excepción de `covers.openlibrary.org`; D4 restringe rutas absolutas a PDFs; `gen/schemas/` es generado y CI valida el manifiesto Android.
 
 ## Checklist antes de responder
 

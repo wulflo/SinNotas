@@ -14,7 +14,7 @@ Propósito: verificar que el algoritmo y su persistencia sigan siendo correctos.
 | `src/editor/fsrs.ts` — `FSRSEngine`, `nextInterval`, `computeDueDate`, `formatInterval`, `previewRatings` | Motor FSRS-7 y vectores dorados |
 | `src/editor/fsrs-settings.ts` — `normalizeFSRSParameters`, `parseLearningSteps` | 34 pesos, retención, pasos y validación |
 | `src/views/flashcards-manager.ts` — `parseBlockFSRS`, `readScheduleSnapshot`, `updateBlockFSRS`, `applyScheduleSnapshot`, `rate`, `readProperty`, `stripScheduledProperties` | Lectura/escritura de programación en Markdown |
-| `src/store/review-progress.ts` — `record`, `commitUndo`, `commitRedo` | Diario y deshacer/rehacer |
+| `src/store/review-progress.ts` — `record`, `commitUndo`, `commitRedo` | Diario y deshacer/rehacer; en Tauri persiste vía `tauri/commands.ts` (`readReviewProgressCmd` / `writeReviewProgressCmd` / `clearReviewProgressCmd`) |
 | `src/desktop.ts` — `applyFSRSRating`, `findReviewCardBlock`; `src/mobile/review-app.ts` — `rate` | Flujo de calificación en escritorio y APK |
 | `src/editor/flashcard-target.ts` — `resolveCardTargetIds`; `src/desktop.ts` — `cardTargetIds`, `createBasicCardFromSelection`, `deleteFlashcardsInSelection` | Atajos `Alt+R`/`Alt+T`: resuelven el bullet objetivo (selección → cursor → foco) y evitan duplicar `#card` en bullets que ya generan tarjeta |
 

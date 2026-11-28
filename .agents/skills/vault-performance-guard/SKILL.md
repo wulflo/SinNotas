@@ -18,6 +18,8 @@ Complementa la skill `Búsqueda incremental` (patrones de paginación y epochs).
   - Referencias del repo: `ContentSearchIndex.search(query, limit)` y `FlashcardLoader` (lotes adaptativos 16→64).
 - Los *file watchers* deben tener `debounce` y actualizar solo la nota modificada (epochs de `VaultVersionView`), no reconstruir toda la bóveda.
 - **Cachés acotadas:** ningún mapa que crezca sin límite; revisar los topes existentes (`MAX_LOADED_PAGES`, caché de páginas PDF).
+- **Ingress de `PageData`:** todos pasan por `store/normalize-page.ts normalizePage()`. En Tauri se llama con `{blockTypes:false}` porque Rust ya serializa los tipos canónicos: renormalizar el vault completo en cada arranque era trabajo innecesario. No reintroduzcas normalizaciones locales en `vault.ts`.
+- **Async obsoleto:** las mutaciones que esperan IPC capturan un epoch y descartan su resultado con `store/epoch-guard.ts isStaleMutation()`; un chunk descartado no debe tocar memoria ni UI.
 
 ## 2. Lotes y concurrencia
 
@@ -39,7 +41,7 @@ git diff --check
 
 - `npx tsc --noEmit` detecta tipos e imports sin usar; no hace falta `knip`/`jscpd` (no están en `devDependencies` y requerirían red).
 - `cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings` si se tocó Rust.
-- Buscar comandos `#[tauri::command]` registrados en `invoke_handler` que ya no se llamen desde el frontend; y exportaciones TS que nadie importa tras el refactor.
+- Buscar comandos `#[tauri::command]` registrados en `invoke_handler` que ya no se llamen desde el frontend; y exportaciones TS que nadie importa tras el refactor. Revisar también los `invoke` directos que aún no usan `src/tauri/commands.ts` y los tests que quedaron huérfanos al borrar un helper (caso real: `buildReviewHeatmap()` y 4 tests suyos se eliminaron juntos).
 - Revisar que no queden estilos CSS huérfanos introducidos por el cambio (buscar la clase en `src/`, `index.html` y los temas).
 
 ## 4. Checklist antes de responder

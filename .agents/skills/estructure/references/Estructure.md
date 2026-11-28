@@ -3,7 +3,7 @@
 > **Índice técnico extremadamente detallado de Sin Notas.**
 >
 > Versión del código indexada: **0.5.9** (`package.json`), 2026-11-27.
-> Fecha del índice: **2026-11-27**, actualizado **2026-11-28** (de `f230f45` a `a4acd70`). Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
+> Fecha del índice: **2026-11-27**, actualizado **2026-11-28** (de `f230f45` a `6d974b2`). Los números de línea son de la versión 0.5.6; buscar siempre por símbolo.
 >
 > Este documento **no modifica ni describe cambios en el código**: es solo un mapa de referencia.
 > Responde a la pregunta _«¿dónde está la pieza que hace que funcione cada cosa?»_.
@@ -102,6 +102,7 @@
 - **Sin React, sin Tailwind.** Toda la UI es DOM imperativo creado en `desktop.ts` y `views/`.
 - **Dependencias npm relevantes** (`package.json`): `@tauri-apps/api` y plugins (`clipboard-manager`, `dialog`, `fs`, `http`, `opener`, `os`, `process`, `updater`), `dompurify` (saneado), `katex` (matemáticas), `ts-fsrs` 6.0 (FSRS-7).
 - **Dependencias Rust relevantes** (`src-tauri/Cargo.toml`): `tauri` v2, `serde`/`serde_json`, `notify` (watcher), `pdfium` (PDF nativo), `reqwest` (metadatos/bibliografía), `walkdir`, `chrono`, `tokio`.
+- **Frontera IPC tipada:** `src/tauri/commands.ts` construye los argumentos de `invoke` y normaliza las formas de datos que cruzan el puente (caso real: `Backlink` en snake_case desde Rust). Los `await` que mutan la bóveda capturan un epoch y usan `store/epoch-guard.ts isStaleMutation()` para descartar resultados obsoletos. Cobertura parcial: bóveda, progreso y mazos; el resto de `invoke` sigue disperso en `desktop.ts`, vistas y móvil.
 
 ### 1.2 Puntos de entrada
 
@@ -129,6 +130,8 @@
    - `await import("./desktop")` → se ejecuta `initializeDesktopApp()` (`src/desktop.ts:16992`).
 5. Si no: `mountMobileReviewApp()` (`src/mobile/review-app.ts`).
 6. Si falla cualquier cosa: `src/main.ts:42-50` reemplaza el body por un mensaje de error y llama a `hideAppSplash()`.
+7. Las decisiones puras de este flujo viven en `src/boot-invariants.ts`: `shouldRenderEditorOnBoot()` y `needsEditorHydration()` deciden si el editor se pinta y si la nota metadata-only se hidrata **antes** del primer render (bug histórico «nota vacía hasta pulsar +»). Tests: `boot-invariants.test.ts`.
+8. Entrar en Repaso desde escritorio (`#btn-enter-review-mode`) pasa por `desktop.ts confirmAction()` antes de `requestReviewMode()`; cancelar deja `sinnotas-review-mode` intacto. El botón móvil «Volver al repaso» no pide confirmación.
 
 ### 1.4 Modos de app y cómo se eligen
 
@@ -262,6 +265,8 @@ Tecla 1/2/3/4 o botón → src/desktop.ts:13508 applyFSRSRating()
 | :--- | ---: | :--- |
 | `main.ts` | 62 | Bootstrap y selección de superficie. |
 | `app-mode.ts` | 141 | Detección y preferencia de modo (desktop / repaso / editor completo móvil). |
+| `boot-invariants.ts` | — | Decisiones puras de arranque: render del editor e hidratación previa de notas metadata-only. Tests: `boot-invariants.test.ts`. |
+| `tauri/commands.ts` | — | Adaptador tipado de `invoke`: argumentos y normalización de payloads (`Backlink`). Tests: `tauri/commands.test.ts`. |
 | `splash.ts` | 25 | Ocultar splash con duración mínima. |
 | `types.ts` | 233 | **Todos** los tipos compartidos del dominio. |
 | `desktop.ts` | 16.873 | App de escritorio: editor, 8 vistas, ajustes, repaso, vault, snapshots, i18n, gamepad. |
@@ -273,6 +278,7 @@ Tecla 1/2/3/4 o botón → src/desktop.ts:13508 applyFSRSRating()
 | `settings/shortcuts-ui.ts` | 107 | UI de atajos editables (registro puro en `shortcuts.ts`). |
 | `review/card-editor.ts` | 263 | Editor de tarjeta del repaso con dependencias inyectadas. |
 | `i18n.ts` | 2.339 | Diccionarios español→inglés y español→chino + `translate()`. |
+| `i18n-coverage.test.ts` | — | Exige que los textos visibles del HTML y los avisos dinámicos documentados tengan clave en es/en/zh. |
 | `gamepad.ts` | 248 | Mapeo y sondeo del gamepad. |
 | `periodic-elements.ts` | 543 | Tabla periódica para el "árbol de progreso" de repaso. |
 | `typography.ts` | 399 | Escalas tipográficas por área y fuentes del sistema. |
@@ -423,7 +429,7 @@ Tecla 1/2/3/4 o botón → src/desktop.ts:13508 applyFSRSRating()
 | `SnapshotActiveNote` | 40–51 | Resumen de nota con snapshots activos (para el gestor). |
 | `RestoredSnapshot` | 53–56 | `blocks` + `frontmatter` de una versión restaurada. |
 | `PageData` | 58–82 | `id`, `title`, `path`, `blocks`, `frontmatter?`, `isJournal?`, `journalDate?`, `updatedAt?`, `updatedAtMs?`, `createdAtMs?`, `revisions?`, `pinned?`, `pinnedAt?`, `blocksLoaded?`, `blockCount?`. `blocksLoaded=false` ⇒ carga metadata-only, se rehidrata vía `read_pages_cached`. |
-| `Backlink` | 84–89 | `source_page`, `source_path`, `line_number`, `snippet`. |
+| `Backlink` | 84–89 | `source_page`, `source_path`, `line_number`, `snippet` (snake_case, igual que lo serializa Rust). `src/tauri/commands.ts findBacklinksCmd()` acepta también `sourcePage`/`sourcePath`/`lineNumber` de consumidores antiguos y devuelve siempre esta forma; `vault.ts` lee `source_page`. |
 | `VaultCacheDelta` | 96–101 | `rootPath`, `changed: PageData[]`, `removed: string[]`, `revision`. Emitido por el watcher Rust. |
 | `CursorState` | 103–106 | `blockId`, `offset`. |
 | `FlashcardType` | 108 | `"basic" \| "cloze" \| "image-occlusion"`. |
@@ -683,9 +689,11 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | `restoreSnapshot(page, revisionId)` | 1210 | Tauri `restore_snapshot`; actualiza bloques/frontmatter en memoria. |
 | `createPage()` / `createJournal()` | 1244 / 1274 | `pages/<Título>.md` / `journals/AAAA_MM_DD.md`. |
 
-**Helpers privados destacados:** `normalizeBlockTypes()` (L11, detecta imágenes por regex `!\[...\]\(...\)` y extensión), `toRelativeNotePath()` (L591), `safeSetItem()` (L329, avisa con `CustomEvent("vault-operation-error")` si se llena la cuota), `sweepUnpinnedPages()` (L839, LRU), `persistPage()` (L937, encola `save_page`), `enqueueFileOperation()` (L1323, serializa por ruta), `rewriteRenameLinks()` (L1086, usa `find_backlinks` en modo metadata-only y rehidrata candidatos).
+**Helpers privados destacados:** `safeSetItem()` (L329, avisa con `CustomEvent("vault-operation-error")` si se llena la cuota), `sweepUnpinnedPages()` (L839, LRU), `persistPage()` (L937, encola `save_page`), `enqueueFileOperation()` (L1323, serializa por ruta), `rewriteRenameLinks()` (usa `tauri/commands.ts findBacklinksCmd` en modo metadata-only y rehidrata candidatos). `normalizeBlockTypes()` y `toRelativeNotePath()` ya no viven aquí: están en `store/normalize-page.ts` y se aplican desde `normalizePage()` en todos los ingress.
 
-> **Hueco de cobertura:** `vault.ts` tiene un único test propio (`vault-replace.test.ts`, 80 líneas) que cubre solo `replaceVault`. Guardado, debounce, LRU, deltas, renombres y snapshots se ejercen solo de forma indirecta.
+**Normalización y epoch (fases 3 y 5):** `store/normalize-page.ts normalizePage(page, rootPath?, {blockTypes})` hace en un paso tipos de bloque, ruta relativa y fijadas del frontmatter. En Tauri se llama con `blockTypes: false`: el payload de Rust ya trae tipos canónicos y renormalizar el vault completo en cada arranque era innecesario. Las mutaciones asíncronas capturan `getMutationVersion()`/`getOwnWriteEpoch()` y comprueban `store/epoch-guard.ts isStaleMutation(captured, current)` antes de aplicar el resultado; el caso «cambia la bóveda durante un await» está cubierto en `vault-epoch.test.ts`.
+
+> **Cobertura:** además de `vault-replace.test.ts`, hay `vault.test.ts`, `vault-epoch.test.ts` y `normalize-page.test.ts`. Guardado, debounce, LRU, deltas, renombres y snapshots siguen ejerciéndose sobre todo de forma indirecta.
 
 ### 5.2 `content-search.ts` (313 líneas) — omnibar
 
@@ -727,6 +735,8 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | `sidebar-selection.ts` (40) | `selectSidebarPages()` (L12) | `pinned` ordenados por `pinnedAt` ascendente; `recent` por `recentPaths`, sin fijadas, sin duplicados, sin huérfanas. |
 | `pinned-frontmatter.ts` | `readPinnedFromFrontmatter()`, `writePinnedToFrontmatter()`, `applyPinnedFrontmatter()` | Persistencia de fijadas en el `.md`: escribe/lee `pinned:: true` y `pinned-at:: <ISO>` en el frontmatter (el backend solo serializa frontmatter + bloques). Lo usan `replaceVault()`, el alta de `applyExternalDelta()`, `sctx-pin`, restaurar snapshot y borrar propiedades. Tests: `pinned-frontmatter.test.ts`. |
 | `wikilinks.ts` (53) | `WikiLinkRef` (L5), `collectOutgoingLinks()` (L28) | Extrae `[[Destino\|Alias]]`; dedupe por destino, omite auto-enlaces, ignora código, conserva destinos rotos. La reescritura en renombres **no** usa este módulo (vault.ts hace su propia regex en L1055). |
+| `normalize-page.ts` | `normalizePage()`, `normalizeBlockTypes()`, `normalizeNotePath()` | Único normalizador de ingress de `PageData`: tipos de bloque (opcional), ruta relativa y `pinned`/`pinnedAt` desde frontmatter. Tests: `normalize-page.test.ts`. |
+| `epoch-guard.ts` | `isStaleMutation(captured, current)` | Descarta el resultado de un `await` cuando la bóveda cambió mientras esperaba. Tests: `epoch-guard.test.ts`. |
 
 ### 5.6 Mapa rápido del store
 
@@ -736,7 +746,10 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | Arranque metadata-only | `store/vault.ts:256,272` |
 | Guardado con debounce | `store/vault.ts:261,874,904` |
 | Cola de operaciones de archivo | `store/vault.ts:1323` |
-| Renombrado + wikilinks + revisiones | `store/vault.ts:1011,1086` |
+| Renombrado + wikilinks + revisiones | `store/vault.ts:1011,1086` + `tauri/commands.ts findBacklinksCmd` |
+| Normalización única de ingress | `store/normalize-page.ts normalizePage` (constructor web, `replaceVault`, deltas, hidratación y guardado) |
+| Guard async obsoleto | `store/epoch-guard.ts isStaleMutation` + `store/vault.ts getMutationVersion/getOwnWriteEpoch` |
+| Decisiones puras de arranque | `src/boot-invariants.ts shouldRenderEditorOnBoot / needsEditorHydration` |
 | LRU de bloques (FASE 4) | `store/vault.ts:378-381,759-863` |
 | Versionado para cachés | `store/vault.ts:313-433` |
 | Hook antes de guardar (undo) | `store/vault.ts:570` |
@@ -765,7 +778,7 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | `flashcard-loader.ts` | 403 | `FlashcardLoader` (88), `load()` (193), `processChunk()` (284), `finish()` (344), `evaluateCache()` (106) | Escaneo **streaming** por lotes adaptativos (16→64, objetivo 14 ms, mitad si >28 ms) con caché incremental por `VaultVersionView`. Hidrata notas metadata-only antes de escanear. `setDetectedCards` se llama **una sola vez** al terminar para que `mixed` no se rebaraje a mitad. |
 | `flashcard-maintenance.ts` | 253 | `runFlashcardMaintenance()` (176), `groupCardsByBlock()` (100), `applyAction()` (144), `DEFAULT_BATCH_SIZE = 40` (65) | 4 acciones (`due-dates`, `reschedule`, `convert` FSRS-4.5→7, `reset`). Agrupa por `page.id\0block.id` para escribir una sola vez cada bloque aunque produzca varias tarjetas; comprueba `signal.aborted` antes y dentro de cada lote; cede el hilo con rAF. |
 | `flashcard-decks.ts` | 281 | `buildDeckTree()` (75), `searchDeckTree()` (203), `flattenDeckRows()` (262), `getDeckSelectionState()` (168), `collectDeckPageTitles()` (156), `sortDeckTree()` (144) | **Árbol de mazos jerárquico** derivado de los títulos (`Salud mental → Ansiedad → Tema 1`), con selección tri-state y paginación por raíces visibles. Ojo: es distinto de `store/flashcard-decks.ts` (el modelo `decks.json`). |
-| `review-heatmap.ts` | — | `buildReviewHeatmapYear()`, `buildReviewHeatmapQuipu()`, `defaultHeatmapStart()`, `levelFor()` | Máximo 365 días, solo eventos `state === "applied"`. El quipu genera 12 hilos colgantes y un nudo por semana con `intensity = días con repasos / 7` y `knotSize` (ancho/alto/radio). Tests: `review-heatmap.test.ts`. |
+| `review-heatmap.ts` | — | `buildReviewHeatmapYear()`, `buildReviewHeatmapQuipu()`, `defaultHeatmapStart()`, `levelFor()` | Máximo 365 días, solo eventos `state === "applied"`. El quipu genera 12 hilos (x 20…240, paso 20) y un nudo por semana con `intensity = días con repasos / 7`; `knotSize` = 15 × 9,6 px, radio 2. El render (`desktop.ts renderFlashcardHeatmap`) dibuja nudos como `<rect>` y el cordel solo en los huecos entre ellos, para que no se vea dentro. Se eliminó el helper muerto `buildReviewHeatmap()` y su tipo `ReviewHeatmapWeek`. Tests: `review-heatmap.test.ts`. |
 
 ### 6.2 Grafo y mapa conceptual
 
@@ -821,7 +834,7 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 | Modo Aprendizaje | `desktop.ts` (`LEARNING_MODE_STORAGE_KEY`), `mobile/review-app.ts:2581-2627` |
 | Tarjetas de oclusión de imagen | `editor/image-occlusion.ts`, `desktop.ts:12887 createImageOcclusionPreview`, `mobile/review-app.ts:3326 createImagePreview` |
 | Explorador (lista virtual) | `desktop.ts:13167 renderFlashcardExplorer`, `views/virtual-list.ts` |
-| Heatmap | `views/review-heatmap.ts:41`, `desktop.ts:12401 renderFlashcardHeatmap` |
+| Heatmap / quipu | `views/review-heatmap.ts buildReviewHeatmapYear / buildReviewHeatmapQuipu`, `desktop.ts renderFlashcardHeatmap` (clases `.heatmap-quipu-*`, cordel segmentado) |
 | "Árbol periódico" de progreso | `periodic-elements.ts:530 progressStageFromPoints` (118 elementos + 15 moléculas), `desktop.ts:12111/12133/12283/12342` |
 | Pomodoro | `desktop.ts:12507 renderPomodoro`, `:12572 startPomodoro`, `:12553 startPomodoroBreak` |
 | Gamepad (calificar con mando) | `gamepad.ts:200 GamepadListener`, `desktop.ts:3462 handleGamepadButton` |
@@ -895,7 +908,8 @@ Modelo puro (sin DOM): `MarkdownTableModel` (L11) = `header`, `alignments`, `row
 - `excludedContentSelector` (L1877): 24 selectores de contenido del usuario **nunca traducido** (`.block-editor`, `.page-title`, `.flashcard-explorer-question`, `[contenteditable='true']`, `.bib-user-data`, selectores `.mobile-*`, …).
 - `WeakMap`s de originales y salidas (L1907–1910) permiten alternar idiomas sin perder el texto original.
 - API: `translate()` (2230), `currentLanguage()` (2234), `currentLanguagePreference()` (2238), `setLanguagePreference()` (2247, persiste `sinnotas-language` y aplica en caliente), `onLanguageChange()` (2257), `initializeLocalization()` (2278, instala `MutationObserver` sobre `document.body` para traducir nodos dinámicos).
-- Consumidores: `desktop.ts:214`, `mobile/review-app.ts:59-64`, `views/pdf-view.ts:2`, `views/bibliography-view.ts:1`. **Sin test propio.**
+- Consumidores: `desktop.ts:214`, `mobile/review-app.ts:59-64`, `views/pdf-view.ts:2`, `views/bibliography-view.ts:1`, `views/journals-view.ts` (días de la semana) y `views/all-pages-view.ts` (badge de diario/página).
+- `i18n-coverage.test.ts` comprueba que los textos visibles del HTML y los avisos dinámicos documentados estén en es/en/zh; los literales generados en TS deben pasar por `translate()`. Deuda conocida: algunos `showToast` de rutas nativas/poco frecuentes siguen sin envolver (ver `~/Descargas/evidencia-refactor-contratos/07-i18n-literales.md`).
 
 ### 11.2 `typography.ts` (399 líneas) — 10 tamaños configurables
 
@@ -967,7 +981,7 @@ El crate `sin-notas` v0.5.6 (`lib` = `sin_notas_lib`) tiene en `lib.rs`:
 
 ### 13.2 Los 51 comandos registrados
 
-Registro exacto: `lib.rs:6040-6092` (`generate_handler!`). El único evento Rust→front es `"vault-cache-delta"` (emitido en `lib.rs:1958`), consumido por `desktop.ts:16796`.
+Registro exacto: `lib.rs:6040-6092` (`generate_handler!`). El único evento Rust→front es `"vault-cache-delta"` (emitido en `lib.rs:1958`), consumido por `desktop.ts:16796`. Los comandos que transportan datos de dominio se llaman desde `src/tauri/commands.ts` (wrappers `savePageCmd`, `readPagesCachedCmd`, `findBacklinksCmd`, `readReviewProgressCmd`, `writeFlashcardDecksCmd`, etc.); en modo dev `assertRequired()` falla si falta un argumento. No todos los `invoke` están migrados todavía.
 
 | Dominio | Comandos (línea de la función en `lib.rs` salvo indicación) |
 | :--- | :--- |
@@ -1041,10 +1055,10 @@ Registro exacto: `lib.rs:6040-6092` (`generate_handler!`). El único evento Rust
 
 | Comando | Qué ejecuta |
 | :--- | :--- |
-| `npm test` | `vitest run` — ~465 pruebas en 45 archivos (según `docs/SinNotas.md:680`). Entorno `happy-dom` donde hace falta DOM. |
+| `npm test` | `vitest run` — 643 pruebas en 69 archivos (verificación 2026-11-28, commit `6d974b2`). Entorno `happy-dom` donde hace falta DOM. |
 | `npx tsc --noEmit` | Gate de tipos estricto (`noUnusedLocals`/`noUnusedParameters`). |
 | `npm run build` | `tsc && vite build` → `dist/`. |
-| `cargo test --locked` (en `src-tauri`) | ~56 + 15 + 12 + 4 + 13 tests Rust. |
+| `cargo test --manifest-path src-tauri/Cargo.toml --lib --locked` | 106 tests Rust (105 pasan, 1 smoke de red ignorado; verificación 2026-11-28). |
 | `cargo clippy --locked -- -D warnings` | Lint Rust. |
 | `cargo audit` | Auditoría de dependencias (con `glib 0.18.5` tolerada, ver checklist §A3). |
 | `npm run dev` → `localhost:1420/graph-harness.html` | Harness del grafo, debe terminar en `HARNESS PASS`. |
@@ -1054,7 +1068,9 @@ Registro exacto: `lib.rs:6040-6092` (`generate_handler!`). El único evento Rust
 
 **Mayores suites frontend** (por líneas): `desktop` no tiene test propio; `views/flashcards-manager.test.ts` (1.065, 50 `it`), `store/flashcard-decks.test.ts` (313), `store/review-progress.test.ts` (297), `store/content-search.test.ts` (239), `views/bibliography.test.ts` (242), `i18n.ts` sin test, `editor/fsrs.test.ts` (434), `editor/markdown.test.ts` (184), `editor/tree-engine.test.ts` (173), `services/update-utils.test.ts` (160).
 
-**Huecos de cobertura conocidos:** `vault.ts` (1.355 líneas) solo tiene `vault-replace.test.ts`; `history.ts`, `html.ts`, `math.ts` no tienen test directo; `export.ts` no tiene tests y 5 de sus 6 exportaciones no tienen consumidor; `desktop.ts`, `main.ts`, `splash.ts`, `i18n.ts`, `bibliography-view.ts`, `concept-map-view.ts`, `graph-view.ts`, `pdf-view.ts`, `review-app.ts` y `mobile.css` carecen de test propio.
+**Suites añadidas en el refactor:** `tauri/commands.test.ts` (forma de argumentos y normalización de `Backlink`), `store/normalize-page.test.ts`, `store/epoch-guard.test.ts`, `store/vault-epoch.test.ts`, `boot-invariants.test.ts` e `i18n-coverage.test.ts`.
+
+**Huecos de cobertura conocidos:** `history.ts`, `html.ts`, `math.ts` no tienen test directo; `export.ts` no tiene tests y 5 de sus 6 exportaciones no tienen consumidor; `desktop.ts`, `main.ts`, `splash.ts`, `i18n.ts` (solo cobertura indirecta de claves), `bibliography-view.ts`, `concept-map-view.ts`, `graph-view.ts`, `pdf-view.ts`, `review-app.ts` y `mobile.css` carecen de test propio. La matriz de 6 temas se verificó con capturas, no con un test visual automatizado.
 
 Resultados publicados en `docs/BENCHMARK-2026-10-29.md`: caché 5.000 notas frío 1.446,71 ms vs caliente 253,82 ms (5,70×); 20.000 notas 5.423,30 vs 1.019,74 ms (5,32×).
 
@@ -1166,7 +1182,11 @@ Todas las acciones de terceros están pineadas a SHA; `npm ci --ignore-scripts`;
 | Búsqueda de contenido en Rust | `[R] content_search.rs search_content`, `run_content_search` |
 | Diarios por fecha | `[S] vault.ts:1274` + `[D] views/journals-view.ts` |
 | Todas las páginas (orden/filtro columnas) | `[V] all-pages.ts` + `[D] views/all-pages-view.ts` |
-| Backlinks | `[R] lib.rs:5261` + `[D] desktop.ts:9059` |
+| Backlinks | `[R] lib.rs:5261 find_backlinks` → `[SVC] tauri/commands.ts findBacklinksCmd` (normaliza `source_page` ↔ `sourcePage`) → `[D] desktop.ts` y `[S] vault.ts rewriteRenameLinks` |
+| Contrato de `invoke` | `[SVC] tauri/commands.ts` (argumentos tipados y assert en dev) + `tauri/commands.test.ts` |
+| Normalizar nota al entrar | `[S] store/normalize-page.ts normalizePage` |
+| Descartar mutación async obsoleta | `[S] store/epoch-guard.ts isStaleMutation` |
+| Textos visibles en es/en/zh | `[SVC] i18n.ts translate()` + `i18n-coverage.test.ts` |
 
 ### 18.3 Repaso
 
@@ -1183,7 +1203,9 @@ Todas las acciones de terceros están pineadas a SHA; `npm ci --ignore-scripts`;
 | Modo Aprendizaje (sin persistir FSRS) | `[D] desktop.ts`, `[M] review-app.ts:2590` |
 | Undo/redo de repasos | `[S] review-progress.ts:422-475` + `[D] desktop.ts:13777` |
 | Pomodoro y productividad | `[D] desktop.ts:12460-12633` |
-| Heatmap y árbol periódico | `[V] review-heatmap.ts`, `[E/D] periodic-elements.ts` |
+| Heatmap / quipu y árbol periódico | `[V] review-heatmap.ts buildReviewHeatmapQuipu` + `[D] desktop.ts renderFlashcardHeatmap` (nudos `<rect>`, cordel segmentado), `[E/D] periodic-elements.ts` |
+| Entrar en Repaso desde escritorio | `[D] desktop.ts #btn-enter-review-mode → confirmAction() → requestReviewMode()`; el móvil «Volver al repaso» no confirma |
+| Píldora del Pomodoro | `[D] desktop.ts renderPomodoro` + `style.css .pomodoro-clock` (fondo transparente, aro de bolitas) |
 | Gamepad | `[SVC] gamepad.ts` + `[D] desktop.ts:3379-3560` |
 
 ### 18.4 Grafos, documentos y tareas

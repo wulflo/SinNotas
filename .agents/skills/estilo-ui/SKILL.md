@@ -24,6 +24,7 @@ Propósito: evitar que aparezcan controles con el estilo del sistema operativo o
    - Verificar con `data-theme="light"` (tema claro) y sin atributo (tema oscuro).
    - Verificar los estilos visuales `data-visual="lino"` y `data-visual="dracula"`: neutralizan Aero y pueden sobrescribir `background`, `border-radius` o `box-shadow`.
    - Si un tema redefine una superficie (p. ej. `--ls-kanban-card-bg`), la regla base debe leer la variable, no un color fijo.
+   - Los SVG generados (p. ej. los nudos del quipu) usan `color-mix(in srgb, var(--heatmap-ink) N%, transparent)` en vez de colores literales; el anillo lleva `stroke-width` y opacidad bajos para que el trazo se vea suave en los seis estilos/temas.
 
 4. **Tipografía, padding y foco**
    - `font: inherit` / `font-family: inherit` y `font-size: var(--ls-font-size-ui)` o `calc(Npx * var(--ls-font-scale, 1))`.
@@ -51,5 +52,6 @@ Propósito: evitar que aparezcan controles con el estilo del sistema operativo o
 | Reglas de controles | `src/style.css` (SETTINGS DROPDOWN, CustomSelect, settings inputs) |
 | Flashcards | Los botones de `.flashcards-container` aclaran su fondo en tema claro y usan superficie de tema/borde de acento tenue en oscuro; el fondo de `#view-flashcards` depende de `data-visual` (Aero halo de acento, Lino transparente, Dracula `--md-tertiary`). |
 | Sidebar de Ajustes | La barra vertical de Aero se normaliza con tokens: sin puntos de colores fijos ni `box-shadow: inset` tipo borde izquierdo; pestaña activa con `--ls-accent-subtle` y texto `--ls-accent`, contraste correcto en claro/oscuro y en los tres estilos visuales. |
+| Quipu y Pomodoro | Los nudos son `<rect>` con `rx` pequeño (bordes suaves), ancho 15 × alto 9,6 y cordel dibujado solo en los huecos; el centro de `.pomodoro-clock` es `transparent` y lo define solo el aro de bolitas. |
 | Ejemplo de toolbar agrupado | `desktop.ts` → `createTableToolbar` |
 | Mapa de estilos | skill `estructure` → `references/Estructure.md` §11.3 |

@@ -49,13 +49,13 @@ Clasificación: `error` (la skill lleva a un resultado erróneo, fallo o brecha 
 - Comprobar que no existe otra con el mismo ID ni dominio solapado (`ls .agents/skills`).
 - Probar el disparo con frases reales del usuario en español, no solo con la ejecución: una skill perfecta que nunca se activa no aporta nada.
 - Si la skill se origina en un pack descargado, conservar atribución y licencia (`LICENSE.txt` cuando corresponda) en un apartado «Origen».
-- Actualizar la skill `estructure` (índice técnico en `references/Estructure.md`) y la checklist de la fase en `~/Descargas/` con el commit y el diff.
+- Actualizar la skill `estructure` (índice técnico en `references/Estructure.md`) con los módulos, símbolos, tests y clave de commit nuevos, y la checklist de la fase en `~/Descargas/` con el commit y el diff. Si un helper desaparece, borrar también su entrada del índice y de las skills que lo citen.
 - Verificar con `git diff --check` y `grep -RIn` que no queden referencias a la ruta antigua.
 - Las sesiones ya abiertas necesitan `/reload`; las nuevas descubren la skill sola.
 
 ## 5. Skills actuales en este repo
 
-`busqueda-incremental`, `estilo-ui`, `diseno-visual` (crítica visual con evidencia), `traducciones-ui`, `guia-de-uso`, `vault-performance-guard`, `tauri-desktop`, `calidad-pruebas`, `verificacion-manual` y esta misma.
+`estructure` (índice técnico, con `references/Estructure.md`), `busqueda-incremental`, `estilo-ui`, `diseno-visual` (crítica visual con evidencia), `traducciones-ui`, `guia-de-uso`, `vault-performance-guard`, `fsrs7-audit`, `tauri-desktop`, `calidad-pruebas`, `verificacion-manual` y esta misma. Doce en total; revisar siempre esta lista al añadir o retirar una skill.
 
 ## Referencias
 

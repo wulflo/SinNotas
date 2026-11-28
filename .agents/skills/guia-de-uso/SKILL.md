@@ -27,7 +27,8 @@ se renombra un control o se modifica un flujo visible.
    - **Vistas (Editor, Diarios, Todas las páginas, Bibliografía, Flashcards, Grafo, Kanban, PDF):**
      cómo acceder, qué se ve y qué acciones tiene la vista.
    - **Editor de tablas:** selección de celda, toolbar, formato por celda, movimiento de filas/columnas.
-   - **Repaso/FSRS:** calificación, Undo/Redo, parámetros globales y por mazo.
+   - **Repaso/FSRS:** calificación, Undo/Redo, parámetros globales y por mazo, y confirmación al entrar en Repaso desde escritorio («Volver al repaso» en móvil no confirma).
+   - **Avisos nuevos:** si se añade un toast visible, anotar el texto y verificar su traducción (skill `Traducciones UI`). Los retoques puramente visuales (radio del quipu, fondo de la píldora) no requieren cambiar la guía.
    - **Atajos de teclado:** `index.html` → shortcuts modal y `src/desktop.ts`.
 
 4. **No duplicar el índice técnico**
