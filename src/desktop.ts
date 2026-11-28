@@ -185,7 +185,7 @@ import "./bibliography.css";
 import { VirtualList } from "./views/virtual-list";
 import { ConceptMapView } from "./views/concept-map-view";
 import { migrateSelect, syncCustomSelect } from "./views/custom-select";
-import { buildReviewHeatmap, defaultHeatmapStart } from "./views/review-heatmap";
+import { buildReviewHeatmapYear, defaultHeatmapStart } from "./views/review-heatmap";
 import {
   isFlashcardBlockContent,
   removeFlashcardMarkers,
@@ -707,7 +707,7 @@ interface FlashcardProgressStats {
 const flashcardProgressStorageKey = "sinnotas-flashcard-progress";
 const flashcardHeatmapSettingsKey = "sinnotas-flashcard-heatmap-settings";
 type FlashcardHeatmapStyle = "accent" | "classic";
-let flashcardHeatmapStartDate = defaultHeatmapStart(currentLocalDate());
+let flashcardHeatmapStartDate = `${currentLocalDate().slice(0, 4)}-01-01`;
 let flashcardHeatmapStyle: FlashcardHeatmapStyle = "accent";
 try {
   const savedHeatmapSettings = JSON.parse(localStorage.getItem(flashcardHeatmapSettingsKey) || "null") as {
@@ -898,7 +898,6 @@ const flashcardKeyGood = document.getElementById("flashcard-key-good") as HTMLIn
 const flashcardKeyEasy = document.getElementById("flashcard-key-easy") as HTMLInputElement;
 const flashcardHeatmapStartInput = document.getElementById("flashcard-heatmap-start-setting") as HTMLInputElement;
 const flashcardHeatmapStyleSelect = document.getElementById("flashcard-heatmap-style-setting") as HTMLSelectElement;
-const flashcardHeatmapMonths = document.getElementById("flashcard-heatmap-months") as HTMLDivElement;
 const flashcardHeatmapGrid = document.getElementById("flashcard-heatmap-grid") as HTMLDivElement;
 const flashcardHeatmapTotal = document.getElementById("flashcard-heatmap-total") as HTMLElement;
 const flashcardHeatmapFocus = document.getElementById("flashcard-heatmap-focus") as HTMLElement;
@@ -13056,8 +13055,9 @@ function saveFlashcardHeatmapSettings(): void {
 function renderFlashcardHeatmap(): void {
   const today = currentLocalDate();
   const minimumDate = defaultHeatmapStart(today, 365);
+  const yearStart = `${today.slice(0, 4)}-01-01` < minimumDate ? minimumDate : `${today.slice(0, 4)}-01-01`;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(flashcardHeatmapStartDate) || flashcardHeatmapStartDate < minimumDate || flashcardHeatmapStartDate > today) {
-    flashcardHeatmapStartDate = defaultHeatmapStart(today);
+    flashcardHeatmapStartDate = yearStart;
   }
   flashcardHeatmapStartInput.min = minimumDate;
   flashcardHeatmapStartInput.max = today;
@@ -13066,27 +13066,40 @@ function renderFlashcardHeatmap(): void {
   syncCustomSelect(flashcardHeatmapStyleSelect);
   flashcardHeatmapGrid.dataset.style = flashcardHeatmapStyle;
 
-  const weeks = buildReviewHeatmap(reviewProgress.getEntries(), flashcardHeatmapStartDate, today);
-  flashcardHeatmapMonths.replaceChildren();
+  // Se muestran los 12 meses del año aunque las semanas futuras aún no tengan
+  // datos: así la cinta es estable y no «crece» mes a mes.
+  const displayEnd = `${today.slice(0, 4)}-12-31`;
+  const months = buildReviewHeatmapYear(reviewProgress.getEntries(), flashcardHeatmapStartDate, displayEnd);
   flashcardHeatmapGrid.replaceChildren();
   let totalReviews = 0;
-  weeks.forEach((week) => {
-    const month = document.createElement("span");
-    month.textContent = week.monthLabel;
-    flashcardHeatmapMonths.appendChild(month);
-    week.days.forEach((day) => {
-      const cell = document.createElement("span");
-      cell.className = "flashcard-heatmap-cell";
-      if (day.date) {
-        totalReviews += day.count;
-        cell.dataset.level = String(day.level);
-        cell.title = `${day.date}: ${day.count} ${translate(day.count === 1 ? "repaso" : "repasos")}`;
-      } else {
-        cell.classList.add("is-empty");
-        cell.setAttribute("aria-hidden", "true");
-      }
-      flashcardHeatmapGrid.appendChild(cell);
-    });
+  months.forEach((month) => {
+    const row = document.createElement("div");
+    row.className = "heatmap-month-row";
+    const label = document.createElement("span");
+    label.className = "heatmap-month-label";
+    label.textContent = month.label;
+    row.appendChild(label);
+    // Dos franjas de hasta 16 días por mes: celdas de ~8 px en vez de los
+    // 3 px que dejaría una sola fila de 31 dentro del panel estrecho.
+    for (let offset = 0; offset < month.days.length; offset += 16) {
+      const strip = document.createElement("div");
+      strip.className = "heatmap-month-strip";
+      month.days.slice(offset, offset + 16).forEach((day) => {
+        const cell = document.createElement("span");
+        cell.className = "heatmap-cell";
+        if (day.date && day.date <= today) {
+          totalReviews += day.count;
+          cell.dataset.level = String(day.level);
+          cell.title = `${day.date}: ${day.count} ${translate(day.count === 1 ? "repaso" : "repasos")}`;
+        } else {
+          cell.classList.add("is-empty");
+          cell.setAttribute("aria-hidden", "true");
+        }
+        strip.appendChild(cell);
+      });
+      row.appendChild(strip);
+    }
+    flashcardHeatmapGrid.appendChild(row);
   });
   flashcardHeatmapTotal.textContent = `${totalReviews} ${translate(totalReviews === 1 ? "repaso" : "repasos")}`;
   flashcardHeatmapGrid.setAttribute(

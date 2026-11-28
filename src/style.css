@@ -7499,92 +7499,80 @@ body.mobile-full-editor .flashcard-review-tools {
   opacity: 1;
 }
 
+/* Cinta anual: una fila por mes con un cuadrito por día. Cabe entera en el
+ * panel de productividad, sin scroll horizontal ni vista adicional. */
 .flashcard-heatmap-scroll {
   max-width: 100%;
-  overflow-x: auto;
-  overscroll-behavior-x: contain;
   padding: 2px 0 5px;
 }
 
 .flashcard-heatmap-content {
-  width: max-content;
+  width: 100%;
 }
 
-.flashcard-heatmap-months,
-.flashcard-heatmap-grid {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: 11px;
-  column-gap: 3px;
-}
-
-.flashcard-heatmap-months {
-  min-height: 15px;
-  margin-left: 20px;
-  color: var(--ls-text-muted);
-  font-size: 9px;
-  line-height: 1;
-}
-
-.flashcard-heatmap-months span {
-  overflow: visible;
-  white-space: nowrap;
-}
-
-.flashcard-heatmap-body {
-  display: flex;
-  align-items: start;
-  gap: 5px;
-}
-
-.flashcard-heatmap-weekdays {
-  display: grid;
-  grid-template-rows: repeat(7, 11px);
-  gap: 3px;
-  width: 15px;
-  color: var(--ls-text-muted);
-  font-size: 8px;
-  line-height: 11px;
-  text-align: center;
-}
-
-.flashcard-heatmap-grid {
+.flashcard-heatmap-year {
   --heatmap-color: var(--ls-accent);
-  grid-template-rows: repeat(7, 11px);
+  display: grid;
   gap: 3px;
-  min-height: 95px;
 }
 
-.flashcard-heatmap-grid[data-style="classic"] {
+.flashcard-heatmap-year[data-style="classic"] {
   --heatmap-color: #2da44e;
 }
 
-.flashcard-heatmap-cell {
-  width: 11px;
-  height: 11px;
+.heatmap-month-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  align-items: center;
+  gap: 2px 4px;
+}
+
+.heatmap-month-label {
+  grid-row: 1 / span 2;
+  overflow: hidden;
+  color: var(--ls-text-muted);
+  font-size: calc(8px * var(--ls-font-scale, 1));
+  font-weight: 700;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.heatmap-month-strip {
+  display: grid;
+  grid-template-columns: repeat(16, 8px);
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.heatmap-cell {
+  width: 8px;
+  height: 8px;
   box-sizing: border-box;
   border: 1px solid color-mix(in srgb, var(--heatmap-color) 16%, var(--ls-border-subtle));
-  border-radius: 3px;
+  border-radius: 2px;
   background: color-mix(in srgb, var(--heatmap-color) 8%, var(--ls-bg-tertiary));
 }
 
-.flashcard-heatmap-cell[data-level="1"] {
+.heatmap-cell[data-level="1"] {
   background: color-mix(in srgb, var(--heatmap-color) 28%, var(--ls-bg-tertiary));
 }
 
-.flashcard-heatmap-cell[data-level="2"] {
+.heatmap-cell[data-level="2"] {
   background: color-mix(in srgb, var(--heatmap-color) 48%, var(--ls-bg-tertiary));
 }
 
-.flashcard-heatmap-cell[data-level="3"] {
+.heatmap-cell[data-level="3"] {
   background: color-mix(in srgb, var(--heatmap-color) 70%, var(--ls-bg-tertiary));
 }
 
-.flashcard-heatmap-cell[data-level="4"] {
+.heatmap-cell[data-level="4"] {
   background: color-mix(in srgb, var(--heatmap-color) 92%, var(--ls-bg-tertiary));
 }
 
-.flashcard-heatmap-cell.is-empty {
+.heatmap-cell.is-empty {
   visibility: hidden;
   border-color: transparent;
   background: transparent;
