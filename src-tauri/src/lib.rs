@@ -3066,6 +3066,18 @@ fn read_text_bounded<R: Read>(reader: R, max_bytes: usize) -> Result<String, Str
     String::from_utf8(buffer).map_err(|_| "El archivo interno no es UTF-8 válido.".to_string())
 }
 
+/// Crea un archivo nuevo sin seguir symlinks: `create_new` falla si el nombre
+/// ya existe, incluido un symlink colgante.
+fn write_new_file(path: &Path, contents: &str) -> Result<(), String> {
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .map_err(|e| e.to_string())?;
+    file.write_all(contents.as_bytes())
+        .map_err(|e: std::io::Error| e.to_string())
+}
+
 /// Escribe `contents` de forma atómica: primero a un archivo temporal en la
 /// MISMA carpeta que el destino y luego lo renombra sobre él, de modo que el
 /// destino nunca queda a medias si el proceso se interrumpe. Si alguna de las
@@ -3113,7 +3125,7 @@ pub(crate) fn write_file_atomically(path: &Path, contents: &str) -> Result<(), S
     }
 
     let write_and_rename = || -> Result<(), String> {
-        fs::write(&temp_path, contents).map_err(|e| e.to_string())?;
+        write_new_file(&temp_path, contents)?;
         fs::rename(&temp_path, path).map_err(|e: std::io::Error| e.to_string())
     };
 
@@ -4777,6 +4789,29 @@ mod tests {
         assert!(!has_virtualization_marker("Microsoft Corporation"));
         assert!(!has_virtualization_marker("LENOVO"));
         assert!(!has_virtualization_marker("ASUSTeK COMPUTER INC."));
+    }
+
+    #[test]
+    fn write_new_file_does_not_follow_an_existing_symlink() {
+        use std::os::unix::fs::symlink;
+        let dir = std::env::temp_dir().join(format!(
+            "sinnotas-create-new-test-{}-{}",
+            process::id(),
+            Uuid::new_v4()
+        ));
+        fs::create_dir_all(&dir).unwrap();
+        let target = dir.join("target.txt");
+        fs::write(&target, "original").unwrap();
+        let link = dir.join("link.txt");
+        symlink(&target, &link).unwrap();
+
+        assert!(write_new_file(&link, "parche").is_err());
+        assert_eq!(fs::read_to_string(&target).unwrap(), "original");
+
+        let fresh = dir.join("fresh.txt");
+        write_new_file(&fresh, "contenido").unwrap();
+        assert_eq!(fs::read_to_string(&fresh).unwrap(), "contenido");
+        let _ = fs::remove_dir_all(&dir);
     }
 
     #[test]
