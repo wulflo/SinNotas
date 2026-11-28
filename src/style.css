@@ -7354,10 +7354,8 @@ body.mobile-full-editor .flashcard-review-tools {
   --pomodoro-countup-color: #668d74;
   --pomodoro-break-color: #6685a5;
   --pomodoro-color: var(--pomodoro-focus-color);
-  /* El relleno y la pista son tintes translúcidos para que el reloj se apoye
-     en la superficie de la tarjeta en vez de taparla con un bloque opaco. */
-  --pomodoro-fill: color-mix(in srgb, var(--pomodoro-color) 46%, transparent);
-  --pomodoro-track: color-mix(in srgb, var(--pomodoro-color) 10%, transparent);
+  --pomodoro-track: color-mix(in srgb, var(--ls-border-subtle) 60%, transparent);
+  position: relative;
   display: flex;
   width: 100%;
   height: 58px;
@@ -7365,26 +7363,42 @@ body.mobile-full-editor .flashcard-review-tools {
   align-items: center;
   justify-content: center;
   margin: 10px 0 14px;
-  border: 1px solid var(--ls-border-subtle);
+  border: 0;
   border-radius: var(--ma-radius-xl, 14px);
-  background: linear-gradient(
-    to right,
-    var(--pomodoro-fill) 0%,
-    var(--pomodoro-fill) calc(var(--pomodoro-progress) * 1%),
-    var(--pomodoro-track) calc(var(--pomodoro-progress) * 1%),
-    var(--pomodoro-track) 100%
-  );
+  background: color-mix(in srgb, var(--ls-bg-secondary) 55%, transparent);
   font-variant-numeric: tabular-nums;
   font-weight: 700;
   text-align: center;
 }
 
+/* El progreso corre por el borde: franja gruesa con degradado y variación de
+ * tono sobre una pista neutra. El centro queda transparente, no teñido. */
+.pomodoro-clock::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 5px;
+  border-radius: inherit;
+  background: conic-gradient(
+    from -90deg,
+    color-mix(in srgb, var(--pomodoro-color) 55%, var(--ls-accent)) 0%,
+    var(--pomodoro-color) calc(var(--pomodoro-progress) * 0.5%),
+    color-mix(in srgb, var(--pomodoro-color) 70%, var(--ls-bg-primary)) calc(var(--pomodoro-progress) * 1%),
+    var(--pomodoro-track) calc(var(--pomodoro-progress) * 1%),
+    var(--pomodoro-track) 100%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
 [data-theme="light"] .pomodoro-clock {
-  --pomodoro-focus-color: #f0bfc2;
-  --pomodoro-countup-color: #c3dfc9;
-  --pomodoro-break-color: #bfd5eb;
-  --pomodoro-fill: color-mix(in srgb, var(--pomodoro-color) 56%, transparent);
-  --pomodoro-track: color-mix(in srgb, var(--pomodoro-color) 12%, transparent);
+  --pomodoro-focus-color: #c25b66;
+  --pomodoro-countup-color: #4f8c63;
+  --pomodoro-break-color: #4f7fb0;
+  --pomodoro-track: color-mix(in srgb, var(--ls-border-subtle) 55%, transparent);
 }
 
 .pomodoro-clock-value {
