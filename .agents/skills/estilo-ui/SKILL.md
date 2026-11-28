@@ -49,5 +49,6 @@ Propósito: evitar que aparezcan controles con el estilo del sistema operativo o
 | Implementación del dropdown | `src/views/custom-select.ts` (`CustomSelect`, `migrateSelect`, `syncCustomSelect`) |
 | Tokens y temas | `src/style.css` (`--ls-*`), `src/material-aero.css`, `src/theme-lino.css`, `src/theme-dracula.css` |
 | Reglas de controles | `src/style.css` (SETTINGS DROPDOWN, CustomSelect, settings inputs) |
+| Flashcards | Los botones de `.flashcards-container` aclaran su fondo en tema claro y usan superficie de tema/borde de acento tenue en oscuro; el fondo de `#view-flashcards` depende de `data-visual` (Aero halo de acento, Lino transparente, Dracula `--md-tertiary`). |
 | Ejemplo de toolbar agrupado | `desktop.ts` → `createTableToolbar` |
 | Mapa de estilos | skill `estructure` → `references/Estructure.md` §11.3 |
