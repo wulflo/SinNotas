@@ -9119,11 +9119,13 @@ body.mobile-full-editor .flashcard-review-tools {
   text-align: center;
 }
 
-/* Línea entre «Lun…Dom» y los números del mes; usa el borde ya presente en
- * la vista, sin introducir ningún color nuevo. */
+/* Líneas por encima y por debajo de «Lun…Dom»; usan el borde ya presente en
+ * la vista, sin introducir ningún color nuevo. El margin negativo las extiende
+ * hasta los bordes interiores del panel (padding de 16 px). */
 .journal-calendar-separator {
   grid-column: 1 / -1;
   height: 1px;
+  margin-inline: -16px;
   background: var(--md-outline-variant);
 }
 

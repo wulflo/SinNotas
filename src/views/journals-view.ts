@@ -146,6 +146,13 @@ function renderJournalCalendar(container: HTMLElement, journalPages: PageData[])
 
   const grid = document.createElement("div");
   grid.className = "journal-calendar-grid";
+
+  // Línea superior, simétrica a la que separa la cabecera de los números.
+  const topSeparator = document.createElement("div");
+  topSeparator.className = "journal-calendar-separator";
+  topSeparator.setAttribute("aria-hidden", "true");
+  grid.appendChild(topSeparator);
+
   ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].forEach((name) => {
     const weekday = document.createElement("span");
     weekday.className = "journal-calendar-weekday";
