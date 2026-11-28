@@ -1,6 +1,16 @@
-import { PageData, PageRevision, BlockNode, RestoredSnapshot, VaultCacheDelta } from "../types";
+import { Backlink, PageData, PageRevision, BlockNode, RestoredSnapshot, VaultCacheDelta } from "../types";
 import { getAllBlocksFlat, findNodeLocation, cloneTree } from "../editor/tree-engine";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
+import {
+  deletePageCmd,
+  findBacklinksCmd,
+  readNoteSnapshotsCmd,
+  readPagesCachedCmd,
+  renamePageCmd,
+  restoreSnapshotCmd,
+  savePageCmd,
+  writePageRevisionsCmd,
+} from "../tauri/commands";
 import {
   hasInvalidDeckTitleCharacters,
   normalizeDeckTitle,
@@ -518,7 +528,7 @@ export class VaultStore {
     }
 
     try {
-      const revs = await invoke<PageRevision[]>("read_note_snapshots", { filePath: page.path });
+      const revs = await readNoteSnapshotsCmd(page.path);
       this.revisionCache.set(page.path, revs);
       return revs;
     } catch (error) {
@@ -562,7 +572,7 @@ export class VaultStore {
         continue;
       }
       try {
-        await invoke("write_page_revisions", { filePath: page.path, revisions: revs });
+        await writePageRevisionsCmd(page.path, revs);
         migrated += revs.length;
       } catch (error) {
         failed++;
@@ -833,7 +843,7 @@ export class VaultStore {
     const paths = [...new Set(targets.map((page) => page.path))];
     let loaded: PageData[];
     try {
-      loaded = await invoke<PageData[]>("read_pages_cached", { paths });
+      loaded = await readPagesCachedCmd(paths);
     } catch (error) {
       console.error("No se pudo rehidratar la nota desde la caché de Rust:", error);
       return;
@@ -979,7 +989,7 @@ export class VaultStore {
     return this.enqueueFileOperation(
       [updatedPage.path],
       "save markdown file",
-      () => invoke("save_page", {
+      () => savePageCmd({
         filePath: updatedPage.path,
         blocks: updatedPage.blocks,
         frontmatter: updatedPage.frontmatter || [],
@@ -1031,7 +1041,7 @@ export class VaultStore {
 
     if (isTauri()) {
       void this.enqueueFileOperation([pageToDelete.path], "delete markdown file", () =>
-        invoke("delete_page", { filePath: pageToDelete.path }).then(() => {
+        deletePageCmd(pageToDelete.path).then(() => {
           this.markOwnWrite();
         })
       );
@@ -1092,7 +1102,7 @@ export class VaultStore {
 
     if (isTauri()) {
       void this.enqueueFileOperation([oldPath, newPath], "rename markdown file", () =>
-        invoke("rename_page", { oldPath, newPath }).then(() => {
+        renamePageCmd(oldPath, newPath).then(() => {
           this.markOwnWrite();
         })
       );
@@ -1140,12 +1150,9 @@ export class VaultStore {
 
     if (!isMetadataOnlyBoot() || !isTauri()) return rewrite(this.pages);
 
-    let backlinks: Array<{ sourcePath: string; sourcePage: string }> = [];
+    let backlinks: Backlink[] = [];
     try {
-      backlinks = await invoke<Array<{ sourcePath: string; sourcePage: string }>>(
-        "find_backlinks",
-        { pageTitle: oldTitle }
-      );
+      backlinks = await findBacklinksCmd(oldTitle);
     } catch (error) {
       console.error("find_backlinks no disponible; reescritura en memoria:", error);
       return rewrite(this.pages);
@@ -1164,7 +1171,7 @@ export class VaultStore {
       seen.add(page.id);
       candidates.push(page);
     };
-    [...new Set(backlinks.map((b) => b.sourcePage.toLowerCase()))].forEach((key) =>
+    [...new Set(backlinks.map((b) => b.source_page.toLowerCase()))].forEach((key) =>
       push(byTitle.get(key))
     );
     if (renamedPage.blocksLoaded === false) push(renamedPage);
@@ -1251,10 +1258,7 @@ export class VaultStore {
       return { blocks: cloneTree(rev.blocks), frontmatter: page.frontmatter || [] };
     }
 
-    const restored = await invoke<RestoredSnapshot>("restore_snapshot", {
-      filePath: page.path,
-      snapshotId: revisionId,
-    });
+    const restored = await restoreSnapshotCmd(page.path, revisionId);
     this.revisionCache.delete(page.path);
 
     const pageToUpdate = this.pages.find((p) => p.id === page.id);
