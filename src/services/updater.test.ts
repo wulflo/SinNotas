@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readAndroidManifestResponse } from "./updater";
+import { androidFetchInit, readAndroidManifestResponse } from "./updater";
 import { UpdateError } from "./update-utils";
 
 const MANIFEST = {
@@ -21,6 +21,16 @@ function jsonResponse(body: unknown, contentType = "application/json"): Response
     headers: { "content-type": contentType },
   });
 }
+
+describe("androidFetchInit", () => {
+  it("acota los redirects y conserva las cabeceras de cada petición", () => {
+    const init = androidFetchInit({ Accept: "application/json" });
+    expect(init).toMatchObject({ method: "GET", cache: "no-store", redirect: "follow" });
+    expect(init.maxRedirections).toBeGreaterThan(0);
+    expect(init.maxRedirections).toBeLessThanOrEqual(5);
+    expect(init.headers).toEqual({ Accept: "application/json" });
+  });
+});
 
 describe("readAndroidManifestResponse", () => {
   it("acepta un manifiesto servido como application/octet-stream", async () => {

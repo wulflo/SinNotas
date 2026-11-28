@@ -37,6 +37,25 @@ export const ANDROID_APK_FILE_NAME = "SinNotas-update.apk";
 const CHECK_TIMEOUT_MS = 20_000;
 const DOWNLOAD_TIMEOUT_MS = 15 * 60_000;
 const MAX_MANIFEST_BYTES = 256 * 1024;
+/** GitHub redirige los assets de releases; cinco saltos son suficientes. */
+const ANDROID_MAX_REDIRECTS = 5;
+
+/**
+ * Opciones compartidas por las dos peticiones Android. `maxRedirections` acota
+ * los saltos y, con `scopeRedirects` activo, cada uno se valida contra la
+ * capability antes de seguirlo.
+ */
+export function androidFetchInit(headers: Record<string, string>): RequestInit & {
+  maxRedirections: number;
+} {
+  return {
+    method: "GET",
+    cache: "no-store",
+    redirect: "follow",
+    maxRedirections: ANDROID_MAX_REDIRECTS,
+    headers,
+  };
+}
 
 export type UpdateStatus =
   | "idle"
@@ -258,7 +277,7 @@ interface TimedResponse {
 async function fetchWithTimeout(
   url: string,
   timeoutMs: number,
-  init: RequestInit,
+  init: RequestInit & { maxRedirections: number },
   timeoutMessage: string,
   fetchImpl: FetchLike
 ): Promise<TimedResponse> {
@@ -327,12 +346,7 @@ async function fetchAndroidManifest(): Promise<ReleaseManifest> {
   const { response, dispose } = await fetchWithTimeout(
     UPDATE_MANIFEST_URL,
     CHECK_TIMEOUT_MS,
-    {
-      method: "GET",
-      cache: "no-store",
-      redirect: "follow",
-      headers: { Accept: "application/json" },
-    },
+    androidFetchInit({ Accept: "application/json" }),
     "GitHub tardó demasiado en responder.",
     await getAndroidFetch()
   );
@@ -459,12 +473,7 @@ async function downloadAndroidUpdate(release: ReleaseManifest): Promise<UpdateSt
   const { response, dispose } = await fetchWithTimeout(
     asset.url,
     DOWNLOAD_TIMEOUT_MS,
-    {
-      method: "GET",
-      cache: "no-store",
-      redirect: "follow",
-      headers: { Accept: "application/vnd.android.package-archive" },
-    },
+    androidFetchInit({ Accept: "application/vnd.android.package-archive" }),
     "La descarga del APK tardó demasiado.",
     await getAndroidFetch()
   );

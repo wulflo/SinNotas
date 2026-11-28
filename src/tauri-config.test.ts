@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import tauriConfig from "../src-tauri/tauri.conf.json";
+import androidCapability from "../src-tauri/capabilities/android.json";
 import iconManifest from "../src-tauri/icons/icon-manifest.json";
 import androidIconManifest from "../src-tauri/icons/icon-manifest.android.json";
 import androidBackgroundXml from "../src-tauri/icons/android/values/ic_launcher_background.xml?raw";
@@ -17,6 +18,23 @@ describe("seguridad de la app empaquetada", () => {
     for (const csp of [tauriConfig.app.security.csp, tauriConfig.app.security.devCsp]) {
       expect(csp).toContain("style-src-attr 'unsafe-inline'");
       expect(csp).toContain("font-src 'self' data:");
+    }
+  });
+
+  it("valida los redirects del actualizador Android contra el scope HTTP", () => {
+    expect(tauriConfig.plugins.http.scopeRedirects).toBe(true);
+
+    const urls = androidCapability.permissions.flatMap((permission) =>
+      "allow" in permission ? permission.allow.map((entry) => entry.url) : []
+    );
+    for (const host of [
+      "github.com/wulflo/SinNotas/releases/",
+      "api.github.com/repos/wulflo/SinNotas/releases/",
+      "objects.githubusercontent.com/",
+      "release-assets.githubusercontent.com/",
+      "github-releases.githubusercontent.com/",
+    ]) {
+      expect(urls.some((url) => url.includes(host)), `falta el host ${host}`).toBe(true);
     }
   });
 

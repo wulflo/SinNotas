@@ -64,6 +64,9 @@
     }
   },
   "plugins": {
+    "http": {
+      "scopeRedirects": true
+    },
     "updater": {
       "endpoints": [
         "https://github.com/wulflo/SinNotas/releases/latest/download/latest.json"
