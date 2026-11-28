@@ -7647,6 +7647,29 @@ body.mobile-full-editor .flashcard-review-tools {
   height: 210px;
 }
 
+/* Fondo: átomos difusos y un campo suave con tokens neutros, para dar
+ * profundidad sin cargar el panel de acento. */
+.focus-tree .atom-energy-field {
+  fill: color-mix(in srgb, var(--ls-text-muted) 4%, transparent);
+}
+
+.focus-tree .atom-ghost-orbit {
+  fill: none;
+  stroke: var(--ls-text-muted);
+  stroke-width: 0.8;
+  opacity: 0.18;
+}
+
+.focus-tree .atom-ghost-nucleus {
+  fill: var(--ls-text-muted);
+  opacity: 0.22;
+}
+
+.focus-tree .atom-ghost-electron {
+  fill: var(--ls-text-muted);
+  opacity: 0.28;
+}
+
 .focus-tree .atom-nucleus-glow {
   fill: var(--ls-accent-subtle);
 }

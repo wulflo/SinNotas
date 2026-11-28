@@ -12997,6 +12997,53 @@ function renderMoleculeStage(tree: SVGElement, molecule: MoleculeStage): void {
   }
 }
 
+/** Fondo tenue: otros átomos y un campo de energía sin usar más acento. */
+function renderAtomBackdrop(tree: SVGElement): void {
+  const backdrop = createSvgElement("g");
+  backdrop.classList.add("atom-backdrop");
+  backdrop.setAttribute("aria-hidden", "true");
+
+  const field = createSvgElement("circle");
+  field.setAttribute("cx", "80");
+  field.setAttribute("cy", "70");
+  field.setAttribute("r", "62");
+  field.setAttribute("class", "atom-energy-field");
+  backdrop.appendChild(field);
+
+  const ghosts = [
+    { x: 28, y: 34, rotate: 25 },
+    { x: 134, y: 46, rotate: -30 },
+    { x: 116, y: 132, rotate: 15 },
+    { x: 36, y: 122, rotate: -18 },
+  ];
+  ghosts.forEach(({ x, y, rotate }) => {
+    const orbit = createSvgElement("ellipse");
+    orbit.setAttribute("cx", String(x));
+    orbit.setAttribute("cy", String(y));
+    orbit.setAttribute("rx", "13");
+    orbit.setAttribute("ry", "5.5");
+    orbit.setAttribute("transform", `rotate(${rotate} ${x} ${y})`);
+    orbit.setAttribute("class", "atom-ghost-orbit");
+    backdrop.appendChild(orbit);
+
+    const nucleus = createSvgElement("circle");
+    nucleus.setAttribute("cx", String(x));
+    nucleus.setAttribute("cy", String(y));
+    nucleus.setAttribute("r", "2.4");
+    nucleus.setAttribute("class", "atom-ghost-nucleus");
+    backdrop.appendChild(nucleus);
+
+    const electron = createSvgElement("circle");
+    electron.setAttribute("cx", String(x + 12));
+    electron.setAttribute("cy", String(y - 2));
+    electron.setAttribute("r", "1.4");
+    electron.setAttribute("class", "atom-ghost-electron");
+    backdrop.appendChild(electron);
+  });
+
+  tree.appendChild(backdrop);
+}
+
 function updateFlashcardProgressTree(force = false): void {
   const tree = flashcardGrowthTree;
   if (!tree) return;
@@ -13034,7 +13081,9 @@ function updateFlashcardProgressTree(force = false): void {
   // molécula) sin rehacer sus coordenadas internas.
   const content = createSvgElement("g");
   content.setAttribute("transform", "translate(80 70) scale(1.18) translate(-80 -70)");
-  tree.replaceChildren(content);
+  tree.replaceChildren();
+  renderAtomBackdrop(tree);
+  tree.appendChild(content);
 
   if (stage.kind === "proton") {
     renderProtonStage(content);
