@@ -7302,8 +7302,10 @@ body.mobile-full-editor .flashcard-review-tools {
 }
 
 .focus-panel {
+  position: relative;
   min-width: 0;
   padding: 16px;
+  overflow: hidden;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -7642,60 +7644,66 @@ body.mobile-full-editor .flashcard-review-tools {
 }
 
 .focus-tree-panel {
-  position: relative;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
-  overflow: hidden;
 }
 
-/* Humo de acento: dos velos radiales desplazados en tono se funden detrás
- * del átomo. Sin colores nuevos: solo color-mix + hue-rotate sobre --ls-accent. */
-.focus-tree-panel::before,
-.focus-tree-panel::after {
+/* Humo de acento en los tres paneles: dos velos radiales desplazados en tono
+ * detrás del contenido. Opacidad baja y hue distinto por panel. */
+.focus-panel::before,
+.focus-panel::after {
   content: "";
   position: absolute;
   inset: -25%;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.5;
+  opacity: 0.34;
 }
 
-.focus-tree-panel::before {
+.focus-panel::before {
   background:
-    radial-gradient(ellipse at 32% 34%, color-mix(in oklch, var(--ls-accent) 30%, transparent), transparent 58%),
-    radial-gradient(ellipse at 70% 68%, color-mix(in oklch, var(--ls-accent) 20%, transparent), transparent 55%);
-  filter: blur(26px) hue-rotate(-16deg);
-  animation: progress-smoke-a 19s ease-in-out infinite alternate;
+    radial-gradient(ellipse at 32% 34%, color-mix(in oklch, var(--ls-accent) 28%, transparent), transparent 58%),
+    radial-gradient(ellipse at 70% 68%, color-mix(in oklch, var(--ls-accent) 18%, transparent), transparent 55%);
+  filter: blur(30px) hue-rotate(-20deg);
+  animation: focus-smoke-a 19s ease-in-out infinite alternate;
 }
 
-.focus-tree-panel::after {
+.focus-panel::after {
   background:
-    radial-gradient(ellipse at 64% 26%, color-mix(in oklch, var(--ls-accent) 18%, transparent), transparent 50%),
-    radial-gradient(ellipse at 26% 76%, color-mix(in oklch, var(--ls-accent) 14%, transparent), transparent 52%);
-  filter: blur(32px) hue-rotate(24deg);
-  animation: progress-smoke-b 23s ease-in-out infinite alternate;
+    radial-gradient(ellipse at 64% 26%, color-mix(in oklch, var(--ls-accent) 16%, transparent), transparent 50%),
+    radial-gradient(ellipse at 26% 76%, color-mix(in oklch, var(--ls-accent) 12%, transparent), transparent 52%);
+  filter: blur(36px) hue-rotate(24deg);
+  animation: focus-smoke-b 23s ease-in-out infinite alternate;
 }
 
-.focus-tree-panel > * {
+/* Pomodoro (más frío) → Actividad (neutro) → Progreso (más cálido). */
+.focus-panel:nth-child(1)::before { filter: blur(30px) hue-rotate(-30deg); }
+.focus-panel:nth-child(1)::after { filter: blur(36px) hue-rotate(-4deg); }
+.focus-panel:nth-child(2)::before { filter: blur(30px) hue-rotate(2deg); }
+.focus-panel:nth-child(2)::after { filter: blur(36px) hue-rotate(30deg); }
+.focus-panel:nth-child(3)::before { filter: blur(30px) hue-rotate(26deg); }
+.focus-panel:nth-child(3)::after { filter: blur(36px) hue-rotate(52deg); }
+
+.focus-panel > * {
   position: relative;
   z-index: 1;
 }
 
-@keyframes progress-smoke-a {
+@keyframes focus-smoke-a {
   from { transform: translate3d(-3%, 2%, 0) scale(1); }
   to { transform: translate3d(4%, -3%, 0) scale(1.08); }
 }
 
-@keyframes progress-smoke-b {
+@keyframes focus-smoke-b {
   from { transform: translate3d(3%, -2%, 0) scale(1.06); }
   to { transform: translate3d(-4%, 3%, 0) scale(1); }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .focus-tree-panel::before,
-  .focus-tree-panel::after {
+  .focus-panel::before,
+  .focus-panel::after {
     animation: none;
   }
 }
