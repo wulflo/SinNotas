@@ -1,4 +1,9 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
+import {
+  clearReviewProgressCmd,
+  readReviewProgressCmd,
+  writeReviewProgressCmd,
+} from "../tauri/commands";
 import type { FSRSRating } from "../editor/fsrs";
 import type { FlashcardType } from "../types";
 import type { CardScheduleSnapshot } from "../views/flashcards-manager";
@@ -323,7 +328,7 @@ export class ReviewProgressStore {
       let readOk = false;
       try {
         if (isTauri()) {
-          raw = await invoke<string | null>("read_review_progress");
+          raw = await readReviewProgressCmd();
         } else {
           raw = localStorage.getItem(PROGRESS_STORAGE_KEY);
         }
@@ -377,7 +382,7 @@ export class ReviewProgressStore {
    */
   public async clear(): Promise<void> {
     if (isTauri()) {
-      await invoke("clear_review_progress");
+      await clearReviewProgressCmd();
     } else {
       localStorage.removeItem(PROGRESS_STORAGE_KEY);
     }
@@ -537,9 +542,7 @@ export class ReviewProgressStore {
 
     try {
       if (isTauri()) {
-        const merged = await invoke<string>("write_review_progress", {
-          contents: JSON.stringify(payload),
-        });
+        const merged = await writeReviewProgressCmd(JSON.stringify(payload));
         this.file = mergeReviewProgress(this.file, parseReviewProgress(merged));
       } else {
         const existing = parseReviewProgress(localStorage.getItem(PROGRESS_STORAGE_KEY));

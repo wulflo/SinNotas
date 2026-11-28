@@ -1,4 +1,5 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
+import { readFlashcardDecksCmd, writeFlashcardDecksCmd } from "../tauri/commands";
 import {
   FLASHCARD_DECKS_FILE,
   FLASHCARD_DECKS_LEGACY_DECK_ID,
@@ -96,7 +97,7 @@ export class FlashcardDeckRepository {
   public async load(rootPath: string | null): Promise<FlashcardDeckFile> {
     let raw: string | null = null;
     if (isTauri()) {
-      raw = await invoke<string | null>("read_flashcard_decks");
+      raw = await readFlashcardDecksCmd();
     } else {
       raw = safeGetItem(webDecksStorageKey(rootPath));
     }
@@ -135,7 +136,7 @@ export class FlashcardDeckRepository {
     }
 
     if (isTauri()) {
-      await invoke("write_flashcard_decks", { contents: serialized });
+      await writeFlashcardDecksCmd(serialized);
     } else {
       const key = webDecksStorageKey(rootPath);
       try {

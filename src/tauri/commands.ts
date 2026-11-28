@@ -90,3 +90,25 @@ export function restoreSnapshotCmd(filePath: string, snapshotId: string): Promis
   assertRequired({ filePath, snapshotId }, ["filePath", "snapshotId"]);
   return invoke<RestoredSnapshot>("restore_snapshot", { filePath, snapshotId });
 }
+
+export function readReviewProgressCmd(): Promise<string | null> {
+  return invoke<string | null>("read_review_progress");
+}
+
+export function writeReviewProgressCmd(contents: string): Promise<string> {
+  assertRequired({ contents }, ["contents"]);
+  return invoke<string>("write_review_progress", { contents });
+}
+
+export function clearReviewProgressCmd(): Promise<void> {
+  return invoke("clear_review_progress");
+}
+
+export function readFlashcardDecksCmd(): Promise<string | null> {
+  return invoke<string | null>("read_flashcard_decks");
+}
+
+export function writeFlashcardDecksCmd(contents: string): Promise<void> {
+  assertRequired({ contents }, ["contents"]);
+  return invoke("write_flashcard_decks", { contents });
+}

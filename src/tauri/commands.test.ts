@@ -7,12 +7,17 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 import {
   deletePageCmd,
   findBacklinksCmd,
+  readFlashcardDecksCmd,
   readNoteSnapshotsCmd,
   readPagesCachedCmd,
+  readReviewProgressCmd,
   renamePageCmd,
   restoreSnapshotCmd,
   savePageCmd,
+  clearReviewProgressCmd,
+  writeFlashcardDecksCmd,
   writePageRevisionsCmd,
+  writeReviewProgressCmd,
 } from "./commands";
 
 describe("adaptador tipado de comandos Tauri", () => {
@@ -81,5 +86,21 @@ describe("adaptador tipado de comandos Tauri", () => {
       { source_page: "A", source_path: "pages/A.md", line_number: 3, snippet: "x" },
       { source_page: "B", source_path: "pages/B.md", line_number: 4, snippet: "y" },
     ]);
+  });
+
+  it("progreso y mazos usan el argumento contents", async () => {
+    await writeReviewProgressCmd("{}");
+    await writeFlashcardDecksCmd("{}");
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "write_review_progress", { contents: "{}" });
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "write_flashcard_decks", { contents: "{}" });
+  });
+
+  it("lecturas y borrado de progreso/mazos no envían argumentos", async () => {
+    await readReviewProgressCmd();
+    await readFlashcardDecksCmd();
+    await clearReviewProgressCmd();
+    expect(invokeMock).toHaveBeenNthCalledWith(1, "read_review_progress");
+    expect(invokeMock).toHaveBeenNthCalledWith(2, "read_flashcard_decks");
+    expect(invokeMock).toHaveBeenNthCalledWith(3, "clear_review_progress");
   });
 });
