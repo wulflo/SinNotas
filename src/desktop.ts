@@ -13078,7 +13078,7 @@ function renderFlashcardHeatmap(): void {
   const wheel = buildReviewHeatmapWheel(months, currentMonthKey);
   const svgNS = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(svgNS, "svg");
-  svg.setAttribute("viewBox", "0 0 220 220");
+  svg.setAttribute("viewBox", "0 0 260 180");
   svg.classList.add("heatmap-wheel");
 
   flashcardHeatmapGrid.replaceChildren();
@@ -13107,8 +13107,8 @@ function renderFlashcardHeatmap(): void {
     svg.appendChild(text);
   });
   const center = document.createElementNS(svgNS, "circle");
-  center.setAttribute("cx", "110");
-  center.setAttribute("cy", "110");
+  center.setAttribute("cx", "130");
+  center.setAttribute("cy", "90");
   center.setAttribute("r", "3");
   center.classList.add("heatmap-wheel-center");
   svg.appendChild(center);

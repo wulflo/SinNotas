@@ -126,7 +126,7 @@ describe("review heatmap — rueda anual", () => {
   it("resalta el mes actual y mantiene las etiquetas dentro del viewBox", () => {
     const wheel = buildReviewHeatmapWheel(months, "2026-03");
     expect(wheel.labels.filter((label) => label.isCurrent).map((label) => label.text)).toEqual(["MAR"]);
-    expect(wheel.labels.every((label) => label.x > 0 && label.x < 220 && label.y > 0 && label.y < 220)).toBe(true);
+    expect(wheel.labels.every((label) => label.x > 0 && label.x < 260 && label.y > 0 && label.y < 180)).toBe(true);
     expect(new Set(wheel.labels.map((label) => `${label.x},${label.y}`)).size).toBe(12);
   });
 

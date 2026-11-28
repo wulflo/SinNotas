@@ -167,15 +167,20 @@ export interface HeatmapWheelLabel {
   isCurrent: boolean;
 }
 
-const WHEEL_CENTER = 110;
-const WHEEL_MIN_RADIUS = 30;
-const WHEEL_MAX_RADIUS = 88;
-const WHEEL_LABEL_RADIUS = 98;
+/* Óvalo ancho y bajo para acompañar la forma del temporizador Pomodoro. */
+const WHEEL_CENTER_X = 130;
+const WHEEL_CENTER_Y = 90;
+const WHEEL_MIN_RX = 34;
+const WHEEL_MAX_RX = 104;
+const WHEEL_MIN_RY = 22;
+const WHEEL_MAX_RY = 66;
+const WHEEL_LABEL_RX = 124;
+const WHEEL_LABEL_RY = 80;
 
-function wheelPoint(radius: number, angle: number): [number, number] {
+function wheelPoint(rx: number, ry: number, angle: number): [number, number] {
   return [
-    WHEEL_CENTER + radius * Math.cos(angle),
-    WHEEL_CENTER + radius * Math.sin(angle),
+    WHEEL_CENTER_X + rx * Math.cos(angle),
+    WHEEL_CENTER_Y + ry * Math.sin(angle),
   ];
 }
 
@@ -189,22 +194,21 @@ export function buildReviewHeatmapWheel(
 ): { segments: HeatmapWheelSegment[]; labels: HeatmapWheelLabel[] } {
   const segments: HeatmapWheelSegment[] = [];
   const labels: HeatmapWheelLabel[] = [];
-  const radiusStep = months.length > 1
-    ? (WHEEL_MAX_RADIUS - WHEEL_MIN_RADIUS) / (months.length - 1)
-    : 0;
+  const step = months.length > 1 ? 1 / (months.length - 1) : 0;
 
   months.forEach((month, monthIndex) => {
-    const radius = WHEEL_MIN_RADIUS + monthIndex * radiusStep;
+    const rx = WHEEL_MIN_RX + monthIndex * step * (WHEEL_MAX_RX - WHEEL_MIN_RX);
+    const ry = WHEEL_MIN_RY + monthIndex * step * (WHEEL_MAX_RY - WHEEL_MIN_RY);
     const angleStart = -Math.PI / 2 - (2 * Math.PI) / (months.length || 1) / 2;
     month.days.forEach((day, dayIndex) => {
       if (!day.date) return;
       const dayAngle = (2 * Math.PI) / month.days.length;
       const from = angleStart + dayIndex * dayAngle + 0.02;
       const to = angleStart + (dayIndex + 1) * dayAngle - 0.02;
-      const [x1, y1] = wheelPoint(radius, from);
-      const [x2, y2] = wheelPoint(radius, to);
+      const [x1, y1] = wheelPoint(rx, ry, from);
+      const [x2, y2] = wheelPoint(rx, ry, to);
       segments.push({
-        d: `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${radius.toFixed(2)} ${radius.toFixed(2)} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`,
+        d: `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${rx.toFixed(2)} ${ry.toFixed(2)} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`,
         level: day.level,
         date: day.date,
         count: day.count,
@@ -213,7 +217,7 @@ export function buildReviewHeatmapWheel(
     });
 
     const labelAngle = angleStart + (monthIndex * 2 * Math.PI) / months.length;
-    const [lx, ly] = wheelPoint(WHEEL_LABEL_RADIUS, labelAngle);
+    const [lx, ly] = wheelPoint(WHEEL_LABEL_RX, WHEEL_LABEL_RY, labelAngle);
     labels.push({
       text: month.label.replace(".", "").slice(0, 3).toUpperCase(),
       x: Number(lx.toFixed(2)),
