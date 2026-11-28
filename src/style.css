@@ -9067,11 +9067,16 @@ body.mobile-full-editor .flashcard-review-tools {
   color: var(--md-on-primary-container);
 }
 
-/* Botones de paginación de Diarios: mismo alto táctil (28 px), pero menos
- * padding horizontal que la variante compartida con Tareas. */
+/* Botones de paginación de Diarios: compactos (24 px) y con glifo más
+ * pequeño que la variante compartida con Tareas. Sin cambios de color. */
 .journals-pagination .btn-pagination {
-  min-width: 30px;
-  padding: 4px 6px;
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border-radius: 6px;
+  font-size: calc(12px * var(--ls-font-scale, 1));
 }
 
 .journals-pagination .font-option-btn {
