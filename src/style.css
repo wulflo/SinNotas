@@ -7313,31 +7313,26 @@ body.mobile-full-editor .flashcard-review-tools {
   background: var(--ls-card-bg);
 }
 
-/* Seis variantes: tres estilos visuales × claro/oscuro. Cada una cambia la
- * profundidad y el tinte de la sombra sin introducir colores nuevos. */
-:root[data-visual="aero"][data-theme="light"] .focus-panel {
-  box-shadow: 0 8px 24px -12px color-mix(in srgb, var(--ls-accent) 28%, transparent), 0 1px 2px color-mix(in srgb, var(--ls-accent) 10%, transparent);
+/* Sombras por estilo, modo y subsección. Se usan los tokens de elevación de
+ * cada tema: Lino es plano (sin sombras) y Dracula no comparte los tonos de
+ * Aero, así que las seis combinaciones son realmente distintas. */
+:root[data-visual="lino"] .focus-panel {
+  box-shadow: none;
 }
 
-:root[data-visual="aero"][data-theme="dark"] .focus-panel {
-  box-shadow: 0 10px 30px -12px color-mix(in srgb, var(--ls-accent) 42%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ls-accent) 8%, transparent);
-}
+:root[data-visual="aero"][data-theme="light"] .focus-panel:nth-child(1) { box-shadow: var(--md-elevation-1); }
+:root[data-visual="aero"][data-theme="light"] .focus-panel:nth-child(2) { box-shadow: var(--md-elevation-2); }
+:root[data-visual="aero"][data-theme="light"] .focus-panel:nth-child(3) { box-shadow: var(--md-elevation-3); }
+:root[data-visual="aero"][data-theme="dark"] .focus-panel:nth-child(1) { box-shadow: var(--md-elevation-1); }
+:root[data-visual="aero"][data-theme="dark"] .focus-panel:nth-child(2) { box-shadow: var(--md-elevation-2); }
+:root[data-visual="aero"][data-theme="dark"] .focus-panel:nth-child(3) { box-shadow: var(--md-elevation-3); }
 
-:root[data-visual="lino"][data-theme="light"] .focus-panel {
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--ls-border-color) 60%, transparent);
-}
-
-:root[data-visual="lino"][data-theme="dark"] .focus-panel {
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--ls-border-color) 45%, transparent);
-}
-
-:root[data-visual="dracula"][data-theme="light"] .focus-panel {
-  box-shadow: 0 10px 28px -12px color-mix(in srgb, var(--ls-accent) 34%, transparent);
-}
-
-:root[data-visual="dracula"][data-theme="dark"] .focus-panel {
-  box-shadow: 0 12px 34px -10px color-mix(in srgb, var(--ls-accent) 48%, transparent), inset 0 1px 0 color-mix(in srgb, var(--ls-accent) 10%, transparent);
-}
+:root[data-visual="dracula"][data-theme="light"] .focus-panel:nth-child(1) { box-shadow: var(--md-elevation-1); }
+:root[data-visual="dracula"][data-theme="light"] .focus-panel:nth-child(2) { box-shadow: var(--md-elevation-2); }
+:root[data-visual="dracula"][data-theme="light"] .focus-panel:nth-child(3) { box-shadow: var(--md-elevation-3); }
+:root[data-visual="dracula"][data-theme="dark"] .focus-panel:nth-child(1) { box-shadow: var(--md-elevation-1); }
+:root[data-visual="dracula"][data-theme="dark"] .focus-panel:nth-child(2) { box-shadow: var(--md-elevation-2); }
+:root[data-visual="dracula"][data-theme="dark"] .focus-panel:nth-child(3) { box-shadow: var(--md-elevation-3); }
 
 .focus-panel h3,
 .focus-panel label {
