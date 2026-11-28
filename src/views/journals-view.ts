@@ -153,6 +153,12 @@ function renderJournalCalendar(container: HTMLElement, journalPages: PageData[])
     grid.appendChild(weekday);
   });
 
+  // Separador entre la cabecera de días de la semana y los números del mes.
+  const separator = document.createElement("div");
+  separator.className = "journal-calendar-separator";
+  separator.setAttribute("aria-hidden", "true");
+  grid.appendChild(separator);
+
   const existingDates = new Set(
     journalPages.map((page) => page.journalDate).filter((date): date is string => Boolean(date))
   );

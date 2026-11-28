@@ -9082,7 +9082,13 @@ body.mobile-full-editor .flashcard-review-tools {
 }
 
 .journal-calendar-navigation .btn-icon {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   border-radius: 8px;
+  font-size: calc(18px * var(--ls-font-scale, 1));
+  line-height: 1;
 }
 
 .journal-calendar-header h2 {
@@ -9109,6 +9115,14 @@ body.mobile-full-editor .flashcard-review-tools {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-align: center;
+}
+
+/* Línea entre «Lun…Dom» y los números del mes; usa el borde ya presente en
+ * la vista, sin introducir ningún color nuevo. */
+.journal-calendar-separator {
+  grid-column: 1 / -1;
+  height: 1px;
+  background: var(--md-outline-variant);
 }
 
 .journal-calendar-day {
